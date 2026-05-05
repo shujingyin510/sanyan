@@ -48,7 +48,7 @@ python main.py
 运行示例文件：
 
 ```bash
-python main.py greeting.san
+python main.py examples/greeting.san
 ```
 
 ## 三言长什么样
