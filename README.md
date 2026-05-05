@@ -32,23 +32,30 @@
 ## 快速开始
 
 ```bash
-git clone https://github.com/你的用户名/sanyan.git
+git clone https://github.com/shujingyin510/sanyan.git
 cd sanyan
 python main.py
+```
+
 进入 REPL 后尝试：
 
-text
+```text
 三言> 设 a = 10;
 三言> 输出(a ^ 2);
   => 100  (三进制: ++-0+)
+```
+
 运行示例文件：
 
-bash
+```bash
 python main.py examples/greeting.san
-三言长什么样
-糖语法（类 C，日常使用）：
+```
 
-c
+## 三言长什么样
+
+**糖语法**（类 C，日常使用）：
+
+```c
 // 智能家居：晚安模式
 定义 晚安 () {
     置 灯 = 灭;
@@ -67,9 +74,11 @@ c
         置 灯 = 灭;
     }
 }
-原生 S 表达式（底层等价形式，适合元编程）：
+```
 
-lisp
+**原生 S 表达式**（底层等价形式，适合元编程）：
+
+```lisp
 （定义 晚安 （）
   （做
     （置 灯.灭）
@@ -80,45 +89,62 @@ lisp
 （遍历 i 1 5
   （若 （读 人体）
       （置 灯.亮）
-      （若 （可能） （置 灯.守） （置 灯.灭）））
+      （若 （可能） （置 灯.守） （置 灯.灭））））
+```
+
 两种语法共享同一个求值器，可以混用。
 
-三进制不是模拟
-三言的三进制不是“用二进制模拟三进制”。ternary_core.py 从位运算层开始就是三值的：
+---
 
-text
+## 三进制不是模拟
+
+三言的三进制不是"用二进制模拟三进制"。`ternary_core.py` 从位运算层开始就是三值的：
+
+```text
 平衡三进制加法：
   +0-  (十进制 2)
 +  0+  (十进制 3)
 ------
   +--  (十进制 5) ✓
-三值逻辑（Kleene 强逻辑）：
+```
 
-A	B	A 且 B	A 或 B
-真	可能	可能	真
-假	可能	假	可能
-可能	可能	可能	可能
-可能 且 可能 还是可能。 不确定的事情叠加不确定的事情，结果仍然不确定。
+**三值逻辑**（Kleene 强逻辑）：
 
-特性一览
-特性	示例
-变量与赋值	设 x = 42;
-三态词	开/关/守, 真/假/可能, 是/否/待
-条件分支	若 (x > 10) { ... } 否则 { ... }
-循环	循环 (i < 10) { ... }
-遍历	遍历 i 从 1 到 100 { ... }
-函数定义	定义 平方 (x) { x * x; }
-匿名函数	函数(x) { x + 1; } 或 λ(x) { x + 1; }
-高阶函数	映射、过滤、归并
-容器	列表、数组（定长）、字典
-三态逻辑	且、或、非，三值真值表
-IoT 控制	置 灯 = 亮;、查 灯;、对 灯 { ... }
-模块加载	加载("utils.san");
-数学函数	绝对值、平方根、最大值、最小值、随机数
-字符串	连接("你好", "世界")，原文块 原文{任意内容}
-调试	调试() 打印变量和传感器状态
-项目结构
-text
+| A | B | A 且 B | A 或 B |
+|---|---|--------|--------|
+| 真 | 可能 | 可能 | 真 |
+| 假 | 可能 | 假 | 可能 |
+| 可能 | 可能 | 可能 | 可能 |
+
+可能 且 可能 还是可能。不确定的事情叠加不确定的事情，结果仍然不确定。
+
+---
+
+## 特性一览
+
+| 特性 | 示例 |
+|------|------|
+| 变量与赋值 | `设 x = 42;` |
+| 三态词 | `开/关/守`, `真/假/可能`, `是/否/待` |
+| 条件分支 | `若 (x > 10) { ... } 否则 { ... }` |
+| 循环 | `循环 (i < 10) { ... }` |
+| 遍历 | `遍历 i 从 1 到 100 { ... }` |
+| 函数定义 | `定义 平方 (x) { x * x; }` |
+| 匿名函数 | `函数(x) { x + 1; }` 或 `λ(x) { x + 1; }` |
+| 高阶函数 | `映射`、`过滤`、`归并` |
+| 容器 | `列表`、`数组`（定长）、`字典` |
+| 三态逻辑 | `且`、`或`、`非`，三值真值表 |
+| IoT 控制 | `置 灯 = 亮;`、`查 灯;`、`对 灯 { ... }` |
+| 模块加载 | `加载("utils.san");` |
+| 数学函数 | `绝对值`、`平方根`、`最大值`、`最小值`、`随机数` |
+| 字符串 | `连接("你好", "世界")`，原文块 `原文{任意内容}` |
+| 调试 | `调试()` 打印变量和传感器状态 |
+
+---
+
+## 项目结构
+
+```text
 sanyan/
 ├── main.py            # 入口
 ├── ternary_core.py    # 平衡三进制核心（BT、ALU、TritValue、ArrayValue）
@@ -132,86 +158,95 @@ sanyan/
 ├── repl.py            # REPL 交互环境
 ├── examples/          # 示例程序
 └── docs/              # 语言手册
-三态词表
+```
+
+---
+
+## 三态词表
+
 三言内置了一组中文语义词，直接映射三进制值：
 
-语义	三进制值	整数值
-开 / 真 / 亮 / 有 / 是	+	1
-守 / 可能 / 待 / 未知	0	0
-关 / 假 / 灭 / 无 / 否	-	-1
-这些不是关键字别名，是语言的语义层。守 表示"保持当前状态"，可能 表示"尚未确定"，待 表示"等待输入"。在 IoT 场景下，这些区别有实际意义。
+| 语义 | 三进制值 | 整数值 |
+|------|---------|--------|
+| 开 / 真 / 亮 / 有 / 是 | `+` | 1 |
+| 守 / 可能 / 待 / 未知 | `0` | 0 |
+| 关 / 假 / 灭 / 无 / 否 | `-` | -1 |
 
-路线图
-平衡三进制算术与三值逻辑
+这些不是关键字别名，是语言的语义层。`守` 表示"保持当前状态"，`可能` 表示"尚未确定"，`待` 表示"等待输入"。在 IoT 场景下，这些区别有实际意义。
 
-自定义命令与匿名函数
+---
 
-高阶函数（映射/过滤/归并）
+## 路线图
 
-列表、数组、字典容器
+- 平衡三进制算术与三值逻辑
+- 自定义命令与匿名函数
+- 高阶函数（映射/过滤/归并）
+- 列表、数组、字典容器
+- IoT 传感器/执行器抽象
+- 类 C 糖语法 + S 表达式双语法
+- `返回` 关键字，函数提前退出
+- 模块命名空间隔离
+- 异常处理 `尝试` / `捕获`
+- 文件读写原语
+- GPIO 真实硬件控制
+- Web IDE
+- 标准库扩展（字符串、排序、时间）
 
-IoT 传感器/执行器抽象
+---
 
-类 C 糖语法 + S 表达式双语法
+## 为什么是中文
 
-返回 关键字，函数提前退出
-
-模块命名空间隔离
-
-异常处理 尝试 / 捕获
-
-文件读写原语
-
-树莓派 GPIO 真实硬件控制
-
-Web IDE
-
-标准库扩展（字符串、排序、时间）
-
-为什么是中文
 中文天然适合表达三进制。
-英文只有 "on / off"，中文有 “开 / 关 / 守”。
-英文只有 "true / false"，中文有 “真 / 假 / 可能”。
+
+英文只有 "on / off"，中文有 "开 / 关 / 守"。
+英文只有 "true / false"，中文有 "真 / 假 / 可能"。
 
 "可能" 由"可"和"能"两个独立语素组成——"可不可以"和"能不能"是两个维度，它们的张力产生了第三态。这是中文造词法特有的能力。
 
 三言没有"翻译"任何语言。它的中文关键字直接生长在三值逻辑之上。
 
-三进制最有价值的地方
+---
+
+## 三进制最有价值的地方
+
 不是万能钥匙，但恰好能打开最重要的门：
 
-✅ 传感器冲突（智能家居）：不确定时不动作，而非强行判定
+- **传感器冲突（智能家居）**：不确定时不动作，而非强行判定
+- **用户犹豫（智能穿戴 / VR）**：`可能` 是自然交互状态
+- **AI 推理加速（NPU/GPU）**：乘法变加减，零值跳过
+- **脑机接口**：大脑信号永远不确定
+- **游戏 NPC**：NPC 天然需要犹豫
 
-✅ 用户犹豫（智能穿戴 / VR）：可能 是自然交互状态
-
-✅ AI 推理加速（NPU/GPU）：乘法变加减，零值跳过
-
-✅ 脑机接口：大脑信号永远不确定
-
-✅ 游戏 NPC：NPC 天然需要犹豫
-
-❌ 不适用：火灾报警、加密、网络协议等需要绝对确定性的场合。
+不适用：火灾报警、加密、网络协议等需要绝对确定性的场合。
 
 ---
 
 ## For English Readers (TL;DR)
 
-**Sanyan** is a Chinese programming language based on **balanced ternary logic** (+, 0, -).
+**Sanyan** is a Chinese programming language based on balanced ternary logic (`+`, `0`, `-`).
 
-Unlike most "Chinese programming languages" that merely translate English keywords, Sanyan leverages the fact that **Chinese semantics naturally support ternary thinking**: words like `守` (hold/keep), `可能` (maybe/uncertain), and `待` (await) carry nuanced third-state meanings that have no direct equivalent in English.
+Unlike most "Chinese programming languages" that merely translate English keywords, Sanyan leverages the fact that Chinese semantics naturally support ternary thinking: words like `守` (hold/keep), `可能` (maybe/uncertain), and `待` (await) carry nuanced third-state meanings that have no direct equivalent in English.
 
 It runs on Python. It has:
+
 - Native ternary arithmetic (not simulated)
 - Kleene strong logic (`true AND maybe = maybe`)
 - C-like sugar syntax + Lisp-style S-expressions
-- Higher-order functions (`map`, `filter`, `reduce`)
+- Higher-order functions (map, filter, reduce)
 - Built-in IoT sensor/actuator abstraction
 
 **Quick start:**
-```bash
-pip install sanyan  # (coming soon)
-python main.py
-Philosophy: uncertainty is not a bug — it's a legitimate computational state.
 
-License
-MIT © 2025
+```bash
+git clone https://github.com/shujingyin510/sanyan.git
+cd sanyan
+python main.py
+```
+
+**Philosophy:** uncertainty is not a bug — it's a legitimate computational state.
+
+---
+
+## License
+
+MIT (c) 2025
