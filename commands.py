@@ -1,5 +1,6 @@
 """自定义命令：定义与调用"""
 from ternary_core import TritValue
+from builtins_ops import ReturnException
 
 class Commands:
     @staticmethod
@@ -24,6 +25,7 @@ class Commands:
             if op not in evaluator.commands:
                 raise NameError(f"未定义的操作: {op}")
             params, body = evaluator.commands[op]
+            # 智能拆分（原有逻辑）
             if len(params) != len(args):
                 if len(params) == 2 and len(args) == 1:
                     sole_arg = args[0]
@@ -54,7 +56,11 @@ class Commands:
             result = None
             try:
                 for expr in body:
-                    result = evaluator.eval(expr)
+                    try:
+                        result = evaluator.eval(expr)
+                    except ReturnException as ret:
+                        result = ret.value
+                        break   # 提前退出循环
             finally:
                 for param in params:
                     if param in saved:

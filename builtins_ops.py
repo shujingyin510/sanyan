@@ -3,6 +3,11 @@ from ternary_core import BT, TernaryALU, TritValue, ArrayValue
 import math
 import random
 
+class ReturnException(Exception):
+    """用于函数提前返回的内部异常"""
+    def __init__(self, value):
+        self.value = value
+
 class FunctionValue:
     """三言中的可调用函数对象（普通函数/lambda）"""
     def __init__(self, params, body, evaluator=None):
@@ -27,7 +32,11 @@ class FunctionValue:
         try:
             result = None
             for expr in self.body:
-                result = evaluator.eval(expr)
+                try:
+                    result = evaluator.eval(expr)
+                except ReturnException as ret:
+                    result = ret.value
+                    break
             return result if result is not None else TritValue(0)
         finally:
             for param in self.params:
@@ -700,3 +709,10 @@ class Builtins:
             return func.call(evaluator, args)
         else:
             raise TypeError(f"不可调用的对象: {type(func)}")
+    @staticmethod
+    def return_op(evaluator, args):
+        """(返回 值) 在函数中提前退出并返回指定值"""
+        if len(args) == 0:
+            raise ReturnException(TritValue(0))
+        value = evaluator.eval(args[0])
+        raise ReturnException(value)

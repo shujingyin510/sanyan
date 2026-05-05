@@ -341,13 +341,15 @@ class _Parser:
                 return [func] + args
             # 前缀操作符（如 幂 1 a）
             if tok in self.PREFIXABLE_OPS:
+                saved_pos = self.pos
                 args = []
                 while (self.peek() is not None and
                        self.peek() not in (';', '}', ')', ',') and
                        self.peek() not in self.PREC):
                     args.append(self.parse_primary())
                 if not args:
-                    raise self._err(f"前缀操作符 '{tok}' 需要至少一个参数")
+                    # 没有收集到参数，可能作为函数参数传递，直接返回标识符
+                    return tok
                 return [tok] + args
             return tok
         raise self._err(f"未知的表达式元素: {tok}")

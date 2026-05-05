@@ -99,6 +99,7 @@ class SanyanEvaluator(SanyanRuntime):
             '映射': lambda: Builtins.map_op(self, args),
             '过滤': lambda: Builtins.filter_op(self, args),
             '归并': lambda: Builtins.reduce_op(self, args),
+            '返回': lambda: Builtins.return_op(self, args),
         }
 
         if op in dispatch:
