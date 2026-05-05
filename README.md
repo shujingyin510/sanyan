@@ -32,7 +32,7 @@
 ## 快速开始
 
 ```bash
-git clone https://github.com/你的用户名/sanyan.git
+git clone https://github.com/shujingyin510/sanyan.git
 cd sanyan
 python main.py
 进入 REPL 后尝试：
