@@ -46,11 +46,13 @@ def repl():
             if result:
                 should_print = True
                 if isinstance(ast, list) and len(ast) > 0:
-                    if ast[0] in ('输出', '查'):
+                    # 这些语句本身已经有输出，或返回值无意义，不重复打印
+                    no_print_ops = ('输出', '查', '若', '循环', '遍历', '定义')
+                    if ast[0] in no_print_ops:
                         should_print = False
                     elif ast[0] == '做' and len(ast) > 1:
                         last_stmt = ast[-1]
-                        if isinstance(last_stmt, list) and len(last_stmt) > 0 and last_stmt[0] in ('输出', '查'):
+                        if isinstance(last_stmt, list) and len(last_stmt) > 0 and last_stmt[0] in no_print_ops:
                             should_print = False
                 if should_print:
                     try:
