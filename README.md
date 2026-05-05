@@ -57,6 +57,7 @@ python main.py examples/greeting.san
 **糖语法**（类 C，日常使用）：
 
 c
+c
 // 智能家居：晚安模式
 定义 晚安 () {
     置 灯 = 灭;
