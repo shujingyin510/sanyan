@@ -8,7 +8,7 @@
 
 1958 年，莫斯科国立大学造了一台三进制计算机，叫 **Setun**。每个比特不是 0 或 1，而是**正、零、负**。它稳定运行了三十年，功耗只有同期二进制计算机的三分之一。然后被停产了——不是因为技术不行，而是苏联的工业标准全面转向了二进制。
 
-2024 年，我在用 STM32 做单片机开发时，发现所有传感器都在对我说三种状态：有人、没人、信号不稳。但我的代码只能写 `if` 和 `else`。"信号不稳"被强行归类为 0 或 1，然后我加了一堆阈值、状态机和注释来弥补丢失的信息。
+2024 年，我在用 STM32 做智能家居时，发现所有传感器都在对我说三种状态：有人、没人、信号不稳。但我的代码只能写 `if` 和 `else`。"信号不稳"被强行归类为 0 或 1，然后我加了一堆阈值、状态机和注释来弥补丢失的信息。
 
 **如果编程语言原生支持第三种状态呢？**  
 于是就有了三言。
@@ -45,7 +45,7 @@ text
 
 bash
 python main.py examples/greeting.san
-## 三言长什么样
+三言长什么样
 糖语法（类 C，日常使用）：
 
 c
@@ -192,24 +192,28 @@ Web IDE
 
 ❌ 不适用：火灾报警、加密、网络协议等需要绝对确定性的场合。
 
----
+For English Readers (TL;DR)
+Sanyan is a Chinese programming language based on balanced ternary logic (+, 0, -).
 
-## For English Readers (TL;DR)
-
-**Sanyan** is a Chinese programming language based on **balanced ternary logic** (+, 0, -).
-
-Unlike most "Chinese programming languages" that merely translate English keywords, Sanyan leverages the fact that **Chinese semantics naturally support ternary thinking**: words like `守` (hold/keep), `可能` (maybe/uncertain), and `待` (await) carry nuanced third-state meanings that have no direct equivalent in English.
+Unlike most "Chinese programming languages" that merely translate English keywords, Sanyan leverages the fact that Chinese semantics naturally support ternary thinking: words like 守 (hold/keep), 可能 (maybe/uncertain), and 待 (await) carry nuanced third-state meanings that have no direct equivalent in English.
 
 It runs on Python. It has:
-- Native ternary arithmetic (not simulated)
-- Kleene strong logic (`true AND maybe = maybe`)
-- C-like sugar syntax + Lisp-style S-expressions
-- Higher-order functions (`map`, `filter`, `reduce`)
-- Built-in IoT sensor/actuator abstraction
 
-**Quick start:**
-```bash
-pip install sanyan  # (coming soon)
+Native ternary arithmetic (not simulated)
+
+Kleene strong logic (true AND maybe = maybe)
+
+C-like sugar syntax + Lisp-style S-expressions
+
+Higher-order functions (map, filter, reduce)
+
+Built-in IoT sensor/actuator abstraction
+
+Quick start:
+
+bash
+git clone https://github.com/shujingyin510/sanyan.git
+cd sanyan
 python main.py
 Philosophy: uncertainty is not a bug — it's a legitimate computational state.
 
