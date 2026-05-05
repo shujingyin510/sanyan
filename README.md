@@ -45,7 +45,7 @@ text
 
 bash
 python main.py examples/greeting.san
-三言长什么样
+## 三言长什么样
 糖语法（类 C，日常使用）：
 
 c
