@@ -36,30 +36,26 @@
 git clone https://github.com/shujingyin510/sanyan.git
 cd sanyan
 python main.py
+```
 
 进入 REPL 后尝试：
 
-
-text
-text
+```text
 三言> 设 a = 10;
 三言> 输出(a ^ 2);
   => 100  (三进制: ++-0+)
+```
 
 运行示例文件：
 
-
-bash
-bash
+```bash
 python main.py examples/greeting.san
+```
 
+## 三言长什么样
 
-三言长什么样
+**糖语法**（类 C，日常使用）：
 
-糖语法（类 C，日常使用）：
-
-
-c
 c
 // 智能家居：晚安模式
 定义 晚安 () {
