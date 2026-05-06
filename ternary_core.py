@@ -55,17 +55,18 @@ class TernaryALU:
         for i in range(max_len - 1, -1, -1):
             s = a[i] + b[i] + carry
             if s == 2:
-                res.insert(0, -1); carry = 1
+                res.append(-1); carry = 1
             elif s == 3:
-                res.insert(0, 0); carry = 1
+                res.append(0); carry = 1
             elif s == -2:
-                res.insert(0, 1); carry = -1
+                res.append(1); carry = -1
             elif s == -3:
-                res.insert(0, 0); carry = -1
+                res.append(0); carry = -1
             else:
-                res.insert(0, s); carry = 0
+                res.append(s); carry = 0
         if carry:
-            res.insert(0, carry)
+            res.append(carry)
+        res.reverse()
         return res
 
     @staticmethod

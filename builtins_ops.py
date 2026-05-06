@@ -229,10 +229,23 @@ class Builtins:
     @staticmethod
     def arithmetic(evaluator, op, args):
         if op == '加':
-            total = 0
-            for arg in args:
-                total += evaluator.eval(arg).to_int()
-            return TritValue(total)
+            # 尝试整数加法，若失败则自动转为字符串拼接
+            try:
+                total = 0
+                for arg in args:
+                    total += evaluator.eval(arg).to_int()
+                return TritValue(total)
+            except (AttributeError, TypeError):
+                parts = []
+                for arg in args:
+                    val = evaluator.eval(arg)
+                    if isinstance(val, str):
+                        parts.append(val)
+                    elif isinstance(val, TritValue):
+                        parts.append(str(val.to_int()))
+                    else:
+                        parts.append(str(val))
+                return ''.join(parts)
         elif op == '减':
             if len(args) < 2:
                 raise SyntaxError("减 需要至少两个参数")
@@ -311,11 +324,7 @@ class Builtins:
         val = evaluator.eval(args[0])
         if isinstance(val, TritValue):
             print(f"  => {val.to_int()}  (三进制: {val.symbol})")
-        elif isinstance(val, list):
-            print(f"  => 列表: {val}")
-        elif isinstance(val, dict):
-            print(f"  => 字典: {val}")
-        elif isinstance(val, ArrayValue):
+        elif isinstance(val, str):
             print(f"  => {val}")
         else:
             print(f"  => {val}")
@@ -414,11 +423,7 @@ class Builtins:
     # ── 字符串操作 ──
     @staticmethod
     def _arg_to_str(evaluator, arg):
-        if isinstance(arg, str):
-            return arg
-        if isinstance(arg, int):
-            return str(arg)
-        val = evaluator.eval(arg)
+        val = evaluator.eval(arg) if not isinstance(arg, (str, int)) else arg
         if isinstance(val, str):
             return val
         if isinstance(val, TritValue):
@@ -429,26 +434,28 @@ class Builtins:
     def string_concat(evaluator, args):
         if len(args) < 2:
             raise SyntaxError("连接 需要至少两个参数")
-        parts = [Builtins._arg_to_str(evaluator, a) for a in args]
-        result = ''.join(parts)
-        print(f"  => 字符串: {result}")
-        return TritValue(len(result))
+        parts = []
+        for a in args:
+            val = evaluator.eval(a)
+            if isinstance(val, str):
+                parts.append(val)
+            elif isinstance(val, TritValue):
+                parts.append(str(val.to_int()))
+            else:
+                parts.append(str(val))
+        return ''.join(parts)
 
     @staticmethod
     def string_length(evaluator, args):
         if len(args) != 1:
             raise SyntaxError("取长 需要一个参数")
-        arg = args[0]
-        if isinstance(arg, str):
-            return TritValue(len(arg))
-        if isinstance(arg, int):
-            return TritValue(len(str(arg)))
-        val = evaluator.eval(arg)
+        val = evaluator.eval(args[0])      # 先求值
         if isinstance(val, str):
             return TritValue(len(val))
         if isinstance(val, TritValue):
             return TritValue(len(str(val.to_int())))
-        raise ValueError("取长 只能作用于字符串或数值")
+        # 其他类型尝试转字符串
+        return TritValue(len(str(val)))
 
     # ── 列表操作 ──
     @staticmethod
@@ -709,6 +716,7 @@ class Builtins:
             return func.call(evaluator, args)
         else:
             raise TypeError(f"不可调用的对象: {type(func)}")
+        
     @staticmethod
     def return_op(evaluator, args):
         """(返回 值) 在函数中提前退出并返回指定值"""
@@ -716,3 +724,106 @@ class Builtins:
             raise ReturnException(TritValue(0))
         value = evaluator.eval(args[0])
         raise ReturnException(value)
+    
+    @staticmethod
+    def time_now(evaluator, args):
+        import time
+        return TritValue(int(time.time()))  # 返回Unix时间戳整数
+    
+    # ── 新增实用函数 ──
+    @staticmethod
+    def sleep_op(evaluator, args):
+        import time
+        if len(args) != 1:
+            raise SyntaxError("等待 需要一个参数（秒数）")
+        sec = evaluator.eval(args[0]).to_int()
+        time.sleep(sec)
+        return TritValue(0)
+
+    @staticmethod
+    def read_file_op(evaluator, args):
+        if len(args) != 1:
+            raise SyntaxError("读文件 需要文件路径")
+        path = evaluator.eval(args[0])
+        if hasattr(path, 'to_int'):
+            path = str(path.to_int())
+        with open(str(path), 'r', encoding='utf-8') as f:
+            content = f.read()
+        return content
+
+    @staticmethod
+    def write_file_op(evaluator, args):
+        if len(args) != 2:
+            raise SyntaxError("写文件 需要路径和内容")
+        path = evaluator.eval(args[0])
+        content = evaluator.eval(args[1])
+        if hasattr(path, 'to_int'):
+            path = str(path.to_int())
+        if not isinstance(content, str):
+            content = str(content)
+        with open(str(path), 'w', encoding='utf-8') as f:
+            f.write(content)
+        return TritValue(0)
+
+    @staticmethod
+    def is_number(evaluator, args):
+        if len(args) != 1:
+            raise SyntaxError("是数字 需要一个参数")
+        val = evaluator.eval(args[0])
+        if isinstance(val, TritValue):
+            return TritValue(1)
+        return TritValue(-1)
+
+    @staticmethod
+    def is_string(evaluator, args):
+        if len(args) != 1:
+            raise SyntaxError("是字符串 需要一个参数")
+        val = evaluator.eval(args[0])
+        if isinstance(val, str):
+            return TritValue(1)
+        return TritValue(-1)
+
+    @staticmethod
+    def str_equals(evaluator, args):
+        if len(args) != 2:
+            raise SyntaxError("字符串相等 需要两个参数")
+        a = evaluator.eval(args[0])
+        b = evaluator.eval(args[1])
+        if isinstance(a, str) and isinstance(b, str):
+            return TritValue(1 if a == b else -1)
+        return TritValue(-1)
+    
+    @staticmethod
+    def try_catch(evaluator, args):
+        if len(args) != 2:
+            raise SyntaxError("尝试 需要两个参数：尝试体和捕获体")
+        try_body = args[0]
+        catch_spec = args[1]
+
+        if not isinstance(catch_spec, list) or len(catch_spec) < 2 or catch_spec[0] != '捕获':
+            raise SyntaxError("捕获体格式应为 (捕获 (错误变量) 体...)")
+        error_var = catch_spec[1]
+        if isinstance(error_var, list):
+            if len(error_var) != 1:
+                raise SyntaxError("捕获的错误变量必须是一个标识符")
+            error_var = error_var[0]
+        catch_body = catch_spec[2:]
+
+        try:
+            return evaluator.eval(try_body)
+        except Exception as e:
+            saved = None
+            if error_var in evaluator.vars:
+                saved = evaluator.vars[error_var]
+            evaluator.vars[error_var] = str(e)
+            try:
+                result = None
+                for expr in catch_body:
+                    result = evaluator.eval(expr)
+                return result if result is not None else TritValue(0)
+            finally:
+                if saved is not None:
+                    evaluator.vars[error_var] = saved
+                else:
+                    if error_var in evaluator.vars:
+                        del evaluator.vars[error_var]

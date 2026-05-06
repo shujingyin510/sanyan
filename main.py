@@ -23,30 +23,31 @@ if __name__ == '__main__':
 
         env = SanyanEvaluator()
         try:
-            if '{' in code or ';' in code:
+            # 优先使用糖语法，失败时回退到原生 S‑表达式
+            try:
                 ast = SugarConverter.convert(code)
                 result = env.eval(ast)
-            else:
+            except SyntaxError:
                 from lexer import tokenize
                 from parser import parse
                 tokens = tokenize(code)
+                if not tokens:
+                    sys.exit(0)
                 ast = parse(tokens)
                 result = env.eval(ast)
 
-            # 判断最后一条语句是否是「输出」，避免重复打印
+            # 判断是否应该打印最终结果
             if result is not None:
-                last_is_output = False
-                last_is_output = False
-                if isinstance(ast, list) and len(ast) > 0:
-                    # 这些语句的返回值通常没有展示意义
-                    control_flow_ops = ('输出', '连接', '遍历', '循环', '若', '做')
-                    if ast[0] in control_flow_ops:
-                        last_is_output = True
-                    elif ast[0] == '做' and len(ast) > 1:
-                        last_stmt = ast[-1]
-                        if isinstance(last_stmt, list) and len(last_stmt) > 0 and last_stmt[0] in control_flow_ops:
-                            last_is_output = True
-                if not last_is_output:
+                def _has_output_like(node):
+                    if isinstance(node, list) and len(node) > 0:
+                        if node[0] in ('输出', '连接', '查', '调试'):
+                            return True
+                        for child in node[1:]:
+                            if _has_output_like(child):
+                                return True
+                    return False
+
+                if not _has_output_like(ast):
                     if isinstance(result, TritValue):
                         print(f"结果: {result.to_int()}")
                     else:

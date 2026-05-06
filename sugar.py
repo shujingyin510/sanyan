@@ -178,6 +178,8 @@ class _Parser:
     def parse_statement(self):
         tok = self.peek()
         if tok is None: return None
+        if tok == '尝试':
+            return self.parse_try()
         if tok == '若': return self.parse_if()
         if tok == '循环': return self.parse_loop()
         if tok == '遍历': return self.parse_traversal()
@@ -186,8 +188,10 @@ class _Parser:
         if tok in ('否则', '再若'):
             raise self._err(f"{tok} 不能单独作为语句，需跟在「若」之后")
         stmt = self.parse_simple_statement()
+        # 分号完全可选：有就消耗，没有也不报错
         if self.peek() == ';':
             self.consume(';')
+        # 如果后面直接是 '}'、EOF 也合法
         return stmt
 
     def parse_simple_statement(self):
@@ -241,7 +245,50 @@ class _Parser:
                     if self.peek() == ',': self.consume(',')
                 self.consume(')')
             return ['调试'] + args
-        # ── 新增匿名函数 ──
+
+        # === 新增命令（等待、读文件、写文件、是数字、是字符串、字符串相等）===
+        elif tok == '等待':
+            self.consume('等待')
+            self.consume('(')
+            sec = self.parse_expression()
+            self.consume(')')
+            return ['等待', sec]
+        elif tok == '读文件':
+            self.consume('读文件')
+            self.consume('(')
+            path = self.parse_expression()
+            self.consume(')')
+            return ['读文件', path]
+        elif tok == '写文件':
+            self.consume('写文件')
+            self.consume('(')
+            path = self.parse_expression()
+            self.consume(',')
+            content = self.parse_expression()
+            self.consume(')')
+            return ['写文件', path, content]
+        elif tok == '是数字':
+            self.consume('是数字')
+            self.consume('(')
+            val = self.parse_expression()
+            self.consume(')')
+            return ['是数字', val]
+        elif tok == '是字符串':
+            self.consume('是字符串')
+            self.consume('(')
+            val = self.parse_expression()
+            self.consume(')')
+            return ['是字符串', val]
+        elif tok == '字符串相等':
+            self.consume('字符串相等')
+            self.consume('(')
+            a = self.parse_expression()
+            self.consume(',')
+            b = self.parse_expression()
+            self.consume(')')
+            return ['字符串相等', a, b]
+
+        # === 匿名函数（函数/λ）===
         elif tok == 'λ' or tok == '函数':
             self.consume(tok)
             self.consume('(')
@@ -253,13 +300,25 @@ class _Parser:
             self.consume(')')
             body = self.parse_block()
             return ['函数', params] + body
-        # ── 原有末尾处理（省略号不变）──
+
+        # === 通用：连续赋值 或 表达式/函数调用 ===
         else:
             if self.pos + 2 < len(self.tokens) and self.tokens[self.pos+1] == '=':
                 var = self.consume()
                 self.consume('=')
                 value = self.parse_expression()
                 return ['设', var, value]
+            # 通用函数调用：标识符后面紧跟 '('
+            if isinstance(tok, str) and self.pos + 1 < len(self.tokens) and self.tokens[self.pos + 1] == '(':
+                func = self.consume()
+                self.consume('(')
+                args = []
+                while self.peek() != ')':
+                    args.append(self.parse_expression())
+                    if self.peek() == ',':
+                        self.consume(',')
+                self.consume(')')
+                return [func] + args
             expr = self.parse_expression()
             if isinstance(expr, list) and len(expr) > 0 and isinstance(expr[0], str):
                 return expr
@@ -295,63 +354,58 @@ class _Parser:
             expr = self.parse_expression()
             self.consume(')')
             return expr
-        # 字符串（引号开头）
+        # 字符串（引号）
         if tok and tok[0] in ('"', '\u201c', '\u2018') and len(tok) >= 2:
             self.consume()
             return tok[1:-1]
-        # 原文块：以 '原文{' 开头的 token
+        # 原文块
         if isinstance(tok, str) and tok.startswith('原文{') and tok.endswith('}'):
             self.consume()
-            inner = tok[3:-1]
-            return inner
-        # 数字（包含负数）
+            return tok[3:-1]
+        # 数字（含负数）
         if tok.isdigit() or (tok.startswith('-') and tok[1:].isdigit()):
             self.consume()
             return int(tok)
 
-        # 标识符或关键字
+        # 标识符、关键字、匿名函数
         if tok.isalpha() or tok[0] == '_' or '\u4e00' <= tok[0] <= '\u9fff':
-            # ── 匿名函数：函数(参数...) { 体 } 或 λ(...) {...} ──
+            # 匿名函数
             if tok in ('函数', 'λ'):
-                # 提前看下一个 token 是不是 '('
                 if self.pos + 1 < len(self.tokens) and self.tokens[self.pos + 1] == '(':
-                    self.consume(tok)       # 吃掉 函数 或 λ
+                    self.consume(tok)
                     self.consume('(')
                     params = []
                     while self.peek() != ')':
                         params.append(self.consume())
-                        if self.peek() == ',':
-                            self.consume(',')
+                        if self.peek() in (',', '，'):
+                            self.consume()
                     self.consume(')')
                     body = self.parse_block()
                     return [tok, params] + body
-
-            # 普通标识符
-            self.consume()
-            # 函数调用：标识符后面紧跟 '('
-            if self.peek() == '(':
-                func = tok
-                self.consume('(')
+            # 普通函数调用：标识符后面紧跟 '(' 或 '（'
+            saved_tok = tok
+            self.consume()  # 吃掉标识符
+            if self.peek() in ('(', '（'):
+                func = saved_tok
+                self.consume()  # 吃掉左括号
                 args = []
-                while self.peek() != ')':
+                while self.peek() not in (')', '）'):
                     args.append(self.parse_expression())
-                    if self.peek() == ',':
-                        self.consume(',')
-                self.consume(')')
+                    if self.peek() in (',', '，'):
+                        self.consume()
+                self.consume()  # 吃掉右括号
                 return [func] + args
-            # 前缀操作符（如 幂 1 a）
-            if tok in self.PREFIXABLE_OPS:
-                saved_pos = self.pos
+            # 前缀操作符（若无参数则当作变量）
+            if saved_tok in self.PREFIXABLE_OPS:
                 args = []
                 while (self.peek() is not None and
-                       self.peek() not in (';', '}', ')', ',') and
+                       self.peek() not in (';', '}', ')', '）', ',', '，') and
                        self.peek() not in self.PREC):
                     args.append(self.parse_primary())
-                if not args:
-                    # 没有收集到参数，可能作为函数参数传递，直接返回标识符
-                    return tok
-                return [tok] + args
-            return tok
+                if args:
+                    return [saved_tok] + args
+            # 普通标识符
+            return saved_tok
         raise self._err(f"未知的表达式元素: {tok}")
 
     def parse_block(self):
@@ -399,6 +453,17 @@ class _Parser:
                             ['若', elif_cond, ['做'] + elif_body]]
             else:
                 return ['若', cond, ['做'] + true_body]
+    
+    def parse_try(self):
+        self.consume('尝试')
+        try_body = self.parse_block()   # 解析 { ... }
+        self.consume('捕获')
+        self.consume('(')
+        error_var = self.consume()       # 错误变量名
+        self.consume(')')
+        catch_body = self.parse_block()
+        # AST: ['尝试', ['做'] + try_body, ['捕获', error_var] + catch_body]
+        return ['尝试', ['做'] + try_body, ['捕获', error_var] + catch_body]
 
     def _parse_elif_tail(self):
         self.elif_depth += 1

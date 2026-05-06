@@ -28,15 +28,17 @@ class SanyanEvaluator(SanyanRuntime):
         elif isinstance(node, int):
             return TritValue(node)
         elif isinstance(node, str):
-            # 处理字符串字面量（带引号）
-            if len(node) >= 2 and node[0] in ('"', '\u201c', '\u2018'):
-                # 去除首尾引号
+            # 去掉首尾引号（如果有）
+            if len(node) >= 2 and node[0] in ('"', '\u201c', '\u2018', "'"):
                 return node[1:-1]
-            # 否则走符号解析，如果找不到就当作普通字符串值返回
-            try:
-                return self._eval_symbol(node)
-            except NameError:
-                return node
+            # 如果是合法标识符，才尝试符号解析
+            if self._is_valid_identifier(node):
+                try:
+                    return self._eval_symbol(node)
+                except NameError:
+                    return node
+            # 否则直接当作普通字符串数据
+            return node
         else:
             raise RuntimeError(f"不支持的节点类型: {type(node)}")
 
@@ -100,6 +102,14 @@ class SanyanEvaluator(SanyanRuntime):
             '过滤': lambda: Builtins.filter_op(self, args),
             '归并': lambda: Builtins.reduce_op(self, args),
             '返回': lambda: Builtins.return_op(self, args),
+            '当前时间': lambda: Builtins.time_now(self, args),
+            '等待': lambda: Builtins.sleep_op(self, args),
+            '读文件': lambda: Builtins.read_file_op(self, args),
+            '写文件': lambda: Builtins.write_file_op(self, args),
+            '是数字': lambda: Builtins.is_number(self, args),
+            '是字符串': lambda: Builtins.is_string(self, args),
+            '字符串相等': lambda: Builtins.str_equals(self, args),
+            '尝试': lambda: Builtins.try_catch(self, args),
         }
 
         if op in dispatch:
@@ -128,3 +138,14 @@ class SanyanEvaluator(SanyanRuntime):
             # 变量既不是函数也不是容器
             raise TypeError(f"变量 '{op}' 的值不可调用或索引")
         return Commands.call(self, op, args)
+    
+    @staticmethod
+    def _is_valid_identifier(s: str) -> bool:
+        """判断是否可能是一个变量名（不含点号等特殊字符）"""
+        if not s:
+            return False
+        for c in s:
+            if c.isalnum() or c == '_' or '\u4e00' <= c <= '\u9fff' or '\u3400' <= c <= '\u4dbf':
+                continue
+            return False
+        return True
