@@ -139,8 +139,9 @@ class _Parser:
     PREFIXABLE_OPS = {
         '幂', '加', '减', '乘', '除', '余',
         '大于', '小于', '等于', '不等于', '大于等于', '小于等于',
-        '非', '且', '或', '取位'
+        '非', '且', '或', '取位', '读'
     }
+    PREFIXABLE_OPS_SINGLE_ARG = {'读', '非', '取位'}
 
     def __init__(self, tokens):
         self.tokens = tokens
@@ -398,10 +399,17 @@ class _Parser:
             # 前缀操作符（若无参数则当作变量）
             if saved_tok in self.PREFIXABLE_OPS:
                 args = []
-                while (self.peek() is not None and
-                       self.peek() not in (';', '}', ')', '）', ',', '，') and
-                       self.peek() not in self.PREC):
-                    args.append(self.parse_primary())
+                if saved_tok in self.PREFIXABLE_OPS_SINGLE_ARG:
+                    # 一元前缀：只取紧邻的一个参数
+                    if (self.peek() is not None and
+                        self.peek() not in (';', '}', ')', '）', ',', '，')):
+                        args.append(self.parse_primary())
+                else:
+                    # 多参数前缀：和原来一样
+                    while (self.peek() is not None and
+                           self.peek() not in (';', '}', ')', '）', ',', '，') and
+                           self.peek() not in self.PREC):
+                        args.append(self.parse_primary())
                 if args:
                     return [saved_tok] + args
             # 普通标识符

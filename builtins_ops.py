@@ -184,7 +184,9 @@ class Builtins:
             return results[-1] if results else TritValue(0)
         if target in evaluator.actuators:
             val = evaluator.actuators[target]
-            print(f"  {target} 当前状态: {val.symbol} (值: {val.to_int()})")
+            state_map = {1: "开", 0: "守", -1: "关", '+': "开", '0': "守", '-': "关"}
+            state_word = state_map.get(val.to_int(), val.symbol)
+            print(f"  {target} 当前状态: {state_word} ({val.symbol})")
             return val
         if target in evaluator.sensors:
             val = evaluator.sensors[target]
@@ -737,7 +739,10 @@ class Builtins:
         if len(args) != 1:
             raise SyntaxError("等待 需要一个参数（秒数）")
         sec = evaluator.eval(args[0]).to_int()
-        time.sleep(sec)
+        try:
+            time.sleep(sec)
+        except KeyboardInterrupt:
+            raise RuntimeError("等待被用户中断（Ctrl+C）")
         return TritValue(0)
 
     @staticmethod
