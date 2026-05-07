@@ -52,19 +52,19 @@ class FunctionValue:
 class Builtins:
     @staticmethod
     def logic_op(evaluator, op, args):
-        if op in ('且', '或'):
+        if op in ('and', 'or'):
             if len(args) == 0:
                 return TritValue(0)
             result = evaluator.eval(args[0])
             for i in range(1, len(args)):
                 next_val = evaluator.eval(args[i])
-                if op == '且':
+                if op == 'and':
                     res_trits = TernaryALU.tritwise_and(result.value, next_val.value)
                 else:
                     res_trits = TernaryALU.tritwise_or(result.value, next_val.value)
                 result = TritValue(BT.to_int(res_trits))
             return result
-        elif op == '非':
+        elif op == 'not':
             a = evaluator.eval(args[0])
             res = TernaryALU.tritwise_not(a.value)
             return TritValue(BT.to_int(res))
@@ -72,38 +72,37 @@ class Builtins:
 
     @staticmethod
     def control(evaluator, op, args):
-        if op == '若':
+        if op == 'if':
             if len(args) < 2:
-                raise SyntaxError("若 需要条件和真分支")
-            cond_node = evaluator._maybe_implicit_and(args[0])
-            cond = evaluator.eval(cond_node)
+                raise SyntaxError("条件分支需要条件和体")
+            cond = evaluator.eval(args[0])          # 直接求值条件，不再包裹隐式 and
             if BT.to_int(cond.value) == 1:
                 return evaluator.eval(args[1])
             elif len(args) >= 3:
                 return evaluator.eval(args[2])
             else:
                 return TritValue(0)
-        elif op == '做':
+        elif op == 'do':
             if not args:
                 return TritValue(0)
             result = None
             for statement in args:
                 result = evaluator.eval(statement)
             return result if result is not None else TritValue(0)
-        elif op == '循环':
+        elif op == 'loop':
             if len(args) < 2:
-                raise SyntaxError("循环 需要条件和体")
-            cond_node = evaluator._maybe_implicit_and(args[0])
+                raise SyntaxError("循环需要条件和体")
+            cond = evaluator.eval(args[0])          # 同样直接求值
             body = args[1:]
             result = TritValue(0)
             evaluator.loop_count = 0
             while evaluator.loop_count < evaluator.max_loop_steps:
-                cond = evaluator.eval(cond_node)
                 if BT.to_int(cond.value) != 1:
                     break
                 for statement in body:
                     result = evaluator.eval(statement)
                 evaluator.loop_count += 1
+                cond = evaluator.eval(args[0])      # 循环条件重新求值
             return result
         raise ValueError(f"未知的控制操作: {op}")
 
@@ -138,40 +137,56 @@ class Builtins:
         if not args:
             raise SyntaxError("置 需要参数")
         target = args[0]
+
+        # 辅助函数：确保存储的值是 TritValue
+        def ensure_trit(val):
+            if isinstance(val, TritValue):
+                return val
+            try:
+                return TritValue.from_string(str(val))
+            except:
+                return TritValue(0)
+
+        # 批量设置: (置 (对象.状态 ...))
         if isinstance(target, list):
             pairs = evaluator._parse_pairs(target)
             last_state = TritValue(0)
             for obj, val_str in pairs:
-                state = TritValue.from_string(val_str)
+                state = ensure_trit(TritValue.from_string(val_str))
                 if obj in evaluator.sensors:
                     evaluator.sensors[obj] = state
                 elif obj in evaluator.actuators:
                     evaluator.actuators[obj] = state
                 else:
+                    # 动态创建执行器
                     evaluator.actuators[obj] = state
                 last_state = state
             return last_state
-        elif isinstance(target, str):
+
+        # 单个对象
+        if isinstance(target, str):
             if len(args) >= 2:
                 sensor_name = target
-                state = evaluator.eval(args[1])
+                state = ensure_trit(evaluator.eval(args[1]))
             elif '.' in target:
                 sensor_name, attr = target.split('.')
-                state = TritValue.from_string(attr)
+                state = ensure_trit(TritValue.from_string(attr))
             elif '：' in target:
                 sensor_name, attr = target.split('：')
-                state = TritValue.from_string(attr)
+                state = ensure_trit(TritValue.from_string(attr))
             else:
                 raise SyntaxError("置 的用法: (置 对象 状态) 或 (置 (对象.状态 ...))")
+
+            # 存储到对应容器，未知对象动态创建为执行器
             if sensor_name in evaluator.sensors:
                 evaluator.sensors[sensor_name] = state
             elif sensor_name in evaluator.actuators:
                 evaluator.actuators[sensor_name] = state
             else:
-                evaluator.actuators[sensor_name] = state
+                evaluator.actuators[sensor_name] = state  # 动态创建
             return state
-        else:
-            raise SyntaxError("置 的参数格式错误")
+
+        raise SyntaxError("置 的参数格式错误")
 
     @staticmethod
     def query(evaluator, args):
@@ -182,31 +197,52 @@ class Builtins:
                 result = Builtins.query(evaluator, [item])
                 results.append(result)
             return results[-1] if results else TritValue(0)
+
+        state_map = {1: "开", 0: "守", -1: "关", '+': "开", '0': "守", '-': "关"}
+
+        # 统一的设备状态获取与容错
+        def get_device_val(device_dict, key):
+            val = device_dict.get(key, TritValue(0))
+            if not isinstance(val, TritValue):
+                try:
+                    val = TritValue.from_string(str(val))
+                except:
+                    val = TritValue(0)
+                device_dict[key] = val   # 原地修正
+            return val
+
         if target in evaluator.actuators:
-            val = evaluator.actuators[target]
-            state_map = {1: "开", 0: "守", -1: "关", '+': "开", '0': "守", '-': "关"}
+            val = get_device_val(evaluator.actuators, target)
             state_word = state_map.get(val.to_int(), val.symbol)
             print(f"  {target} 当前状态: {state_word} ({val.symbol})")
             return val
+
         if target in evaluator.sensors:
-            val = evaluator.sensors[target]
-            print(f"  {target} 当前状态: {val.symbol} (值: {val.to_int()})")
+            val = get_device_val(evaluator.sensors, target)
+            state_word = state_map.get(val.to_int(), val.symbol)
+            print(f"  {target} 当前状态: {state_word} ({val.symbol})")
             return val
+
+        # 处理带点号或冒号的查询
         if isinstance(target, str) and '.' in target:
             obj, attr = target.split('.')
             if obj in evaluator.actuators:
-                val = evaluator.actuators[obj]
-                print(f"  {obj} 当前状态: {val.symbol} (值: {val.to_int()})")
+                val = get_device_val(evaluator.actuators, obj)
+                state_word = state_map.get(val.to_int(), val.symbol)
+                print(f"  {obj} 当前状态: {state_word} ({val.symbol})")
                 return val
             if obj in evaluator.sensors:
-                sensor_val = evaluator.sensors[obj]
+                sensor_val = get_device_val(evaluator.sensors, obj)
                 attr_val = TritValue.from_string(attr)
                 print(f"  传感器 {obj} 当前值: {sensor_val.symbol}")
                 return TritValue(1 if sensor_val.symbol == attr_val.symbol else -1)
+
         if isinstance(target, str) and '：' in target:
             obj, attr = target.split('：')
             return Builtins.query(evaluator, [obj + '.' + attr])
+
         raise NameError(f"无法查看: {target}（执行器、传感器中均不存在）")
+
 
     @staticmethod
     def context_op(evaluator, args):
@@ -230,8 +266,7 @@ class Builtins:
 
     @staticmethod
     def arithmetic(evaluator, op, args):
-        if op == '加':
-            # 尝试整数加法，若失败则自动转为字符串拼接
+        if op == 'add':
             try:
                 total = 0
                 for arg in args:
@@ -241,48 +276,41 @@ class Builtins:
                 parts = []
                 for arg in args:
                     val = evaluator.eval(arg)
-                    if isinstance(val, str):
-                        parts.append(val)
-                    elif isinstance(val, TritValue):
-                        parts.append(str(val.to_int()))
-                    else:
-                        parts.append(str(val))
+                    if isinstance(val, str): parts.append(val)
+                    elif isinstance(val, TritValue): parts.append(str(val.to_int()))
+                    else: parts.append(str(val))
                 return ''.join(parts)
-        elif op == '减':
+        elif op == 'sub':
             if len(args) < 2:
                 raise SyntaxError("减 需要至少两个参数")
             result = evaluator.eval(args[0]).to_int()
             for arg in args[1:]:
                 result -= evaluator.eval(arg).to_int()
             return TritValue(result)
-        elif op == '乘':
+        elif op == 'mul':
             result = 1
             for arg in args:
                 result *= evaluator.eval(arg).to_int()
             return TritValue(result)
-        elif op == '除':
+        elif op == 'div':
             if len(args) != 2:
                 raise SyntaxError("除 需要两个参数")
             a = evaluator.eval(args[0]).to_int()
             b = evaluator.eval(args[1]).to_int()
-            if b == 0:
-                raise ValueError("除数不能为零")
+            if b == 0: raise ValueError("除数不能为零")
             return TritValue(a // b)
-        elif op == '余':
-            if len(args) != 2:
-                raise SyntaxError("余 需要两个参数")
+        elif op == 'mod':
+            if len(args) != 2: raise SyntaxError("余 需要两个参数")
             a = evaluator.eval(args[0]).to_int()
             b = evaluator.eval(args[1]).to_int()
             return TritValue(a % b)
-        elif op == '幂':
-            if len(args) != 2:
-                raise SyntaxError("幂 需要两个参数")
+        elif op == 'pow':
+            if len(args) != 2: raise SyntaxError("幂 需要两个参数")
             a = evaluator.eval(args[0]).to_int()
             b = evaluator.eval(args[1]).to_int()
             return TritValue(a ** b)
-        elif op == '取位':
-            if len(args) != 2:
-                raise SyntaxError("取位 需要数字和位置")
+        elif op == 'digit':
+            if len(args) != 2: raise SyntaxError("取位 需要数字和位置")
             num = evaluator.eval(args[0]).to_int()
             pos = evaluator.eval(args[1]).to_int()
             digit = (abs(num) // (10 ** pos)) % 10
@@ -293,15 +321,37 @@ class Builtins:
     def comparison(evaluator, op, args):
         if len(args) != 2:
             raise SyntaxError(f"{op} 需要两个参数")
-        a = evaluator.eval(args[0]).to_int()
-        b = evaluator.eval(args[1]).to_int()
+        a_val = evaluator.eval(args[0])
+        b_val = evaluator.eval(args[1])
+
+        def to_int(v):
+            if isinstance(v, TritValue):
+                return v.to_int()
+            if isinstance(v, int):
+                return v
+            # 如果是字符串，尝试自动转换
+            if isinstance(v, str):
+                # 先尝试三态词
+                if evaluator.skin_manager:
+                    state = evaluator.skin_manager.is_ternary_word(v)
+                    if state is not None:
+                        return state
+                # 再尝试整数
+                try:
+                    return int(v)
+                except:
+                    pass
+            raise TypeError(f"无法将 '{v}' 转换为整数用于比较")
+
+        a = to_int(a_val)
+        b = to_int(b_val)
         truth = False
-        if op == '等于':   truth = a == b
-        elif op == '大于': truth = a > b
-        elif op == '小于': truth = a < b
-        elif op == '不等于': truth = a != b
-        elif op == '大于等于': truth = a >= b
-        elif op == '小于等于': truth = a <= b
+        if op == 'eq':   truth = a == b
+        elif op == 'gt': truth = a > b
+        elif op == 'lt': truth = a < b
+        elif op == 'ne': truth = a != b
+        elif op == 'gte': truth = a >= b
+        elif op == 'lte': truth = a <= b
         return TritValue(1 if truth else -1)
 
     @staticmethod
@@ -607,26 +657,19 @@ class Builtins:
         # 自动判断糖语法
         if '{' in code or ';' in code or '；' in code:
             from sugar import SugarConverter
-            ast = SugarConverter.convert(code)
+            ast = SugarConverter.convert(code, evaluator.skin_manager)
             return evaluator.eval(ast)
         else:
-            # 原生语法按行处理
+            # 原生 S 表达式语法，整体解析（修复加载 stdlib 等文件）
             from lexer import tokenize
             from parser import parse
-            lines = code.splitlines()
-            last_result = TritValue(0)
-            for line in lines:
-                line = line.strip()
-                if not line or line.startswith('；') or line.startswith(';') or line.startswith('//'):
-                    continue
-                tokens = tokenize(line)
-                if not tokens:
-                    continue
-                ast = parse(tokens)
-                last_result = evaluator.eval(ast)
-            return last_result
+            tokens = tokenize(code)
+            if not tokens:
+                return TritValue(0)
+            ast = parse(tokens)
+            return evaluator.eval(ast)
     
-        # ── Lambda 创建 ──
+    # ── Lambda 创建 ──
     @staticmethod
     def make_lambda(evaluator, args):
         """(λ (参数...) 体...)"""
@@ -805,7 +848,8 @@ class Builtins:
         try_body = args[0]
         catch_spec = args[1]
 
-        if not isinstance(catch_spec, list) or len(catch_spec) < 2 or catch_spec[0] != '捕获':
+        # 兼容内部标识 'catch' 和中文 '捕获'
+        if not isinstance(catch_spec, list) or len(catch_spec) < 2 or catch_spec[0] not in ('捕获', 'catch'):
             raise SyntaxError("捕获体格式应为 (捕获 (错误变量) 体...)")
         error_var = catch_spec[1]
         if isinstance(error_var, list):
@@ -832,3 +876,21 @@ class Builtins:
                 else:
                     if error_var in evaluator.vars:
                         del evaluator.vars[error_var]
+    
+    @staticmethod
+    def judge_op(evaluator, args):
+        """三态分支：判 表达式 { 真 {...} 可能 {...} 假 {...} }"""
+        if len(args) != 4:
+            raise SyntaxError("判 需要一个表达式和三个分支体")
+        expr_node = args[0]
+        true_body = args[1]
+        maybe_body = args[2]
+        false_body = args[3]
+        val = evaluator.eval(expr_node)
+        int_val = val.to_int()
+        if int_val == 1:
+            return evaluator.eval(true_body) if isinstance(true_body, list) else TritValue(0)
+        elif int_val == 0:
+            return evaluator.eval(maybe_body) if isinstance(maybe_body, list) else TritValue(0)
+        else:  # -1
+            return evaluator.eval(false_body) if isinstance(false_body, list) else TritValue(0)

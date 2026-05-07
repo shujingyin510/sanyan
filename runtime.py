@@ -22,7 +22,7 @@ class SanyanRuntime:
         '尝试', '捕获',
     }
 
-    def __init__(self, max_loop_steps=500):
+    def __init__(self, max_loop_steps=500, skin_manager=None):
         self.vars = {}
         self.sensors = {
             '人体': TritValue(0),
@@ -40,6 +40,7 @@ class SanyanRuntime:
         self.commands = {}
         self.call_depth = 0
         self.max_call_depth = 200
+        self.skin_manager = skin_manager
 
     def _maybe_implicit_and(self, node):
         if isinstance(node, list) and len(node) > 0:
@@ -47,7 +48,7 @@ class SanyanRuntime:
             if isinstance(first, str) and first in self.BUILTIN_OPS:
                 return node
             if len(node) >= 2:
-                return ['且'] + node
+                return ['and'] + node
         return node
 
     def _parse_pairs(self, items):
@@ -78,8 +79,11 @@ class SanyanRuntime:
             return self.vars[symbol]
         if symbol.isdigit() or (symbol.startswith('-') and symbol[1:].isdigit()):
             return TritValue(int(symbol))
-        if symbol in TritValue.STATE_MAP:
-            return TritValue.from_string(symbol)
+        # 使用皮肤判断三态词
+        if self.skin_manager:
+            state = self.skin_manager.is_ternary_word(symbol)
+            if state is not None:
+                return TritValue(state)
         if '.' in symbol:
             obj, attr = symbol.split('.')
             if obj in self.actuators:

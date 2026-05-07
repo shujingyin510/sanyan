@@ -8,17 +8,15 @@ from builtins_ops import Builtins, FunctionValue
 
 
 class SanyanEvaluator(SanyanRuntime):
-    def __init__(self, max_loop_steps=500):
-        super().__init__(max_loop_steps)
+    def __init__(self, max_loop_steps=500, skin_manager=None):
+        super().__init__(max_loop_steps, skin_manager=skin_manager)
 
     def eval(self, node: Any):
         if isinstance(node, list):
-            # 统一容错：单元素列表且为数字字符串
             if len(node) == 1 and isinstance(node[0], str):
                 s = node[0]
                 if s.isdigit() or (s.startswith('-') and s[1:].isdigit()):
                     return TritValue(int(s))
-            # 如果第一个元素是 FunctionValue，则调用它
             first = node[0]
             if isinstance(first, FunctionValue):
                 func = first
@@ -28,120 +26,137 @@ class SanyanEvaluator(SanyanRuntime):
         elif isinstance(node, int):
             return TritValue(node)
         elif isinstance(node, str):
-            # 去掉首尾引号（如果有）
             if len(node) >= 2 and node[0] in ('"', '\u201c', '\u2018', "'"):
                 return node[1:-1]
-            # 如果是合法标识符，才尝试符号解析
             if self._is_valid_identifier(node):
                 try:
                     return self._eval_symbol(node)
                 except NameError:
                     return node
-            # 否则直接当作普通字符串数据
             return node
         else:
             raise RuntimeError(f"不支持的节点类型: {type(node)}")
 
     def _apply(self, op: str, args: list) -> TritValue:
+        # 将显示关键字/操作符转为内部标识
+        skin = self.skin_manager
+        internal = op
+        if skin:
+            kw = skin.get_internal_keyword(op)
+            if kw:
+                internal = kw
+            else:
+                op_internal = skin.get_internal_op(op)
+                if op_internal:
+                    internal = op_internal
+
         dispatch = {
-            '且': lambda: Builtins.logic_op(self, op, args),
-            '或': lambda: Builtins.logic_op(self, op, args),
-            '非': lambda: Builtins.logic_op(self, op, args),
-            '若': lambda: Builtins.control(self, op, args),
-            '做': lambda: Builtins.control(self, op, args),
-            '循环': lambda: Builtins.control(self, op, args),
-            '遍历': lambda: Builtins.traversal(self, args),
-            '设': lambda: Builtins.define_var(self, args),
-            '定义': lambda: Commands.define(self, args),
-            '置': lambda: Builtins.set_sensor(self, args),
-            '查': lambda: Builtins.query(self, args),
-            '对': lambda: Builtins.context_op(self, args),
-            '读': lambda: Builtins._sensor_read(self, args),
-            '输出': lambda: Builtins.output(self, args),
-            '加载': lambda: Builtins._load_file(self, args),
-            '输入': lambda: Builtins.input_op(self, args),
-            '调试': lambda: Builtins.debug_op(self, args),
-            '加': lambda: Builtins.arithmetic(self, op, args),
-            '减': lambda: Builtins.arithmetic(self, op, args),
-            '乘': lambda: Builtins.arithmetic(self, op, args),
-            '除': lambda: Builtins.arithmetic(self, op, args),
-            '余': lambda: Builtins.arithmetic(self, op, args),
-            '幂': lambda: Builtins.arithmetic(self, op, args),
-            '取位': lambda: Builtins.arithmetic(self, op, args),
-            '等于': lambda: Builtins.comparison(self, op, args),
-            '大于': lambda: Builtins.comparison(self, op, args),
-            '小于': lambda: Builtins.comparison(self, op, args),
-            '不等于': lambda: Builtins.comparison(self, op, args),
-            '大于等于': lambda: Builtins.comparison(self, op, args),
-            '小于等于': lambda: Builtins.comparison(self, op, args),
-            '同': lambda: Builtins.equals_op(self, args),
-            '绝对值': lambda: Builtins.math_abs(self, args),
-            '最大值': lambda: Builtins.math_max(self, args),
-            '最小值': lambda: Builtins.math_min(self, args),
-            '平方根': lambda: Builtins.math_sqrt(self, args),
-            '随机数': lambda: Builtins.math_random(self, args),
-            '随机态': lambda: Builtins.math_random_state(self, args),
-            '连接': lambda: Builtins.string_concat(self, args),
-            '取长': lambda: Builtins.string_length(self, args),
-            '列表': lambda: Builtins.list_new(self, args),
-            '列表合': lambda: Builtins.list_concat(self, args),
-            '表长': lambda: Builtins.list_length(self, args),
-            '字列': lambda: Builtins.str_to_list(self, args),
-            '数组': lambda: Builtins.array_new(self, args),
-            '组长': lambda: Builtins.array_length(self, args),
-            '数组列': lambda: Builtins.array_to_list(self, args),
-            '取': lambda: Builtins.generic_get(self, args),
-            '置元素': lambda: Builtins.generic_set(self, args),
-            '字典': lambda: Builtins.dict_new(self, args),
-            '取键': lambda: Builtins.dict_get(self, args),
-            '置键': lambda: Builtins.dict_set(self, args),
-            'λ': lambda: Builtins.make_lambda(self, args),
-            '函数': lambda: Builtins.make_lambda(self, args),
-            '应用': lambda: Builtins.apply(self, args),
-            '映射': lambda: Builtins.map_op(self, args),
-            '过滤': lambda: Builtins.filter_op(self, args),
-            '归并': lambda: Builtins.reduce_op(self, args),
-            '返回': lambda: Builtins.return_op(self, args),
-            '当前时间': lambda: Builtins.time_now(self, args),
-            '等待': lambda: Builtins.sleep_op(self, args),
-            '读文件': lambda: Builtins.read_file_op(self, args),
-            '写文件': lambda: Builtins.write_file_op(self, args),
-            '是数字': lambda: Builtins.is_number(self, args),
-            '是字符串': lambda: Builtins.is_string(self, args),
-            '字符串相等': lambda: Builtins.str_equals(self, args),
-            '尝试': lambda: Builtins.try_catch(self, args),
+            # 逻辑
+            'and': lambda: Builtins.logic_op(self, 'and', args),
+            'or': lambda: Builtins.logic_op(self, 'or', args),
+            'not': lambda: Builtins.logic_op(self, 'not', args),
+            # 控制
+            'if': lambda: Builtins.control(self, 'if', args),
+            'do': lambda: Builtins.control(self, 'do', args),
+            'loop': lambda: Builtins.control(self, 'loop', args),
+            # 遍历
+            'for': lambda: Builtins.traversal(self, args),
+            # 定义/赋值
+            'set': lambda: Builtins.define_var(self, args),
+            'fn': lambda: Commands.define(self, args),
+            # 传感器/执行器
+            'write': lambda: Builtins.set_sensor(self, args),
+            'query': lambda: Builtins.query(self, args),
+            'context': lambda: Builtins.context_op(self, args),
+            'read': lambda: Builtins._sensor_read(self, args),
+            # 输出/输入/调试
+            'print': lambda: Builtins.output(self, args),
+            'load': lambda: Builtins._load_file(self, args),
+            'input': lambda: Builtins.input_op(self, args),
+            'debug': lambda: Builtins.debug_op(self, args),
+            # 算术
+            'add': lambda: Builtins.arithmetic(self, 'add', args),
+            'sub': lambda: Builtins.arithmetic(self, 'sub', args),
+            'mul': lambda: Builtins.arithmetic(self, 'mul', args),
+            'div': lambda: Builtins.arithmetic(self, 'div', args),
+            'mod': lambda: Builtins.arithmetic(self, 'mod', args),
+            'pow': lambda: Builtins.arithmetic(self, 'pow', args),
+            'digit': lambda: Builtins.arithmetic(self, 'digit', args),
+            # 比较
+            'eq': lambda: Builtins.comparison(self, 'eq', args),
+            'gt': lambda: Builtins.comparison(self, 'gt', args),
+            'lt': lambda: Builtins.comparison(self, 'lt', args),
+            'ne': lambda: Builtins.comparison(self, 'ne', args),
+            'gte': lambda: Builtins.comparison(self, 'gte', args),
+            'lte': lambda: Builtins.comparison(self, 'lte', args),
+            'same': lambda: Builtins.equals_op(self, args),
+            # 数学函数
+            'abs': lambda: Builtins.math_abs(self, args),
+            'max': lambda: Builtins.math_max(self, args),
+            'min': lambda: Builtins.math_min(self, args),
+            'sqrt': lambda: Builtins.math_sqrt(self, args),
+            'random': lambda: Builtins.math_random(self, args),
+            'random_state': lambda: Builtins.math_random_state(self, args),
+            # 字符串
+            'concat': lambda: Builtins.string_concat(self, args),
+            'length': lambda: Builtins.string_length(self, args),
+            # 列表/数组/字典
+            'list': lambda: Builtins.list_new(self, args),
+            'list_concat': lambda: Builtins.list_concat(self, args),
+            'list_len': lambda: Builtins.list_length(self, args),
+            'str_to_list': lambda: Builtins.str_to_list(self, args),
+            'array': lambda: Builtins.array_new(self, args),
+            'array_len': lambda: Builtins.array_length(self, args),
+            'array_to_list': lambda: Builtins.array_to_list(self, args),
+            'get': lambda: Builtins.generic_get(self, args),
+            'set_element': lambda: Builtins.generic_set(self, args),
+            'dict': lambda: Builtins.dict_new(self, args),
+            'get_key': lambda: Builtins.dict_get(self, args),
+            'set_key': lambda: Builtins.dict_set(self, args),
+            # 高阶函数
+            'lambda': lambda: Builtins.make_lambda(self, args),
+            'apply': lambda: Builtins.apply(self, args),
+            'map': lambda: Builtins.map_op(self, args),
+            'filter': lambda: Builtins.filter_op(self, args),
+            'reduce': lambda: Builtins.reduce_op(self, args),
+            # 返回/时间/文件/类型等
+            'return': lambda: Builtins.return_op(self, args),
+            'time': lambda: Builtins.time_now(self, args),
+            'sleep': lambda: Builtins.sleep_op(self, args),
+            'read_file': lambda: Builtins.read_file_op(self, args),
+            'write_file': lambda: Builtins.write_file_op(self, args),
+            'is_number': lambda: Builtins.is_number(self, args),
+            'is_string': lambda: Builtins.is_string(self, args),
+            'str_equals': lambda: Builtins.str_equals(self, args),
+            'try': lambda: Builtins.try_catch(self, args),
+            'judge': lambda: Builtins.judge_op(self, args),
         }
 
-        if op in dispatch:
-            return dispatch[op]()
+        if internal in dispatch:
+            return dispatch[internal]()
+
         # 变量作为函数或容器调用
         if op in self.vars:
             val = self.vars[op]
             from builtins_ops import FunctionValue
-            # 1. 函数调用
             if isinstance(val, FunctionValue):
                 evaluated_args = [self.eval(a) for a in args]
                 return val.call(self, evaluated_args)
-            # 2. 容器索引（列表/数组/字典）
             if isinstance(val, (list, ArrayValue, dict)):
                 if len(args) != 1:
                     raise SyntaxError(f"容器索引需要一个参数，但提供了 {len(args)} 个")
                 idx = self.eval(args[0])
                 if isinstance(val, dict):
-                    # 字典的键可以是整数或字符串，TritValue 自动转整数
                     key = idx.to_int() if isinstance(idx, TritValue) else idx
                     return val[key]
                 else:
-                    # 列表、数组用整数索引
                     index_int = idx.to_int() if isinstance(idx, TritValue) else idx
                     return val[index_int]
-            # 变量既不是函数也不是容器
             raise TypeError(f"变量 '{op}' 的值不可调用或索引")
         return Commands.call(self, op, args)
-    
+
     @staticmethod
     def _is_valid_identifier(s: str) -> bool:
-        """判断是否可能是一个变量名（不含点号等特殊字符）"""
         if not s:
             return False
         for c in s:

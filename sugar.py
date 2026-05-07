@@ -1,153 +1,301 @@
 """
 类 C 大括号语法 → 三言 S‑表达式 AST 转换器
-支持：中英运算符（中缀/前缀）、连续赋值、否则若/再若、错误位置、中文引号、负数数字、原文块
+支持：中英运算符、全角符号、国际皮肤、模板插值、三态分支判
 """
 from typing import List
 
 
 class SugarConverter:
-    CN_OPS = {'大于', '小于', '等于', '不等于', '大于等于', '小于等于',
-              '加', '减', '乘', '除', '余', '幂'}
-
     @staticmethod
     def tokenize(code: str) -> List[str]:
+        # 全局替换全角空格为半角空格，彻底解决中文输入法问题
+        code = code.replace('\u3000', ' ')
         tokens = []
-        i, n = 0, len(code)
-        while i < n:
+        current = ''
+        i = 0
+        length = len(code)
+
+        fullwidth_map = {
+            '（': '(', '）': ')', '，': ',', '；': ';', '＝': '=', '＞': '>', '＜': '<',
+            '＋': '+', '－': '-', '＊': '*', '／': '/', '％': '%', '＾': '^',
+            '！': '!', '｛': '{', '｝': '}', '：': ':', '。': '.',
+        }
+
+        while i < length:
             c = code[i]
-            if c in (' ', '\t', '\n', '\r'):
-                i += 1; continue
-            # 多字符符号运算符
-            if c == '>' and i+1 < n and code[i+1] == '=':
-                tokens.append('>='); i += 2; continue
-            if c == '<' and i+1 < n and code[i+1] == '=':
-                tokens.append('<='); i += 2; continue
-            if c == '=' and i+1 < n and code[i+1] == '=':
-                tokens.append('=='); i += 2; continue
-            if c == '!' and i+1 < n and code[i+1] == '=':
-                tokens.append('!='); i += 2; continue
-            # 注释
-            if c == '/' and i+1 < n and code[i+1] == '/':
-                i += 2
-                while i < n and code[i] != '\n': i += 1
-                continue
-            if c == '#':
-                i += 1
-                while i < n and code[i] != '\n': i += 1
-                continue
-            # 单字符符号
-            if c == '{':    tokens.append('{'); i += 1; continue
-            if c == '}':    tokens.append('}'); i += 1; continue
-            if c in ('(', '（'): tokens.append('('); i += 1; continue
-            if c in (')', '）'): tokens.append(')'); i += 1; continue
-            if c in (';', '；'): tokens.append(';'); i += 1; continue
-            if c in (',', '，'): tokens.append(','); i += 1; continue
-            if c == '=':    tokens.append('='); i += 1; continue
-            if c == '>':    tokens.append('>'); i += 1; continue
-            if c == '<':    tokens.append('<'); i += 1; continue
-            if c == '+':    tokens.append('+'); i += 1; continue
-            # 处理减号/负号：如果后面是数字，合并为负数token
-            if c == '-':
-                # 判断是否应该合并为负数token
-                if i+1 < n and code[i+1].isdigit():
-                    # 前一个字符是分隔类符号，或者当前位置是开头
-                    if i == 0 or code[i-1] in (' ', '\t', '\n', '(', '（', ',', '，', '=', '{', '[', ':', '：'):
-                        i += 1
-                        start = i
-                        while i < n and code[i].isdigit(): i += 1
-                        tokens.append('-' + code[start:i])
-                        continue
-                tokens.append('-')
+            # 跳过所有空白（半角、全角空格、制表等）
+            if c in (' ', '\t', '\n', '\r', '\u3000'):
+                if current:
+                    tokens.append(current)
+                    current = ''
                 i += 1
                 continue
-            if c == '*':    tokens.append('*'); i += 1; continue
-            if c == '/':    tokens.append('/'); i += 1; continue
-            if c == '%':    tokens.append('%'); i += 1; continue
-            if c == '^':    tokens.append('^'); i += 1; continue
-            if c == '.':    tokens.append('.'); i += 1; continue
-            # 字符串（中英文引号）
+
+            # 全角符号转换（字符串内部不会执行到这里，因为字符串已单独处理并跳过）
+            if c in fullwidth_map:
+                c = fullwidth_map[c]
+
+            # 字符串处理（中英文引号）
             if c in ('"', '\u201c', '\u2018'):
+                if current:
+                    tokens.append(current)
+                    current = ''
                 quote = c
                 end_quote = '"' if quote == '"' else ('\u201d' if quote == '\u201c' else '\u2019')
                 j = i + 1
-                while j < n and code[j] != end_quote:
-                    if code[j] == '\\': j += 1
+                while j < length and code[j] != end_quote:
+                    if code[j] == '\\':
+                        j += 1
                     j += 1
-                if j < n: j += 1
-                tokens.append(code[i:j]); i = j; continue
-            # 标识符 / 数字 / 中文运算符 / 原文块
+                if j < length:
+                    j += 1
+                tokens.append(code[i:j])
+                i = j
+                continue
+
+            # 注释处理
+            if c == '/' and i+1 < length and code[i+1] == '/':
+                if current:
+                    tokens.append(current)
+                    current = ''
+                i += 2
+                while i < length and code[i] != '\n':
+                    i += 1
+                continue
+            if c == '#':
+                if current:
+                    tokens.append(current)
+                    current = ''
+                i += 1
+                while i < length and code[i] != '\n':
+                    i += 1
+                continue
+
+            # 单字符符号
+            if c in ('{', '}', '(', ')', ';', ',', '=', '>', '<', '+', '-', '*', '/', '%', '^', '.'):
+                if current:
+                    tokens.append(current)
+                    current = ''
+                # 多字符操作符
+                if c == '>' and i+1 < length and code[i+1] == '=':
+                    tokens.append('>='); i += 2; continue
+                if c == '<' and i+1 < length and code[i+1] == '=':
+                    tokens.append('<='); i += 2; continue
+                if c == '=' and i+1 < length and code[i+1] == '=':
+                    tokens.append('=='); i += 2; continue
+                if c == '!' and i+1 < length and code[i+1] == '=':
+                    tokens.append('!='); i += 2; continue
+                if c == '-' and i+1 < length and code[i+1].isdigit():
+                    # 负数
+                    if i == 0 or code[i-1] in (' ', '\t', '\n', '(', '（', ',', '，', '=', '{', '[', ':', '：'):
+                        i += 1
+                        start = i
+                        while i < length and code[i].isdigit():
+                            i += 1
+                        tokens.append('-' + code[start:i])
+                        continue
+                tokens.append(c)
+                i += 1
+                continue
+
+            # 标识符、数字、中文关键字
             if c.isalpha() or c == '_' or '\u4e00' <= c <= '\u9fff' or '\u3400' <= c <= '\u4dbf':
                 start = i
-                while i < n and (code[i].isalnum() or code[i] == '_' or
-                                 '\u4e00' <= code[i] <= '\u9fff' or
-                                 '\u3400' <= code[i] <= '\u4dbf' or
-                                 code[i] == '.'):
+                while i < length and (code[i].isalnum() or code[i] == '_' or
+                                      '\u4e00' <= code[i] <= '\u9fff' or
+                                      '\u3400' <= code[i] <= '\u4dbf' or
+                                      code[i] == '.'):
                     i += 1
                 word = code[start:i]
-                # 检测是否为“原文{...}”块
-                if word == '原文' and i < n and code[i] == '{':
-                    i += 1  # 跳过 {
+                if word == '原文' and i < length and code[i] == '{':
+                    i += 1
                     content_start = i
                     brace_depth = 1
-                    while i < n and brace_depth > 0:
+                    while i < length and brace_depth > 0:
                         if code[i] == '{': brace_depth += 1
                         elif code[i] == '}': brace_depth -= 1
                         i += 1
-                    inner = code[content_start:i-1]   # 去掉最后那个 }
-                    # 生成特殊 token，标记为原文
+                    inner = code[content_start:i-1]
                     tokens.append(f'原文{{{inner}}}')
                     continue
-                if word in SugarConverter.CN_OPS:
-                    tokens.append(word)
-                else:
-                    tokens.append(word)
+                if word == '模板' and i < length and code[i] == '{':
+                    template_tokens, new_i = SugarConverter._parse_template(code, i+1)
+                    tokens.extend(template_tokens)
+                    i = new_i
+                    continue
+                tokens.append(word)
                 continue
+
             if c.isdigit():
                 start = i
-                while i < n and code[i].isdigit(): i += 1
-                tokens.append(code[start:i]); continue
-            if c == '：': tokens.append('：'); i += 1; continue
+                while i < length and code[i].isdigit():
+                    i += 1
+                tokens.append(code[start:i])
+                continue
+
             i += 1
+
+        if current:
+            tokens.append(current)
         return tokens
 
+    @staticmethod
+    def _parse_template(code: str, start: int):
+        i = start
+        parts = []
+        current_text = []
+        while i < len(code):
+            ch = code[i]
+            if ch == '}':
+                if current_text:
+                    parts.append(''.join(current_text))
+                    current_text = []
+                i += 1
+                break
+            elif ch == '$' and i+1 < len(code) and code[i+1] == '{':
+                if current_text:
+                    parts.append(''.join(current_text))
+                    current_text = []
+                i += 2
+                expr_tokens, new_i = SugarConverter._parse_expr_until_brace(code, i)
+                parts.append(expr_tokens)
+                i = new_i
+            else:
+                current_text.append(ch)
+                i += 1
+        if current_text:
+            parts.append(''.join(current_text))
+        tokens = ['concat', '(']
+        for idx, part in enumerate(parts):
+            if idx % 2 == 0:
+                tokens.append(f'"{part}"')
+            else:
+                tokens.extend(part)
+            if idx < len(parts) - 1:
+                tokens.append(',')
+        tokens.append(')')
+        return tokens, i
+
+    @staticmethod
+    def _parse_expr_until_brace(code: str, start: int):
+        i = start
+        brace_depth = 1
+        expr_chars = []
+        while i < len(code) and brace_depth > 0:
+            ch = code[i]
+            if ch == '{':
+                brace_depth += 1
+                expr_chars.append('{')
+                i += 1
+            elif ch == '}':
+                brace_depth -= 1
+                if brace_depth == 0:
+                    i += 1
+                    break
+                else:
+                    expr_chars.append('}')
+                    i += 1
+            elif ch == '"':
+                j = i + 1
+                while j < len(code) and code[j] != '"':
+                    if code[j] == '\\': j += 1
+                    j += 1
+                expr_chars.extend(code[i:j+1])
+                i = j + 1
+            else:
+                expr_chars.append(ch)
+                i += 1
+        expr_str = ''.join(expr_chars)
+        expr_tokens = SugarConverter.tokenize(expr_str)
+        return expr_tokens, i
+
     @classmethod
-    def convert(cls, code: str):
+    def convert(cls, code: str, skin_manager=None):
         tokens = cls.tokenize(code)
-        parser = _Parser(tokens)
+        parser = _Parser(tokens, skin_manager)
         return parser.parse_program()
 
 
 class _Parser:
-    PREC = {
-        '==': 1, '!=': 1, '>': 1, '<': 1, '>=': 1, '<=': 1,
-        '大于': 1, '小于': 1, '等于': 1, '不等于': 1, '大于等于': 1, '小于等于': 1,
-        '+': 2, '-': 2,
-        '加': 2, '减': 2,
-        '*': 3, '/': 3, '%': 3,
-        '乘': 3, '除': 3, '余': 3,
-        '^': 4, '幂': 4,
-    }
-    RIGHT_ASSOC = {'^', '幂'}
-    OP_MAP = {
-        '>': '大于', '<': '小于', '>=': '大于等于', '<=': '小于等于',
-        '==': '等于', '!=': '不等于',
-        '+': '加', '-': '减', '*': '乘', '/': '除', '%': '余', '^': '幂',
-        '大于': '大于', '小于': '小于', '等于': '等于', '不等于': '不等于',
-        '大于等于': '大于等于', '小于等于': '小于等于',
-        '加': '加', '减': '减', '乘': '乘', '除': '除', '余': '余', '幂': '幂',
-    }
-    PREFIXABLE_OPS = {
-        '幂', '加', '减', '乘', '除', '余',
-        '大于', '小于', '等于', '不等于', '大于等于', '小于等于',
-        '非', '且', '或', '取位', '读'
-    }
-    PREFIXABLE_OPS_SINGLE_ARG = {'读', '非', '取位'}
+    @staticmethod
+    def _is_ident(tok):
+        if not tok or tok[0].isdigit():
+            return False
+        for c in tok:
+            if c.isalnum() or c == '_' or '\u4e00' <= c <= '\u9fff' or '\u3400' <= c <= '\u4dbf':
+                continue
+            return False
+        return True
 
-    def __init__(self, tokens):
+    def __init__(self, tokens, skin_manager=None):
         self.tokens = tokens
         self.pos = 0
         self.elif_depth = 0
         self.max_elif_depth = 50
+        self.skin = skin_manager
+
+        # 操作符映射
+        self.OP_MAP = {}
+        if self.skin:
+            for intern, name in self.skin.skin_data.get('operators', {}).items():
+                self.OP_MAP[name] = intern
+            self.OP_MAP.update({
+                '>': 'gt', '<': 'lt', '==': 'eq', '!=': 'ne', '>=': 'gte', '<=': 'lte',
+                '+': 'add', '-': 'sub', '*': 'mul', '/': 'div', '%': 'mod', '^': 'pow'
+            })
+        else:
+            self.OP_MAP = {
+                '大于': 'gt', '小于': 'lt', '等于': 'eq', '不等于': 'ne',
+                '大于等于': 'gte', '小于等于': 'lte',
+                '加': 'add', '减': 'sub', '乘': 'mul', '除': 'div', '余': 'mod', '幂': 'pow',
+                '且': 'and', '或': 'or', '非': 'not', '取位': 'digit',
+                '>': 'gt', '<': 'lt', '==': 'eq', '!=': 'ne', '>=': 'gte', '<=': 'lte',
+                '+': 'add', '-': 'sub', '*': 'mul', '/': 'div', '%': 'mod', '^': 'pow'
+            }
+
+        # 优先级（包含逻辑运算符）
+        self.PREC = {
+            'eq': 1, 'ne': 1, 'gt': 1, 'lt': 1, 'gte': 1, 'lte': 1,
+            'and': 2, 'or': 2,
+            'add': 3, 'sub': 3,
+            'mul': 4, 'div': 4, 'mod': 4,
+            'pow': 5,
+        }
+        self.RIGHT_ASSOC = {'pow'}
+
+        self.PREFIXABLE_OPS = {
+            'add', 'sub', 'mul', 'div', 'mod', 'pow',
+            'gt', 'lt', 'eq', 'ne', 'gte', 'lte',
+            'not', 'and', 'or', 'digit', 'read'
+        }
+        self.PREFIXABLE_OPS_SINGLE_ARG = {'read', 'not', 'digit'}
+
+        # 关键字反向映射
+        self.KEYWORD_REVERSE = {}
+        if self.skin:
+            for intern, name in self.skin.skin_data.get('keywords', {}).items():
+                self.KEYWORD_REVERSE[name] = intern
+        else:
+            self.KEYWORD_REVERSE = {
+                '设': 'set', '若': 'if', '再若': 'elif', '否则': 'else',
+                '循环': 'loop', '遍历': 'for', '定义': 'fn',
+                '输出': 'print', '查': 'query', '置': 'write', '读': 'read',
+                '加载': 'load', '输入': 'input', '调试': 'debug',
+                '等待': 'sleep', '读文件': 'read_file', '写文件': 'write_file',
+                '是数字': 'is_number', '是字符串': 'is_string', '字符串相等': 'str_equals',
+                'λ': 'lambda', '函数': 'lambda', '尝试': 'try', '捕获': 'catch',
+                '返回': 'return', '对': 'context', '应用': 'apply',
+                '映射': 'map', '过滤': 'filter', '归并': 'reduce',
+                '判': 'judge', '随机态': 'random_state', '随机数': 'random',
+                '绝对值': 'abs', '最大值': 'max', '最小值': 'min', '平方根': 'sqrt',
+                '连接': 'concat', '取长': 'length',
+                '列表': 'list', '列表合': 'list_concat', '表长': 'list_len', '字列': 'str_to_list',
+                '数组': 'array', '组长': 'array_len', '数组列': 'array_to_list',
+                '取': 'get', '置元素': 'set_element',
+                '字典': 'dict', '取键': 'get_key', '置键': 'set_key',
+                '同': 'same', '取位': 'digit', '当前时间': 'time',
+                '做': 'do'
+            }
 
     def _err(self, msg):
         start = max(0, self.pos - 2)
@@ -160,7 +308,8 @@ class _Parser:
 
     def consume(self, expected=None):
         if self.pos >= len(self.tokens):
-            if expected: raise self._err(f"期待 {expected}，但已到结尾")
+            if expected:
+                raise self._err(f"期待 {expected}，但已到结尾")
             return None
         tok = self.tokens[self.pos]
         if expected and tok != expected:
@@ -174,70 +323,81 @@ class _Parser:
             stmt = self.parse_statement()
             if stmt is not None:
                 stmts.append(stmt)
-        return ['做'] + stmts if len(stmts) > 1 else (stmts[0] if stmts else [])
+        return ['do'] + stmts if len(stmts) > 1 else (stmts[0] if stmts else [])
 
     def parse_statement(self):
         tok = self.peek()
-        if tok is None: return None
+        if tok is None:
+            return None
+        # 单独分号视为空语句，跳过
+        if tok == ';':
+            self.consume(';')
+            return None
         if tok == '尝试':
             return self.parse_try()
-        if tok == '若': return self.parse_if()
-        if tok == '循环': return self.parse_loop()
-        if tok == '遍历': return self.parse_traversal()
-        if tok == '定义': return self.parse_definition()
-        if tok == '做': return self.parse_do_block()
+        internal = self.KEYWORD_REVERSE.get(tok)
+        if internal:
+            if internal == 'if': return self.parse_if()
+            if internal == 'loop': return self.parse_loop()
+            if internal == 'for': return self.parse_traversal()
+            if internal == 'fn': return self.parse_definition()
+            if internal == 'do': return self.parse_do_block()
+            if internal == 'try': return self.parse_try()
+            if internal == 'judge': return self.parse_judge()
         if tok in ('否则', '再若'):
             raise self._err(f"{tok} 不能单独作为语句，需跟在「若」之后")
         stmt = self.parse_simple_statement()
-        # 分号完全可选：有就消耗，没有也不报错
         if self.peek() == ';':
             self.consume(';')
-        # 如果后面直接是 '}'、EOF 也合法
         return stmt
 
     def parse_simple_statement(self):
         tok = self.peek()
-        if tok == '设':
-            self.consume('设')
+        internal = self.KEYWORD_REVERSE.get(tok)
+        if internal == 'set':
+            self.consume(tok)
             var = self.consume()
+            if not self._is_ident(var) or var[0].isdigit():
+                raise self._err(f"非法变量名: {var}")
             if self.peek() == '=':
                 self.consume('=')
                 value = self.parse_expression()
-                return ['设', var, value]
-            raise self._err("设定语句格式: 设 变量 = 表达式")
-        elif tok == '输出':
-            self.consume('输出')
+                return ['set', var, value]
+            raise self._err("设定语句格式: 变量 = 表达式")
+        elif internal == 'print':
+            self.consume(tok)
             self.consume('(')
             expr = self.parse_expression()
             self.consume(')')
-            return ['输出', expr]
-        elif tok == '查':
-            self.consume('查')
-            return ['查', self.parse_expression()]
-        elif tok == '置':
-            self.consume('置')
-            if self.peek() == '(': return self.parse_set_batch()
+            return ['print', expr]
+        elif internal == 'query':
+            self.consume(tok)
+            return ['query', self.parse_expression()]
+        elif internal == 'write':
+            self.consume(tok)
+            if self.peek() == '(':
+                return self.parse_set_batch()
             obj = self.parse_expression()
             if isinstance(obj, str) and '.' in obj:
-                return ['置', obj]
+                return ['write', obj]
             elif self.peek() == '=':
                 self.consume('=')
-                return ['置', obj, self.parse_expression()]
-            raise self._err("置 语句格式: 置 对象.状态 或 置 对象 = 状态")
-        elif tok == '读':
-            self.consume('读')
-            return ['读', self.consume()]
-        elif tok == '加载':
-            self.consume('加载')
-            return ['加载', self.parse_expression()]
-        elif tok == '输入':
-            self.consume('输入')
+                return ['write', obj, self.parse_expression()]
+            raise self._err("置 语句格式: 对象.状态 或 对象 = 状态")
+        elif internal == 'read':
+            self.consume(tok)
+            return ['read', self.consume()]
+        elif internal == 'load':
+            self.consume(tok)
+            return ['load', self.parse_expression()]
+        elif internal == 'input':
+            self.consume(tok)
             self.consume('(')
             prompt = self.parse_expression() if self.peek() != ')' else None
             self.consume(')')
-            return ['输入', prompt] if prompt else ['输入']
-        elif tok == '调试':
-            self.consume('调试')
+            return ['input', prompt] if prompt else ['input']
+        elif internal == 'debug':
+            self.consume(tok)
             args = []
             if self.peek() == '(':
                 self.consume('(')
@@ -245,52 +405,48 @@ class _Parser:
                     args.append(self.parse_expression())
                     if self.peek() == ',': self.consume(',')
                 self.consume(')')
-            return ['调试'] + args
-
-        # === 新增命令（等待、读文件、写文件、是数字、是字符串、字符串相等）===
-        elif tok == '等待':
-            self.consume('等待')
+            return ['debug'] + args
+        elif internal == 'sleep':
+            self.consume(tok)
             self.consume('(')
             sec = self.parse_expression()
             self.consume(')')
-            return ['等待', sec]
-        elif tok == '读文件':
-            self.consume('读文件')
+            return ['sleep', sec]
+        elif internal == 'read_file':
+            self.consume(tok)
             self.consume('(')
             path = self.parse_expression()
             self.consume(')')
-            return ['读文件', path]
-        elif tok == '写文件':
-            self.consume('写文件')
+            return ['read_file', path]
+        elif internal == 'write_file':
+            self.consume(tok)
             self.consume('(')
             path = self.parse_expression()
             self.consume(',')
             content = self.parse_expression()
             self.consume(')')
-            return ['写文件', path, content]
-        elif tok == '是数字':
-            self.consume('是数字')
+            return ['write_file', path, content]
+        elif internal == 'is_number':
+            self.consume(tok)
             self.consume('(')
             val = self.parse_expression()
             self.consume(')')
-            return ['是数字', val]
-        elif tok == '是字符串':
-            self.consume('是字符串')
+            return ['is_number', val]
+        elif internal == 'is_string':
+            self.consume(tok)
             self.consume('(')
             val = self.parse_expression()
             self.consume(')')
-            return ['是字符串', val]
-        elif tok == '字符串相等':
-            self.consume('字符串相等')
+            return ['is_string', val]
+        elif internal == 'str_equals':
+            self.consume(tok)
             self.consume('(')
             a = self.parse_expression()
             self.consume(',')
             b = self.parse_expression()
             self.consume(')')
-            return ['字符串相等', a, b]
-
-        # === 匿名函数（函数/λ）===
-        elif tok == 'λ' or tok == '函数':
+            return ['str_equals', a, b]
+        elif internal == 'lambda':
             self.consume(tok)
             self.consume('(')
             params = []
@@ -300,16 +456,27 @@ class _Parser:
                     self.consume(',')
             self.consume(')')
             body = self.parse_block()
-            return ['函数', params] + body
-
-        # === 通用：连续赋值 或 表达式/函数调用 ===
+            return ['lambda', params] + body
+        elif internal == 'return':
+            self.consume(tok)
+            expr = self.parse_expression()
+            return ['return', expr]
+        elif internal == 'context':
+            self.consume(tok)
+            obj = self.parse_expression()
+            body = self.parse_block()
+            return ['context', obj] + body
+        elif internal == 'try':
+            return self.parse_try()
         else:
+            # 连续赋值 或 表达式/函数调用
             if self.pos + 2 < len(self.tokens) and self.tokens[self.pos+1] == '=':
                 var = self.consume()
+                if not self._is_ident(var) or var[0].isdigit():
+                    raise self._err(f"非法变量名: {var}")
                 self.consume('=')
                 value = self.parse_expression()
-                return ['设', var, value]
-            # 通用函数调用：标识符后面紧跟 '('
+                return ['set', var, value]
             if isinstance(tok, str) and self.pos + 1 < len(self.tokens) and self.tokens[self.pos + 1] == '(':
                 func = self.consume()
                 self.consume('(')
@@ -331,18 +498,22 @@ class _Parser:
         while self.peek() != ')':
             items.append(self.consume())
         self.consume(')')
-        return ['置', items]
+        return ['write', items]
 
     def parse_expression(self, min_prec=0):
         lhs = self.parse_primary()
         while True:
             op = self.peek()
-            if op not in self.PREC or self.PREC[op] < min_prec:
+            if op is None: break
+            internal_op = self.OP_MAP.get(op)
+            if internal_op is None or internal_op not in self.PREC:
                 break
-            next_min = self.PREC[op] + (0 if op in self.RIGHT_ASSOC else 1)
+            prec = self.PREC[internal_op]
+            if prec < min_prec:
+                break
+            next_min = prec + (0 if internal_op in self.RIGHT_ASSOC else 1)
             self.consume(op)
             rhs = self.parse_expression(next_min)
-            internal_op = self.OP_MAP[op]
             lhs = [internal_op, lhs, rhs]
         return lhs
 
@@ -355,23 +526,19 @@ class _Parser:
             expr = self.parse_expression()
             self.consume(')')
             return expr
-        # 字符串（引号）
         if tok and tok[0] in ('"', '\u201c', '\u2018') and len(tok) >= 2:
             self.consume()
             return tok[1:-1]
-        # 原文块
         if isinstance(tok, str) and tok.startswith('原文{') and tok.endswith('}'):
             self.consume()
             return tok[3:-1]
-        # 数字（含负数）
         if tok.isdigit() or (tok.startswith('-') and tok[1:].isdigit()):
             self.consume()
             return int(tok)
 
-        # 标识符、关键字、匿名函数
-        if tok.isalpha() or tok[0] == '_' or '\u4e00' <= tok[0] <= '\u9fff':
-            # 匿名函数
-            if tok in ('函数', 'λ'):
+        if self._is_ident(tok):
+            internal = self.KEYWORD_REVERSE.get(tok)
+            if internal == 'lambda':
                 if self.pos + 1 < len(self.tokens) and self.tokens[self.pos + 1] == '(':
                     self.consume(tok)
                     self.consume('(')
@@ -382,37 +549,44 @@ class _Parser:
                             self.consume()
                     self.consume(')')
                     body = self.parse_block()
-                    return [tok, params] + body
-            # 普通函数调用：标识符后面紧跟 '(' 或 '（'
+                    return ['lambda', params] + body
+                        # 保存原始 token
             saved_tok = tok
-            self.consume()  # 吃掉标识符
+            self.consume()
+            # 如果是关键字命令，转换为内部标识符，以便正确生成 AST
+            internal_saved = self.KEYWORD_REVERSE.get(saved_tok, saved_tok)
+
+            # 函数调用形式：标识符后跟 '(' 或 '（'
             if self.peek() in ('(', '（'):
-                func = saved_tok
-                self.consume()  # 吃掉左括号
+                func = internal_saved          # 使用内部标识
+                self.consume()
                 args = []
                 while self.peek() not in (')', '）'):
                     args.append(self.parse_expression())
                     if self.peek() in (',', '，'):
                         self.consume()
-                self.consume()  # 吃掉右括号
+                self.consume()
                 return [func] + args
-            # 前缀操作符（若无参数则当作变量）
-            if saved_tok in self.PREFIXABLE_OPS:
+
+            # 前缀操作符（如读、非、取位等）
+            if internal_saved in self.PREFIXABLE_OPS or self.OP_MAP.get(internal_saved) in self.PREFIXABLE_OPS:
+                internal_op = internal_saved
                 args = []
-                if saved_tok in self.PREFIXABLE_OPS_SINGLE_ARG:
-                    # 一元前缀：只取紧邻的一个参数
-                    if (self.peek() is not None and
-                        self.peek() not in (';', '}', ')', '）', ',', '，')):
+                if internal_op in self.PREFIXABLE_OPS_SINGLE_ARG:
+                    # 一元前缀：取下一个任意 token 作为参数（空白已在词法阶段跳过）
+                    if self.peek() is not None:
                         args.append(self.parse_primary())
                 else:
-                    # 多参数前缀：和原来一样
                     while (self.peek() is not None and
                            self.peek() not in (';', '}', ')', '）', ',', '，') and
-                           self.peek() not in self.PREC):
+                           self.OP_MAP.get(self.peek()) not in self.PREC):
                         args.append(self.parse_primary())
                 if args:
-                    return [saved_tok] + args
-            # 普通标识符
+                    return [internal_op] + args
+                else:
+                    return internal_op   # 无参数时返回操作符本身（例如单独的 `非`）
+
+            # 普通标识符（变量名或未识别的字符串）
             return saved_tok
         raise self._err(f"未知的表达式元素: {tok}")
 
@@ -420,7 +594,9 @@ class _Parser:
         self.consume('{')
         stmts = []
         while self.peek() != '}':
-            stmts.append(self.parse_statement())
+            stmt = self.parse_statement()
+            if stmt is not None:   # 忽略空语句（单独分号）
+                stmts.append(stmt)
         self.consume('}')
         return stmts
 
@@ -441,11 +617,11 @@ class _Parser:
                     elif_cond = self.parse_expression()
                     self.consume(')')
                     elif_body = self.parse_block()
-                    return ['若', cond, ['做'] + true_body,
-                            ['若', elif_cond, ['做'] + elif_body, self._parse_elif_tail()]]
+                    return ['if', cond, ['do'] + true_body,
+                            ['if', elif_cond, ['do'] + elif_body, self._parse_elif_tail()]]
                 else:
                     false_body = self.parse_block()
-                    return ['若', cond, ['做'] + true_body, ['做'] + false_body]
+                    return ['if', cond, ['do'] + true_body, ['do'] + false_body]
             elif nxt == '再若':
                 self.consume('再若')
                 self.consume('(')
@@ -454,24 +630,23 @@ class _Parser:
                 elif_body = self.parse_block()
                 false_part = self._parse_elif_tail()
                 if false_part is not None:
-                    return ['若', cond, ['做'] + true_body,
-                            ['若', elif_cond, ['做'] + elif_body, false_part]]
+                    return ['if', cond, ['do'] + true_body,
+                            ['if', elif_cond, ['do'] + elif_body, false_part]]
                 else:
-                    return ['若', cond, ['做'] + true_body,
-                            ['若', elif_cond, ['做'] + elif_body]]
+                    return ['if', cond, ['do'] + true_body,
+                            ['if', elif_cond, ['do'] + elif_body]]
             else:
-                return ['若', cond, ['做'] + true_body]
-    
+                return ['if', cond, ['do'] + true_body]
+
     def parse_try(self):
         self.consume('尝试')
-        try_body = self.parse_block()   # 解析 { ... }
+        try_body = self.parse_block()
         self.consume('捕获')
         self.consume('(')
-        error_var = self.consume()       # 错误变量名
+        error_var = self.consume()
         self.consume(')')
         catch_body = self.parse_block()
-        # AST: ['尝试', ['做'] + try_body, ['捕获', error_var] + catch_body]
-        return ['尝试', ['做'] + try_body, ['捕获', error_var] + catch_body]
+        return ['try', ['do'] + try_body, ['catch', error_var] + catch_body]
 
     def _parse_elif_tail(self):
         self.elif_depth += 1
@@ -488,10 +663,10 @@ class _Parser:
                         cond = self.parse_expression()
                         self.consume(')')
                         body = self.parse_block()
-                        return ['若', cond, ['做'] + body, self._parse_elif_tail()]
+                        return ['if', cond, ['do'] + body, self._parse_elif_tail()]
                     else:
                         false_body = self.parse_block()
-                        return ['做'] + false_body
+                        return ['do'] + false_body
                 elif nxt == '再若':
                     self.consume('再若')
                     self.consume('(')
@@ -500,9 +675,9 @@ class _Parser:
                     body = self.parse_block()
                     false_part = self._parse_elif_tail()
                     if false_part is not None:
-                        return ['若', cond, ['做'] + body, false_part]
+                        return ['if', cond, ['do'] + body, false_part]
                     else:
-                        return ['若', cond, ['做'] + body]
+                        return ['if', cond, ['do'] + body]
                 else:
                     return None
         finally:
@@ -514,17 +689,22 @@ class _Parser:
         cond = self.parse_expression()
         self.consume(')')
         body = self.parse_block()
-        return ['循环', cond] + body
+        return ['loop', cond] + body
 
     def parse_traversal(self):
-        self.consume('遍历')
+        self.consume('遍历')       # 消耗 '遍历'（中文或英文皮肤的关键字）
         var = self.consume()
-        self.consume('从')
+        # 消耗 '从' 关键字，如果存在
+        if self.peek() == '从':
+            self.consume('从')
+        # 如果皮肤改变了关键字，可能没有 '从'；此时假设之后直接是起始表达式
         start = self.parse_expression()
-        self.consume('到')
+        # 消耗 '到' 关键字，如果存在
+        if self.peek() == '到':
+            self.consume('到')
         end = self.parse_expression()
         body = self.parse_block()
-        return ['遍历', var, start, end] + body
+        return ['for', var, start, end] + body
 
     def parse_definition(self):
         self.consume('定义')
@@ -533,11 +713,29 @@ class _Parser:
         params = []
         while self.peek() != ')':
             params.append(self.consume())
-            if self.peek() == ',': self.consume(',')
+            if self.peek() == ',':
+                self.consume(',')
         self.consume(')')
         body = self.parse_block()
-        return ['定义', name, params] + body
+        return ['fn', name, params] + body
 
     def parse_do_block(self):
         self.consume('做')
-        return ['做'] + self.parse_block()
+        return ['do'] + self.parse_block()
+
+    def parse_judge(self):
+        self.consume()   # 消耗 '判' 或皮肤对应的关键字
+        expr = self.parse_expression()
+        self.consume('{')
+        bodies = {'真': None, '可能': None, '假': None}
+        while self.peek() != '}':
+            tag = self.consume()
+            if tag not in bodies:
+                raise self._err(f"判 分支必须是 真/可能/假，但得到 {tag}")
+            body = self.parse_block()
+            bodies[tag] = body
+        self.consume('}')
+        true_body = ['do'] + (bodies['真'] if bodies['真'] else [])
+        maybe_body = ['do'] + (bodies['可能'] if bodies['可能'] else [])
+        false_body = ['do'] + (bodies['假'] if bodies['假'] else [])
+        return ['judge', expr, true_body, maybe_body, false_body]

@@ -3,62 +3,75 @@ from lexer import tokenize
 from parser import parse
 from evaluator import SanyanEvaluator
 from sugar import SugarConverter
+from skin import SkinManager
 
 
-def demo():
+def demo(skin_mgr):
     print("\n========== 三言 v3.4 演示 ==========")
-    env = SanyanEvaluator()
-
-    env.eval(['定义', '设置设备', ['对象', '状态'], ['对', '对象', '状态']])
+    env = SanyanEvaluator(skin_manager=skin_mgr)
+    env.eval(['fn', '设置设备', ['对象', '状态'], ['context', '对象', '状态']])
     print("1. 智能设备控制")
     env.eval(['设置设备', '灯.亮'])
-    env.eval(['查', '灯'])
+    env.eval(['query', '灯'])
     env.eval(['设置设备', '窗帘.关'])
-    env.eval(['查', '窗帘'])
+    env.eval(['query', '窗帘'])
 
     print("\n2. 晚安模式（自定义命令）")
-    env.eval(['定义', '晚安', [], ['做', ['设置设备', '灯.灭'], ['设置设备', '窗帘.关']]])
+    env.eval(['fn', '晚安', [], ['do', ['设置设备', '灯.灭'], ['设置设备', '窗帘.关']]])
     env.eval(['晚安'])
-    env.eval(['查', '灯'])
-    env.eval(['查', '窗帘'])
+    env.eval(['query', '灯'])
+    env.eval(['query', '窗帘'])
 
     print("\n3. 数学运算与比较")
-    env.eval(['设', 'a', 10])
-    env.eval(['输出', ['加', 'a', 5]])
-    env.eval(['输出', ['大于', 'a', 3]])
+    env.eval(['set', 'a', 10])
+    env.eval(['print', ['add', 'a', 5]])
+    env.eval(['print', ['gt', 'a', 3]])
 
     print("\n4. 条件分支")
-    env.eval(['若', ['大于', 'a', 5], ['输出', 1], ['输出', 0]])
+    env.eval(['if', ['gt', 'a', 5], ['print', 1], ['print', 0]])
 
     print("\n5. 循环")
-    env.eval(['设', 'i', 0])
-    env.eval(['循环', ['小于', 'i', 3], ['做', ['输出', 'i'], ['设', 'i', ['加', 'i', 1]]]])
+    env.eval(['set', 'i', 0])
+    env.eval(['loop', ['lt', 'i', 3], ['do', ['print', 'i'], ['set', 'i', ['add', 'i', 1]]]])
 
     print("\n6. 数学函数")
-    env.eval(['输出', ['绝对值', -5]])
-    env.eval(['输出', ['平方根', 81]])
-    env.eval(['输出', ['随机数', 1, 10]])
+    env.eval(['print', ['abs', -5]])
+    env.eval(['print', ['sqrt', 81]])
+    env.eval(['print', ['random', 1, 10]])
 
     print("\n7. 字符串拼接")
-    env.eval(['连接', '你好', '世界'])
-    env.eval(['输出', ['取长', 'hello']])
+    env.eval(['concat', '你好', '世界'])
+    env.eval(['print', ['length', 'hello']])
 
     print("========== 演示结束 ==========\n")
 
 
 def repl():
-    print("三言 v3.4 REPL (支持中英文语法、中缀表达式、多行输入)")
+    skin_mgr = SkinManager('chinese')
+    env = SanyanEvaluator(skin_manager=skin_mgr)
+    print("三言 v3.4 REPL (母语可定制)")
+    print("输入 :lang english 切换英文，:lang chinese 切换中文")
     print("输入（退出）或（exit）离开")
-    env = SanyanEvaluator()
     while True:
         try:
             code = input("三言> ").strip()
+            code = code.replace('\u3000', ' ')   # 全角空格 → 半角空格
             if not code:
                 continue
             if code in ('（退出）', '退出', '（exit）', 'exit'):
                 break
+            if code.startswith(':lang'):
+                parts = code.split()
+                if len(parts) == 2:
+                    lang = parts[1]
+                    if lang in ('chinese', 'english'):
+                        skin_mgr.switch_skin(lang)
+                        print(f"皮肤已切换至 {skin_mgr.lang}")
+                    else:
+                        print("支持的语言：chinese, english")
+                continue
 
-            # 多行输入支持（糖语法 & 原生语法，兼容全角括号）
+            # 多行输入支持
             while True:
                 if code.rstrip().endswith('{') or code.rstrip().endswith('（'):
                     pass
@@ -77,9 +90,8 @@ def repl():
                     continue
                 code += "\n" + next_line
 
-            # 优先尝试糖语法，失败回退原生
             try:
-                ast = SugarConverter.convert(code)
+                ast = SugarConverter.convert(code, skin_mgr)
                 result = env.eval(ast)
             except SyntaxError as e:
                 print(f"  糖语法解析错误: {e}")
@@ -96,14 +108,13 @@ def repl():
                 print(f"    输入内容: {code}")
                 continue
 
-            # 结果打印
             if result:
                 should_print = True
                 if isinstance(ast, list) and len(ast) > 0:
-                    no_print_ops = ('输出', '查', '若', '循环', '遍历', '定义', '尝试', '连接')
+                    no_print_ops = ('print', 'query', 'if', 'loop', 'for', 'fn', 'try', 'concat')
                     if ast[0] in no_print_ops:
                         should_print = False
-                    elif ast[0] == '做' and len(ast) > 1:
+                    elif ast[0] == 'do' and len(ast) > 1:
                         last_stmt = ast[-1]
                         if isinstance(last_stmt, list) and len(last_stmt) > 0 and last_stmt[0] in no_print_ops:
                             should_print = False
@@ -115,7 +126,6 @@ def repl():
                             raise AttributeError
                     except:
                         print(f"  => {result}")
-
         except KeyboardInterrupt:
             print("\n  操作已中断。")
             continue
