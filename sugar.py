@@ -1,6 +1,6 @@
 """
 类 C 大括号语法 → 三言 S‑表达式 AST 转换器
-支持：中英运算符、全角符号、国际皮肤、模板插值、三态分支判
+支持：中英运算符、全角符号、国际皮肤、模板插值、三态分支判、列表字面量/生成式
 """
 from typing import List
 
@@ -71,7 +71,7 @@ class SugarConverter:
                     i += 1
                 continue
 
-            # 单字符符号
+            # 单字符符号 (注意：这里已经将半角符号处理，且 '[' 和 ']' 保留)
             if c in ('{', '}', '(', ')', ';', ',', '=', '>', '<', '+', '-', '*', '/', '%', '^', '.'):
                 if current:
                     tokens.append(current)
@@ -94,6 +94,15 @@ class SugarConverter:
                             i += 1
                         tokens.append('-' + code[start:i])
                         continue
+                tokens.append(c)
+                i += 1
+                continue
+
+            # 新增：识别半角方括号，直接作为 token
+            if c in ('[', ']'):
+                if current:
+                    tokens.append(current)
+                    current = ''
                 tokens.append(c)
                 i += 1
                 continue
@@ -253,13 +262,12 @@ class _Parser:
                 '+': 'add', '-': 'sub', '*': 'mul', '/': 'div', '%': 'mod', '^': 'pow'
             }
 
-        # 优先级（包含逻辑运算符）
         self.PREC = {
-            'and': 1, 'or': 1,           # 逻辑最低
-            'eq': 2, 'ne': 2, 'gt': 2, 'lt': 2, 'gte': 2, 'lte': 2,  # 比较
-            'add': 3, 'sub': 3,           # 加减
-            'mul': 4, 'div': 4, 'mod': 4, # 乘除取余
-            'pow': 5,                     # 幂最高
+            'and': 1, 'or': 1,
+            'eq': 2, 'ne': 2, 'gt': 2, 'lt': 2, 'gte': 2, 'lte': 2,
+            'add': 3, 'sub': 3,
+            'mul': 4, 'div': 4, 'mod': 4,
+            'pow': 5,
         }
         self.RIGHT_ASSOC = {'pow'}
 
@@ -270,7 +278,6 @@ class _Parser:
         }
         self.PREFIXABLE_OPS_SINGLE_ARG = {'read', 'not', 'digit'}
 
-        # 关键字反向映射
         self.KEYWORD_REVERSE = {}
         if self.skin:
             for intern, name in self.skin.skin_data.get('keywords', {}).items():
@@ -295,7 +302,7 @@ class _Parser:
                 '字典': 'dict', '取键': 'get_key', '置键': 'set_key',
                 '同': 'same', '取位': 'digit', '当前时间': 'time',
                 '做': 'do',
-                '跳出': 'break', '继续': 'continue','导入': 'import'
+                '跳出': 'break', '继续': 'continue','导入': 'import','在': 'in'
             }
 
     def _err(self, msg):
@@ -330,7 +337,6 @@ class _Parser:
         tok = self.peek()
         if tok is None:
             return None
-        # 单独分号视为空语句，跳过
         if tok == ';':
             self.consume(';')
             return None
@@ -397,12 +403,6 @@ class _Parser:
         elif internal == 'load':
             self.consume(tok)
             return ['load', self.parse_expression()]
-        elif internal == 'import':
-            self.consume(tok)
-            self.consume('(')
-            path = self.parse_expression()
-            self.consume(')')
-            return ['import', path]
         elif internal == 'input':
             self.consume(tok)
             self.consume('(')
@@ -473,9 +473,6 @@ class _Parser:
         elif internal == 'break':
             self.consume(tok)
             return ['break']
-        elif internal == 'break':
-            self.consume(tok)
-            return ['break']
         elif internal == 'continue':
             self.consume(tok)
             return ['continue']
@@ -491,7 +488,6 @@ class _Parser:
         elif internal == 'try':
             return self.parse_try()
         else:
-            # 连续赋值 或 表达式/函数调用
             if self.pos + 2 < len(self.tokens) and self.tokens[self.pos+1] == '=':
                 var = self.consume()
                 if not self._is_ident(var) or var[0].isdigit():
@@ -548,6 +544,36 @@ class _Parser:
             expr = self.parse_expression()
             self.consume(')')
             return expr
+        # 列表字面量 / 生成式
+        if tok == '[':
+            self.consume('[')
+            # 空列表
+            if self.peek() == ']':
+                self.consume(']')
+                return ['list']
+            # 先解析第一个表达式
+            first_expr = self.parse_expression()
+            nxt = self.peek()
+            # 如果直接是 ']'，则单元素列表 [expr]
+            if nxt == ']':
+                self.consume(']')
+                return ['list', first_expr]
+            # 逗号分隔的列表字面量
+            if nxt in (',', '，'):
+                items = [first_expr]
+                while self.peek() in (',', '，'):
+                    self.consume()
+                    items.append(self.parse_expression())
+                self.consume(']')
+                return ['list'] + items
+            # 如果是 '遍历' 或 'for'，则为生成式
+            if nxt in ('遍历', 'for'):
+                # 回退？不，直接调用辅助方法完成最后的解析，需要传入已解析的表达式
+                comp = self._finish_comprehension(first_expr)
+                self.consume(']')
+                return comp
+            # 其他情况（如表达式后直接跟 ']' 已在上面处理，此外非法）
+            raise self._err(f"列表字面量/生成式格式错误，得到 {nxt}")
         if tok and tok[0] in ('"', '\u201c', '\u2018') and len(tok) >= 2:
             self.consume()
             return tok[1:-1]
@@ -558,21 +584,19 @@ class _Parser:
             self.consume()
             return int(tok)
 
-        if tok.isalpha() or tok[0] == '_' or '\u4e00' <= tok[0] <= '\u9fff':
+        if self._is_ident(tok):
             internal = self.KEYWORD_REVERSE.get(tok)
-
             if internal == 'lambda':
                 saved_pos = self.pos
-                # 形式：函数 { ... }  or 函数 ( 参数 ) { ... }
                 if self.pos + 1 < len(self.tokens):
                     next_tok = self.tokens[self.pos + 1]
                     if next_tok == '{':
-                        self.consume(tok)          # 消耗 '函数'
+                        self.consume(tok)
                         body = self.parse_block()
                         return ['lambda', [], body]
                     elif next_tok in ('(', '（'):
                         self.consume(tok)
-                        self.consume('(')          # 已统一为半角 '(‘
+                        self.consume('(')
                         params = []
                         while self.peek() != ')':
                             params.append(self.consume())
@@ -581,17 +605,11 @@ class _Parser:
                         self.consume(')')
                         body = self.parse_block()
                         return ['lambda', params] + body
-                # 如果没有匹配，回退
                 self.pos = saved_pos
-                # 继续作为普通标识符（不消耗 token）
             saved_tok = tok
             self.consume()
-            # 如果是关键字命令，转换为内部标识符，以便正确生成 AST
-            internal_saved = self.KEYWORD_REVERSE.get(saved_tok, saved_tok)
-
-            # 函数调用形式：标识符后跟 '(' 或 '（'
             if self.peek() in ('(', '（'):
-                func = internal_saved          # 使用内部标识
+                func = saved_tok
                 self.consume()
                 args = []
                 while self.peek() not in (')', '）'):
@@ -600,13 +618,11 @@ class _Parser:
                         self.consume()
                 self.consume()
                 return [func] + args
-
-            # 前缀操作符（如读、非、取位等）
-            if internal_saved in self.PREFIXABLE_OPS or self.OP_MAP.get(internal_saved) in self.PREFIXABLE_OPS:
-                internal_op = internal_saved
+            # 前缀操作符
+            if saved_tok in self.PREFIXABLE_OPS or self.OP_MAP.get(saved_tok) in self.PREFIXABLE_OPS:
+                internal_op = self.OP_MAP.get(saved_tok, saved_tok)
                 args = []
                 if internal_op in self.PREFIXABLE_OPS_SINGLE_ARG:
-                    # 一元前缀：取下一个任意 token 作为参数（空白已在词法阶段跳过）
                     if self.peek() is not None:
                         args.append(self.parse_primary())
                 else:
@@ -617,18 +633,38 @@ class _Parser:
                 if args:
                     return [internal_op] + args
                 else:
-                    return internal_op   # 无参数时返回操作符本身（例如单独的 `非`）
-
-            # 普通标识符（变量名或未识别的字符串）
+                    return internal_op
             return saved_tok
         raise self._err(f"未知的表达式元素: {tok}")
+
+    def _finish_comprehension(self, expr):
+        """
+        已完成 '[' 和第一个表达式 expr 的解析，后续是 '遍历' var '在' container ['若' cond] ']'
+        返回完整的生成式 AST
+        """
+        tok = self.consume()
+        if tok not in ('遍历', 'for'):
+            raise self._err(f"期待 '遍历' 或 'for'，但得到 {tok}")
+        var = self.consume()
+        tok = self.consume()
+        if tok not in ('在', 'in'):
+            raise self._err(f"期待 '在' 或 'in'，但得到 {tok}")
+        container = self.parse_expression()
+        if self.peek() in ('若', 'if'):
+            self.consume()
+            condition = self.parse_expression()
+            # 映射 + 过滤
+            return ['map', ['lambda', [var], expr],
+                    ['filter', ['lambda', [var], condition], container]]
+        else:
+            return ['map', ['lambda', [var], expr], container]
 
     def parse_block(self):
         self.consume('{')
         stmts = []
         while self.peek() != '}':
             stmt = self.parse_statement()
-            if stmt is not None:   # 忽略空语句（单独分号）
+            if stmt is not None:
                 stmts.append(stmt)
         self.consume('}')
         return stmts
@@ -725,19 +761,22 @@ class _Parser:
         return ['loop', cond] + body
 
     def parse_traversal(self):
-        self.consume('遍历')       # 消耗 '遍历'（中文或英文皮肤的关键字）
+        self.consume('遍历')
         var = self.consume()
-        # 消耗 '从' 关键字，如果存在
-        if self.peek() == '从':
-            self.consume('从')
-        # 如果皮肤改变了关键字，可能没有 '从'；此时假设之后直接是起始表达式
-        start = self.parse_expression()
-        # 消耗 '到' 关键字，如果存在
-        if self.peek() == '到':
-            self.consume('到')
-        end = self.parse_expression()
-        body = self.parse_block()
-        return ['for', var, start, end] + body
+        if self.peek() in ('在', 'in'):
+            self.consume()
+            container = self.parse_expression()
+            body = self.parse_block()
+            return ['forin', var, container] + body
+        else:
+            if self.peek() == '从':
+                self.consume('从')
+            start = self.parse_expression()
+            if self.peek() == '到':
+                self.consume('到')
+            end = self.parse_expression()
+            body = self.parse_block()
+            return ['for', var, start, end] + body
 
     def parse_definition(self):
         self.consume('定义')
@@ -757,7 +796,7 @@ class _Parser:
         return ['do'] + self.parse_block()
 
     def parse_judge(self):
-        self.consume()   # 消耗 '判' 或皮肤对应的关键字
+        self.consume()
         expr = self.parse_expression()
         self.consume('{')
         bodies = {'真': None, '可能': None, '假': None}

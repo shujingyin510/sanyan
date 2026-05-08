@@ -1,5 +1,5 @@
 """控制流操作：若、做、循环、遍历、返回、跳出、异常处理"""
-from ternary_core import BT, TritValue
+from ternary_core import BT, TritValue, ArrayValue
 from values import ReturnException, BreakException, ContinueException, SanyanError,SanyanSyntaxError
 
 class ControlOps:
@@ -136,3 +136,36 @@ class ControlOps:
     @staticmethod
     def continue_op(evaluator, args):
         raise ContinueException()
+    
+    @staticmethod
+    def forin_op(evaluator, args):
+        if len(args) < 3:
+            raise SanyanSyntaxError("遍历-在 需要 变量名 容器 体")
+        var_name = args[0]
+        container = evaluator.eval(args[1])
+        body = args[2:]
+        result = TritValue(0)
+        if isinstance(container, (list, ArrayValue)):
+            for item in container:
+                evaluator.vars[var_name] = item
+                try:
+                    for expr in body:
+                        result = evaluator.eval(expr)
+                except BreakException:
+                    break
+                except ContinueException:
+                    continue
+        elif isinstance(container, str):
+            # 字符串遍历：每个字符（已通过字列转为列表，或直接迭代字符）
+            for ch in container:
+                evaluator.vars[var_name] = ch
+                try:
+                    for expr in body:
+                        result = evaluator.eval(expr)
+                except BreakException:
+                    break
+                except ContinueException:
+                    continue
+        else:
+            raise SanyanSyntaxError("遍历-在 只支持列表、数组或字符串")
+        return result

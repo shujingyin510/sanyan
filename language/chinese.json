@@ -60,7 +60,8 @@
     "digit": "取位",
     "break": "跳出",
     "continue": "继续",
-    "import": "导入"
+    "import": "导入",
+    "in": "在"
   },
   "operators": {
     "add": "加",

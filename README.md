@@ -24,7 +24,7 @@
 
 ## 为什么不一样
 
-| | 其他所谓"中文编程"语言 | 三言 |
+| | 其他中文编程语言 | 三言 |
 |---|---|---|
 | **计算模型** | 二进制 | 平衡三进制（+1, 0, -1） |
 | **第三态** | 用 null/NaN 模拟 | `可能` 是第一等计算状态 |
@@ -50,19 +50,24 @@ python main.py
 三言> 设 a = 10
 三言> 输出(a ^ 2)
   => 100  (三进制: ++-0+)
+
+三言> 设 状态 = 可能
+三言> 输出(状态)
+  => 0  (三进制: 0)
 ```
 
 运行示例文件：
 
 ```bash
 python main.py examples/greenhouse.san
+python main.py examples/sensor_pipeline_simple.san
 ```
 
-### 杀手级示例：智能温室控制系统
+## 杀手级示例：智能温室控制系统
 
 以下代码模拟了一个温室环境，光线和人体传感器返回三态信号（充足/不足/不稳，有人/无人/不确定），温度传感器返回连续值。系统根据三态决策控制灯光、窗帘、风扇和加热器，并在传感器冲突时执行优先级处理。
 
-#### 糖语法版（examples/greenhouse.san，自包含，无需外部模块）
+### 糖语法版（examples/greenhouse.san，自包含，无需外部模块）
 
 ```c
 // 智能温室控制系统 greenhouse.san（最终展示版）
@@ -102,23 +107,23 @@ python main.py examples/greenhouse.san
 
 定义 温室控制 () {
     记录("温室系统启动（随机传感器模拟，共检测10次）。")
-    
+
     设 运行次数 = 0
     设 总次数 = 10
-    
+
     循环 (运行次数 < 总次数) {
         设 光线值 = 随机态()
         设 温度值 = 随机数(10, 35)
         置 人体 = 随机态()
-        
+
         设 光线描述 = 转光线描述(光线值)
         设 温度描述 = 转温度描述(温度值)
-        设 人体值 = 读 人体
+        设 人体值 = 读(人体)
         设 人体描述 = 转人体描述(人体值)
-        
+
         记录("----------------------------------------")
         记录(连接("【检测 ", 运行次数 + 1, "/", 总次数, "】光线: ", 光线描述, "，温度: ", 温度值, "（", 温度描述, "），人体: ", 人体描述))
-        
+
         // 光线控制窗帘和补光灯
         若 (光线值 == 真) {
             置 灯 = 灭
@@ -133,10 +138,10 @@ python main.py examples/greenhouse.san
             置 窗帘 = 守
             记录("光照不稳，设备保持原状。")
         }
-        
+
         设 常温上限 = 28
         设 常温下限 = 15
-        
+
         // 温度控制风扇和加热
         若 (温度值 > 常温上限) {
             置 风扇 = 开
@@ -151,7 +156,7 @@ python main.py examples/greenhouse.san
             置 加热 = 守
             记录("温度适宜，设备待机。")
         }
-        
+
         // 人体传感器独立控制灯（覆盖光线决策，体现优先级）
         若 (人体值 == 真) {
             置 灯 = 亮
@@ -163,11 +168,11 @@ python main.py examples/greenhouse.san
             // 不确定时，保持灯当前状态，不动作
             记录("人体检测：不确定，灯光维持现状。")
         }
-        
+
         运行次数 = 运行次数 + 1
         等待(1)   // 1秒间隔，节奏紧凑
     }
-    
+
     记录("========== 温室监控结束 ==========")
     记录(连接("共执行 ", 总次数, " 次检测。"))
     查 灯
@@ -180,7 +185,7 @@ python main.py examples/greenhouse.san
 温室控制()
 ```
 
-> 等效 S 表达式版（examples/greenhouse_se.san）提供相同输出，保证 100% 稳定运行。
+等效 S 表达式版（examples/greenhouse_se.san）提供相同输出，保证 100% 稳定运行。
 
 某次运行输出片段（所有传感器状态均为随机）：
 
@@ -206,9 +211,7 @@ python main.py examples/greenhouse.san
   加热 当前状态: 守 (三进制: 0)
 ```
 
-这个示例直观展示了三言的核心价值：**不确定状态 `守` 作为一等公民参与决策**，无需用"阈值+默认值"的二进制技巧来模拟。
-
----
+这个示例直观展示了三言的核心价值：不确定状态 `守` 作为一等公民参与决策，无需用"阈值+默认值"的二进制技巧来模拟。
 
 ## 三言长什么样
 
@@ -225,9 +228,9 @@ python main.py examples/greenhouse.san
 
 // 遍历传感器，只在确定时动作
 遍历 i 从 1 到 5 {
-    若 (读 人体 == 真) {
+    若 (读(人体) == 真) {
         置 灯 = 亮;
-    } 再若 (读 人体 == 可能) {
+    } 再若 (读(人体) == 可能) {
         置 灯 = 守;   // 不确定有没有人，保持待机
     } 否则 {
         置 灯 = 灭;
@@ -253,20 +256,20 @@ python main.py examples/greenhouse.san
 
 两种语法共享同一个求值器，可以混用。
 
----
-
 ## 新增特性速览（v3.4）
 
 | 特性 | 示例 |
-| --- | --- |
+|---|---|
 | 🌐 母语皮肤 | `:lang english` 切换英文，关键字可自定义 JSON |
 | ⌨️ 全角符号兼容 | 纯中文输入法直接写 `设 a＝5；输出（a＋2）` |
 | 📝 字符串插值 | `模板{温度: ${x}°C}` 自动展开为 `连接` 调用 |
-| 🔀 三态分支 `判` | `判 x { 真 {…} 可能 {…} 假 {…} }` 原生三态匹配 |
-| 🛡️ 解析器回归测试 | 24 项核心语法测试全部通过 |
+| 🔀 三态分支 判 | `判 x { 真 {…} 可能 {…} 假 {…} }` 原生三态匹配 |
+| 🚪 跳出 / 继续 | `跳出` 退出循环，`继续` 跳过当前迭代 |
+| 🛟 窄异常捕获 | 只捕获语言错误，系统错误直接暴露以利调试 |
+| 🛡️ 解析器回归测试 | 24 项核心语法测试 + 模糊测试 500 轮全部通过 |
 | 🖨️ 中文状态查询 | `查 灯` 输出"开/守/关"而非 +/-/0 |
-
----
+| 📋 列表字面量与生成式 | `[1,2,3]`、`[x*2 遍历 x in lst]`、带 `若` 过滤 |
+| 🔁 遍历-在 | `遍历 值 在 容器` 直接迭代列表/数组/字符串 |
 
 ## 三进制不是模拟
 
@@ -283,14 +286,12 @@ python main.py examples/greenhouse.san
 三值逻辑（Kleene 强逻辑）：
 
 | A | B | A 且 B | A 或 B |
-|---|---|--------|--------|
+|---|---|---|---|
 | 真 | 可能 | 可能 | 真 |
 | 假 | 可能 | 假 | 可能 |
 | 可能 | 可能 | 可能 | 可能 |
 
-**可能 且 可能 还是可能**。不确定的事情叠加不确定的事情，结果仍然不确定。
-
----
+`可能 且 可能` 还是`可能`。不确定的事情叠加不确定的事情，结果仍然不确定。
 
 ## 项目结构
 
@@ -299,36 +300,40 @@ sanyan/
 ├── main.py            # 入口
 ├── ternary_core.py    # 平衡三进制核心
 ├── runtime.py         # 运行环境
-├── builtins_ops.py    # 内置操作
+├── builtins_ops.py    # 内置操作聚合层
 ├── commands.py        # 自定义命令
 ├── evaluator.py       # 求值器
 ├── lexer.py           # S 表达式词法
 ├── parser.py          # S 表达式语法
 ├── sugar.py           # 糖语法转换器
 ├── skin.py            # 皮肤管理器
+├── values.py          # 值类型与语言异常
 ├── repl.py            # REPL 交互环境
+├── ops/               # 内置操作实现模块
+│   ├── control_ops.py
+│   ├── math_ops.py
+│   ├── string_ops.py
+│   ├── container_ops.py
+│   ├── io_ops.py
+│   └── iot_ops.py
 ├── language/          # 皮肤文件（chinese.json / english.json）
 ├── examples/          # 示例（含温室糖语法版与 S 表达式版）
-├── stdlib/            # 标准库（math, string, list, iot, io）
-├── tests/             # 解析器回归测试
+├── stdlib/            # 标准库（math, string, list, iot, io, logic, format）
+├── tests/             # 自动测试与模糊测试
 └── docs/              # 语言手册
 ```
-
----
 
 ## 三态词表
 
 三言内置了一组中文语义词，直接映射三进制值：
 
-| 语义 | 三进制值 | 整数值 |
-| --- | --- | --- |
-| 开 / 真 / 亮 / 有 / 是 | `+` | 1 |
-| 守 / 可能 / 待 / 未知 | `0` | 0 |
-| 关 / 假 / 灭 / 无 / 否 | `-` | -1 |
+| 语义 | 三进制值 | 整数值 | 含义 |
+|---|---|---|---|
+| 开 / 真 / 亮 / 有 / 是 | + | 1 | 确定的正向状态 |
+| 守 / 可能 / 待 / 未知 | 0 | 0 | 不确定或保持当前状态 |
+| 关 / 假 / 灭 / 无 / 否 | - | -1 | 确定的负向状态 |
 
-这些不是关键字别名，是语言的语义层。`守` 表示"保持当前状态"，`可能` 表示"尚未确定"，`待` 表示"等待输入"。在 IoT 场景下，这些区别有实际意义。
-
----
+这些不是关键字别名，是语言的语义层。`守` 表示"保持当前状态"（常用于 IoT），`可能` 表示"尚未确定"，`待` 表示"等待输入"。在 IoT 场景下，这些区别有实际意义。
 
 ## 路线图
 
@@ -343,13 +348,15 @@ sanyan/
 - [x] 文件读写原语
 - [x] 国际化皮肤（母语可定制）
 - [x] 全角符号兼容
-- [ ] 字符串插值 `模板{...}`
-- [ ] 三态分支 `判`
+- [x] 字符串插值 `模板{...}`
+- [x] 三态分支 `判`
+- [x] `跳出` / `继续` 关键字
+- [x] 窄异常捕获
+- [x] 列表字面量与生成式
+- [x] 遍历-在
 - [ ] GPIO 真实硬件控制
 - [ ] Web IDE
 - [ ] 标准库扩展（更多自举模块）
-
----
 
 ## 为什么是中文
 
@@ -362,8 +369,6 @@ sanyan/
 
 三言没有"翻译"任何语言。它的中文关键字直接生长在三值逻辑之上。
 
----
-
 ## 三进制最有价值的地方
 
 不是万能钥匙，但恰好能打开最重要的门：
@@ -374,15 +379,13 @@ sanyan/
 - **脑机接口**：大脑信号永远不确定
 - **游戏 NPC**：NPC 天然需要犹豫
 
-**不适用**：火灾报警、加密、网络协议等需要绝对确定性的场合。
-
----
+不适用：火灾报警、加密、网络协议等需要绝对确定性的场合。
 
 ## For English Readers (TL;DR)
 
-**Sanyan** is a Chinese programming language based on balanced ternary logic (+, 0, -).
+Sanyan is a Chinese programming language based on balanced ternary logic (+, 0, -).
 
-Unlike most "Chinese programming languages" that merely translate English keywords, Sanyan leverages the fact that Chinese semantics naturally support ternary thinking: words like `守` (hold/keep), `可能` (maybe/uncertain), and `待` (await) carry nuanced third-state meanings that have no direct equivalent in English.
+Unlike most Chinese programming languages that merely translate English keywords, Sanyan leverages the fact that Chinese semantics naturally support ternary thinking: words like 守 (hold/keep), 可能 (maybe/uncertain), and 待 (await) carry nuanced third-state meanings that have no direct equivalent in English.
 
 It runs on Python. It has:
 
@@ -393,7 +396,8 @@ It runs on Python. It has:
 - Built-in IoT sensor/actuator abstraction
 - Skin system for keywords in any natural language
 - Full-width symbol compatibility
-- String interpolation and ternary switch `judge`
+- String interpolation, ternary switch judge, break/continue, narrow exception catching
+- List comprehensions and container iteration
 
 Quick start:
 
@@ -403,9 +407,7 @@ cd sanyan
 python main.py
 ```
 
-**Philosophy**: uncertainty is not a bug — it's a legitimate computational state.
-
----
+Philosophy: uncertainty is not a bug — it's a legitimate computational state.
 
 ## License
 

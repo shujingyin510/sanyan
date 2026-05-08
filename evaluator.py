@@ -53,6 +53,7 @@ class SanyanEvaluator(SanyanRuntime):
             'do': lambda: Builtins.control(self, 'do', args),
             'loop': lambda: Builtins.control(self, 'loop', args),
             'for': lambda: Builtins.traversal(self, args),
+            'forin': lambda: Builtins.forin_op(self, args),
             'return': lambda: Builtins.return_op(self, args),
             'break': lambda: Builtins.break_op(self, args),
             'try': lambda: Builtins.try_catch(self, args),

@@ -59,7 +59,8 @@
     "digit": "digit",
     "break": "break",
     "continue": "continue",
-    "import": "import"
+    "import": "import",
+    "in": "in"
   },
   "operators": {
     "add": "+",

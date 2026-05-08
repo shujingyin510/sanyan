@@ -44,6 +44,9 @@ class Builtins:
     @staticmethod
     def continue_op(evaluator, args):
         return ControlOps.continue_op(evaluator, args)
+    @staticmethod
+    def forin_op(evaluator, args):
+        return ControlOps.forin_op(evaluator, args)
     # 数学/逻辑
     @staticmethod
     def arithmetic(evaluator, op, args):
