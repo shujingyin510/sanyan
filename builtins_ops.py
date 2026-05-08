@@ -41,6 +41,9 @@ class Builtins:
     @staticmethod
     def judge_op(evaluator, args):
         return ControlOps.judge_op(evaluator, args)
+    @staticmethod
+    def continue_op(evaluator, args):
+        return ControlOps.continue_op(evaluator, args)
     # 数学/逻辑
     @staticmethod
     def arithmetic(evaluator, op, args):
@@ -207,3 +210,7 @@ class Builtins:
             value = evaluator.eval(value_node)
         evaluator.vars[var_name] = value
         return value
+    
+    @staticmethod
+    def import_module(evaluator, args):
+        return IOOps.import_module(evaluator, args)

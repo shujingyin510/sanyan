@@ -57,7 +57,9 @@
     "judge": "judge",
     "same": "same",
     "digit": "digit",
-    "break": "break"
+    "break": "break",
+    "continue": "continue",
+    "import": "import"
   },
   "operators": {
     "add": "+",

@@ -1,7 +1,8 @@
 """输入/输出、文件、时间、类型判断等"""
 import time
 from ternary_core import TritValue
-from values import call_function   # 替换原来的 Builtins 依赖
+from values import call_function, SanyanSyntaxError
+from values import ModuleValue
 
 class IOOps:
     @staticmethod
@@ -167,3 +168,28 @@ class IOOps:
                 ast = parse(tokens)
                 last_result = evaluator.eval(ast)
             return last_result
+        
+    @staticmethod
+    def import_module(evaluator, args):
+        if len(args) != 1:
+            raise SanyanSyntaxError("导入 需要一个文件路径")
+        path = evaluator.eval(args[0])
+        if hasattr(path, 'to_int'):
+            path = str(path.to_int())
+        with open(path, 'r', encoding='utf-8') as f:
+            code = f.read()
+        if not code.strip():
+            return ModuleValue({}, {})
+        # 在独立求值器中执行代码，不污染当前环境
+        from evaluator import SanyanEvaluator
+        module_env = SanyanEvaluator(skin_manager=evaluator.skin_manager)
+        if '{' in code or ';' in code or '；' in code:
+            from sugar import SugarConverter
+            ast = SugarConverter.convert(code, module_env.skin_manager)
+        else:
+            from lexer import tokenize
+            from parser import parse
+            tokens = tokenize(code)
+            ast = parse(tokens)
+        module_env.eval(ast)
+        return ModuleValue(module_env.vars, module_env.commands)

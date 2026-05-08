@@ -295,7 +295,7 @@ class _Parser:
                 '字典': 'dict', '取键': 'get_key', '置键': 'set_key',
                 '同': 'same', '取位': 'digit', '当前时间': 'time',
                 '做': 'do',
-                '跳出': 'break'
+                '跳出': 'break', '继续': 'continue','导入': 'import'
             }
 
     def _err(self, msg):
@@ -385,12 +385,24 @@ class _Parser:
                 self.consume('=')
                 return ['write', obj, self.parse_expression()]
             raise self._err("置 语句格式: 对象.状态 或 对象 = 状态")
+        elif internal == 'import':
+            self.consume(tok)
+            self.consume('(')
+            path = self.parse_expression()
+            self.consume(')')
+            return ['import', path]
         elif internal == 'read':
             self.consume(tok)
             return ['read', self.consume()]
         elif internal == 'load':
             self.consume(tok)
             return ['load', self.parse_expression()]
+        elif internal == 'import':
+            self.consume(tok)
+            self.consume('(')
+            path = self.parse_expression()
+            self.consume(')')
+            return ['import', path]
         elif internal == 'input':
             self.consume(tok)
             self.consume('(')
@@ -464,6 +476,9 @@ class _Parser:
         elif internal == 'break':
             self.consume(tok)
             return ['break']
+        elif internal == 'continue':
+            self.consume(tok)
+            return ['continue']
         elif internal == 'return':
             self.consume(tok)
             expr = self.parse_expression()
@@ -543,20 +558,32 @@ class _Parser:
             self.consume()
             return int(tok)
 
-        if self._is_ident(tok):
+        if tok.isalpha() or tok[0] == '_' or '\u4e00' <= tok[0] <= '\u9fff':
             internal = self.KEYWORD_REVERSE.get(tok)
+
             if internal == 'lambda':
-                if self.pos + 1 < len(self.tokens) and self.tokens[self.pos + 1] == '(':
-                    self.consume(tok)
-                    self.consume('(')
-                    params = []
-                    while self.peek() != ')':
-                        params.append(self.consume())
-                        if self.peek() in (',', '，'):
-                            self.consume()
-                    self.consume(')')
-                    body = self.parse_block()
-                    return ['lambda', params] + body
+                saved_pos = self.pos
+                # 形式：函数 { ... }  or 函数 ( 参数 ) { ... }
+                if self.pos + 1 < len(self.tokens):
+                    next_tok = self.tokens[self.pos + 1]
+                    if next_tok == '{':
+                        self.consume(tok)          # 消耗 '函数'
+                        body = self.parse_block()
+                        return ['lambda', [], body]
+                    elif next_tok in ('(', '（'):
+                        self.consume(tok)
+                        self.consume('(')          # 已统一为半角 '(‘
+                        params = []
+                        while self.peek() != ')':
+                            params.append(self.consume())
+                            if self.peek() in (',', '，'):
+                                self.consume()
+                        self.consume(')')
+                        body = self.parse_block()
+                        return ['lambda', params] + body
+                # 如果没有匹配，回退
+                self.pos = saved_pos
+                # 继续作为普通标识符（不消耗 token）
             saved_tok = tok
             self.consume()
             # 如果是关键字命令，转换为内部标识符，以便正确生成 AST

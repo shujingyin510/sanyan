@@ -1,6 +1,6 @@
 """控制流操作：若、做、循环、遍历、返回、跳出、异常处理"""
 from ternary_core import BT, TritValue
-from values import ReturnException, BreakException, SanyanError, SanyanSyntaxError
+from values import ReturnException, BreakException, ContinueException, SanyanError,SanyanSyntaxError
 
 class ControlOps:
     @staticmethod
@@ -40,6 +40,11 @@ class ControlOps:
                     result = evaluator.eval(statement)
             except BreakException:
                 break
+            except ContinueException:
+                # 跳过本次循环，继续下一次 while 迭代
+                evaluator.loop_count += 1
+                cond = evaluator.eval(args[0])
+                continue
             evaluator.loop_count += 1
             cond = evaluator.eval(args[0])   # 重新求值条件
         return result
@@ -60,6 +65,8 @@ class ControlOps:
                     result = evaluator.eval(expr)
             except BreakException:
                 break
+            except ContinueException:
+                continue   # Python 的 continue，进入下一次 i 迭代
         return result
 
     @staticmethod
@@ -125,3 +132,7 @@ class ControlOps:
             return evaluator.eval(maybe_body)
         else:
             return evaluator.eval(false_body)
+    
+    @staticmethod
+    def continue_op(evaluator, args):
+        raise ContinueException()

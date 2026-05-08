@@ -4,7 +4,7 @@ from ternary_core import TritValue, ArrayValue
 from runtime import SanyanRuntime
 from builtins_ops import Builtins
 from commands import Commands
-from values import FunctionValue
+from values import FunctionValue, ModuleValue
 
 class SanyanEvaluator(SanyanRuntime):
     def __init__(self, max_loop_steps=None, skin_manager=None):
@@ -116,6 +116,8 @@ class SanyanEvaluator(SanyanRuntime):
             'read': lambda: Builtins._sensor_read(self, args),
             'set': lambda: Builtins.define_var(self, args),
             'fn': lambda: Commands.define(self, args),
+            'continue': lambda: Builtins.continue_op(self, args),
+            'import': lambda: Builtins.import_module(self, args),
         }
 
         if internal in dispatch:
@@ -125,6 +127,9 @@ class SanyanEvaluator(SanyanRuntime):
         if op in self.vars:
             val = self.vars[op]
             if isinstance(val, FunctionValue):
+                evaluated_args = [self.eval(a) for a in args]
+                return val.call(self, evaluated_args)
+            if isinstance(val, ModuleValue):
                 evaluated_args = [self.eval(a) for a in args]
                 return val.call(self, evaluated_args)
             if isinstance(val, (list, ArrayValue, dict)):

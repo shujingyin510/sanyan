@@ -58,7 +58,9 @@
     "judge": "判",
     "same": "同",
     "digit": "取位",
-    "break": "跳出"
+    "break": "跳出",
+    "continue": "继续",
+    "import": "导入"
   },
   "operators": {
     "add": "加",

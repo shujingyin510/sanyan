@@ -104,15 +104,26 @@ def repl():
                     continue
                 code += "\n" + next_line
 
+            # 优先尝试糖语法，失败静默回退原生解析
+            ast = None
             try:
                 ast = SugarConverter.convert(code, skin_mgr)
-                result = env.eval(ast)
-            except SyntaxError as e:
-                print(f"  糖语法解析错误: {e}")
+            except SyntaxError:
+                pass   # 糖语法失败属于正常情况（如用户输入 S 表达式），不回显错误
+
+            if ast is None:
                 tokens = tokenize(code)
-                if not tokens:
-                    continue
-                ast = parse(tokens)
+                if tokens:
+                    try:
+                        ast = parse(tokens)
+                    except SyntaxError as e:
+                        print(f"  语法错误: {e}")
+                        continue
+
+            if ast is None:
+                continue
+
+            try:
                 result = env.eval(ast)
             except KeyboardInterrupt:
                 print("\n  操作已中断（Ctrl+C）。")
