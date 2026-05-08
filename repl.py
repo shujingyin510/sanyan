@@ -9,6 +9,8 @@ from skin import SkinManager
 def demo(skin_mgr):
     print("\n========== 三言 v3.4 演示 ==========")
     env = SanyanEvaluator(skin_manager=skin_mgr)
+
+    # 1. 智能设备控制
     env.eval(['fn', '设置设备', ['对象', '状态'], ['context', '对象', '状态']])
     print("1. 智能设备控制")
     env.eval(['设置设备', '灯.亮'])
@@ -16,32 +18,38 @@ def demo(skin_mgr):
     env.eval(['设置设备', '窗帘.关'])
     env.eval(['query', '窗帘'])
 
+    # 2. 晚安模式
     print("\n2. 晚安模式（自定义命令）")
     env.eval(['fn', '晚安', [], ['do', ['设置设备', '灯.灭'], ['设置设备', '窗帘.关']]])
     env.eval(['晚安'])
     env.eval(['query', '灯'])
     env.eval(['query', '窗帘'])
 
+    # 3. 数学运算与比较
     print("\n3. 数学运算与比较")
     env.eval(['set', 'a', 10])
     env.eval(['print', ['add', 'a', 5]])
     env.eval(['print', ['gt', 'a', 3]])
 
+    # 4. 条件分支
     print("\n4. 条件分支")
     env.eval(['if', ['gt', 'a', 5], ['print', 1], ['print', 0]])
 
+    # 5. 循环
     print("\n5. 循环")
     env.eval(['set', 'i', 0])
     env.eval(['loop', ['lt', 'i', 3], ['do', ['print', 'i'], ['set', 'i', ['add', 'i', 1]]]])
 
+    # 6. 数学函数
     print("\n6. 数学函数")
     env.eval(['print', ['abs', -5]])
     env.eval(['print', ['sqrt', 81]])
     env.eval(['print', ['random', 1, 10]])
 
+    # 7. 字符串拼接（注意字符串参数需要双引号）
     print("\n7. 字符串拼接")
-    env.eval(['concat', '你好', '世界'])
-    env.eval(['print', ['length', 'hello']])
+    env.eval(['concat', '"你好"', '"世界"'])
+    env.eval(['print', ['length', '"hello"']])
 
     print("========== 演示结束 ==========\n")
 
@@ -108,10 +116,10 @@ def repl():
                 print(f"    输入内容: {code}")
                 continue
 
-            if result:
+            if result is not None:
                 should_print = True
                 if isinstance(ast, list) and len(ast) > 0:
-                    no_print_ops = ('print', 'query', 'if', 'loop', 'for', 'fn', 'try', 'concat')
+                    no_print_ops = ('print', 'query', '查', '输出', 'if', 'loop', 'for', 'fn', '定义', 'try', '连接', 'concat', '映射', '过滤', '归并')
                     if ast[0] in no_print_ops:
                         should_print = False
                     elif ast[0] == 'do' and len(ast) > 1:
@@ -123,7 +131,7 @@ def repl():
                         if hasattr(result, 'symbol') and hasattr(result, 'to_int'):
                             print(f"  => {result.symbol}   (整数值: {result.to_int()})")
                         else:
-                            raise AttributeError
+                            print(f"  => {result}")
                     except:
                         print(f"  => {result}")
         except KeyboardInterrupt:

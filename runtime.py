@@ -1,6 +1,6 @@
 """运行环境：传感器、执行器、变量、命令存储及基础解析"""
 from ternary_core import TritValue
-
+from values import SanyanNameError
 
 class SanyanRuntime:
     BUILTIN_OPS = {
@@ -42,15 +42,6 @@ class SanyanRuntime:
         self.max_call_depth = 200
         self.skin_manager = skin_manager
 
-    def _maybe_implicit_and(self, node):
-        if isinstance(node, list) and len(node) > 0:
-            first = node[0]
-            if isinstance(first, str) and first in self.BUILTIN_OPS:
-                return node
-            if len(node) >= 2:
-                return ['and'] + node
-        return node
-
     def _parse_pairs(self, items):
         pairs = []
         if all(isinstance(x, str) and '.' in x for x in items):
@@ -84,6 +75,9 @@ class SanyanRuntime:
             state = self.skin_manager.is_ternary_word(symbol)
             if state is not None:
                 return TritValue(state)
+        # 硬编码兜底（确保皮肤失效时仍能识别）
+        if symbol in TritValue.STATE_MAP:
+            return TritValue(TritValue.STATE_MAP[symbol])
         if '.' in symbol:
             obj, attr = symbol.split('.')
             if obj in self.actuators:
@@ -110,4 +104,11 @@ class SanyanRuntime:
                 sensor_val = self.sensors[obj]
                 attr_val = TritValue.from_string(symbol)
                 return TritValue(1 if sensor_val.symbol == attr_val.symbol else -1)
-        raise NameError(f"未定义的符号: {symbol}")
+        # 安全网：如果符号包含中文字符且未被识别，将其视为字符串返回
+        if any('\u4e00' <= c <= '\u9fff' for c in symbol):
+            return symbol
+        # 最终回退：如果符号看起来像自然语言文本，当作字符串
+        if any(c for c in symbol if '\u4e00' <= c <= '\u9fff'):
+            # 含有汉字，且未找到定义，很可能是在字符串外面误用了中文
+            return symbol
+        raise SanyanNameError(f"未定义的符号: {symbol}")

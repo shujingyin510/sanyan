@@ -255,11 +255,11 @@ class _Parser:
 
         # 优先级（包含逻辑运算符）
         self.PREC = {
-            'eq': 1, 'ne': 1, 'gt': 1, 'lt': 1, 'gte': 1, 'lte': 1,
-            'and': 2, 'or': 2,
-            'add': 3, 'sub': 3,
-            'mul': 4, 'div': 4, 'mod': 4,
-            'pow': 5,
+            'and': 1, 'or': 1,           # 逻辑最低
+            'eq': 2, 'ne': 2, 'gt': 2, 'lt': 2, 'gte': 2, 'lte': 2,  # 比较
+            'add': 3, 'sub': 3,           # 加减
+            'mul': 4, 'div': 4, 'mod': 4, # 乘除取余
+            'pow': 5,                     # 幂最高
         }
         self.RIGHT_ASSOC = {'pow'}
 
@@ -294,7 +294,8 @@ class _Parser:
                 '取': 'get', '置元素': 'set_element',
                 '字典': 'dict', '取键': 'get_key', '置键': 'set_key',
                 '同': 'same', '取位': 'digit', '当前时间': 'time',
-                '做': 'do'
+                '做': 'do',
+                '跳出': 'break'
             }
 
     def _err(self, msg):
@@ -457,6 +458,12 @@ class _Parser:
             self.consume(')')
             body = self.parse_block()
             return ['lambda', params] + body
+        elif internal == 'break':
+            self.consume(tok)
+            return ['break']
+        elif internal == 'break':
+            self.consume(tok)
+            return ['break']
         elif internal == 'return':
             self.consume(tok)
             expr = self.parse_expression()

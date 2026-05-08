@@ -1,12 +1,12 @@
 """自定义命令：定义与调用"""
 from ternary_core import TritValue
-from builtins_ops import ReturnException
+from values import ReturnException, SanyanNameError, SanyanSyntaxError
 
 class Commands:
     @staticmethod
     def define(evaluator, args):
         if len(args) < 3:
-            raise SyntaxError("定义 需要名称、参数列表和体")
+            raise SanyanSyntaxError("定义 需要名称、参数列表和体")
         cmd_name = args[0]
         if isinstance(cmd_name, list):
             cmd_name = cmd_name[0]
@@ -37,11 +37,11 @@ class Commands:
                             obj, attr = sole_arg.split('：', 1)
                             args = [obj, attr]
                         else:
-                            raise SyntaxError(f"命令 '{op}' 需要 {len(params)} 个参数，但提供了 {len(args)} 个")
+                            raise SanyanSyntaxError(f"命令 '{op}' 需要 {len(params)} 个参数，但提供了 {len(args)} 个")
                     else:
-                        raise SyntaxError(f"命令 '{op}' 需要 {len(params)} 个参数，但提供了 {len(args)} 个")
+                        raise SanyanSyntaxError(f"命令 '{op}' 需要 {len(params)} 个参数，但提供了 {len(args)} 个")
                 else:
-                    raise SyntaxError(f"命令 '{op}' 需要 {len(params)} 个参数，但提供了 {len(args)} 个")
+                    raise SanyanSyntaxError(f"命令 '{op}' 需要 {len(params)} 个参数，但提供了 {len(args)} 个")
             saved = {}
             for param, arg_node in zip(params, args):
                 if param in evaluator.vars:

@@ -57,7 +57,8 @@
     "set_key": "置键",
     "judge": "判",
     "same": "同",
-    "digit": "取位"
+    "digit": "取位",
+    "break": "跳出"
   },
   "operators": {
     "add": "加",

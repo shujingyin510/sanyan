@@ -1,0 +1,127 @@
+"""控制流操作：若、做、循环、遍历、返回、跳出、异常处理"""
+from ternary_core import BT, TritValue
+from values import ReturnException, BreakException, SanyanError, SanyanSyntaxError
+
+class ControlOps:
+    @staticmethod
+    def if_op(evaluator, args):
+        if len(args) < 2:
+            raise SanyanSyntaxError("if 需要条件和真分支")
+        cond = evaluator.eval(args[0])
+        if BT.to_int(cond.value) == 1:
+            return evaluator.eval(args[1])
+        elif len(args) >= 3:
+            return evaluator.eval(args[2])
+        else:
+            return TritValue(0)
+
+    @staticmethod
+    def do_op(evaluator, args):
+        if not args:
+            return TritValue(0)
+        result = None
+        for statement in args:
+            result = evaluator.eval(statement)
+        return result if result is not None else TritValue(0)
+
+    @staticmethod
+    def loop_op(evaluator, args):
+        if len(args) < 2:
+            raise SanyanSyntaxError("loop 需要条件和体")
+        cond = evaluator.eval(args[0])
+        body = args[1:]
+        result = TritValue(0)
+        evaluator.loop_count = 0
+        while evaluator.loop_count < evaluator.max_loop_steps:
+            if BT.to_int(cond.value) != 1:
+                break
+            try:
+                for statement in body:
+                    result = evaluator.eval(statement)
+            except BreakException:
+                break
+            evaluator.loop_count += 1
+            cond = evaluator.eval(args[0])   # 重新求值条件
+        return result
+
+    @staticmethod
+    def traversal_op(evaluator, args):
+        if len(args) < 4:
+            raise SanyanSyntaxError("遍历 需要 变量名 起始 结束 体")
+        var_name = args[0]
+        start = evaluator.eval(args[1]).to_int()
+        end = evaluator.eval(args[2]).to_int()
+        body = args[3:]
+        result = TritValue(0)
+        for i in range(start, end + 1):
+            evaluator.vars[var_name] = TritValue(i)
+            try:
+                for expr in body:
+                    result = evaluator.eval(expr)
+            except BreakException:
+                break
+        return result
+
+    @staticmethod
+    def return_op(evaluator, args):
+        if len(args) == 0:
+            raise ReturnException(TritValue(0))
+        value = evaluator.eval(args[0])
+        raise ReturnException(value)
+
+    @staticmethod
+    def break_op(evaluator, args):
+        raise BreakException()
+
+    @staticmethod
+    def try_catch(evaluator, args):
+        if len(args) != 2:
+            raise SanyanSyntaxError("尝试 需要两个参数：尝试体和捕获体")
+        try_body = args[0]
+        catch_spec = args[1]
+        if not isinstance(catch_spec, list) or len(catch_spec) < 2 or catch_spec[0] not in ('捕获', 'catch'):
+            raise SanyanSyntaxError("捕获体格式应为 (捕获 (错误变量) 体...)")
+        error_var = catch_spec[1]
+        if isinstance(error_var, list):
+            if len(error_var) != 1:
+                raise SanyanSyntaxError("捕获的错误变量必须是一个标识符")
+            error_var = error_var[0]
+        catch_body = catch_spec[2:]
+
+        try:
+            return evaluator.eval(try_body)
+        except SanyanError as e:
+            # 只捕获语言层异常
+            saved = None
+            if error_var in evaluator.vars:
+                saved = evaluator.vars[error_var]
+            evaluator.vars[error_var] = str(e)
+            try:
+                result = None
+                for expr in catch_body:
+                    result = evaluator.eval(expr)
+                return result if result is not None else TritValue(0)
+            finally:
+                if saved is not None:
+                    evaluator.vars[error_var] = saved
+                else:
+                    if error_var in evaluator.vars:
+                        del evaluator.vars[error_var]
+        # 其他异常（如 AttributeError）不捕获，直接向上抛出
+    
+    @staticmethod
+    def judge_op(evaluator, args):
+        if len(args) != 4:
+            raise SanyanSyntaxError("判 需要一个表达式和三个分支体")
+        expr_node = args[0]
+        true_body = args[1]
+        maybe_body = args[2]
+        false_body = args[3]
+        val = evaluator.eval(expr_node)
+        int_val = val.to_int()
+        if int_val == 1:
+            return evaluator.eval(true_body)
+        elif int_val == 0:
+            return evaluator.eval(maybe_body)
+        else:
+            return evaluator.eval(false_body)
