@@ -69,6 +69,12 @@ def repl():
             if code in ('（退出）', '退出', '（exit）', 'exit'):
                 break
             if code.startswith(':lang'):
+                if code.startswith(':maxloop'):
+                    parts = code.split()
+                    if len(parts) == 2 and parts[1].isdigit():
+                        env.max_loop_steps = int(parts[1])
+                        print(f"最大循环步数已设为: {env.max_loop_steps}")
+                    continue
                 parts = code.split()
                 if len(parts) == 2:
                     lang = parts[1]
@@ -128,10 +134,9 @@ def repl():
                             should_print = False
                 if should_print:
                     try:
-                        if hasattr(result, 'symbol') and hasattr(result, 'to_int'):
-                            print(f"  => {result.symbol}   (整数值: {result.to_int()})")
-                        else:
-                            print(f"  => {result}")
+                        from ops.io_ops import IOOps
+                        formatted = IOOps.format_value(result)
+                        print(f"  => {formatted}")
                     except:
                         print(f"  => {result}")
         except KeyboardInterrupt:

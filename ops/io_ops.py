@@ -5,16 +5,41 @@ from values import call_function   # 替换原来的 Builtins 依赖
 
 class IOOps:
     @staticmethod
+    def format_value(val):
+        """将三言值格式化为美观字符串，容器附三进制注释"""
+        from ternary_core import TritValue, ArrayValue
+        
+        if isinstance(val, list):
+            items_int = []
+            items_trit = []
+            for v in val:
+                if isinstance(v, TritValue):
+                    items_int.append(str(v.to_int()))
+                    items_trit.append(str(v.symbol))
+                else:
+                    items_int.append(str(v))
+                    items_trit.append('?')
+            base = '[' + ', '.join(items_int) + ']'
+            if items_trit and not all(t == '?' for t in items_trit):
+                base += '（三进制: ' + ', '.join(items_trit) + '）'
+            return base
+        elif isinstance(val, ArrayValue):
+            return IOOps.format_value(val.data)   # 重用列表格式化
+        elif isinstance(val, dict):
+            # 字典简单显示，可扩展
+            return str(val)
+        elif isinstance(val, TritValue):
+            return f"{val.to_int()}（三进制: {val.symbol}）"
+        else:
+            return str(val)
+
+    @staticmethod
     def output(evaluator, args):
         if len(args) == 0:
             return TritValue(0)
         val = evaluator.eval(args[0])
-        if isinstance(val, TritValue):
-            print(f"  => {val.to_int()}  (三进制: {val.symbol})")
-        elif isinstance(val, str):
-            print(f"  => {val}")
-        else:
-            print(f"  => {val}")
+        formatted = IOOps.format_value(val)
+        print(f"  => {formatted}")
         return val
 
     @staticmethod

@@ -1,6 +1,6 @@
 """自定义命令：定义与调用"""
+from values import ReturnException, SanyanSyntaxError, SanyanNameError
 from ternary_core import TritValue
-from values import ReturnException, SanyanNameError, SanyanSyntaxError
 
 class Commands:
     @staticmethod

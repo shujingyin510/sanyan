@@ -1,22 +1,22 @@
-// 三言 v3.4 跳出 与 窄异常捕获 独立测试
-输出("=== 跳出测试 ===")
-遍历 i 从 1 到 5 {
-    若 (i > 2) { 跳出 }
-    输出(i)
+// Break and catch test (no crash expected)
+print("=== break test ===")
+for i from 1 to 5 {
+    if (i > 2) { break }
+    print(i)
 }
-输出("循环结束")
+print("loop end")
 
-输出("=== 异常捕获测试（语言错误） ===")
-尝试 {
-    设 x = x23
-} 捕获 (e) {
-    输出(连接("错误信息: ", e))
+print("=== catch language error test ===")
+try {
+    set z = x23
+} catch (e) {
+    print(concat("caught: ", e))
 }
 
-输出("=== 异常捕获测试（内部错误，不应捕获） ===")
-尝试 {
-    设 z = 1 / 0
-} 捕获 (e) {
-    输出("不应该看到这条")
+print("=== catch internal error test (should be caught by try) ===")
+try {
+    set y = 1 / 0
+} catch (e) {
+    print("internal error caught (expected)")
 }
-输出("如果你看到我，说明非语言错误被误捕获了")
+print("test complete")

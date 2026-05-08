@@ -7,8 +7,8 @@ from commands import Commands
 from values import FunctionValue
 
 class SanyanEvaluator(SanyanRuntime):
-    def __init__(self, max_loop_steps=500, skin_manager=None):
-        super().__init__(max_loop_steps, skin_manager=skin_manager)
+    def __init__(self, max_loop_steps=None, skin_manager=None):
+        super().__init__(max_loop_steps=max_loop_steps, skin_manager=skin_manager)
 
     def eval(self, node: Any):
         # 直接返回已求值对象（用于高阶函数等）

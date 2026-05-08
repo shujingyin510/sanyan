@@ -130,7 +130,7 @@ class TritValue:
         return BT.to_int(self.value)
 
     def __repr__(self):
-        return f"Trit({self.symbol})"
+        return str(self.to_int())      # 只返回整数，如 "3"
 
 
 class ArrayValue:
@@ -160,4 +160,4 @@ class ArrayValue:
         self.set(index, value)
 
     def __repr__(self):
-        return f"数组[{', '.join(str(x) for x in self.data)}]"
+        return '[' + ', '.join(str(x) for x in self.data) + ']'

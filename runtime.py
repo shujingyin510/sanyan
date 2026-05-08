@@ -1,4 +1,5 @@
 """运行环境：传感器、执行器、变量、命令存储及基础解析"""
+import os
 from ternary_core import TritValue
 from values import SanyanNameError
 
@@ -22,7 +23,10 @@ class SanyanRuntime:
         '尝试', '捕获',
     }
 
-    def __init__(self, max_loop_steps=500, skin_manager=None):
+    def __init__(self, max_loop_steps=None, skin_manager=None):
+        if max_loop_steps is None:
+            max_loop_steps = int(os.environ.get("MAX_LOOP_STEPS", "500"))
+        self.max_loop_steps = max_loop_steps
         self.vars = {}
         self.sensors = {
             '人体': TritValue(0),

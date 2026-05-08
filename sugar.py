@@ -557,7 +557,6 @@ class _Parser:
                     self.consume(')')
                     body = self.parse_block()
                     return ['lambda', params] + body
-                        # 保存原始 token
             saved_tok = tok
             self.consume()
             # 如果是关键字命令，转换为内部标识符，以便正确生成 AST

@@ -1,0 +1,30 @@
+// Edge case test (safe)
+print("=== edge test ===")
+
+// Division by zero caught
+try {
+    set a = 1 / 0
+} catch (e) {
+    print("div by zero caught")
+}
+
+// Empty container
+set empty = list()
+print(concat("empty list length: ", length(empty)))
+
+// Break in loop
+set cnt = 0
+loop (cnt < 500) {
+    cnt = cnt + 1
+    if (cnt > 100) { break }
+}
+print(concat("cnt after break: ", cnt))
+
+// Recursion depth
+define recur (n) {
+    if (n <= 0) { return(0) }
+    return(1 + recur(n - 1))
+}
+print(concat("recur depth 10: ", recur(10)))
+
+print("edge test complete")
