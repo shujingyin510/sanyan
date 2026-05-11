@@ -100,6 +100,21 @@ class TernaryALU:
     @staticmethod
     def tritwise_not(a: list) -> list:
         return [-x for x in a]
+    
+    @staticmethod
+    def multiply(a: list, b: list) -> list:
+        """平衡三进制乘法：通过移位加实现"""
+        if TernaryALU.is_zero(a) or TernaryALU.is_zero(b):
+            return [0]
+        result = [0]
+        for i, trit in enumerate(reversed(b)):
+            if trit == 1:
+                shifted = a + [0] * i
+                result = TernaryALU.add(result, shifted)
+            elif trit == -1:
+                shifted = a + [0] * i
+                result = TernaryALU.sub(result, shifted)
+        return result
 
     @staticmethod
     def is_zero(a: list) -> bool:

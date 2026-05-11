@@ -1,30 +1,30 @@
-// Edge case test (safe)
-print("=== edge test ===")
+／／ 边界情况测试
+输出（"=== 边界测试 ==="）
 
-// Division by zero caught
-try {
-    set a = 1 / 0
-} catch (e) {
-    print("div by zero caught")
-}
+／／ 未定义变量捕获（语言层错误）
+尝试 ｛
+    设 a ＝ 未定义变量
+｝ 捕获 （e） ｛
+    输出（"异常捕获正常"）
+｝
 
-// Empty container
-set empty = list()
-print(concat("empty list length: ", length(empty)))
+／／ 空容器
+设 空列表 ＝ 列表（）
+输出（连接（"空列表长度: "， 表长（空列表）））
 
-// Break in loop
-set cnt = 0
-loop (cnt < 500) {
-    cnt = cnt + 1
-    if (cnt > 100) { break }
-}
-print(concat("cnt after break: ", cnt))
+／／ 大数循环（跳出保护）
+设 cnt ＝ 0
+循环 （cnt ＜ 500） ｛
+    cnt ＝ cnt ＋ 1
+    若 （cnt ＞ 100） ｛ 跳出 ｝
+｝
+输出（连接（"跳出循环后 cnt = "， cnt））
 
-// Recursion depth
-define recur (n) {
-    if (n <= 0) { return(0) }
-    return(1 + recur(n - 1))
-}
-print(concat("recur depth 10: ", recur(10)))
+／／ 递归深度
+定义 递归测试 （n） ｛
+    若 （n ＜＝ 0） ｛ 返回（0） ｝
+    返回（1 ＋ 递归测试（n － 1））
+｝
+输出（连接（"递归深度 10: "， 递归测试（10）））
 
-print("edge test complete")
+输出（"边界测试完成"）

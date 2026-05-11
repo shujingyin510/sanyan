@@ -2,17 +2,23 @@
 from typing import Any
 from ternary_core import TritValue, ArrayValue
 from runtime import SanyanRuntime
-from builtins_ops import Builtins
 from commands import Commands
-from values import FunctionValue, ModuleValue
+from values import FunctionValue, ModuleValue, call_function, SanyanNameError
+
+# 直接导入 ops 模块的方法
+from ops.control_ops import ControlOps
+from ops.math_ops import MathOps
+from ops.string_ops import StringOps
+from ops.container_ops import ContainerOps
+from ops.io_ops import IOOps
+from ops.iot_ops import IotOps
 
 class SanyanEvaluator(SanyanRuntime):
     def __init__(self, max_loop_steps=None, skin_manager=None):
         super().__init__(max_loop_steps=max_loop_steps, skin_manager=skin_manager)
 
     def eval(self, node: Any):
-        # 直接返回已求值对象（用于高阶函数等）
-        if isinstance(node, (TritValue, ArrayValue, FunctionValue)):
+        if isinstance(node, (TritValue, ArrayValue, FunctionValue, ModuleValue)):
             return node
         if isinstance(node, list):
             if len(node) == 1 and isinstance(node[0], str):
@@ -24,6 +30,9 @@ class SanyanEvaluator(SanyanRuntime):
                 func = first
                 args = node[1:]
                 return func.call(self, args)
+            if isinstance(first, ModuleValue):
+                evaluated_args = [self.eval(a) for a in args]
+                return first.call(self, evaluated_args)
             return self._apply(node[0], node[1:])
         elif isinstance(node, int):
             return TritValue(node)
@@ -31,7 +40,13 @@ class SanyanEvaluator(SanyanRuntime):
             if len(node) >= 2 and node[0] in ('"', '\u201c', '\u2018', "'"):
                 return node[1:-1]
             if self._is_valid_identifier(node):
-                return self._eval_symbol(node)
+                try:
+                    return self._eval_symbol(node)
+                except SanyanNameError:
+                    # 若包含中文，视为未加引号的字符串字面量，返回其本身
+                    if any('\u4e00' <= c <= '\u9fff' for c in node):
+                        return node
+                    raise
             return node
         else:
             raise RuntimeError(f"不支持的节点类型: {type(node)}")
@@ -49,76 +64,86 @@ class SanyanEvaluator(SanyanRuntime):
                     internal = op_internal
 
         dispatch = {
-            'if': lambda: Builtins.control(self, 'if', args),
-            'do': lambda: Builtins.control(self, 'do', args),
-            'loop': lambda: Builtins.control(self, 'loop', args),
-            'for': lambda: Builtins.traversal(self, args),
-            'forin': lambda: Builtins.forin_op(self, args),
-            'return': lambda: Builtins.return_op(self, args),
-            'break': lambda: Builtins.break_op(self, args),
-            'try': lambda: Builtins.try_catch(self, args),
-            'judge': lambda: Builtins.judge_op(self, args),
-            'and': lambda: Builtins.logic_op(self, 'and', args),
-            'or': lambda: Builtins.logic_op(self, 'or', args),
-            'not': lambda: Builtins.logic_op(self, 'not', args),
-            'add': lambda: Builtins.arithmetic(self, 'add', args),
-            'sub': lambda: Builtins.arithmetic(self, 'sub', args),
-            'mul': lambda: Builtins.arithmetic(self, 'mul', args),
-            'div': lambda: Builtins.arithmetic(self, 'div', args),
-            'mod': lambda: Builtins.arithmetic(self, 'mod', args),
-            'pow': lambda: Builtins.arithmetic(self, 'pow', args),
-            'digit': lambda: Builtins.arithmetic(self, 'digit', args),
-            'eq': lambda: Builtins.comparison(self, 'eq', args),
-            'gt': lambda: Builtins.comparison(self, 'gt', args),
-            'lt': lambda: Builtins.comparison(self, 'lt', args),
-            'ne': lambda: Builtins.comparison(self, 'ne', args),
-            'gte': lambda: Builtins.comparison(self, 'gte', args),
-            'lte': lambda: Builtins.comparison(self, 'lte', args),
-            'same': lambda: Builtins.equals_op(self, args),
-            'abs': lambda: Builtins.math_abs(self, args),
-            'max': lambda: Builtins.math_max(self, args),
-            'min': lambda: Builtins.math_min(self, args),
-            'sqrt': lambda: Builtins.math_sqrt(self, args),
-            'random': lambda: Builtins.math_random(self, args),
-            'random_state': lambda: Builtins.math_random_state(self, args),
-            'concat': lambda: Builtins.string_concat(self, args),
-            'length': lambda: Builtins.string_length(self, args),
-            'str_to_list': lambda: Builtins.str_to_list(self, args),
-            'list': lambda: Builtins.list_new(self, args),
-            'list_concat': lambda: Builtins.list_concat(self, args),
-            'list_len': lambda: Builtins.list_length(self, args),
-            'array': lambda: Builtins.array_new(self, args),
-            'array_len': lambda: Builtins.array_length(self, args),
-            'array_to_list': lambda: Builtins.array_to_list(self, args),
-            'get': lambda: Builtins.generic_get(self, args),
-            'set_element': lambda: Builtins.generic_set(self, args),
-            'dict': lambda: Builtins.dict_new(self, args),
-            'get_key': lambda: Builtins.dict_get(self, args),
-            'set_key': lambda: Builtins.dict_set(self, args),
-            'lambda': lambda: Builtins.make_lambda(self, args),
-            'apply': lambda: Builtins.apply(self, args),
-            'map': lambda: Builtins.map_op(self, args),
-            'filter': lambda: Builtins.filter_op(self, args),
-            'reduce': lambda: Builtins.reduce_op(self, args),
-            'print': lambda: Builtins.output(self, args),
-            'input': lambda: Builtins.input_op(self, args),
-            'debug': lambda: Builtins.debug_op(self, args),
-            'time': lambda: Builtins.time_now(self, args),
-            'sleep': lambda: Builtins.sleep_op(self, args),
-            'read_file': lambda: Builtins.read_file_op(self, args),
-            'write_file': lambda: Builtins.write_file_op(self, args),
-            'is_number': lambda: Builtins.is_number(self, args),
-            'is_string': lambda: Builtins.is_string(self, args),
-            'str_equals': lambda: Builtins.str_equals(self, args),
-            'load': lambda: Builtins._load_file(self, args),
-            'write': lambda: Builtins.set_sensor(self, args),
-            'query': lambda: Builtins.query(self, args),
-            'context': lambda: Builtins.context_op(self, args),
-            'read': lambda: Builtins._sensor_read(self, args),
-            'set': lambda: Builtins.define_var(self, args),
+            # 控制
+            'if': lambda: ControlOps.if_op(self, args),
+            'do': lambda: ControlOps.do_op(self, args),
+            'loop': lambda: ControlOps.loop_op(self, args),
+            'for': lambda: ControlOps.traversal_op(self, args),
+            'forin': lambda: ControlOps.forin_op(self, args),
+            'return': lambda: ControlOps.return_op(self, args),
+            'break': lambda: ControlOps.break_op(self, args),
+            'continue': lambda: ControlOps.continue_op(self, args),
+            'try': lambda: ControlOps.try_catch(self, args),
+            'judge': lambda: ControlOps.judge_op(self, args),
+            # 变量
+            'set': lambda: ControlOps.define_var(self, args),
             'fn': lambda: Commands.define(self, args),
-            'continue': lambda: Builtins.continue_op(self, args),
-            'import': lambda: Builtins.import_module(self, args),
+            # 逻辑
+            'and': lambda: MathOps.logic_op(self, 'and', args),
+            'or': lambda: MathOps.logic_op(self, 'or', args),
+            'not': lambda: MathOps.logic_op(self, 'not', args),
+            # 算术
+            'add': lambda: MathOps.arithmetic(self, 'add', args),
+            'sub': lambda: MathOps.arithmetic(self, 'sub', args),
+            'mul': lambda: MathOps.arithmetic(self, 'mul', args),
+            'div': lambda: MathOps.arithmetic(self, 'div', args),
+            'mod': lambda: MathOps.arithmetic(self, 'mod', args),
+            'pow': lambda: MathOps.arithmetic(self, 'pow', args),
+            'digit': lambda: MathOps.arithmetic(self, 'digit', args),
+            # 比较
+            'eq': lambda: MathOps.comparison(self, 'eq', args),
+            'gt': lambda: MathOps.comparison(self, 'gt', args),
+            'lt': lambda: MathOps.comparison(self, 'lt', args),
+            'ne': lambda: MathOps.comparison(self, 'ne', args),
+            'gte': lambda: MathOps.comparison(self, 'gte', args),
+            'lte': lambda: MathOps.comparison(self, 'lte', args),
+            'same': lambda: MathOps.equals_op(self, args),
+            # 数学函数
+            'abs': lambda: MathOps.math_abs(self, args),
+            'max': lambda: MathOps.math_max(self, args),
+            'min': lambda: MathOps.math_min(self, args),
+            'sqrt': lambda: MathOps.math_sqrt(self, args),
+            'random': lambda: MathOps.math_random(self, args),
+            'random_state': lambda: MathOps.math_random_state(self, args),
+            # 字符串
+            'concat': lambda: StringOps.string_concat(self, args),
+            'length': lambda: StringOps.string_length(self, args),
+            'str_to_list': lambda: StringOps.str_to_list(self, args),
+            # 容器
+            'list': lambda: ContainerOps.list_new(self, args),
+            'list_concat': lambda: ContainerOps.list_concat(self, args),
+            'list_len': lambda: ContainerOps.list_length(self, args),
+            'array': lambda: ContainerOps.array_new(self, args),
+            'array_len': lambda: ContainerOps.array_length(self, args),
+            'array_to_list': lambda: ContainerOps.array_to_list(self, args),
+            'get': lambda: ContainerOps.generic_get(self, args),
+            'set_element': lambda: ContainerOps.generic_set(self, args),
+            'dict': lambda: ContainerOps.dict_new(self, args),
+            'get_key': lambda: ContainerOps.dict_get(self, args),
+            'set_key': lambda: ContainerOps.dict_set(self, args),
+            'lambda': lambda: ContainerOps.make_lambda(self, args),
+            'apply': lambda: ContainerOps.apply(self, args),
+            'map': lambda: ContainerOps.map_op(self, args),
+            'filter': lambda: ContainerOps.filter_op(self, args),
+            'reduce': lambda: ContainerOps.reduce_op(self, args),
+            # IO
+            'print': lambda: IOOps.output(self, args),
+            'input': lambda: IOOps.input_op(self, args),
+            'debug': lambda: IOOps.debug_op(self, args),
+            'time': lambda: IOOps.time_now(self, args),
+            'sleep': lambda: IOOps.sleep_op(self, args),
+            'read_file': lambda: IOOps.read_file_op(self, args),
+            'write_file': lambda: IOOps.write_file_op(self, args),
+            'is_number': lambda: IOOps.is_number(self, args),
+            'is_string': lambda: IOOps.is_string(self, args),
+            'str_equals': lambda: IOOps.str_equals(self, args),
+            'load': lambda: IOOps._load_file(self, args),
+            'import': lambda: IOOps.import_module(self, args),
+            # IoT
+            'write': lambda: IotOps.set_sensor(self, args),
+            'query': lambda: IotOps.query(self, args),
+            'context': lambda: IotOps.context_op(self, args),
+            'read': lambda: IotOps.sensor_read(self, args),
         }
 
         if internal in dispatch:

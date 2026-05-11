@@ -26,14 +26,11 @@ if __name__ == '__main__':
         env = SanyanEvaluator(skin_manager=skin_mgr)
         try:
             ast = SugarConverter.convert(code, skin_mgr)
-        except SyntaxError:
-            # 糖语法失败 → 回退到原生 S 表达式解析
-            from lexer import tokenize
-            from parser import parse
-            tokens = tokenize(code)
-            if not tokens:
-                sys.exit(0)
-            ast = parse(tokens)
+        except SyntaxError as e:
+            print(f"语法错误: {e}")
+            import traceback
+            traceback.print_exc()
+            sys.exit(1)
 
         try:
             result = env.eval(ast)

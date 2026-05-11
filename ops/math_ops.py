@@ -82,10 +82,10 @@ class MathOps:
                 result -= evaluator.eval(arg).to_int()
             return TritValue(result)
         elif op == 'mul':
-            result = 1
-            for arg in args:
-                result *= evaluator.eval(arg).to_int()
-            return TritValue(result)
+            val = evaluator.eval(args[0]).value
+            for arg in args[1:]:
+                val = TernaryALU.multiply(val, evaluator.eval(arg).value)
+            return TritValue(BT.to_int(val))
         elif op == 'div':
             if len(args) != 2:
                 raise SyntaxError("除 需要两个参数")

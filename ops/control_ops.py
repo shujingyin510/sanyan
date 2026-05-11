@@ -23,6 +23,33 @@ class ControlOps:
         for statement in args:
             result = evaluator.eval(statement)
         return result if result is not None else TritValue(0)
+    
+    @staticmethod
+    def define_var(evaluator, args):
+        from ternary_core import TritValue
+        if not args:
+            raise SanyanSyntaxError("设 需要参数，格式: (设 变量名 值)")
+        if len(args) == 1 and isinstance(args[0], list):
+            pairs = evaluator._parse_pairs(args[0])
+            last_val = TritValue(0)
+            for var, val_str in pairs:
+                val = TritValue.from_string(val_str)
+                evaluator.vars[var] = val
+                last_val = val
+            return last_val
+        if len(args) < 2:
+            raise SanyanSyntaxError("设 需要变量名和值，格式: (设 变量名 值)")
+        var_name = args[0]
+        if isinstance(var_name, list):
+            var_name = var_name[0]
+        value_node = args[1]
+        if (isinstance(value_node, list) and len(value_node) == 1 
+                and isinstance(value_node[0], str) and value_node[0].isdigit()):
+            value = TritValue(int(value_node[0]))
+        else:
+            value = evaluator.eval(value_node)
+        evaluator.vars[var_name] = value
+        return value
 
     @staticmethod
     def loop_op(evaluator, args):
@@ -31,8 +58,8 @@ class ControlOps:
         cond = evaluator.eval(args[0])
         body = args[1:]
         result = TritValue(0)
-        evaluator.loop_count = 0
-        while evaluator.loop_count < evaluator.max_loop_steps:
+        local_count = 0
+        while local_count < evaluator.max_loop_steps:
             if BT.to_int(cond.value) != 1:
                 break
             try:
@@ -41,12 +68,9 @@ class ControlOps:
             except BreakException:
                 break
             except ContinueException:
-                # 跳过本次循环，继续下一次 while 迭代
-                evaluator.loop_count += 1
-                cond = evaluator.eval(args[0])
-                continue
-            evaluator.loop_count += 1
-            cond = evaluator.eval(args[0])   # 重新求值条件
+                pass
+            local_count += 1
+            cond = evaluator.eval(args[0])
         return result
 
     @staticmethod

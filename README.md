@@ -300,7 +300,6 @@ sanyan/
 ├── main.py            # 入口
 ├── ternary_core.py    # 平衡三进制核心
 ├── runtime.py         # 运行环境
-├── builtins_ops.py    # 内置操作聚合层
 ├── commands.py        # 自定义命令
 ├── evaluator.py       # 求值器
 ├── lexer.py           # S 表达式词法
@@ -316,9 +315,13 @@ sanyan/
 │   ├── container_ops.py
 │   ├── io_ops.py
 │   └── iot_ops.py
+├── tools/             # 辅助开发工具
+│   ├── fix_quotes.py
+│   ├── fix_comments.py
+│   └── convert_to_fullwidth.py
 ├── language/          # 皮肤文件（chinese.json / english.json）
-├── examples/          # 示例（含温室糖语法版与 S 表达式版）
-├── stdlib/            # 标准库（math, string, list, iot, io, logic, format）
+├── examples/          # 示例（温室、投票、数据清洗、传感器管道）
+├── stdlib/            # 标准库（math, string, list, iot, logic, format）
 ├── tests/             # 自动测试与模糊测试
 └── docs/              # 语言手册
 ```
@@ -332,6 +335,8 @@ sanyan/
 | 开 / 真 / 亮 / 有 / 是 | + | 1 | 确定的正向状态 |
 | 守 / 可能 / 待 / 未知 | 0 | 0 | 不确定或保持当前状态 |
 | 关 / 假 / 灭 / 无 / 否 | - | -1 | 确定的负向状态 |
+
+> **语义区分**：`守` 常用于 IoT 保持状态；`可能` 常用于逻辑/投票/数据清洗。
 
 这些不是关键字别名，是语言的语义层。`守` 表示"保持当前状态"（常用于 IoT），`可能` 表示"尚未确定"，`待` 表示"等待输入"。在 IoT 场景下，这些区别有实际意义。
 
@@ -347,13 +352,14 @@ sanyan/
 - [x] 异常处理 `尝试` / `捕获`
 - [x] 文件读写原语
 - [x] 国际化皮肤（母语可定制）
-- [x] 全角符号兼容
+- [x] 全角符号兼容（含注释、引号、运算符）
 - [x] 字符串插值 `模板{...}`
 - [x] 三态分支 `判`
 - [x] `跳出` / `继续` 关键字
 - [x] 窄异常捕获
 - [x] 列表字面量与生成式
 - [x] 遍历-在
+- [x] 模块导入（命名空间隔离）
 - [ ] GPIO 真实硬件控制
 - [ ] Web IDE
 - [ ] 标准库扩展（更多自举模块）

@@ -39,8 +39,6 @@ class SanyanRuntime:
             '加热': TritValue(0),
         }
         self.context_object = None
-        self.max_loop_steps = max_loop_steps
-        self.loop_count = 0
         self.commands = {}
         self.call_depth = 0
         self.max_call_depth = 200
@@ -108,11 +106,4 @@ class SanyanRuntime:
                 sensor_val = self.sensors[obj]
                 attr_val = TritValue.from_string(symbol)
                 return TritValue(1 if sensor_val.symbol == attr_val.symbol else -1)
-        # 安全网：如果符号包含中文字符且未被识别，将其视为字符串返回
-        if any('\u4e00' <= c <= '\u9fff' for c in symbol):
-            return symbol
-        # 最终回退：如果符号看起来像自然语言文本，当作字符串
-        if any(c for c in symbol if '\u4e00' <= c <= '\u9fff'):
-            # 含有汉字，且未找到定义，很可能是在字符串外面误用了中文
-            return symbol
         raise SanyanNameError(f"未定义的符号: {symbol}")

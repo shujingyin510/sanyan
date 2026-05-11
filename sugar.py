@@ -8,8 +8,9 @@ from typing import List
 class SugarConverter:
     @staticmethod
     def tokenize(code: str) -> List[str]:
-        # 全局替换全角空格为半角空格，彻底解决中文输入法问题
+        # 全局替换全角空格为半角空格
         code = code.replace('\u3000', ' ')
+        code = code.replace('\uff0f', '/')   # 全角斜线 ／ → 半角斜线 /
         tokens = []
         current = ''
         i = 0
@@ -23,7 +24,35 @@ class SugarConverter:
 
         while i < length:
             c = code[i]
-            # 跳过所有空白（半角、全角空格、制表等）
+
+            # ---------- 全角左引号处理（必须在全角符号映射之前） ----------
+            if c in ('\u201c', '\u2018', '\u300c', '\u300e'):
+                if current:
+                    tokens.append(current)
+                    current = ''
+                quote = c
+                end_map = {
+                    '\u201c': '\u201d',   # “ ”
+                    '\u2018': '\u2019',   # ‘ ’
+                    '\u300c': '\u300d',   # 「 」
+                    '\u300e': '\u300f',   # 『 』
+                }
+                end_quote = end_map[quote]
+                j = i + 1
+                while j < length and code[j] != end_quote:
+                    if code[j] == '\\':
+                        j += 1
+                    j += 1
+                if j < length:
+                    inner = code[i+1:j]
+                    tokens.append(f'"{inner}"')   # 统一转为半角双引号
+                    i = j + 1
+                else:
+                    tokens.append(code[i:])
+                    i = length
+                continue
+
+            # ---------- 跳过所有空白 ----------
             if c in (' ', '\t', '\n', '\r', '\u3000'):
                 if current:
                     tokens.append(current)
@@ -31,29 +60,29 @@ class SugarConverter:
                 i += 1
                 continue
 
-            # 全角符号转换（字符串内部不会执行到这里，因为字符串已单独处理并跳过）
+            # ---------- 全角符号转换（不包括引号） ----------
             if c in fullwidth_map:
                 c = fullwidth_map[c]
 
-            # 字符串处理（中英文引号）
-            if c in ('"', '\u201c', '\u2018'):
+            # ---------- 半角双引号字符串 ----------
+            if c == '"':
                 if current:
                     tokens.append(current)
                     current = ''
-                quote = c
-                end_quote = '"' if quote == '"' else ('\u201d' if quote == '\u201c' else '\u2019')
                 j = i + 1
-                while j < length and code[j] != end_quote:
+                while j < length and code[j] != '"':
                     if code[j] == '\\':
                         j += 1
                     j += 1
                 if j < length:
-                    j += 1
-                tokens.append(code[i:j])
-                i = j
+                    tokens.append(code[i:j+1])
+                    i = j + 1
+                else:
+                    tokens.append(code[i:])
+                    i = length
                 continue
 
-            # 注释处理
+            # ---------- 注释 ----------
             if c == '/' and i+1 < length and code[i+1] == '/':
                 if current:
                     tokens.append(current)
@@ -71,19 +100,24 @@ class SugarConverter:
                     i += 1
                 continue
 
-            # 单字符符号 (注意：这里已经将半角符号处理，且 '[' 和 ']' 保留)
-            if c in ('{', '}', '(', ')', ';', ',', '=', '>', '<', '+', '-', '*', '/', '%', '^', '.'):
+            # ---------- 单字符符号（含方括号） ----------
+                        # 单字符符号（半角）
+            if c in ('{', '}', '(', ')', ';', ',', '=', '>', '<', '+', '-', '*', '/', '%', '^', '.', '[', ']'):
                 if current:
                     tokens.append(current)
                     current = ''
-                # 多字符操作符
-                if c == '>' and i+1 < length and code[i+1] == '=':
+                # 多字符操作符（需要检查下一个字符，并预先将其全角转半角）
+                next_half = code[i+1] if i+1 < length else None
+                if next_half and next_half in fullwidth_map:
+                    next_half = fullwidth_map[next_half]
+
+                if c == '>' and next_half == '=':
                     tokens.append('>='); i += 2; continue
-                if c == '<' and i+1 < length and code[i+1] == '=':
+                if c == '<' and next_half == '=':
                     tokens.append('<='); i += 2; continue
-                if c == '=' and i+1 < length and code[i+1] == '=':
+                if c == '=' and next_half == '=':
                     tokens.append('=='); i += 2; continue
-                if c == '!' and i+1 < length and code[i+1] == '=':
+                if c == '!' and next_half == '=':
                     tokens.append('!='); i += 2; continue
                 if c == '-' and i+1 < length and code[i+1].isdigit():
                     # 负数
@@ -98,16 +132,7 @@ class SugarConverter:
                 i += 1
                 continue
 
-            # 新增：识别半角方括号，直接作为 token
-            if c in ('[', ']'):
-                if current:
-                    tokens.append(current)
-                    current = ''
-                tokens.append(c)
-                i += 1
-                continue
-
-            # 标识符、数字、中文关键字
+            # ---------- 标识符、数字、中文关键字、原文块、模板 ----------
             if c.isalpha() or c == '_' or '\u4e00' <= c <= '\u9fff' or '\u3400' <= c <= '\u4dbf':
                 start = i
                 while i < length and (code[i].isalnum() or code[i] == '_' or
@@ -135,6 +160,7 @@ class SugarConverter:
                 tokens.append(word)
                 continue
 
+            # ---------- 数字 ----------
             if c.isdigit():
                 start = i
                 while i < length and code[i].isdigit():
