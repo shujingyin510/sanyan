@@ -277,8 +277,8 @@ python main.py examples/sensor_pipeline_simple.san
 
 ```text
 平衡三进制加法：
-  +0-  (十进制 2)
-+  0+  (十进制 3)
+   +-  (十进制 2)
++  +0  (十进制 3)
 ------
   +--  (十进制 5) ✓
 ```
