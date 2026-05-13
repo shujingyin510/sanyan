@@ -122,13 +122,27 @@ class TernaryALU:
 
 
 class TritValue:
+    __slots__ = ('value', 'symbol', '_initialized')
+
     STATE_MAP = {
         '开': 1, '高': 1, '真': 1, '亮': 1, '启': 1, '通': 1, '有': 1, '是': 1,
         '关': -1, '低': -1, '假': -1, '灭': -1, '停': -1, '断': -1, '无': -1, '否': -1,
         '守': 0, '中': 0, '可能': 0, '待': 0, '未知': 0,
     }
 
+    _pool = {}
+
+    def __new__(cls, value):
+        key = value if isinstance(value, int) else tuple(value) if isinstance(value, list) else value
+        if key not in cls._pool:
+            obj = super().__new__(cls)
+            cls._pool[key] = obj
+        return cls._pool[key]
+
     def __init__(self, value: Union[int, list]):
+        if hasattr(self, '_initialized'):
+            return
+        self._initialized = True
         if isinstance(value, int):
             self.value = BT.from_int(value)
         else:
@@ -150,6 +164,8 @@ class TritValue:
 
 class ArrayValue:
     """固定长度数组，元素可以是任意值"""
+    __slots__ = ('length', 'data')
+
     def __init__(self, length, default=TritValue(0)):
         self.length = length
         self.data = [default] * length

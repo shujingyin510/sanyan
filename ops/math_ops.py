@@ -43,7 +43,7 @@ class MathOps:
                         return state
                 try:
                     return int(v)
-                except:
+                except Exception:
                     pass
             raise TypeError(f"无法将 '{v}' 转换为整数用于比较")
 
@@ -56,6 +56,8 @@ class MathOps:
         elif op == 'ne': truth = a != b
         elif op == 'gte': truth = a >= b
         elif op == 'lte': truth = a <= b
+        elif op == 'ngt': truth = a <= b
+        elif op == 'nlt': truth = a >= b
         return TritValue(1 if truth else -1)
 
     @staticmethod
@@ -172,3 +174,121 @@ class MathOps:
     @staticmethod
     def math_random_state(evaluator, args):
         return TritValue(random.choice([1, 0, -1]))
+
+    @staticmethod
+    def math_sin(evaluator, args):
+        """正弦(x) - 计算正弦值（参数为弧度）"""
+        if len(args) != 1:
+            raise SyntaxError("正弦 需要一个参数")
+        val = evaluator.eval(args[0])
+        if isinstance(val, TritValue):
+            x = val.to_int()
+        else:
+            x = float(val)
+        return TritValue(int(math.sin(x) * 1000))  # 返回千分位精度的整数
+
+    @staticmethod
+    def math_cos(evaluator, args):
+        """余弦(x) - 计算余弦值（参数为弧度）"""
+        if len(args) != 1:
+            raise SyntaxError("余弦 需要一个参数")
+        val = evaluator.eval(args[0])
+        if isinstance(val, TritValue):
+            x = val.to_int()
+        else:
+            x = float(val)
+        return TritValue(int(math.cos(x) * 1000))  # 返回千分位精度的整数
+
+    @staticmethod
+    def math_tan(evaluator, args):
+        """正切(x) - 计算正切值（参数为弧度）"""
+        if len(args) != 1:
+            raise SyntaxError("正切 需要一个参数")
+        val = evaluator.eval(args[0])
+        if isinstance(val, TritValue):
+            x = val.to_int()
+        else:
+            x = float(val)
+        return TritValue(int(math.tan(x) * 1000))  # 返回千分位精度的整数
+
+    @staticmethod
+    def math_log(evaluator, args):
+        """对数(x) - 计算自然对数"""
+        if len(args) != 1:
+            raise SyntaxError("对数 需要一个参数")
+        val = evaluator.eval(args[0]).to_int()
+        if val <= 0:
+            raise ValueError("对数的参数必须为正数")
+        return TritValue(int(math.log(val)))
+
+    @staticmethod
+    def math_log10(evaluator, args):
+        """常用对数(x) - 计算以10为底的对数"""
+        if len(args) != 1:
+            raise SyntaxError("常用对数 需要一个参数")
+        val = evaluator.eval(args[0]).to_int()
+        if val <= 0:
+            raise ValueError("常用对数的参数必须为正数")
+        return TritValue(int(math.log10(val)))
+
+    @staticmethod
+    def math_floor(evaluator, args):
+        """向下取整(x) - 返回不大于x的最大整数"""
+        if len(args) != 1:
+            raise SyntaxError("向下取整 需要一个参数")
+        val = evaluator.eval(args[0])
+        if isinstance(val, TritValue):
+            return TritValue(val.to_int())  # 整数直接返回
+        return TritValue(int(math.floor(float(val))))
+
+    @staticmethod
+    def math_ceil(evaluator, args):
+        """向上取整(x) - 返回不小于x的最小整数"""
+        if len(args) != 1:
+            raise SyntaxError("向上取整 需要一个参数")
+        val = evaluator.eval(args[0])
+        if isinstance(val, TritValue):
+            return TritValue(val.to_int())  # 整数直接返回
+        return TritValue(int(math.ceil(float(val))))
+
+    @staticmethod
+    def math_round(evaluator, args):
+        """四舍五入(x) - 四舍五入到最近整数"""
+        if len(args) != 1:
+            raise SyntaxError("四舍五入 需要一个参数")
+        val = evaluator.eval(args[0])
+        if isinstance(val, TritValue):
+            return TritValue(val.to_int())  # 整数直接返回
+        return TritValue(int(round(float(val))))
+
+    @staticmethod
+    def math_pow(evaluator, args):
+        """幂(base, exp) - 计算base的exp次方"""
+        if len(args) != 2:
+            raise SyntaxError("幂 需要两个参数")
+        base = evaluator.eval(args[0]).to_int()
+        exp = evaluator.eval(args[1]).to_int()
+        return TritValue(int(math.pow(base, exp)))
+
+    @staticmethod
+    def ternary_parse(evaluator, args):
+        """三进制(str) - 将三进制字符串转换为三值整数，如 三进制("+-0") → 6"""
+        if len(args) != 1:
+            raise SyntaxError("三进制 需要一个参数")
+        s = evaluator.eval(args[0])
+        if not isinstance(s, str):
+            raise TypeError("三进制 的参数必须是字符串（含 +, 0, - 字符）")
+        from ternary_core import BT, TritValue
+        trits = []
+        for ch in s:
+            if ch == '+':
+                trits.append(1)
+            elif ch == '0':
+                trits.append(0)
+            elif ch == '-':
+                trits.append(-1)
+            else:
+                raise ValueError(f"三进制字符串只能包含 '+', '0', '-'，但得到 '{ch}'")
+        if not trits:
+            raise ValueError("三进制字符串不能为空")
+        return TritValue(trits)

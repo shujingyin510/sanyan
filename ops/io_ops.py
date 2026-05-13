@@ -2,7 +2,12 @@
 import time
 from ternary_core import TritValue
 from values import call_function, SanyanSyntaxError
-from values import ModuleValue
+from values import ModuleValue, FunctionValue
+
+# 延迟导入避免循环依赖
+def _get_commands():
+    from commands import Commands
+    return Commands
 
 class IOOps:
     @staticmethod
@@ -57,10 +62,43 @@ class IOOps:
 
     @staticmethod
     def debug_op(evaluator, args):
+        # 检查是否是断点模式
+        if args:
+            mode = evaluator.eval(args[0])
+            if isinstance(mode, str) and mode == '断点':
+                return IOOps._breakpoint(evaluator)
+        
+        # 普通调试信息
         print("=== 调试信息 ===")
+        print(f"调用栈深度: {evaluator.call_depth}")
+        if evaluator.call_stack:
+            Commands = _get_commands()
+            last_op, last_args = evaluator.call_stack[-1]
+            formatted = Commands._format_args(last_args) if last_args else ""
+            print(f"最近调用: {last_op}({formatted})")
         print("变量:")
         for name, val in evaluator.vars.items():
-            print(f"  {name}: {val}")
+            type_name = type(val).__name__
+            if isinstance(val, TritValue):
+                type_name = '三值整数'
+                print(f"  {name}: {val} (类型: {type_name}, 三进制: {val.symbol})")
+            elif isinstance(val, str):
+                type_name = '字符串'
+                print(f"  {name}: \"{val}\" (类型: {type_name}, 长度: {len(val)})")
+            elif isinstance(val, list):
+                type_name = '列表'
+                print(f"  {name}: {val} (类型: {type_name}, 长度: {len(val)})")
+            elif isinstance(val, dict):
+                type_name = '字典'
+                print(f"  {name}: {val} (类型: {type_name}, 键数: {len(val)})")
+            elif isinstance(val, FunctionValue):
+                type_name = '函数'
+                print(f"  {name}: {val} (类型: {type_name})")
+            elif isinstance(val, ModuleValue):
+                type_name = '模块'
+                print(f"  {name}: {val} (类型: {type_name})")
+            else:
+                print(f"  {name}: {val} (类型: {type_name})")
         print("传感器:")
         for name, val in evaluator.sensors.items():
             print(f"  {name}: {val.symbol} (int: {val.to_int()})")
@@ -68,6 +106,61 @@ class IOOps:
         for name, val in evaluator.actuators.items():
             print(f"  {name}: {val.symbol} (int: {val.to_int()})")
         print("================")
+        return TritValue(0)
+
+    @staticmethod
+    def _breakpoint(evaluator):
+        """断点调试：暂停执行，进入交互式调试模式"""
+        print("\n=== 断点 ===")
+        print("命令: (继续) 继续执行, (变量) 查看变量, (传感器) 查看传感器, (执行器) 查看执行器")
+        print("输入表达式可求值，输入 (继续) 恢复执行")
+        
+        while True:
+            try:
+                cmd = input("调试> ").strip()
+            except (EOFError, KeyboardInterrupt):
+                print("\n继续执行...")
+                break
+            
+            if not cmd:
+                continue
+            
+            if cmd in ('（继续）', '继续', '(继续)', 'continue', 'c'):
+                print("继续执行...")
+                break
+            elif cmd in ('（变量）', '变量', '(变量)', 'vars', 'v'):
+                print("变量:")
+                for name, val in evaluator.vars.items():
+                    print(f"  {name}: {val}")
+            elif cmd in ('（传感器）', '传感器', '(传感器)', 'sensors', 's'):
+                print("传感器:")
+                for name, val in evaluator.sensors.items():
+                    print(f"  {name}: {val.symbol} (int: {val.to_int()})")
+            elif cmd in ('（执行器）', '执行器', '(执行器)', 'actuators', 'a'):
+                print("执行器:")
+                for name, val in evaluator.actuators.items():
+                    print(f"  {name}: {val.symbol} (int: {val.to_int()})")
+            elif cmd in ('（帮助）', '帮助', '(帮助)', 'help', 'h', '?'):
+                print("命令:")
+                print("  (继续) / c - 继续执行")
+                print("  (变量) / v - 查看所有变量")
+                print("  (传感器) / s - 查看传感器状态")
+                print("  (执行器) / a - 查看执行器状态")
+                print("  (帮助) / h - 显示此帮助")
+                print("  其他输入将作为三言表达式求值")
+            else:
+                # 尝试作为表达式求值
+                try:
+                    from sugar import SugarConverter
+                    ast = SugarConverter.convert(cmd, evaluator.skin_manager)
+                    result = evaluator.eval(ast)
+                    if result is not None:
+                        from ops.io_ops import IOOps
+                        formatted = IOOps.format_value(result)
+                        print(f"  => {formatted}")
+                except Exception as e:
+                    print(f"  错误: {e}")
+        
         return TritValue(0)
 
     @staticmethod
@@ -145,6 +238,12 @@ class IOOps:
         path = args[0]
         if isinstance(path, list):
             path = path[0]
+        # 自动路径解析
+        import os
+        if isinstance(path, str) and not os.sep in path and not path.endswith('.san'):
+            candidate = os.path.join('stdlib', path + '.san')
+            if os.path.exists(candidate):
+                path = candidate
         with open(path, 'r', encoding='utf-8') as f:
             code = f.read()
         if not code.strip():
@@ -176,6 +275,12 @@ class IOOps:
         path = evaluator.eval(args[0])
         if hasattr(path, 'to_int'):
             path = str(path.to_int())
+        # 自动路径解析：无后缀且无路径分隔符时，尝试 stdlib/xxx.san
+        import os
+        if not os.sep in path and not path.endswith('.san'):
+            candidate = os.path.join('stdlib', path + '.san')
+            if os.path.exists(candidate):
+                path = candidate
         with open(path, 'r', encoding='utf-8') as f:
             code = f.read()
         if not code.strip():

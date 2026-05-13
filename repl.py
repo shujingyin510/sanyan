@@ -1,4 +1,17 @@
 """REPL 交互环境与演示程序"""
+import os
+import sys
+
+# REPL 历史记录
+_history_file = os.path.expanduser('~/.sanyan_history')
+try:
+    import readline
+    readline.set_history_length(1000)
+    if os.path.exists(_history_file):
+        readline.read_history_file(_history_file)
+except ImportError:
+    readline = None
+
 from lexer import tokenize
 from parser import parse
 from evaluator import SanyanEvaluator
@@ -7,7 +20,7 @@ from skin import SkinManager
 
 
 def demo(skin_mgr):
-    print("\n========== 三言 v3.4 演示 ==========")
+    print("\n========== 三言 v3.5 演示 ==========")
     env = SanyanEvaluator(skin_manager=skin_mgr)
 
     # 1. 智能设备控制
@@ -54,12 +67,56 @@ def demo(skin_mgr):
     print("========== 演示结束 ==========\n")
 
 
+_BUILTIN_KEYWORDS = [
+    '设', '若', '再若', '否则', '循环', '遍历', '定义', '函数', '返回', '输出', '输入',
+    '调试', '等待', '读文件', '写文件', '尝试', '捕获', '判', '跳出', '继续', '导入',
+    '列表', '字典', '数组', '映射', '过滤', '归并', '应用', '连接', '取长', '子串',
+    '替换', '分割', '查找', '排序', '反转', '包含', '去重', '切片', '求和', '合并',
+    '置', '查', '读', '加载', '随机态', '随机数', '当前时间',
+    '真', '假', '可能', '开', '关', '守',
+    '不大于', '不小于', '大于等于', '小于等于', '不等于', '等于', '大于', '小于',
+    '且', '或', '非', '加', '减', '乘', '除', '幂', '余',
+    '正弦', '余弦', '正切', '对数', '常用对数', '向下取整', '向上取整', '四舍五入',
+    '切换中文', '切换英文', '退出',
+]
+
+def _make_completer(env):
+    def completer(text, state):
+        matches = []
+        # 内置关键字
+        for kw in _BUILTIN_KEYWORDS:
+            if kw.startswith(text):
+                matches.append(kw)
+        # 当前变量名
+        for name in env.vars:
+            if name.startswith(text):
+                matches.append(name)
+        # 当前命令名
+        for name in env.commands:
+            if name.startswith(text):
+                matches.append(name)
+        # REPL 命令
+        for cmd in [':lang', ':maxloop', 'exit', '退出']:
+            if cmd.startswith(text):
+                matches.append(cmd)
+        matches.sort()
+        if state < len(matches):
+            return matches[state]
+        return None
+    return completer
+
 def repl():
     skin_mgr = SkinManager('chinese')
     env = SanyanEvaluator(skin_manager=skin_mgr)
-    print("三言 v3.4 REPL (母语可定制)")
-    print("输入 :lang english 切换英文，:lang chinese 切换中文")
-    print("输入（退出）或（exit）离开")
+
+    # 设置自动补全
+    if readline:
+        readline.set_completer(_make_completer(env))
+        readline.parse_and_bind('tab: complete')
+
+    print("三言 v3.5 REPL (母语可定制)")
+    print("输入 切换英文/:lang english 切换英文，切换中文/:lang chinese 切换中文")
+    print("输入 退出/exit 离开，Tab 键自动补全")
     while True:
         try:
             code = input("三言> ").strip()
@@ -68,21 +125,29 @@ def repl():
                 continue
             if code in ('（退出）', '退出', '（exit）', 'exit'):
                 break
+            if code in ('切换中文', '（切换中文）'):
+                skin_mgr.switch_skin('chinese')
+                print(f"皮肤已切换至 {skin_mgr.lang}")
+                continue
+            if code in ('切换英文', '（切换英文）'):
+                skin_mgr.switch_skin('english')
+                print(f"皮肤已切换至 {skin_mgr.lang}")
+                continue
+            if code.startswith(':maxloop'):
+                parts = code.split()
+                if len(parts) == 2 and parts[1].isdigit():
+                    env.max_loop_steps = int(parts[1])
+                    print(f"最大循环步数已设为: {env.max_loop_steps}")
+                continue
             if code.startswith(':lang'):
-                if code.startswith(':maxloop'):
-                    parts = code.split()
-                    if len(parts) == 2 and parts[1].isdigit():
-                        env.max_loop_steps = int(parts[1])
-                        print(f"最大循环步数已设为: {env.max_loop_steps}")
-                    continue
                 parts = code.split()
                 if len(parts) == 2:
                     lang = parts[1]
-                    if lang in ('chinese', 'english'):
+                    if lang in ('chinese', 'english', '中文', '英文'):
                         skin_mgr.switch_skin(lang)
                         print(f"皮肤已切换至 {skin_mgr.lang}")
                     else:
-                        print("支持的语言：chinese, english")
+                        print("支持的语言：chinese/中文, english/英文")
                 continue
 
             # 多行输入支持
@@ -148,7 +213,7 @@ def repl():
                         from ops.io_ops import IOOps
                         formatted = IOOps.format_value(result)
                         print(f"  => {formatted}")
-                    except:
+                    except Exception:
                         print(f"  => {result}")
         except KeyboardInterrupt:
             print("\n  操作已中断。")
@@ -156,3 +221,10 @@ def repl():
         except Exception as e:
             print(f"  错误: {e}")
             print(f"    输入内容: {code}")
+
+    # 保存历史记录
+    if readline:
+        try:
+            readline.write_history_file(_history_file)
+        except Exception:
+            pass

@@ -8,7 +8,7 @@ if sys.platform == "win32":
     try:
         sys.stdout.reconfigure(encoding='utf-8')
         sys.stderr.reconfigure(encoding='utf-8')
-    except:
+    except Exception:
         pass
 
 TEST_DIR = "tests"
@@ -42,7 +42,12 @@ def main():
                 test_files.append(os.path.join(TEST_DIR, f))
 
     # 收集示例文件作为功能测试
-    example_files = ["greenhouse.san", "voting.san", "data_clean.san"]
+    example_files = [
+        "greenhouse.san", "greenhouse_se.san",
+        "voting.san", "voting_se.san",
+        "data_clean.san", "data_clean_se.san",
+        "sensor_pipeline_simple.san", "sensor_pipeline_simple_se.san",
+    ]
     for f in example_files:
         fp = os.path.join(EXAMPLES_DIR, f)
         if os.path.exists(fp):

@@ -125,7 +125,9 @@ class ContainerOps:
         if not isinstance(params, list):
             raise SyntaxError("λ 的参数必须是列表")
         body = args[1:]
-        return FunctionValue(params, body)
+        # 捕获当前变量环境（闭包）
+        closure_vars = dict(evaluator.vars)
+        return FunctionValue(params, body, closure_vars=closure_vars)
 
     @staticmethod
     def apply(evaluator, args):
@@ -183,3 +185,116 @@ class ContainerOps:
         for i in range(start_idx, len(container)):
             accumulator = call_function(evaluator, func, [accumulator, container[i]])
         return accumulator
+
+    @staticmethod
+    def list_sort(evaluator, args):
+        """排序(container) - 对列表排序（升序）"""
+        if len(args) != 1:
+            raise SyntaxError("排序 需要 1 个参数: (排序 列表)")
+        container = evaluator.eval(args[0])
+        if not isinstance(container, (list, ArrayValue)):
+            raise TypeError("参数必须是列表或数组")
+        lst = list(container) if isinstance(container, ArrayValue) else container[:]
+        def sort_key(x):
+            if isinstance(x, TritValue):
+                return x.to_int()
+            if isinstance(x, str):
+                return x
+            return 0
+        lst.sort(key=sort_key)
+        return lst
+
+    @staticmethod
+    def list_reverse(evaluator, args):
+        """反转(container) - 反转列表"""
+        if len(args) != 1:
+            raise SyntaxError("反转 需要 1 个参数: (反转 列表)")
+        container = evaluator.eval(args[0])
+        if not isinstance(container, (list, ArrayValue)):
+            raise TypeError("参数必须是列表或数组")
+        lst = list(container) if isinstance(container, ArrayValue) else container[:]
+        lst.reverse()
+        return lst
+
+    @staticmethod
+    def list_contains(evaluator, args):
+        """包含(container, item) - 检查列表是否包含元素"""
+        if len(args) != 2:
+            raise SyntaxError("包含 需要 2 个参数: (包含 列表 元素)")
+        container = evaluator.eval(args[0])
+        if not isinstance(container, (list, ArrayValue)):
+            raise TypeError("第一个参数必须是列表或数组")
+        item = evaluator.eval(args[1])
+        for elem in container:
+            if isinstance(elem, TritValue) and isinstance(item, TritValue):
+                if elem.to_int() == item.to_int():
+                    return TritValue(1)
+            elif elem == item:
+                return TritValue(1)
+        return TritValue(-1)
+
+    @staticmethod
+    def list_unique(evaluator, args):
+        """去重(container) - 去除列表中的重复元素"""
+        if len(args) != 1:
+            raise SyntaxError("去重 需要 1 个参数: (去重 列表)")
+        container = evaluator.eval(args[0])
+        if not isinstance(container, (list, ArrayValue)):
+            raise TypeError("参数必须是列表或数组")
+        seen = []
+        result = []
+        for item in container:
+            key = item.to_int() if isinstance(item, TritValue) else item
+            if key not in seen:
+                seen.append(key)
+                result.append(item)
+        return result
+
+    @staticmethod
+    def list_slice(evaluator, args):
+        """切片(container, start, end) - 提取子列表"""
+        if len(args) < 2 or len(args) > 3:
+            raise SyntaxError("切片 需要 2-3 个参数: (切片 列表 起始 [结束])")
+        container = evaluator.eval(args[0])
+        if not isinstance(container, (list, ArrayValue)):
+            raise TypeError("第一个参数必须是列表或数组")
+        start = evaluator.eval(args[1]).to_int()
+        if len(args) == 3:
+            end = evaluator.eval(args[2]).to_int()
+            return list(container)[start:end]
+        return list(container)[start:]
+
+    @staticmethod
+    def list_sum(evaluator, args):
+        """求和(container) - 计算列表元素之和"""
+        if len(args) != 1:
+            raise SyntaxError("求和 需要 1 个参数: (求和 列表)")
+        container = evaluator.eval(args[0])
+        if not isinstance(container, (list, ArrayValue)):
+            raise TypeError("参数必须是列表或数组")
+        total = 0
+        for item in container:
+            if isinstance(item, TritValue):
+                total += item.to_int()
+            elif isinstance(item, (int, float)):
+                total += int(item)
+        return TritValue(total)
+
+    @staticmethod
+    def list_join(evaluator, args):
+        """合并(container, delimiter) - 用分隔符合并列表为字符串"""
+        if len(args) != 2:
+            raise SyntaxError("合并 需要 2 个参数: (合并 列表 分隔符)")
+        container = evaluator.eval(args[0])
+        if not isinstance(container, (list, ArrayValue)):
+            raise TypeError("第一个参数必须是列表或数组")
+        delim = evaluator.eval(args[1])
+        if not isinstance(delim, str):
+            delim = str(delim)
+        parts = []
+        for item in container:
+            if isinstance(item, TritValue):
+                parts.append(str(item.to_int()))
+            else:
+                parts.append(str(item))
+        return delim.join(parts)

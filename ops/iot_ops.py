@@ -13,7 +13,7 @@ class IotOps:
                 return val
             try:
                 return TritValue.from_string(str(val))
-            except:
+            except Exception:
                 return TritValue(0)
 
         if isinstance(target, list):
@@ -69,7 +69,7 @@ class IotOps:
             if not isinstance(val, TritValue):
                 try:
                     val = TritValue.from_string(str(val))
-                except:
+                except Exception:
                     val = TritValue(0)
                 device_dict[key] = val
             return val

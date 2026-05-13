@@ -20,6 +20,13 @@ class SugarConverter:
             '（': '(', '）': ')', '，': ',', '；': ';', '＝': '=', '＞': '>', '＜': '<',
             '＋': '+', '－': '-', '＊': '*', '／': '/', '％': '%', '＾': '^',
             '！': '!', '｛': '{', '｝': '}', '：': ':', '。': '.',
+            '【': '[', '】': ']', '＃': '#', '～': '~',
+        }
+
+        # 全角数字 → 半角数字映射
+        fullwidth_digits = {
+            '０': '0', '１': '1', '２': '2', '３': '3', '４': '4',
+            '５': '5', '６': '6', '７': '7', '８': '8', '９': '9',
         }
 
         while i < length:
@@ -101,8 +108,7 @@ class SugarConverter:
                 continue
 
             # ---------- 单字符符号（含方括号） ----------
-                        # 单字符符号（半角）
-            if c in ('{', '}', '(', ')', ';', ',', '=', '>', '<', '+', '-', '*', '/', '%', '^', '.', '[', ']'):
+            if c in ('{', '}', '(', ')', ';', ',', '=', '>', '<', '+', '-', '*', '/', '%', '^', '.', '[', ']', '!', ':'):
                 if current:
                     tokens.append(current)
                     current = ''
@@ -119,14 +125,16 @@ class SugarConverter:
                     tokens.append('=='); i += 2; continue
                 if c == '!' and next_half == '=':
                     tokens.append('!='); i += 2; continue
-                if c == '-' and i+1 < length and code[i+1].isdigit():
+                if c == '-' and i+1 < length and (code[i+1].isdigit() or code[i+1] in fullwidth_digits):
                     # 负数
-                    if i == 0 or code[i-1] in (' ', '\t', '\n', '(', '（', ',', '，', '=', '{', '[', ':', '：'):
+                    if i == 0 or code[i-1] in (' ', '\t', '\n', '(', '（', ',', '，', '=', '＝', '{', '[', ':', '：'):
                         i += 1
                         start = i
-                        while i < length and code[i].isdigit():
+                        while i < length and (code[i].isdigit() or code[i] in fullwidth_digits):
                             i += 1
-                        tokens.append('-' + code[start:i])
+                        raw = code[start:i]
+                        normalized = ''.join(fullwidth_digits.get(ch, ch) for ch in raw)
+                        tokens.append('-' + normalized)
                         continue
                 tokens.append(c)
                 i += 1
@@ -160,12 +168,15 @@ class SugarConverter:
                 tokens.append(word)
                 continue
 
-            # ---------- 数字 ----------
-            if c.isdigit():
+            # ---------- 数字（含全角数字） ----------
+            if c.isdigit() or c in fullwidth_digits:
                 start = i
-                while i < length and code[i].isdigit():
+                while i < length and (code[i].isdigit() or code[i] in fullwidth_digits):
                     i += 1
-                tokens.append(code[start:i])
+                raw = code[start:i]
+                # 全角数字转半角
+                normalized = ''.join(fullwidth_digits.get(ch, ch) for ch in raw)
+                tokens.append(normalized)
                 continue
 
             i += 1
@@ -246,8 +257,37 @@ class SugarConverter:
 
     @classmethod
     def convert(cls, code: str, skin_manager=None):
+        # #include 预处理器
+        import os
+        lines = code.split('\n')
+        processed = []
+        for line in lines:
+            stripped = line.strip()
+            if stripped.startswith('#include') or stripped.startswith('＃include'):
+                # 提取路径
+                parts = stripped.split(None, 1)
+                if len(parts) == 2:
+                    path = parts[1].strip('"').strip("'").strip('＂').strip('＇')
+                    # 自动路径解析
+                    if not os.sep in path and not path.endswith('.san'):
+                        candidate = os.path.join('stdlib', path + '.san')
+                        if os.path.exists(candidate):
+                            path = candidate
+                    if os.path.exists(path):
+                        with open(path, 'r', encoding='utf-8') as f:
+                            included = f.read()
+                        processed.append(f'／／ #include {path}')
+                        processed.append(included)
+                    else:
+                        processed.append(f'／／ #include {path} (文件不存在，已跳过)')
+                else:
+                    processed.append(line)
+            else:
+                processed.append(line)
+        code = '\n'.join(processed)
+
         tokens = cls.tokenize(code)
-        parser = _Parser(tokens, skin_manager)
+        parser = _Parser(tokens, skin_manager, source_code=code)
         return parser.parse_program()
 
 
@@ -257,17 +297,20 @@ class _Parser:
         if not tok or tok[0].isdigit():
             return False
         for c in tok:
-            if c.isalnum() or c == '_' or '\u4e00' <= c <= '\u9fff' or '\u3400' <= c <= '\u4dbf':
+            if c.isalnum() or c == '_' or c == '.' or '\u4e00' <= c <= '\u9fff' or '\u3400' <= c <= '\u4dbf':
                 continue
             return False
         return True
 
-    def __init__(self, tokens, skin_manager=None):
+    def __init__(self, tokens, skin_manager=None, source_code=None):
         self.tokens = tokens
         self.pos = 0
         self.elif_depth = 0
         self.max_elif_depth = 50
         self.skin = skin_manager
+        self.source_code = source_code
+        # 预计算每个 token 位置对应的行号
+        self.token_lines = self._compute_token_lines()
 
         # 操作符映射
         self.OP_MAP = {}
@@ -282,15 +325,17 @@ class _Parser:
             self.OP_MAP = {
                 '大于': 'gt', '小于': 'lt', '等于': 'eq', '不等于': 'ne',
                 '大于等于': 'gte', '小于等于': 'lte',
+                '不大于': 'ngt', '不小于': 'nlt',
                 '加': 'add', '减': 'sub', '乘': 'mul', '除': 'div', '余': 'mod', '幂': 'pow',
                 '且': 'and', '或': 'or', '非': 'not', '取位': 'digit',
                 '>': 'gt', '<': 'lt', '==': 'eq', '!=': 'ne', '>=': 'gte', '<=': 'lte',
+                '!>': 'ngt', '!<': 'nlt',
                 '+': 'add', '-': 'sub', '*': 'mul', '/': 'div', '%': 'mod', '^': 'pow'
             }
 
         self.PREC = {
             'and': 1, 'or': 1,
-            'eq': 2, 'ne': 2, 'gt': 2, 'lt': 2, 'gte': 2, 'lte': 2,
+            'eq': 2, 'ne': 2, 'gt': 2, 'lt': 2, 'gte': 2, 'lte': 2, 'ngt': 2, 'nlt': 2,
             'add': 3, 'sub': 3,
             'mul': 4, 'div': 4, 'mod': 4,
             'pow': 5,
@@ -299,7 +344,7 @@ class _Parser:
 
         self.PREFIXABLE_OPS = {
             'add', 'sub', 'mul', 'div', 'mod', 'pow',
-            'gt', 'lt', 'eq', 'ne', 'gte', 'lte',
+            'gt', 'lt', 'eq', 'ne', 'gte', 'lte', 'ngt', 'nlt',
             'not', 'and', 'or', 'digit', 'read'
         }
         self.PREFIXABLE_OPS_SINGLE_ARG = {'read', 'not', 'digit'}
@@ -319,7 +364,7 @@ class _Parser:
                 'λ': 'lambda', '函数': 'lambda', '尝试': 'try', '捕获': 'catch',
                 '返回': 'return', '对': 'context', '应用': 'apply',
                 '映射': 'map', '过滤': 'filter', '归并': 'reduce',
-                '判': 'judge', '随机态': 'random_state', '随机数': 'random',
+                '判': 'judge', '随机态': 'random_state', '随机数': 'random', '三进制': 'ternary',
                 '绝对值': 'abs', '最大值': 'max', '最小值': 'min', '平方根': 'sqrt',
                 '连接': 'concat', '取长': 'length',
                 '列表': 'list', '列表合': 'list_concat', '表长': 'list_len', '字列': 'str_to_list',
@@ -328,14 +373,46 @@ class _Parser:
                 '字典': 'dict', '取键': 'get_key', '置键': 'set_key',
                 '同': 'same', '取位': 'digit', '当前时间': 'time',
                 '做': 'do',
-                '跳出': 'break', '继续': 'continue','导入': 'import','在': 'in'
+                '跳出': 'break', '继续': 'continue','导入': 'import','在': 'in',
+                '子串': 'substring', '替换': 'replace', '分割': 'split',
+                '查找': 'find', '去空白': 'trim', '大写': 'upper', '小写': 'lower',
+                '前缀': 'startswith', '后缀': 'endswith',
+                '排序': 'sort', '反转': 'reverse', '包含': 'contains',
+                '去重': 'unique', '切片': 'slice', '求和': 'sum', '合并': 'join',
+                '正弦': 'sin', '余弦': 'cos', '正切': 'tan',
+                '对数': 'log', '常用对数': 'log10',
+                '向下取整': 'floor', '向上取整': 'ceil', '四舍五入': 'round'
             }
+
+    def _compute_token_lines(self):
+        """根据源代码计算每个 token 位置对应的行号"""
+        if not self.source_code:
+            return {}
+        # 扫描源代码，记录每个字符位置的行号
+        char_to_line = {}
+        line = 1
+        for idx, ch in enumerate(self.source_code):
+            char_to_line[idx] = line
+            if ch == '\n':
+                line += 1
+        # 简单估算：根据 token 在源码中的位置映射行号
+        token_lines = {}
+        search_start = 0
+        for tok_idx, tok in enumerate(self.tokens):
+            pos = self.source_code.find(tok, search_start)
+            if pos != -1:
+                token_lines[tok_idx] = char_to_line.get(pos, 1)
+                search_start = pos + len(tok)
+            else:
+                token_lines[tok_idx] = 1
+        return token_lines
 
     def _err(self, msg):
         start = max(0, self.pos - 2)
         end = min(len(self.tokens), self.pos + 3)
         ctx = ' '.join(self.tokens[start:end])
-        return SyntaxError(f"{msg} （位置 {self.pos}，上下文: '{ctx}'）")
+        line = self.token_lines.get(self.pos, '?')
+        return SyntaxError(f"第 {line} 行: {msg} （上下文: '{ctx}'）")
 
     def peek(self):
         return self.tokens[self.pos] if self.pos < len(self.tokens) else None
@@ -602,7 +679,7 @@ class _Parser:
             raise self._err(f"列表字面量/生成式格式错误，得到 {nxt}")
         if tok and tok[0] in ('"', '\u201c', '\u2018') and len(tok) >= 2:
             self.consume()
-            return tok[1:-1]
+            return tok  # 保留引号，让 eval 识别为字符串
         if isinstance(tok, str) and tok.startswith('原文{') and tok.endswith('}'):
             self.consume()
             return tok[3:-1]
@@ -809,12 +886,22 @@ class _Parser:
         name = self.consume()
         self.consume('(')
         params = []
+        param_types = {}
         while self.peek() != ')':
-            params.append(self.consume())
+            param_name = self.consume()
+            params.append(param_name)
+            # 检查类型标注 (参数: 类型)
+            if self.peek() == ':':
+                self.consume(':')
+                type_name = self.consume()
+                param_types[param_name] = type_name
             if self.peek() == ',':
                 self.consume(',')
         self.consume(')')
         body = self.parse_block()
+        # 如果有类型标注，将其作为元数据附加到 AST
+        if param_types:
+            return ['fn', name, params, param_types] + body
         return ['fn', name, params] + body
 
     def parse_do_block(self):
