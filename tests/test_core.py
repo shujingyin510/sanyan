@@ -269,8 +269,8 @@ class TestTernaryEdge(unittest.TestCase):
         self.assertAlmostEqual(BT.to_float(e, 16), 2.718, places=1)
 
     def test_ternary_log_e(self):
-        l = ternary_log(BT.from_float(2.71828, 16), 16)
-        self.assertAlmostEqual(BT.to_float(l, 16), 1.0, places=1)
+        log_e = ternary_log(BT.from_float(2.71828, 16), 16)
+        self.assertAlmostEqual(BT.to_float(log_e, 16), 1.0, places=1)
 
     def test_ternary_cos_zero(self):
         from ternary_core import ternary_cos

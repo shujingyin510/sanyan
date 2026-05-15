@@ -169,7 +169,7 @@ class Commands:
             try:
                 for expr in tail_body[:-1]:
                     try:
-                        result = evaluator.eval(expr)
+                        evaluator.eval(expr)
                     except ReturnException as ret:
                         return ret.value if ret.value is not None else TritValue(0)
 
