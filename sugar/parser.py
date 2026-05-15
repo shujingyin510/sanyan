@@ -1,4 +1,5 @@
 """Pratt 语法分析器：运算符优先级、错误恢复"""
+from __future__ import annotations
 from typing import Optional, Any
 from sugar.lexer import Token, tokenize
 from sugar.errors import SugarErrorReporter
