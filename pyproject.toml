@@ -25,7 +25,7 @@ dev = [
 sanyan = "main:main"
 
 [tool.setuptools]
-packages = ["ops"]
+packages = ["ops", "sugar"]
 py-modules = [
     "commands",
     "evaluator",
@@ -36,7 +36,6 @@ py-modules = [
     "repl",
     "runtime",
     "skin",
-    "sugar",
     "ternary_core",
     "values"
 ]
