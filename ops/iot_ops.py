@@ -1,6 +1,6 @@
 """IoT 相关操作：置、查、读、对"""
 from ternary_core import TritValue
-from values import SanyanSyntaxError, SanyanNameError
+from values import SanyanSyntaxError, SanyanNameError, SanyanValueError
 from ops.device_registry import MockDevice
 
 class IotOps:

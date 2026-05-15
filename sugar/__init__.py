@@ -5,7 +5,6 @@
 """
 from sugar.parser import parse_code
 from sugar.lexer import tokenize
-from sugar.errors import SugarErrorReporter
 
 
 class SugarConverter:

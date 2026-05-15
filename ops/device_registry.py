@@ -1,6 +1,6 @@
 """IoT 设备注册表与协议抽象"""
 from abc import ABC, abstractmethod
-from typing import Optional, Any
+from typing import Optional
 from ternary_core import TritValue
 from values import SanyanNameError, SanyanValueError
 

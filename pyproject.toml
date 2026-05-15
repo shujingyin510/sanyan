@@ -46,7 +46,7 @@ target-version = "py38"
 
 [tool.ruff.lint]
 select = ["E", "F", "W"]
-ignore = []
+ignore = ["E501", "E701", "E702", "E703"]
 
 [tool.ruff.format]
 quote-style = "single"

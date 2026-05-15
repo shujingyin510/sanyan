@@ -1,7 +1,6 @@
 """词法分析器：全角映射、token化、行号追踪"""
 from __future__ import annotations
 from dataclasses import dataclass
-from typing import Optional
 
 
 @dataclass
