@@ -45,6 +45,9 @@
 - **全角 `<=` 等运算符修复**: `sugar/lexer.py` 多字符运算符检查改用 mapped 字符。
 - **`parse_if` 递归修复**: 再若/否则的双消费 token 问题。
 - **`.vscode/settings.json`**: VS Code 工作区配置。
+- **包管理器**: `ops/package_ops.py` 提供 `安装`/`包列表`/`加载包` 命令；本地+远程包索引；示例包 `sample`。
+- **VS Code Marketplace 上架**: `sanyan-language-0.1.0.vsix` 已发布，VS Code 搜索 `三言` 即可安装。
+- **扩展 Logo**: 128x128 自定义图标。
 
 
 ## [v3.7] — 2026-05-14

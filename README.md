@@ -1,5 +1,8 @@
 # 三言 Sanyan v3.7.1
 
+[![VS Code Marketplace](https://img.shields.io/badge/VS%20Code-Marketplace-%23007ACC?logo=visualstudiocode)](https://marketplace.visualstudio.com/items?itemName=sanyan-lang.sanyan-language)
+[![CI](https://github.com/shujingyin510/sanyan/actions/workflows/ci.yml/badge.svg)](https://github.com/shujingyin510/sanyan/actions)
+
 > **面向不确定决策的三值编程语言。** 不确定不是 bug，是合法的计算状态。
 
 ---
@@ -279,6 +282,7 @@ tests/
 | 🧩 **语法解析器拆分为包** | `sugar.py` → `sugar/` 包（lexer + Pratt parser + error reporter） |
 | 🚪 **模块导出** | `导出 name1 name2` 控制模块对外可见的符号 |
 | 📟 **设备注册表** | `注册设备 名称 为 mock` / `注册设备 名称 为 file("path")` |
+| 📦 **包管理器** | `安装("包名")` / `包列表()` / `加载包("包名")` |
 | 🔢 **三进制定点数** | `BT.from_float()` 将浮点转为平衡三进制定点表示 |
 | 🌐 **全角引号** | 支持 `「」`、`『』`、`""` 等六种字符串定界符 |
 | 💬 **`#` 行注释** | 新增 `#` 注释语法，与 `//` 等价 |
