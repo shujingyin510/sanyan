@@ -17,6 +17,7 @@ from ops.file_ops import FileOps
 from ops.type_ops import TypeOps
 from ops.iot_ops import IotOps
 from ops.json_ops import JsonOps
+from ops.package_ops import PackageOps
 
 
 class SanyanEvaluator(SanyanRuntime):
@@ -88,6 +89,10 @@ class SanyanEvaluator(SanyanRuntime):
         '读': (IotOps, 'sensor_read', False),
         '读取': (IotOps, 'sensor_read', False), '写入': (IotOps, 'set_sensor', False),
         '查询': (IotOps, 'query', False),
+        # 包管理
+        'install': (PackageOps, 'install', False),
+        'list_packages': (PackageOps, 'list_packages', False),
+        'load_package': (PackageOps, 'load', False),
     }
 
 
