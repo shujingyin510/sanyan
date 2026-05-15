@@ -379,6 +379,7 @@ sanyan/
 ├── docs/                  # 语言手册
 └── .vscode/               # VS Code 工作区配置
     └── settings.json
+```
 
 ## 三态词表
 
