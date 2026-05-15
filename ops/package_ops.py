@@ -2,10 +2,8 @@
 from __future__ import annotations
 import json
 import os
-import sys
 from ternary_core import TritValue
 from values import SanyanSyntaxError, SanyanValueError, ModuleValue
-from ops.file_ops import _parse_and_eval_file
 
 PACKAGES_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "packages")
 PACKAGE_INDEX_URL = "https://raw.githubusercontent.com/shujingyin510/sanyan-packages/main/index.json"
