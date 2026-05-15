@@ -23,7 +23,7 @@ class ControlOps:
         for statement in args:
             result = evaluator.eval(statement)
         return result if result is not None else TritValue(0)
-    
+
     @staticmethod
     def define_var(evaluator, args):
         from ternary_core import TritValue
@@ -43,7 +43,7 @@ class ControlOps:
         if isinstance(var_name, list):
             var_name = var_name[0]
         value_node = args[1]
-        if (isinstance(value_node, list) and len(value_node) == 1 
+        if (isinstance(value_node, list) and len(value_node) == 1
                 and isinstance(value_node[0], str) and value_node[0].isdigit()):
             value = TritValue(int(value_node[0]))
         else:
@@ -55,11 +55,11 @@ class ControlOps:
     def loop_op(evaluator, args):
         if len(args) < 2:
             raise SanyanSyntaxError("loop 需要条件和体")
-        cond = evaluator.eval(args[0])
         body = args[1:]
         result = TritValue(0)
         local_count = 0
         while local_count < evaluator.max_loop_steps:
+            cond = evaluator.eval(args[0])
             if BT.to_int(cond.value) != 1:
                 break
             try:
@@ -70,7 +70,6 @@ class ControlOps:
             except ContinueException:
                 pass
             local_count += 1
-            cond = evaluator.eval(args[0])
         return result
 
     @staticmethod
@@ -139,15 +138,29 @@ class ControlOps:
                     if error_var in evaluator.vars:
                         del evaluator.vars[error_var]
         # 其他异常（如 AttributeError）不捕获，直接向上抛出
-    
+
     @staticmethod
     def judge_op(evaluator, args):
-        if len(args) != 4:
+        if len(args) == 4:
+            expr_node, true_body, maybe_body, false_body = args
+        elif len(args) == 7:
+            expr_node = args[0]
+            true_body = maybe_body = false_body = None
+            for i in range(1, len(args), 2):
+                label = args[i]
+                if isinstance(label, list):
+                    label = str(label[0]) if len(label) > 0 else ''
+                body = args[i + 1]
+                if label in ('真', 'true'):
+                    true_body = body
+                elif label in ('可能', 'maybe'):
+                    maybe_body = body
+                elif label in ('假', 'false'):
+                    false_body = body
+            if true_body is None or maybe_body is None or false_body is None:
+                raise SanyanSyntaxError("判 需要 真/可能/假 三个分支")
+        else:
             raise SanyanSyntaxError("判 需要一个表达式和三个分支体")
-        expr_node = args[0]
-        true_body = args[1]
-        maybe_body = args[2]
-        false_body = args[3]
         val = evaluator.eval(expr_node)
         int_val = val.to_int()
         if int_val == 1:
@@ -156,11 +169,11 @@ class ControlOps:
             return evaluator.eval(maybe_body)
         else:
             return evaluator.eval(false_body)
-    
+
     @staticmethod
     def continue_op(evaluator, args):
         raise ContinueException()
-    
+
     @staticmethod
     def forin_op(evaluator, args):
         if len(args) < 3:

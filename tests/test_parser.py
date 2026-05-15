@@ -1,6 +1,5 @@
 """糖语法解析器回归测试"""
 import sys
-import os
 sys.path.insert(0, '.')
 
 # 强制使用 UTF-8 编码输出，避免中文乱码

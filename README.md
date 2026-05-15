@@ -1,4 +1,4 @@
-# 三言 Sanyan v3.5
+# 三言 Sanyan v3.7
 
 > **面向不确定决策的三值编程语言。** 不确定不是 bug，是合法的计算状态。
 
@@ -305,7 +305,6 @@ tests/
 | 🔢 三进制字面量 | `三进制("+-0")` 将三进制字符串转为整数 |
 | 📄 #include 预处理 | `#include "test"` 编译时展开文件内容 |
 | ⌨️ REPL 增强 | 上下键翻历史，Tab 键自动补全 |
-| 📊 基准测试 | `tests/benchmark.san` 测量关键操作性能 |
 
 ## 新增特性速览（v3.4）
 
@@ -351,14 +350,15 @@ tests/
 sanyan/
 ├── main.py            # 入口
 ├── ternary_core.py    # 平衡三进制核心
-├── runtime.py         # 运行环境
-├── commands.py        # 自定义命令
+├── runtime.py         # 运行环境（作用域栈式链）
+├── commands.py        # 自定义命令调用
+├── preprocess.py      # #include 预处理器
 ├── evaluator.py       # 求值器
 ├── lexer.py           # S 表达式词法
 ├── parser.py          # S 表达式语法
 ├── sugar.py           # 糖语法转换器
 ├── skin.py            # 皮肤管理器
-├── values.py          # 值类型与语言异常
+├── values.py          # 值类型与语言异常（Sanyan* 系列）
 ├── repl.py            # REPL 交互环境
 ├── ops/               # 内置操作实现模块
 │   ├── control_ops.py
@@ -366,6 +366,9 @@ sanyan/
 │   ├── string_ops.py
 │   ├── container_ops.py
 │   ├── io_ops.py
+│   ├── file_ops.py
+│   ├── type_ops.py
+│   ├── json_ops.py
 │   └── iot_ops.py
 ├── tools/             # 辅助开发工具
 │   ├── fix_quotes.py
@@ -380,6 +383,7 @@ sanyan/
 ├── stdlib/            # 标准库（math, string, list, iot, logic, io, test）
 ├── tests/             # 自动测试（每个测试提供糖语法 + S 表达式双版本）
 │   ├── run_all.py     # 测试运行器
+│   ├── test_core.py   # Python 单测（三进制核心/作用域/异常体系）
 │   ├── test_*.san     # 糖语法测试
 │   ├── test_*_se.san  # S 表达式测试（对照学习）
 │   ├── regression.san / regression_se.san
@@ -452,7 +456,6 @@ sanyan/
 
 ## 已知限制
 
-- **仅支持整数**：无浮点数。`正弦(1)` 返回 `841`（×1000 取整），非 `0.841`。需小数时手动缩放（如温度×10 计算）。
 - **性能**：基于 Python 的树遍历解释器，高频循环场景性能有限。可使用 PyPy 运行获得 5-10 倍加速。
 - **无标准输入流**：`输入()` 仅支持交互式输入，不支持管道重定向。
 - **模块路径**：`导入("test")` 会自动查找 `stdlib/test.san`，但不支持嵌套包或包管理器。

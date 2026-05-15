@@ -1,6 +1,5 @@
 """REPL 交互环境与演示程序"""
 import os
-import sys
 
 # REPL 历史记录
 _history_file = os.path.expanduser('~/.sanyan_history')
@@ -12,15 +11,16 @@ try:
 except ImportError:
     readline = None
 
-from lexer import tokenize
-from parser import parse
-from evaluator import SanyanEvaluator
-from sugar import SugarConverter
-from skin import SkinManager
+from lexer import tokenize  # noqa: E402
+from parser import parse  # noqa: E402
+from evaluator import SanyanEvaluator  # noqa: E402
+from sugar import SugarConverter  # noqa: E402
+from skin import SkinManager  # noqa: E402
+from runtime import BUILTIN_OPS  # noqa: E402
 
 
-def demo(skin_mgr):
-    print("\n========== 三言 v3.5 演示 ==========")
+def demo(skin_mgr: SkinManager) -> None:
+    print("\n========== 三言 v3.7 演示 ==========")
     env = SanyanEvaluator(skin_manager=skin_mgr)
 
     # 1. 智能设备控制
@@ -67,18 +67,12 @@ def demo(skin_mgr):
     print("========== 演示结束 ==========\n")
 
 
-_BUILTIN_KEYWORDS = [
-    '设', '若', '再若', '否则', '循环', '遍历', '定义', '函数', '返回', '输出', '输入',
-    '调试', '等待', '读文件', '写文件', '尝试', '捕获', '判', '跳出', '继续', '导入',
-    '列表', '字典', '数组', '映射', '过滤', '归并', '应用', '连接', '取长', '子串',
-    '替换', '分割', '查找', '排序', '反转', '包含', '去重', '切片', '求和', '合并',
-    '置', '查', '读', '加载', '随机态', '随机数', '当前时间',
-    '真', '假', '可能', '开', '关', '守',
-    '不大于', '不小于', '大于等于', '小于等于', '不等于', '等于', '大于', '小于',
-    '且', '或', '非', '加', '减', '乘', '除', '幂', '余',
-    '正弦', '余弦', '正切', '对数', '常用对数', '向下取整', '向上取整', '四舍五入',
-    '切换中文', '切换英文', '退出',
-]
+_BUILTIN_KEYWORDS = sorted(
+    BUILTIN_OPS | {
+        '再若', '否则', '真', '假', '可能',
+        '开', '关', '守', '切换中文', '切换英文', '退出',
+    }
+)
 
 def _make_completer(env):
     def completer(text, state):
@@ -88,7 +82,7 @@ def _make_completer(env):
             if kw.startswith(text):
                 matches.append(kw)
         # 当前变量名
-        for name in env.vars:
+        for name in env.all_scoped_vars():
             if name.startswith(text):
                 matches.append(name)
         # 当前命令名
@@ -105,7 +99,7 @@ def _make_completer(env):
         return None
     return completer
 
-def repl():
+def repl() -> None:
     skin_mgr = SkinManager('chinese')
     env = SanyanEvaluator(skin_manager=skin_mgr)
 
@@ -114,7 +108,7 @@ def repl():
         readline.set_completer(_make_completer(env))
         readline.parse_and_bind('tab: complete')
 
-    print("三言 v3.5 REPL (母语可定制)")
+    print("三言 v3.7 REPL (母语可定制)")
     print("输入 切换英文/:lang english 切换英文，切换中文/:lang chinese 切换中文")
     print("输入 退出/exit 离开，Tab 键自动补全")
     while True:

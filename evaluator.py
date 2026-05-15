@@ -3,7 +3,8 @@ from typing import Any
 from ternary_core import TritValue, ArrayValue
 from runtime import SanyanRuntime
 from commands import Commands
-from values import FunctionValue, ModuleValue, call_function, SanyanNameError
+from values import FunctionValue, ModuleValue, SanyanNameError
+from values import SanyanSyntaxError, SanyanTypeError, SanyanKeyError, SanyanAttributeError, SanyanRuntimeError
 
 # 直接导入 ops 模块的方法
 from ops.control_ops import ControlOps
@@ -11,7 +12,10 @@ from ops.math_ops import MathOps
 from ops.string_ops import StringOps
 from ops.container_ops import ContainerOps
 from ops.io_ops import IOOps
+from ops.file_ops import FileOps
+from ops.type_ops import TypeOps
 from ops.iot_ops import IotOps
+from ops.json_ops import JsonOps
 
 
 class SanyanEvaluator(SanyanRuntime):
@@ -107,31 +111,41 @@ class SanyanEvaluator(SanyanRuntime):
         'slice': (ContainerOps, 'list_slice', False),
         'sum': (ContainerOps, 'list_sum', False),
         'join': (ContainerOps, 'list_join', False),
+        'count': (ContainerOps, 'list_count', False),
+        '读取': (IotOps, 'sensor_read', False),
+        '写入': (IotOps, 'set_sensor', False),
+        '查询': (IotOps, 'query', False),
         # IO
         'print': (IOOps, 'output', False),
         'input': (IOOps, 'input_op', False),
         'debug': (IOOps, 'debug_op', False),
-        'time': (IOOps, 'time_now', False),
-        'sleep': (IOOps, 'sleep_op', False),
-        'read_file': (IOOps, 'read_file_op', False),
-        'write_file': (IOOps, 'write_file_op', False),
-        'is_number': (IOOps, 'is_number', False),
-        'is_string': (IOOps, 'is_string', False),
-        'str_equals': (IOOps, 'str_equals', False),
-        'load': (IOOps, '_load_file', False),
-        'import': (IOOps, 'import_module', False),
+        'time': (TypeOps, 'time_now', False),
+        'sleep': (TypeOps, 'sleep_op', False),
+        'read_file': (FileOps, 'read_file_op', False),
+        'write_file': (FileOps, 'write_file_op', False),
+        'is_number': (TypeOps, 'is_number', False),
+        'is_string': (TypeOps, 'is_string', False),
+        'str_equals': (TypeOps, 'str_equals', False),
+        'load': (FileOps, '_load_file', False),
+        'import': (FileOps, 'import_module', False),
         # IoT
         'write': (IotOps, 'set_sensor', False),
         'query': (IotOps, 'query', False),
         'context': (IotOps, 'context_op', False),
         'read': (IotOps, 'sensor_read', False),
+        # JSON
+        'to_json': (JsonOps, 'to_json', False),
+        'from_json': (JsonOps, 'from_json', False),
     }
+
 
     def __init__(self, max_loop_steps=None, skin_manager=None):
         super().__init__(max_loop_steps=max_loop_steps, skin_manager=skin_manager)
         self._op_cache = {}
+        self._name_cache = {}
+        self._name_cache_max = 5000
 
-    def eval(self, node: Any):
+    def eval(self, node: Any) -> Any:
         if isinstance(node, (TritValue, ArrayValue, FunctionValue, ModuleValue)):
             return node
         if isinstance(node, list):
@@ -139,6 +153,10 @@ class SanyanEvaluator(SanyanRuntime):
                 s = node[0]
                 if s.isdigit() or (s.startswith('-') and s[1:].isdigit()):
                     return TritValue(int(s))
+                try:
+                    return TritValue(float(s))
+                except ValueError:
+                    pass
             first = node[0]
             if isinstance(first, FunctionValue):
                 func = first
@@ -159,8 +177,8 @@ class SanyanEvaluator(SanyanRuntime):
                     parts = node.split('.', 1)
                     var_name = parts[0]
                     key = parts[1]
-                    if var_name in self.vars:
-                        var = self.vars[var_name]
+                    if self.has_var(var_name):
+                        var = self.get_var(var_name)
                         if isinstance(var, dict) and key in var:
                             return var[key]
                 try:
@@ -173,19 +191,21 @@ class SanyanEvaluator(SanyanRuntime):
             return node
         else:
             ctx = repr(node)[:100] if not isinstance(node, str) else node[:100]
-            raise RuntimeError(f"不支持的节点类型: {type(node).__name__}，内容: {ctx}")
+            raise SanyanRuntimeError(f"不支持的节点类型: {type(node).__name__}，内容: {ctx}")
 
     def _apply(self, op: str, args: list) -> TritValue:
-        skin = self.skin_manager
-        internal = op
-        if skin:
-            kw = skin.get_internal_keyword(op)
-            if kw:
-                internal = kw
-            else:
-                op_internal = skin.get_internal_op(op)
-                if op_internal:
-                    internal = op_internal
+        internal = self._name_cache.get(op)
+        if internal is None:
+            skin = self.skin_manager
+            internal = op
+            if skin:
+                kw = skin.get_internal_keyword(op) or skin.get_internal_op(op)
+                if kw:
+                    internal = kw
+
+            if len(self._name_cache) >= self._name_cache_max:
+                self._name_cache.clear()
+            self._name_cache[op] = internal
 
         # 使用静态分派表（带缓存）
         if internal in self._op_cache:
@@ -207,8 +227,8 @@ class SanyanEvaluator(SanyanRuntime):
             parts = op.split('.', 1)
             module_name = parts[0]
             func_name = parts[1]
-            if module_name in self.vars:
-                module_val = self.vars[module_name]
+            if self.has_var(module_name):
+                module_val = self.get_var(module_name)
                 if isinstance(module_val, ModuleValue):
                     evaluated_args = [self.eval(a) for a in args]
                     return module_val.call(self, [func_name] + evaluated_args)
@@ -216,10 +236,10 @@ class SanyanEvaluator(SanyanRuntime):
                     # 字典点号访问：学生.姓名 → 学生["姓名"]
                     if args:
                         # 有参数时视为函数调用（如 dict.method(arg)）
-                        raise TypeError(f"字典 '{module_name}' 不支持方法调用")
+                        raise SanyanTypeError(f"字典 '{module_name}' 不支持方法调用")
                     if func_name in module_val:
                         return module_val[func_name]
-                    raise KeyError(f"字典 '{module_name}' 中没有键 '{func_name}'")
+                    raise SanyanKeyError(f"字典 '{module_name}' 中没有键 '{func_name}'")
                 elif isinstance(module_val, (list, ArrayValue)):
                     # 列表/数组点号访问：lst.length → 表长(lst)
                     if func_name == 'length' or func_name == '长度':
@@ -228,11 +248,11 @@ class SanyanEvaluator(SanyanRuntime):
                         idx = int(func_name)
                         return module_val[idx]
                     except (ValueError, IndexError):
-                        raise AttributeError(f"列表 '{module_name}' 没有属性 '{func_name}'")
+                        raise SanyanAttributeError(f"列表 '{module_name}' 没有属性 '{func_name}'")
 
         # 变量作为函数或容器调用
-        if op in self.vars:
-            val = self.vars[op]
+        if self.has_var(op):
+            val = self.get_var(op)
             if isinstance(val, FunctionValue):
                 evaluated_args = [self.eval(a) for a in args]
                 return val.call(self, evaluated_args)
@@ -241,7 +261,7 @@ class SanyanEvaluator(SanyanRuntime):
                 return val.call(self, evaluated_args)
             if isinstance(val, (list, ArrayValue, dict)):
                 if len(args) != 1:
-                    raise SyntaxError(f"容器索引需要一个参数，但提供了 {len(args)} 个")
+                    raise SanyanSyntaxError(f"容器索引需要一个参数，但提供了 {len(args)} 个")
                 idx = self.eval(args[0])
                 if isinstance(val, dict):
                     key = idx.to_int() if isinstance(idx, TritValue) else idx
@@ -249,7 +269,9 @@ class SanyanEvaluator(SanyanRuntime):
                 else:
                     index_int = idx.to_int() if isinstance(idx, TritValue) else idx
                     return val[index_int]
-            raise TypeError(f"变量 '{op}' 的值不可调用或索引")
+            if len(args) == 0:
+                return val
+            raise SanyanTypeError(f"变量 '{op}' 的值不可调用或索引")
         return Commands.call(self, op, args)
 
     @staticmethod

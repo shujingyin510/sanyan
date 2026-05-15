@@ -44,6 +44,7 @@
     "sin": "sin",
     "cos": "cos",
     "tan": "tan",
+    "ternary": "ternary",
     "log": "log",
     "log10": "log10",
     "floor": "floor",
@@ -85,8 +86,15 @@
     "unique": "unique",
     "slice": "slice",
     "sum": "sum",
-    "join": "join"
+    "join": "join",
+    "count": "count",
+    "from": "from",
+    "to": "to",
+    "ternary": "ternary",
+    "to_json": "to_json",
+    "from_json": "from_json"
   },
+
   "operators": {
     "add": "+",
     "sub": "-",

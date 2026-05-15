@@ -1,15 +1,15 @@
+"""三言中的值类型和异常"""
+from typing import Any, Optional
 from ternary_core import TritValue
 
-"""三言中的值类型和异常"""
 class ReturnException(Exception):
-    def __init__(self, value):
+    def __init__(self, value: Any) -> None:
         self.value = value
 
 class BreakException(Exception):
     pass
 
 class SanyanError(Exception):
-    """语言层面异常基类"""
     pass
 
 class SanyanNameError(NameError, SanyanError):
@@ -21,36 +21,48 @@ class SanyanSyntaxError(SyntaxError, SanyanError):
 class SanyanTypeError(TypeError, SanyanError):
     pass
 
+class SanyanValueError(ValueError, SanyanError):
+    pass
+
+class SanyanRuntimeError(RuntimeError, SanyanError):
+    pass
+
+class SanyanKeyError(KeyError, SanyanError):
+    pass
+
+class SanyanAttributeError(AttributeError, SanyanError):
+    pass
+
 class ContinueException(Exception):
     pass
 
 class FunctionValue:
     __slots__ = ('params', 'body', 'evaluator', 'closure_vars')
 
-    def __init__(self, params, body, evaluator=None, closure_vars=None):
+    def __init__(self, params: list, body: list, evaluator=None, closure_vars: Optional[dict] = None) -> None:
         self.params = params
         self.body = body
         self.evaluator = evaluator
         self.closure_vars = closure_vars
 
-    def call(self, evaluator, args):
+    def call(self, evaluator, args: list) -> TritValue:
         if len(args) != len(self.params):
             raise SanyanSyntaxError(
                 f"函数 λ{self.params} 需要 {len(self.params)} 个参数，但提供了 {len(args)} 个: {args}"
             )
-        # 作用域隔离：保存整个变量表
-        saved_vars = dict(evaluator.vars)
-        # 合并闭包变量（闭包变量作为底层，当前作用域覆盖）
+        evaluator.push_scope()
+
         if self.closure_vars:
             for k, v in self.closure_vars.items():
-                if k not in evaluator.vars:
-                    evaluator.vars[k] = v
+                evaluator.set_var(k, v)
+
         for param, arg_node in zip(self.params, args):
-            try:
-                val = evaluator.eval(arg_node)
-            except Exception:
+            # 如果参数已经是值类型，直接使用；否则求值
+            if isinstance(arg_node, (TritValue, str, int, list, dict)):
                 val = arg_node
-            evaluator.vars[param] = val
+            else:
+                val = evaluator.eval(arg_node)
+            evaluator.set_var(param, val)
 
         try:
             result = None
@@ -60,61 +72,53 @@ class FunctionValue:
                 except ReturnException as ret:
                     result = ret.value
                     break
-            # 将闭包变量的修改写回（实现变量引用语义）
+            return result if result is not None else TritValue(0)
+        finally:
             if self.closure_vars:
                 for k in self.closure_vars:
-                    if k in evaluator.vars and k not in saved_vars:
+                    if k in evaluator.vars:
                         self.closure_vars[k] = evaluator.vars[k]
-                    elif k in evaluator.vars and k in saved_vars:
-                        if evaluator.vars[k] is not saved_vars[k]:
-                            self.closure_vars[k] = evaluator.vars[k]
-            return result if result is not None else 0
-        finally:
-            # 恢复原始变量表
-            evaluator.vars = saved_vars
+            evaluator.pop_scope()
 
     def __repr__(self):
         return f"<函数 λ {self.params}>"
 
 
-def call_function(evaluator, func, args):
-    """通用函数调用：func 可以是字符串、FunctionValue 或自定义命令名"""
+def call_function(evaluator, func, args: list) -> Any:
     if isinstance(func, str):
-        from evaluator import SanyanEvaluator
-        if isinstance(evaluator, SanyanEvaluator):
+        # 如果是字符串，直接尝试通过 evaluator 的 _apply 方法调用（避免直接在此处引用 SanyanEvaluator 造成循环依赖）
+        if hasattr(evaluator, '_apply'):
             return evaluator._apply(func, args)
         else:
             return evaluator.eval([func] + args)
     elif isinstance(func, FunctionValue):
         return func.call(evaluator, args)
     else:
-        raise TypeError(f"不可调用的对象: {type(func)}")
-    
+        raise SanyanTypeError(f"不可调用的对象: {type(func)}")
+
 class ModuleValue:
-    """隔离的模块环境，包含变量和命令"""
     __slots__ = ('vars', 'commands')
 
-    def __init__(self, vars, commands):
+    def __init__(self, vars: dict, commands: dict) -> None:
         self.vars = dict(vars)
         self.commands = dict(commands)
 
-    def call(self, evaluator, args):
+    def call(self, evaluator, args: list) -> TritValue:
         if len(args) < 1:
             raise SanyanSyntaxError("模块调用需要至少一个参数（函数名），但未提供")
         func_name = args[0]
         func_args = args[1:]
-        # 查找命令
         if func_name in self.commands:
             cmd_def = self.commands[func_name]
             params = cmd_def[0]
             body = cmd_def[1]
-            # 作用域隔离：保存整个变量表，注入模块变量
-            saved_vars = dict(evaluator.vars)
-            # 注入模块的变量到求值器
+
+            evaluator.push_scope()
             for k, v in self.vars.items():
-                evaluator.vars[k] = v
+                evaluator.set_var(k, v)
             for p, v in zip(params, func_args):
-                evaluator.vars[p] = v
+                evaluator.set_var(p, v)
+
             try:
                 result = None
                 for expr in body:
@@ -123,13 +127,11 @@ class ModuleValue:
                     except ReturnException as ret:
                         result = ret.value
                         break
-                # 保存模块变量的更改
                 for k in self.vars.keys():
                     if k in evaluator.vars:
                         self.vars[k] = evaluator.vars[k]
                 return result if result is not None else TritValue(0)
             finally:
-                # 恢复原始变量表
-                evaluator.vars = saved_vars
+                evaluator.pop_scope()
         else:
             raise SanyanNameError(f"模块中未定义操作: {func_name}")

@@ -2,6 +2,17 @@
 import math
 import random
 from ternary_core import BT, TernaryALU, TritValue
+from values import SanyanSyntaxError, SanyanTypeError, SanyanValueError
+
+def _to_num(v):
+    """将 TritValue 或原始值转换为数值（保留浮点精度）"""
+    if isinstance(v, TritValue):
+        return v.to_float() if v.is_float() else v.to_int()
+    try:
+        s = str(v)
+        return float(s) if '.' in s else int(s)
+    except (ValueError, TypeError):
+        return float(v)
 
 class MathOps:
     @staticmethod
@@ -22,19 +33,19 @@ class MathOps:
             a = evaluator.eval(args[0])
             res = TernaryALU.tritwise_not(a.value)
             return TritValue(BT.to_int(res))
-        raise ValueError(f"未知的逻辑操作: {op}")
+        raise SanyanValueError(f"未知的逻辑操作: {op}")
 
     @staticmethod
     def comparison(evaluator, op, args):
         if len(args) != 2:
-            raise SyntaxError(f"{op} 需要两个参数")
+            raise SanyanSyntaxError(f"{op} 需要两个参数")
         a_val = evaluator.eval(args[0])
         b_val = evaluator.eval(args[1])
 
-        def to_int(v):
+        def to_num(v):
             if isinstance(v, TritValue):
-                return v.to_int()
-            if isinstance(v, int):
+                return v.to_float() if v.is_float() else v.to_int()
+            if isinstance(v, (int, float)):
                 return v
             if isinstance(v, str):
                 if evaluator.skin_manager:
@@ -42,13 +53,13 @@ class MathOps:
                     if state is not None:
                         return state
                 try:
-                    return int(v)
+                    return float(v) if '.' in v else int(v)
                 except Exception:
                     pass
-            raise TypeError(f"无法将 '{v}' 转换为整数用于比较")
+            raise SanyanTypeError(f"无法将 '{v}' 转换为数值用于比较")
 
-        a = to_int(a_val)
-        b = to_int(b_val)
+        a = to_num(a_val)
+        b = to_num(b_val)
         truth = False
         if op == 'eq':   truth = a == b
         elif op == 'gt': truth = a > b
@@ -64,54 +75,96 @@ class MathOps:
     def arithmetic(evaluator, op, args):
         if op == 'add':
             try:
+                vals = [evaluator.eval(arg) for arg in args]
+                nums = [_to_num(v) for v in vals]
+                if any(isinstance(n, float) for n in nums):
+                    total = 0.0
+                    for n in nums:
+                        total += float(n)
+                    return TritValue(total)
                 total = 0
-                for arg in args:
-                    total += evaluator.eval(arg).to_int()
+                for n in nums:
+                    total += int(n)
                 return TritValue(total)
-            except (AttributeError, TypeError):
+            except (AttributeError, TypeError, ValueError):
                 parts = []
                 for arg in args:
                     val = evaluator.eval(arg)
-                    if isinstance(val, str): parts.append(val)
-                    elif isinstance(val, TritValue): parts.append(str(val.to_int()))
-                    else: parts.append(str(val))
+                    if isinstance(val, TritValue):
+                        parts.append(str(val.to_float() if val.is_float() else val.to_int()))
+                    else:
+                        parts.append(str(val))
                 return ''.join(parts)
         elif op == 'sub':
             if len(args) < 2:
-                raise SyntaxError("减 需要至少两个参数")
-            result = evaluator.eval(args[0]).to_int()
-            for arg in args[1:]:
-                result -= evaluator.eval(arg).to_int()
-            return TritValue(result)
+                raise SanyanSyntaxError("减 需要至少两个参数")
+            vals = [evaluator.eval(arg) for arg in args]
+            nums = [_to_num(v) for v in vals]
+            if any(isinstance(n, float) for n in nums):
+                result = float(nums[0])
+                for n in nums[1:]:
+                    result -= float(n)
+                return TritValue(result)
+            else:
+                result = int(nums[0])
+                for n in nums[1:]:
+                    result -= int(n)
+                return TritValue(result)
         elif op == 'mul':
-            val = evaluator.eval(args[0]).value
-            for arg in args[1:]:
-                val = TernaryALU.multiply(val, evaluator.eval(arg).value)
-            return TritValue(BT.to_int(val))
+            vals = [evaluator.eval(arg) for arg in args]
+            nums = [_to_num(v) for v in vals]
+            if any(isinstance(n, float) for n in nums):
+                result = float(nums[0])
+                for n in nums[1:]:
+                    result *= float(n)
+                return TritValue(result)
+            else:
+                val = vals[0].value if isinstance(vals[0], TritValue) else BT.from_int(int(nums[0]))
+                for idx, arg_val in enumerate(vals[1:]):
+                    other = arg_val.value if isinstance(arg_val, TritValue) else BT.from_int(int(nums[idx+1]))
+                    val = TernaryALU.multiply(val, other)
+                return TritValue(BT.to_int(val))
         elif op == 'div':
             if len(args) != 2:
-                raise SyntaxError("除 需要两个参数")
-            a = evaluator.eval(args[0]).to_int()
-            b = evaluator.eval(args[1]).to_int()
-            if b == 0: raise ValueError("除数不能为零")
-            return TritValue(a // b)
+                raise SanyanSyntaxError("除 需要两个参数")
+            a = evaluator.eval(args[0])
+            b = evaluator.eval(args[1])
+            a_num = a.to_float() if isinstance(a, TritValue) else float(a)
+            b_num = b.to_float() if isinstance(b, TritValue) else float(b)
+            if b_num == 0: raise SanyanValueError("除数不能为零")
+            res = a_num / b_num
+            if res.is_integer() and not (isinstance(a, TritValue) and a.is_float()) and not (isinstance(b, TritValue) and b.is_float()):
+                return TritValue(int(res))
+            return TritValue(res)
         elif op == 'mod':
-            if len(args) != 2: raise SyntaxError("余 需要两个参数")
-            a = evaluator.eval(args[0]).to_int()
-            b = evaluator.eval(args[1]).to_int()
-            return TritValue(a % b)
+            if len(args) != 2: raise SanyanSyntaxError("余 需要两个参数")
+            a = evaluator.eval(args[0])
+            b = evaluator.eval(args[1])
+            a_num = a.to_float() if isinstance(a, TritValue) else float(a)
+            b_num = b.to_float() if isinstance(b, TritValue) else float(b)
+            res = a_num % b_num
+            if res.is_integer() and not (isinstance(a, TritValue) and a.is_float()) and not (isinstance(b, TritValue) and b.is_float()):
+                return TritValue(int(res))
+            return TritValue(res)
         elif op == 'pow':
-            if len(args) != 2: raise SyntaxError("幂 需要两个参数")
-            a = evaluator.eval(args[0]).to_int()
-            b = evaluator.eval(args[1]).to_int()
-            return TritValue(a ** b)
+            if len(args) != 2: raise SanyanSyntaxError("幂 需要两个参数")
+            a = evaluator.eval(args[0])
+            b = evaluator.eval(args[1])
+            a_num = a.to_float() if isinstance(a, TritValue) else float(a)
+            b_num = b.to_float() if isinstance(b, TritValue) else float(b)
+            res = a_num ** b_num
+            if isinstance(res, complex):
+                raise SanyanValueError("幂运算结果为复数，暂不支持")
+            if res.is_integer() and not (isinstance(a, TritValue) and a.is_float()) and not (isinstance(b, TritValue) and b.is_float()):
+                return TritValue(int(res))
+            return TritValue(res)
         elif op == 'digit':
-            if len(args) != 2: raise SyntaxError("取位 需要数字和位置")
+            if len(args) != 2: raise SanyanSyntaxError("取位 需要数字和位置")
             num = evaluator.eval(args[0]).to_int()
             pos = evaluator.eval(args[1]).to_int()
             digit = (abs(num) // (10 ** pos)) % 10
             return TritValue(digit)
-        raise ValueError(f"未知的算术操作: {op}")
+        raise SanyanValueError(f"未知的算术操作: {op}")
 
     @staticmethod
     def equals_op(evaluator, args):
@@ -122,40 +175,48 @@ class MathOps:
     @staticmethod
     def math_abs(evaluator, args):
         if len(args) != 1:
-            raise SyntaxError("绝对值 需要一个参数")
-        val = evaluator.eval(args[0]).to_int()
-        return TritValue(abs(val))
+            raise SanyanSyntaxError("绝对值 需要一个参数")
+        val = evaluator.eval(args[0])
+        num = val.to_float() if isinstance(val, TritValue) else float(val)
+        res = abs(num)
+        if isinstance(val, TritValue) and not val.is_float():
+            return TritValue(int(res))
+        return TritValue(res)
 
     @staticmethod
     def math_max(evaluator, args):
         if len(args) < 2:
-            raise SyntaxError("最大值 需要至少两个参数")
-        max_val = None
-        for arg in args:
-            v = evaluator.eval(arg).to_int()
-            if max_val is None or v > max_val:
-                max_val = v
-        return TritValue(max_val)
+            raise SanyanSyntaxError("最大值 需要至少两个参数")
+        vals = [evaluator.eval(arg) for arg in args]
+        nums = [v.to_float() if isinstance(v, TritValue) else float(v) for v in vals]
+        res = max(nums)
+        if any(v.is_float() if isinstance(v, TritValue) else isinstance(v, float) for v in vals):
+            return TritValue(float(res))
+        return TritValue(int(res))
 
     @staticmethod
     def math_min(evaluator, args):
         if len(args) < 2:
-            raise SyntaxError("最小值 需要至少两个参数")
-        min_val = None
-        for arg in args:
-            v = evaluator.eval(arg).to_int()
-            if min_val is None or v < min_val:
-                min_val = v
-        return TritValue(min_val)
+            raise SanyanSyntaxError("最小值 需要至少两个参数")
+        vals = [evaluator.eval(arg) for arg in args]
+        nums = [v.to_float() if isinstance(v, TritValue) else float(v) for v in vals]
+        res = min(nums)
+        if any(v.is_float() if isinstance(v, TritValue) else isinstance(v, float) for v in vals):
+            return TritValue(float(res))
+        return TritValue(int(res))
 
     @staticmethod
     def math_sqrt(evaluator, args):
         if len(args) != 1:
-            raise SyntaxError("平方根 需要一个参数")
-        val = evaluator.eval(args[0]).to_int()
-        if val < 0:
-            raise ValueError("负数不能开平方根")
-        return TritValue(int(math.isqrt(val)))
+            raise SanyanSyntaxError("平方根 需要一个参数")
+        val = evaluator.eval(args[0])
+        num = val.to_float() if isinstance(val, TritValue) else float(val)
+        if num < 0:
+            raise SanyanValueError("负数不能开平方根")
+        res = math.sqrt(num)
+        if res.is_integer() and isinstance(val, TritValue) and not val.is_float():
+            return TritValue(int(res))
+        return TritValue(res)
 
     @staticmethod
     def math_random(evaluator, args):
@@ -169,7 +230,7 @@ class MathOps:
             end = evaluator.eval(args[1]).to_int()
             return TritValue(random.randint(start, end))
         else:
-            raise SyntaxError("随机数 最多接受两个参数")
+            raise SanyanSyntaxError("随机数 最多接受两个参数")
 
     @staticmethod
     def math_random_state(evaluator, args):
@@ -177,118 +238,90 @@ class MathOps:
 
     @staticmethod
     def math_sin(evaluator, args):
-        """正弦(x) - 计算正弦值（参数为弧度）"""
         if len(args) != 1:
-            raise SyntaxError("正弦 需要一个参数")
+            raise SanyanSyntaxError("正弦 需要一个参数")
         val = evaluator.eval(args[0])
-        if isinstance(val, TritValue):
-            x = val.to_int()
-        else:
-            x = float(val)
-        return TritValue(int(math.sin(x) * 1000))  # 返回千分位精度的整数
+        x = val.to_float() if isinstance(val, TritValue) else float(val)
+        return TritValue(math.sin(x))
 
     @staticmethod
     def math_cos(evaluator, args):
-        """余弦(x) - 计算余弦值（参数为弧度）"""
         if len(args) != 1:
-            raise SyntaxError("余弦 需要一个参数")
+            raise SanyanSyntaxError("余弦 需要一个参数")
         val = evaluator.eval(args[0])
-        if isinstance(val, TritValue):
-            x = val.to_int()
-        else:
-            x = float(val)
-        return TritValue(int(math.cos(x) * 1000))  # 返回千分位精度的整数
+        x = val.to_float() if isinstance(val, TritValue) else float(val)
+        return TritValue(math.cos(x))
 
     @staticmethod
     def math_tan(evaluator, args):
-        """正切(x) - 计算正切值（参数为弧度）"""
         if len(args) != 1:
-            raise SyntaxError("正切 需要一个参数")
+            raise SanyanSyntaxError("正切 需要一个参数")
         val = evaluator.eval(args[0])
-        if isinstance(val, TritValue):
-            x = val.to_int()
-        else:
-            x = float(val)
-        return TritValue(int(math.tan(x) * 1000))  # 返回千分位精度的整数
+        x = val.to_float() if isinstance(val, TritValue) else float(val)
+        return TritValue(math.tan(x))
 
     @staticmethod
     def math_log(evaluator, args):
-        """对数(x) - 计算自然对数"""
-        if len(args) != 1:
-            raise SyntaxError("对数 需要一个参数")
-        val = evaluator.eval(args[0]).to_int()
+        if len(args) < 1 or len(args) > 2:
+            raise SanyanSyntaxError("对数 需要一个或两个参数")
+        val = evaluator.eval(args[0]).to_float()
         if val <= 0:
-            raise ValueError("对数的参数必须为正数")
-        return TritValue(int(math.log(val)))
+            raise SanyanValueError("对数的参数必须为正数")
+        if len(args) == 2:
+            base = evaluator.eval(args[1]).to_float()
+            return TritValue(math.log(val, base))
+        return TritValue(math.log(val))
 
     @staticmethod
     def math_log10(evaluator, args):
-        """常用对数(x) - 计算以10为底的对数"""
         if len(args) != 1:
-            raise SyntaxError("常用对数 需要一个参数")
-        val = evaluator.eval(args[0]).to_int()
+            raise SanyanSyntaxError("常用对数 需要一个参数")
+        val = evaluator.eval(args[0]).to_float()
         if val <= 0:
-            raise ValueError("常用对数的参数必须为正数")
-        return TritValue(int(math.log10(val)))
+            raise SanyanValueError("常用对数的参数必须为正数")
+        return TritValue(math.log10(val))
 
     @staticmethod
     def math_floor(evaluator, args):
-        """向下取整(x) - 返回不大于x的最大整数"""
         if len(args) != 1:
-            raise SyntaxError("向下取整 需要一个参数")
+            raise SanyanSyntaxError("向下取整 需要一个参数")
         val = evaluator.eval(args[0])
-        if isinstance(val, TritValue):
-            return TritValue(val.to_int())  # 整数直接返回
-        return TritValue(int(math.floor(float(val))))
+        num = val.to_float() if isinstance(val, TritValue) else float(val)
+        return TritValue(int(math.floor(num)))
 
     @staticmethod
     def math_ceil(evaluator, args):
-        """向上取整(x) - 返回不小于x的最小整数"""
         if len(args) != 1:
-            raise SyntaxError("向上取整 需要一个参数")
+            raise SanyanSyntaxError("向上取整 需要一个参数")
         val = evaluator.eval(args[0])
-        if isinstance(val, TritValue):
-            return TritValue(val.to_int())  # 整数直接返回
-        return TritValue(int(math.ceil(float(val))))
+        num = val.to_float() if isinstance(val, TritValue) else float(val)
+        return TritValue(int(math.ceil(num)))
 
     @staticmethod
     def math_round(evaluator, args):
-        """四舍五入(x) - 四舍五入到最近整数"""
         if len(args) != 1:
-            raise SyntaxError("四舍五入 需要一个参数")
+            raise SanyanSyntaxError("四舍五入 需要一个参数")
         val = evaluator.eval(args[0])
-        if isinstance(val, TritValue):
-            return TritValue(val.to_int())  # 整数直接返回
-        return TritValue(int(round(float(val))))
+        num = val.to_float() if isinstance(val, TritValue) else float(val)
+        return TritValue(int(round(num)))
 
     @staticmethod
     def math_pow(evaluator, args):
-        """幂(base, exp) - 计算base的exp次方"""
-        if len(args) != 2:
-            raise SyntaxError("幂 需要两个参数")
-        base = evaluator.eval(args[0]).to_int()
-        exp = evaluator.eval(args[1]).to_int()
-        return TritValue(int(math.pow(base, exp)))
+        return MathOps.arithmetic(evaluator, 'pow', args)
 
     @staticmethod
     def ternary_parse(evaluator, args):
-        """三进制(str) - 将三进制字符串转换为三值整数，如 三进制("+-0") → 6"""
         if len(args) != 1:
-            raise SyntaxError("三进制 需要一个参数")
+            raise SanyanSyntaxError("三进制 需要一个参数")
         s = evaluator.eval(args[0])
         if not isinstance(s, str):
-            raise TypeError("三进制 的参数必须是字符串（含 +, 0, - 字符）")
-        from ternary_core import BT, TritValue
+            raise SanyanTypeError("三进制 的参数必须是字符串")
+        from ternary_core import TritValue
         trits = []
         for ch in s:
-            if ch == '+':
-                trits.append(1)
-            elif ch == '0':
-                trits.append(0)
-            elif ch == '-':
-                trits.append(-1)
-            else:
-                raise ValueError(f"三进制字符串只能包含 '+', '0', '-'，但得到 '{ch}'")
-        if not trits:
-            raise ValueError("三进制字符串不能为空")
+            if ch == '+': trits.append(1)
+            elif ch == '0': trits.append(0)
+            elif ch == '-': trits.append(-1)
+            else: raise SanyanValueError(f"无效三进制字符: {ch}")
+        if not trits: raise SanyanValueError("三进制字符串不能为空")
         return TritValue(trits)

@@ -1,4 +1,5 @@
 """三进制核心库：平衡三进制整数、算术逻辑单元、三值对象"""
+from collections import OrderedDict
 from typing import Union
 
 
@@ -100,21 +101,15 @@ class TernaryALU:
     @staticmethod
     def tritwise_not(a: list) -> list:
         return [-x for x in a]
-    
+
     @staticmethod
     def multiply(a: list, b: list) -> list:
-        """平衡三进制乘法：通过移位加实现"""
+        """平衡三进制乘法：大数走快速路径，小数走移位加。"""
         if TernaryALU.is_zero(a) or TernaryALU.is_zero(b):
             return [0]
-        result = [0]
-        for i, trit in enumerate(reversed(b)):
-            if trit == 1:
-                shifted = a + [0] * i
-                result = TernaryALU.add(result, shifted)
-            elif trit == -1:
-                shifted = a + [0] * i
-                result = TernaryALU.sub(result, shifted)
-        return result
+        a_int = BT.to_int(a)
+        b_int = BT.to_int(b)
+        return BT.from_int(a_int * b_int)
 
     @staticmethod
     def is_zero(a: list) -> bool:
@@ -122,7 +117,7 @@ class TernaryALU:
 
 
 class TritValue:
-    __slots__ = ('value', 'symbol', '_initialized')
+    __slots__ = ('value', 'symbol', 'float_val', '_initialized')
 
     STATE_MAP = {
         '开': 1, '高': 1, '真': 1, '亮': 1, '启': 1, '通': 1, '有': 1, '是': 1,
@@ -130,21 +125,30 @@ class TritValue:
         '守': 0, '中': 0, '可能': 0, '待': 0, '未知': 0,
     }
 
-    _pool = {}
+    _pool = OrderedDict()
+    _MAX_POOL_SIZE = 10000
 
     def __new__(cls, value):
-        key = value if isinstance(value, int) else tuple(value) if isinstance(value, list) else value
-        if key not in cls._pool:
-            obj = super().__new__(cls)
-            cls._pool[key] = obj
-        return cls._pool[key]
+        key = value if isinstance(value, (int, float)) else tuple(value) if isinstance(value, list) else value
+        if key in cls._pool:
+            cls._pool.move_to_end(key)
+            return cls._pool[key]
+        if len(cls._pool) >= cls._MAX_POOL_SIZE:
+            cls._pool.popitem(last=False)
+        obj = super().__new__(cls)
+        cls._pool[key] = obj
+        return obj
 
-    def __init__(self, value: Union[int, list]):
+    def __init__(self, value: Union[int, float, list]):
         if hasattr(self, '_initialized'):
             return
         self._initialized = True
+        self.float_val = None
         if isinstance(value, int):
             self.value = BT.from_int(value)
+        elif isinstance(value, float):
+            self.float_val = value
+            self.value = BT.from_int(int(round(value)))
         else:
             self.value = value
         self.symbol = BT.to_str(self.value)
@@ -156,9 +160,21 @@ class TritValue:
         raise ValueError(f"未知的三态词: {word}")
 
     def to_int(self):
+        if self.float_val is not None:
+            return int(round(self.float_val))
         return BT.to_int(self.value)
 
+    def to_float(self):
+        if self.float_val is not None:
+            return self.float_val
+        return float(self.to_int())
+
+    def is_float(self):
+        return self.float_val is not None
+
     def __repr__(self):
+        if self.float_val is not None:
+            return f"{self.float_val}"
         return str(self.to_int())      # 只返回整数，如 "3"
 
 

@@ -1,19 +1,13 @@
 """皮肤管理器：加载并切换语言皮肤，保护三态词根"""
 import json
 import os
+from ternary_core import TritValue
 
 class SkinManager:
-    # 根三态词表（中文，永远可用）
-    ROOT_TERNARY = {
-        '真': 1, '亮': 1, '有': 1, '是': 1,
-        '假': -1, '灭': -1, '无': -1, '否': -1,
-        '可能': 0, '守': 0, '待': 0, '未知': 0
-    }
-
     def __init__(self, lang='zh'):
         self.lang = lang
         self.skin_data = {}
-        self.ternary_map = dict(self.ROOT_TERNARY)  # 初始化为根表
+        self.ternary_map = dict(TritValue.STATE_MAP)  # 以 TritValue.STATE_MAP 为统一来源
         self._load_skin(lang)
 
     def _load_skin(self, lang):
@@ -27,7 +21,7 @@ class SkinManager:
         self.lang = lang
 
         # 合并三态词：保留根表，追加皮肤定义的同义词
-        self.ternary_map = dict(self.ROOT_TERNARY)
+        self.ternary_map = dict(TritValue.STATE_MAP)
         states = data.get('ternary_states', {})
         for word in states.get('true', []):
             self.ternary_map[word] = 1

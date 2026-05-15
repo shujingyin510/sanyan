@@ -1,11 +1,12 @@
 """IoT 相关操作：置、查、读、对"""
 from ternary_core import TritValue
+from values import SanyanSyntaxError, SanyanNameError
 
 class IotOps:
     @staticmethod
     def set_sensor(evaluator, args):
         if not args:
-            raise SyntaxError("置 需要参数")
+            raise SanyanSyntaxError("置 需要参数")
         target = args[0]
 
         def ensure_trit(val):
@@ -41,7 +42,7 @@ class IotOps:
                 sensor_name, attr = target.split('：')
                 state = ensure_trit(TritValue.from_string(attr))
             else:
-                raise SyntaxError("置 的用法: (置 对象 状态) 或 (置 (对象.状态 ...))")
+                raise SanyanSyntaxError("置 的用法: (置 对象 状态) 或 (置 (对象.状态 ...))")
             if sensor_name in evaluator.sensors:
                 evaluator.sensors[sensor_name] = state
             elif sensor_name in evaluator.actuators:
@@ -50,7 +51,7 @@ class IotOps:
                 evaluator.actuators[sensor_name] = state
             return state
 
-        raise SyntaxError("置 的参数格式错误")
+        raise SanyanSyntaxError("置 的参数格式错误")
 
     @staticmethod
     def query(evaluator, args):
@@ -102,7 +103,7 @@ class IotOps:
             obj, attr = target.split('：')
             return IotOps.query(evaluator, [obj + '.' + attr])
 
-        raise NameError(f"无法查看: {target}（执行器、传感器中均不存在）")
+        raise SanyanNameError(f"无法查看: {target}（执行器、传感器中均不存在）")
 
     @staticmethod
     def context_op(evaluator, args):
@@ -129,4 +130,4 @@ class IotOps:
         sensor_name = args[0]
         if sensor_name in evaluator.sensors:
             return evaluator.sensors[sensor_name]
-        raise NameError(f"未知传感器: {sensor_name}")
+        raise SanyanNameError(f"未知传感器: {sensor_name}")

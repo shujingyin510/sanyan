@@ -1,0 +1,29 @@
+(set "a" 3.14)
+(set "b" 2.0)
+(print (concat "a + b = " (add a b)))
+(print (concat "a - b = " (sub a b)))
+(print (concat "a * b = " (mul a b)))
+(print (concat "a / b = " (div a b)))
+
+(set "c" 10)
+(print (concat "c + 0.5 = " (add c 0.5)))
+
+(print (concat "sin(3.14159) = " (sin 3.14159)))
+(print (concat "sqrt(2.0) = " (sqrt 2.0)))
+
+(set "dict_obj" (dict))
+(set_key dict_obj "name" "ZhangSan")
+(set_key dict_obj "score" 95.5)
+(set "json_str" (to_json dict_obj))
+(print (concat "JSON: " json_str))
+
+(set "parsed" (from_json json_str))
+(print (concat "Parsed Name: " (get_key parsed "name")))
+(print (concat "Parsed Score: " (get_key parsed "score")))
+
+(load "math")
+(print (concat "GCD(12, 18) = " (最大公约数 12 18)))
+
+(load "list")
+(set "lst" (list 1 2 2 3 2))
+(print (concat "Count 2: " (计数 lst 2)))

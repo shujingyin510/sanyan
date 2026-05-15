@@ -86,7 +86,12 @@
     "slice": "切片",
     "sum": "求和",
     "join": "合并",
-    "ternary": "三进制"
+    "count": "计数",
+    "from": "从",
+    "to": "到",
+    "ternary": "三进制",
+    "to_json": "转JSON",
+    "from_json": "解析JSON"
   },
   "operators": {
     "add": "加",

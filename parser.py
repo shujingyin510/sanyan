@@ -1,5 +1,7 @@
 """语法分析器：将 token 列表解析为 AST（嵌套列表）"""
-def parse(tokens: list):
+from typing import Optional, Union
+
+def parse(tokens: list) -> Optional[list]:
     if not tokens:
         return None
 
@@ -8,7 +10,7 @@ def parse(tokens: list):
     if left_count != right_count:
         raise SyntaxError("括号不匹配")
 
-    def _parse_inner(tokens_list):
+    def _parse_inner(tokens_list: list) -> Optional[Union[list, str]]:
         if not tokens_list:
             return None
         token = tokens_list.pop(0)
