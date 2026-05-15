@@ -1,4 +1,5 @@
 """回归测试运行器：执行所有 .san 测试文件"""
+from __future__ import annotations
 import subprocess
 import sys
 import os
