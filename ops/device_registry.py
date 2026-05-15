@@ -1,4 +1,5 @@
 """IoT 设备注册表与协议抽象"""
+from __future__ import annotations
 from abc import ABC, abstractmethod
 from typing import Optional
 from ternary_core import TritValue
