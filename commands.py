@@ -129,6 +129,11 @@ class Commands:
                 evaluated_args.append(value)
 
             last_expr = body[-1] if body else None
+            # 展开 do 块检查真正的尾调用
+            tail_body = body
+            if isinstance(last_expr, list) and len(last_expr) > 0 and last_expr[0] == 'do':
+                tail_body = last_expr[1:] if len(last_expr) > 1 else []
+                last_expr = tail_body[-1] if tail_body else None
             is_tail_recursive = (last_expr is not None
                                  and Commands._is_tail_call(last_expr, op))
 
@@ -142,7 +147,7 @@ class Commands:
                         evaluator.set_var(param, value)
                     try:
                         result = None
-                        for expr in body[:-1]:
+                        for expr in tail_body[:-1]:
                             try:
                                 result = evaluator.eval(expr)
                             except ReturnException as ret:

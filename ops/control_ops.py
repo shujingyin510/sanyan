@@ -151,12 +151,24 @@ class ControlOps:
                 if isinstance(label, list):
                     label = str(label[0]) if len(label) > 0 else ''
                 body = args[i + 1]
+                matched = False
                 if label in ('真', 'true'):
                     true_body = body
+                    matched = True
                 elif label in ('可能', 'maybe'):
                     maybe_body = body
+                    matched = True
                 elif label in ('假', 'false'):
                     false_body = body
+                    matched = True
+                if not matched and hasattr(evaluator, 'skin_manager') and evaluator.skin_manager:
+                    state = evaluator.skin_manager.is_ternary_word(label)
+                    if state == 1:
+                        true_body = body
+                    elif state == 0:
+                        maybe_body = body
+                    elif state == -1:
+                        false_body = body
             if true_body is None or maybe_body is None or false_body is None:
                 raise SanyanSyntaxError("判 需要 真/可能/假 三个分支")
         else:
@@ -206,3 +218,9 @@ class ControlOps:
         else:
             raise SanyanSyntaxError("遍历-在 只支持列表、数组或字符串")
         return result
+
+    @staticmethod
+    def export_op(evaluator, args):
+        # 导出语句在模块加载时由 _collect_exports 处理
+        # 运行时导出无操作，返回 0
+        return TritValue(0)

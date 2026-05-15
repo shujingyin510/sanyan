@@ -47,12 +47,20 @@ class SanyanRuntime:
             '风扇': TritValue(0),
             '加热': TritValue(0),
         }
+        # IoT 设备注册表（新架构）
+        from ops.device_registry import DeviceRegistry, MockDevice
+        self.device_registry = DeviceRegistry()
+        # 注册默认设备（向后兼容）
+        for name, val in self.sensors.items():
+            self.device_registry.register(name, MockDevice(val))
+        for name, val in self.actuators.items():
+            self.device_registry.register(name, MockDevice(val))
         self.context_object: Optional[str] = None
         self.commands: Dict[str, Any] = {}
         self.call_depth: int = 0
         self.max_call_depth: int = 200
         self.skin_manager: Any = skin_manager
-        self.call_stack: List[Any] = []  # 调用栈：[(函数名, 参数), ...]
+        self.call_stack: List[Any] = []
 
     @property
     def vars(self):
@@ -154,4 +162,10 @@ class SanyanRuntime:
                 sensor_val = self.sensors[obj]
                 attr_val = TritValue.from_string(symbol)
                 return TritValue(1 if sensor_val.symbol == attr_val.symbol else -1)
+            if hasattr(self, 'device_registry'):
+                dev = self.device_registry.get(obj)
+                if dev:
+                    val = TritValue.from_string(symbol)
+                    dev.write(val)
+                    return val
         raise SanyanNameError(f"未定义的符号: {symbol}")

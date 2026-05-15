@@ -35,6 +35,8 @@ class SanyanEvaluator(SanyanRuntime):
         # 变量
         'set': (ControlOps, 'define_var', False),
         'fn': (Commands, 'define', False),
+        'export': (ControlOps, 'export_op', False),
+        'register_device': (IotOps, 'register_device_op', False),
         # 逻辑
         'and': (MathOps, 'logic_op', 'and'),
         'or': (MathOps, 'logic_op', 'or'),
@@ -133,6 +135,10 @@ class SanyanEvaluator(SanyanRuntime):
         'query': (IotOps, 'query', False),
         'context': (IotOps, 'context_op', False),
         'read': (IotOps, 'sensor_read', False),
+        # Chinese aliases for S-expression mode
+        '置': (IotOps, 'set_sensor', False),
+        '查': (IotOps, 'query', False),
+        '读': (IotOps, 'sensor_read', False),
         # JSON
         'to_json': (JsonOps, 'to_json', False),
         'from_json': (JsonOps, 'from_json', False),
@@ -160,7 +166,7 @@ class SanyanEvaluator(SanyanRuntime):
             first = node[0]
             if isinstance(first, FunctionValue):
                 func = first
-                args = node[1:]
+                args = [self.eval(a) for a in node[1:]]
                 return func.call(self, args)
             if isinstance(first, ModuleValue):
                 evaluated_args = [self.eval(a) for a in node[1:]]
@@ -171,6 +177,11 @@ class SanyanEvaluator(SanyanRuntime):
         elif isinstance(node, str):
             if len(node) >= 2 and node[0] in ('"', '\u201c', '\u2018', "'"):
                 return node[1:-1]
+            # 数字字面量（包括浮点）不进标识符路径
+            if node.replace('.', '', 1).replace('-', '', 1).isdigit():
+                if '.' in node:
+                    return TritValue(float(node))
+                return TritValue(int(node))
             if self._is_valid_identifier(node):
                 # 处理字典点号访问：学生.姓名 → 字典取值
                 if '.' in node:
@@ -230,6 +241,8 @@ class SanyanEvaluator(SanyanRuntime):
             if self.has_var(module_name):
                 module_val = self.get_var(module_name)
                 if isinstance(module_val, ModuleValue):
+                    if not module_val.is_exported(func_name):
+                        raise SanyanNameError(f"模块 '{module_name}' 未导出 '{func_name}'")
                     evaluated_args = [self.eval(a) for a in args]
                     return module_val.call(self, [func_name] + evaluated_args)
                 elif isinstance(module_val, dict):
@@ -279,7 +292,7 @@ class SanyanEvaluator(SanyanRuntime):
         if not s:
             return False
         for c in s:
-            if c.isalnum() or c == '_' or '\u4e00' <= c <= '\u9fff' or '\u3400' <= c <= '\u4dbf':
+            if c.isalnum() or c == '_' or c == '.' or '\u4e00' <= c <= '\u9fff' or '\u3400' <= c <= '\u4dbf':
                 continue
             return False
         return True

@@ -6,6 +6,7 @@ from typing import Union
 class BT:
     SYMBOLS = {1: '+', 0: '0', -1: '-'}
     REVERSE = {'+': 1, '0': 0, '-': -1}
+    DEFAULT_PRECISION = 16  # 默认小数位数（三进制 trits）
 
     @staticmethod
     def from_int(n: int, length: int = None) -> list:
@@ -43,6 +44,27 @@ class BT:
     @staticmethod
     def from_str(s: str) -> list:
         return [BT.REVERSE[c] for c in s]
+
+    @staticmethod
+    def from_float(n: float, precision: int = None) -> list:
+        """将浮点数转为平衡三进制定点表示。
+
+        使用缩放整数法：将 n * 3^precision 转为整数，再转为平衡三进制。
+        """
+        if precision is None:
+            precision = BT.DEFAULT_PRECISION
+        scale = 3 ** precision
+        scaled = int(round(n * scale))
+        return BT.from_int(scaled)
+
+    @staticmethod
+    def to_float(trits: list, precision: int = None) -> float:
+        """将平衡三进制定点表示转回浮点数。"""
+        if precision is None:
+            precision = BT.DEFAULT_PRECISION
+        scale = 3 ** precision
+        int_val = BT.to_int(trits)
+        return int_val / scale
 
 
 class TernaryALU:
@@ -117,7 +139,7 @@ class TernaryALU:
 
 
 class TritValue:
-    __slots__ = ('value', 'symbol', 'float_val', '_initialized')
+    __slots__ = ('value', 'symbol', 'float_val', '_initialized', 'precision')
 
     STATE_MAP = {
         '开': 1, '高': 1, '真': 1, '亮': 1, '启': 1, '通': 1, '有': 1, '是': 1,
@@ -128,8 +150,12 @@ class TritValue:
     _pool = OrderedDict()
     _MAX_POOL_SIZE = 10000
 
-    def __new__(cls, value):
-        key = value if isinstance(value, (int, float)) else tuple(value) if isinstance(value, list) else value
+    def __new__(cls, value, precision: int = None):
+        def _hashable(v):
+            if isinstance(v, list):
+                return tuple(_hashable(x) for x in v)
+            return v
+        key = (value, precision) if isinstance(value, (int, float)) else (_hashable(value), precision) if isinstance(value, list) else (value, precision)
         if key in cls._pool:
             cls._pool.move_to_end(key)
             return cls._pool[key]
@@ -139,16 +165,21 @@ class TritValue:
         cls._pool[key] = obj
         return obj
 
-    def __init__(self, value: Union[int, float, list]):
+    def __init__(self, value: Union[int, float, list], precision: int = None):
         if hasattr(self, '_initialized'):
             return
         self._initialized = True
+        self.precision = precision if precision is not None else 0
         self.float_val = None
         if isinstance(value, int):
             self.value = BT.from_int(value)
         elif isinstance(value, float):
             self.float_val = value
-            self.value = BT.from_int(int(round(value)))
+            if precision is None:
+                self.precision = BT.DEFAULT_PRECISION
+            else:
+                self.precision = precision
+            self.value = BT.from_float(value, self.precision)
         else:
             self.value = value
         self.symbol = BT.to_str(self.value)
@@ -162,15 +193,19 @@ class TritValue:
     def to_int(self):
         if self.float_val is not None:
             return int(round(self.float_val))
+        if self.precision > 0:
+            return int(BT.to_float(self.value, self.precision))
         return BT.to_int(self.value)
 
     def to_float(self):
         if self.float_val is not None:
             return self.float_val
+        if self.precision > 0:
+            return BT.to_float(self.value, self.precision)
         return float(self.to_int())
 
     def is_float(self):
-        return self.float_val is not None
+        return self.float_val is not None or self.precision > 0
 
     def __repr__(self):
         if self.float_val is not None:

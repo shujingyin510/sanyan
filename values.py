@@ -97,11 +97,17 @@ def call_function(evaluator, func, args: list) -> Any:
         raise SanyanTypeError(f"不可调用的对象: {type(func)}")
 
 class ModuleValue:
-    __slots__ = ('vars', 'commands')
+    __slots__ = ('vars', 'commands', 'exports')
 
-    def __init__(self, vars: dict, commands: dict) -> None:
+    def __init__(self, vars: dict, commands: dict, exports: Optional[set] = None) -> None:
         self.vars = dict(vars)
         self.commands = dict(commands)
+        self.exports = exports  # None = 全部导出
+
+    def is_exported(self, name: str) -> bool:
+        if self.exports is None:
+            return True
+        return name in self.exports
 
     def call(self, evaluator, args: list) -> TritValue:
         if len(args) < 1:

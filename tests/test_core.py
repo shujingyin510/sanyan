@@ -237,6 +237,21 @@ class TestTernaryEdge(unittest.TestCase):
     def test_zero_has_no_sign(self):
         self.assertEqual(BT.from_int(0), [0])
 
+    def test_fixed_point_conversion(self):
+        trits = BT.from_float(1.5, precision=8)
+        result = BT.to_float(trits, precision=8)
+        self.assertAlmostEqual(result, 1.5, places=2)
+
+    def test_fixed_point_negative(self):
+        trits = BT.from_float(-2.25, precision=8)
+        result = BT.to_float(trits, precision=8)
+        self.assertAlmostEqual(result, -2.25, places=2)
+
+    def test_trit_value_float_precision(self):
+        v = TritValue(3.14)
+        self.assertTrue(v.is_float())
+        self.assertAlmostEqual(v.to_float(), 3.14, places=1)
+
     def test_negative_multiplication(self):
         self.assertEqual(BT.to_int(TernaryALU.multiply(BT.from_int(-1), BT.from_int(-1))), 1)
         self.assertEqual(BT.to_int(TernaryALU.multiply(BT.from_int(-1), BT.from_int(0))), 0)
