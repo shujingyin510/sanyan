@@ -1,4 +1,5 @@
 """错误收集与报告"""
+from __future__ import annotations
 
 
 class SugarError:
