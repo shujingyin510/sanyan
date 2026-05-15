@@ -4,6 +4,7 @@ import json
 import os
 from ternary_core import TritValue
 from values import SanyanSyntaxError, SanyanValueError, ModuleValue
+from ops.registry import register
 
 PACKAGES_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "packages")
 PACKAGE_INDEX_URL = "https://raw.githubusercontent.com/shujingyin510/sanyan-packages/main/index.json"
@@ -206,7 +207,6 @@ class PackageOps:
         return None
 
 # 注册包管理操作
-from ops.registry import register
 register('install', PackageOps.install)
 register('list_packages', PackageOps.list_packages)
 register('load_package', PackageOps.load)

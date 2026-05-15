@@ -2,6 +2,7 @@
 from ternary_core import TritValue, ArrayValue
 from values import FunctionValue, call_function
 from values import SanyanSyntaxError, SanyanTypeError, SanyanValueError
+from ops.registry import register
 
 class ContainerOps:
     @staticmethod
@@ -338,7 +339,6 @@ class ContainerOps:
         return delim.join(parts)
 
 # 注册容器操作
-from ops.registry import register
 register('list', ContainerOps.list_new)
 register('list_concat', ContainerOps.list_concat)
 register('list_len', ContainerOps.list_length)

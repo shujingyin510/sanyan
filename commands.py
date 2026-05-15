@@ -2,6 +2,7 @@
 from typing import Any
 from values import ReturnException, BreakException, SanyanSyntaxError, SanyanNameError, SanyanRuntimeError
 from ternary_core import TritValue
+from ops.registry import register
 
 _TCO_LOOP_MULTIPLIER = 10
 
@@ -221,5 +222,4 @@ class Commands:
         print("==============\n")
 
 # 注册 fn（函数定义）操作
-from ops.registry import register
 register('fn', Commands.define)

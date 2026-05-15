@@ -1,7 +1,6 @@
 """ops 模块单元测试：覆盖所有内置操作"""
 import sys
 import os
-import math
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import unittest
@@ -317,19 +316,19 @@ class TestControlFlow(unittest.TestCase):
         self.env = SanyanEvaluator()
 
     def test_if_true(self):
-        result = self.env.eval(['if', 1, ['do', ['set', 'x', 42]], ['do', ['set', 'x', 0]]])
+        self.env.eval(['if', 1, ['do', ['set', 'x', 42]], ['do', ['set', 'x', 0]]])
         self.assertEqual(self.env.get_var('x').to_int(), 42)
 
     def test_if_false(self):
-        result = self.env.eval(['if', -1, ['do', ['set', 'x', 42]], ['do', ['set', 'x', 0]]])
+        self.env.eval(['if', -1, ['do', ['set', 'x', 42]], ['do', ['set', 'x', 0]]])
         self.assertEqual(self.env.get_var('x').to_int(), 0)
 
     def test_if_maybe(self):
-        result = self.env.eval(['if', 0, ['do', ['set', 'x', 42]], ['do', ['set', 'x', 99]]])
+        self.env.eval(['if', 0, ['do', ['set', 'x', 42]], ['do', ['set', 'x', 99]]])
         self.assertEqual(self.env.get_var('x').to_int(), 99)
 
     def test_do(self):
-        result = self.env.eval(['do', ['set', 'a', 10], ['set', 'b', 20]])
+        self.env.eval(['do', ['set', 'a', 10], ['set', 'b', 20]])
         self.assertEqual(self.env.get_var('a').to_int(), 10)
         self.assertEqual(self.env.get_var('b').to_int(), 20)
 
@@ -343,15 +342,15 @@ class TestControlFlow(unittest.TestCase):
         self.assertEqual(self.env.get_var('x').to_int(), 3)
 
     def test_judge(self):
-        result = self.env.eval(['judge', 1, ['do', ['set', 'v', 100]], ['do', ['set', 'v', 0]], ['do', ['set', 'v', -1]]])
+        self.env.eval(['judge', 1, ['do', ['set', 'v', 100]], ['do', ['set', 'v', 0]], ['do', ['set', 'v', -1]]])
         self.assertEqual(self.env.get_var('v').to_int(), 100)
-        result = self.env.eval(['judge', 0, ['do', ['set', 'v', 100]], ['do', ['set', 'v', 0]], ['do', ['set', 'v', -1]]])
+        self.env.eval(['judge', 0, ['do', ['set', 'v', 100]], ['do', ['set', 'v', 0]], ['do', ['set', 'v', -1]]])
         self.assertEqual(self.env.get_var('v').to_int(), 0)
-        result = self.env.eval(['judge', -1, ['do', ['set', 'v', 100]], ['do', ['set', 'v', 0]], ['do', ['set', 'v', -1]]])
+        self.env.eval(['judge', -1, ['do', ['set', 'v', 100]], ['do', ['set', 'v', 0]], ['do', ['set', 'v', -1]]])
         self.assertEqual(self.env.get_var('v').to_int(), -1)
 
     def test_try_catch(self):
-        result = self.env.eval(['try', ['div', 1, 0], ['catch', 'e', ['set', 'caught', 1]]])
+        self.env.eval(['try', ['div', 1, 0], ['catch', 'e', ['set', 'caught', 1]]])
         self.assertEqual(self.env.get_var('caught').to_int(), 1)
 
 

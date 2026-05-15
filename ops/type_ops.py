@@ -2,6 +2,7 @@
 import time
 from ternary_core import TritValue
 from values import SanyanSyntaxError, SanyanRuntimeError
+from ops.registry import register
 
 class TypeOps:
     @staticmethod
@@ -48,7 +49,6 @@ class TypeOps:
         return TritValue(-1)
 
 # 注册类型操作
-from ops.registry import register
 register('time', TypeOps.time_now)
 register('sleep', TypeOps.sleep_op)
 register('is_number', TypeOps.is_number)

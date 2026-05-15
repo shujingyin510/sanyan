@@ -2,6 +2,7 @@
 import os
 from ternary_core import TritValue
 from values import SanyanSyntaxError, SanyanValueError, ModuleValue
+from ops.registry import register
 
 _SAFE_PATH_SEPARATORS = frozenset({'/', '\\'})
 _module_cache: dict = {}
@@ -161,7 +162,6 @@ class FileOps:
         return module
 
 # 注册文件操作
-from ops.registry import register
 register('read_file', FileOps.read_file_op)
 register('write_file', FileOps.write_file_op)
 register('load', FileOps._load_file)

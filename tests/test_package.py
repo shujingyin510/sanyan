@@ -1,13 +1,11 @@
 """包管理器测试"""
 import sys
 import os
-import tempfile
-import shutil
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import unittest
 from evaluator import SanyanEvaluator
-from ops.package_ops import PACKAGES_DIR, _resolve_package_path
+from ops.package_ops import _resolve_package_path
 
 
 class TestPackageManager(unittest.TestCase):

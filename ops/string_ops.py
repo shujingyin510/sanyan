@@ -1,6 +1,7 @@
 """字符串相关操作"""
 from ternary_core import TritValue
 from values import SanyanSyntaxError, SanyanTypeError
+from ops.registry import register
 
 class StringOps:
     @staticmethod
@@ -151,7 +152,6 @@ class StringOps:
         return TritValue(1 if val.endswith(suffix) else -1)
 
 # 注册字符串操作
-from ops.registry import register
 register('concat', StringOps.string_concat)
 register('length', StringOps.string_length)
 register('str_to_list', StringOps.str_to_list)

@@ -36,4 +36,3 @@ def all_ops() -> list[str]:
 def clear() -> None:
     """清空注册表，主要用于测试隔离。"""
     _OP_DISPATCH.clear()
-    _op_cache.clear()

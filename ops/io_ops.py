@@ -1,6 +1,7 @@
 """输入/输出、调试、值格式化"""
 from ternary_core import TritValue
 from values import FunctionValue, ModuleValue, SanyanValueError
+from ops.registry import register
 
 class IOOps:
     @staticmethod
@@ -160,7 +161,6 @@ class IOOps:
         return TritValue(0)
 
 # 注册 IO 操作
-from ops.registry import register
 register('print', IOOps.output)
 register('input', IOOps.input_op)
 register('debug', IOOps.debug_op)

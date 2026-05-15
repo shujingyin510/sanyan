@@ -17,10 +17,10 @@ import ops.file_ops
 import ops.type_ops
 import ops.iot_ops
 import ops.json_ops
-import ops.package_ops
+import ops.package_ops  # noqa: F401 — triggers module-level op registrations
 
 # 也导入 commands.py 以触发 fn 注册
-import commands
+import commands  # noqa: F401 — triggers module-level op registration
 
 
 class SanyanEvaluator(SanyanRuntime):

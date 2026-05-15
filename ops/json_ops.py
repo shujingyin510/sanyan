@@ -2,6 +2,7 @@
 import json
 from ternary_core import TritValue
 from values import SanyanValueError, SanyanTypeError
+from ops.registry import register
 
 class JsonOps:
     @staticmethod
@@ -50,6 +51,5 @@ class JsonOps:
             raise SanyanValueError(f"JSON 解析失败: {e}")
 
 # 注册 JSON 操作
-from ops.registry import register
 register('to_json', JsonOps.to_json)
 register('from_json', JsonOps.from_json)

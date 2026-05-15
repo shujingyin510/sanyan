@@ -2,6 +2,7 @@
 from ternary_core import TritValue
 from values import SanyanSyntaxError, SanyanNameError, SanyanValueError
 from ops.device_registry import MockDevice
+from ops.registry import register
 
 class IotOps:
     @staticmethod
@@ -183,7 +184,6 @@ class IotOps:
         return TritValue(0)
 
 # 注册 IoT 操作及中文别名
-from ops.registry import register
 register('write', IotOps.set_sensor)
 register('query', IotOps.query)
 register('context', IotOps.context_op)

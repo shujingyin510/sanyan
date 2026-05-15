@@ -1,6 +1,7 @@
 """控制流操作：若、做、循环、遍历、返回、跳出、异常处理"""
 from ternary_core import BT, TritValue, ArrayValue
 from values import ReturnException, BreakException, ContinueException, SanyanError,SanyanSyntaxError
+from ops.registry import register
 
 class ControlOps:
     @staticmethod
@@ -224,7 +225,6 @@ class ControlOps:
         return TritValue(0)
 
 # 注册控制流操作
-from ops.registry import register
 register('if', ControlOps.if_op)
 register('do', ControlOps.do_op)
 register('loop', ControlOps.loop_op)

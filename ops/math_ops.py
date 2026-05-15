@@ -3,6 +3,7 @@ import math
 import random
 from ternary_core import BT, TernaryALU, TritValue, ternary_sin, ternary_cos, ternary_tan, ternary_sqrt, ternary_log, ternary_log10
 from values import SanyanSyntaxError, SanyanTypeError, SanyanValueError
+from ops.registry import register
 
 def _to_num(v):
     """将 TritValue 或原始值转换为数值（保留浮点精度）"""
@@ -360,7 +361,6 @@ class MathOps:
         return TritValue(trits)
 
 # 注册数学操作
-from ops.registry import register
 register('and', MathOps.logic_op, 'and')
 register('or', MathOps.logic_op, 'or')
 register('not', MathOps.logic_op, 'not')
