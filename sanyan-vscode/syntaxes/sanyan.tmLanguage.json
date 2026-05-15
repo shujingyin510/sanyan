@@ -1,0 +1,44 @@
+{
+  "scopeName": "source.sanyan",
+  "name": "Sanyan",
+  "fileTypes": [".san"],
+  "patterns": [
+    { "include": "#comments" },
+    { "include": "#strings" },
+    { "include": "#keywords" },
+    { "include": "#numbers" },
+    { "include": "#operators" }
+  ],
+  "repository": {
+    "comments": {
+      "patterns": [
+        { "match": "(//|#|／／).*", "name": "comment.line.sanyan" }
+      ]
+    },
+    "strings": {
+      "patterns": [
+        { "match": "\"[^\"]*\"", "name": "string.quoted.double.sanyan" },
+        { "match": "'[^']*'", "name": "string.quoted.single.sanyan" },
+        { "match": "「[^」]*」", "name": "string.quoted.sanyan" },
+        { "match": "『[^』]*』", "name": "string.quoted.sanyan" }
+      ]
+    },
+    "keywords": {
+      "patterns": [
+        { "match": "\\b(设|若|再若|否则|循环|遍历|定义|返回|跳出|继续|尝试|捕获|判|函数|λ|在|导入|输出|加载|导出|注册设备|对|置|读|查|调试|等待|从|到)\\b", "name": "keyword.control.sanyan" },
+        { "match": "\\b(加|减|乘|除|余|幂|取位|大于|小于|等于|不等于|大于等于|小于等于|不大于|不小于|且|或|非|同)\\b", "name": "keyword.operator.sanyan" },
+        { "match": "\\b(真|假|可能|开|关|守)\\b", "name": "constant.language.sanyan" }
+      ]
+    },
+    "numbers": {
+      "patterns": [
+        { "match": "\\b[0-9]+(\\.[0-9]+)?\\b", "name": "constant.numeric.sanyan" }
+      ]
+    },
+    "operators": {
+      "patterns": [
+        { "match": "==|!=|>=|<=|!>|!<|>|<|=|\\+|-|\\*|/|%|\\^", "name": "keyword.operator.sanyan" }
+      ]
+    }
+  }
+}

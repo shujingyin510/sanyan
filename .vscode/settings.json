@@ -1,13 +1,8 @@
 {
-  "languageserver": {
-    "sanyan": {
-      "command": "python",
-      "args": ["lsp_server.py"],
-      "filetypes": ["san"],
-      "rootPatterns": [".git", "main.py"]
-    }
-  },
   "files.associations": {
     "*.san": "sanyan"
+  },
+  "search.exclude": {
+    "**/sanyan-vscode": true
   }
 }
