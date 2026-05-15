@@ -181,3 +181,17 @@ class IotOps:
             raise SanyanValueError(f"未知设备类型: {device_type}")
         evaluator.device_registry.register(name, device)
         return TritValue(0)
+
+# 注册 IoT 操作及中文别名
+from ops.registry import register
+register('write', IotOps.set_sensor)
+register('query', IotOps.query)
+register('context', IotOps.context_op)
+register('read', IotOps.sensor_read)
+register('register_device', IotOps.register_device_op)
+register('置', IotOps.set_sensor)
+register('查', IotOps.query)
+register('读', IotOps.sensor_read)
+register('读取', IotOps.sensor_read)
+register('写入', IotOps.set_sensor)
+register('查询', IotOps.query)

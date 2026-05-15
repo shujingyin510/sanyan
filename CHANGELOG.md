@@ -2,6 +2,41 @@
 
 ---
 
+## [v3.8.0] — 2026-05-16
+
+### 新增
+- **纯 Sanyan 元循环求值器** (`stdlib/eval.san`, ~300 行): 运行在 Python 求值器之上的自举级求值器——支持变量绑定、特殊形式（若/做/设/定义/函数/循环/遍历/尝试）、内置操作分派（40+ 操作）、闭包与高阶函数调用。10 组集成测试覆盖算术、比较、逻辑、列表、条件、递归、lambda、闭包、斐波那契。
+- **`dict_contains` 操作** (`ops/container_ops.py`): 安全的字典键存在检查（`含键`），返回 `真`/`假` 永不抛异常，配套内置包装。
+- **操作注册表统一** (`ops/registry.py`): 每个 `ops/*.py` 模块末尾加 `register()` 调用，`evaluator.py` 的 `_OP_DISPATCH` 手写分发表完成迁移到 `registry.get_op()`。
+- **ops 模块单元测试** (`tests/test_ops.py`): 66 项 Python unittest 覆盖算术、比较、逻辑、数学函数、字符串、容器、控制流、JSON、Lambda、文件等全部操作类别。
+- **LSP 测试** (`tests/test_lsp.py`): 6 项（initialize/completion/hover/definition/signatureHelp/didOpen），使用后台读取线程 + 响应 ID 匹配正确区分通知和请求。
+- **包管理器测试** (`tests/test_package.py`): 6 项覆盖安装拒绝 HTTP/FTP、加载不存在的包、包路径解析。
+- **解析器 AST 校验** (`tests/test_parser.py`): 从仅检查"不崩溃"升级为 22 项精确 AST 结构验证（每个测试检查特定的节点类型、子结构、字面值格式）。
+- **`editor.skel.py`, `doc_sync.py`** 等辅助工具。
+
+### 修复
+- **断言框架** (`stdlib/test.san`): `_断言失败` 改为 `1 / 0`（除零触发 `SanyanValueError`），修复断言失败不报错的 bug。
+- **路径穿越加固** (`ops/file_ops.py`): `_resolve_path` 先 `os.path.normpath` 再检查 `..`，防止 `./../../` 绕过。
+- **HTTPS 强制** (`ops/package_ops.py`): 下载包前检查 URL 以 `https://` 开头。
+- **`input_op` 鲁棒性** (`ops/io_ops.py`): 改用 `try: float()` 替代手动 `isdigit` 校验。
+- **`get_var` 语义** (`runtime.py`): 找不到变量时改为 `raise SanyanNameError` 替代返回 `None`。
+- **`eval` 支持 `float`** (`evaluator.py`): 原只支持 `int` 节点类型，现同时支持 `float`。
+- **CHANGELOG 顺序** — v3.3→v3.4→v3.5→v3.6 恢复正确时间线。
+
+### 变更
+- **求值器重构** (`evaluator.py`): `eval()` 拆分为 `_eval_list()` / `_eval_str()`；`_apply()` 拆分为 `_resolve_op_name()` / `_dispatch_op()` / `_handle_dot_access()` / `_handle_variable_call()`。
+- **死代码移除** (`evaluator.py`): `_name_cache_put()` 方法已定义但从未调用 — 删除。
+- **分号风格统一** (`ternary_core.py`): 5 行 `res.append(...); carry = ...` 拆为两行。
+- **测试覆盖增强**: 10 个 `.san` 测试文件（math/string/container/edge/scope/stress/tailcall/type/v37/regression）新增断言语句，`run_all.py` 退出码检查因此更有意义。
+- **`ModuleValue.call`** (`values.py`): 执行函数体期间暴露模块内部 commands，使嵌套调用可达。
+- **文档同步**: README 删除重复文件树（317-339 行），补充遗漏的 `main.py`，修正错误注释。
+- **覆盖率配置** (`pyproject.toml`): 新增 `[tool.coverage.run]` / `[tool.coverage.report]`。
+
+### 文档
+- **CHANGELOG.md**: 新增 v3.8.0 条目。
+- **README.md**: 更新版本号、修正项目结构树、删除重复条目。
+
+---
 
 ## [v3.7.1] — 2026-05-15
 
@@ -106,8 +141,39 @@
 
 ---
 
-## [v3.3] — 2025-05
-- 初始发布：平衡三进制核心、糖语法、S 表达式、高阶函数、IoT 抽象、温室示例
+## [v3.5] — 2026-05-13
+
+### 新增
+- **`不大于` / `不小于` 运算符**：语义化比较运算符，分别等价于 `<=` / `>=`，支持中文和半角符号（`!>` / `!<`）
+- **双语法对照测试与示例**：所有测试和示例均提供糖语法 + S 表达式双版本（`_se` 后缀），方便对照学习
+- **测试框架增强**：新增 `断言不相等`、`断言大于`、`断言小于`、`断言大于等于`、`断言小于等于`、`断言错误`（支持可变参数）
+- **S 表达式语法检测**：`main.py` 自动识别 S 表达式文件，注释中的 `{` 不再误判为糖语法
+- **REPL 中文切换命令**：`切换中文`/`切换英文` 替代 `:lang chinese`/`:lang english`，同时支持 `:lang 中文`/`:lang 英文`
+- **模块路径解析**：`导入("test")` 自动查找 `stdlib/test.san`，无需写完整路径
+- **调试信息增强**：`调试()` 输出包含变量类型、调用栈深度和最近调用
+- **性能优化**：TritValue 对象池 + `__slots__` + `_apply` 方法缓存
+- **Lambda 闭包**：Lambda 自动捕获定义时的变量环境，支持闭包
+- **字典点号访问**：`学生.姓名` 等价于 `取键(学生, "姓名")`
+- **三进制字面量**：`三进制("+-0")` 将三进制字符串转为整数（即 6）
+- **#include 预处理器**：`#include "test"` 编译时展开文件内容
+- **REPL 历史记录**：上下键翻历史，Tab 键自动补全关键字和变量名
+- **基准测试**：`tests/benchmark.san` 测量运算/调用/列表/逻辑性能
+
+### 变更
+- **删除无用文件**：`greenhouse.log`、`__pycache__/`、`.github/workfliws/`、`tools/`、`tests/fuzz.py`
+- **版本号统一**：`main.py`、`repl.py` 版本号更新至 v3.5
+- **skin.py**：`switch_skin()` 支持中文参数（`'中文'`/`'英文'`）
+
+### 修复
+- **尾递归作用域重复弹出**：`commands.py` 中 `ReturnException` 触发时 `finally` 与 `except` 均调用 `pop_scope()`，修复为仅 `finally` 负责清理
+- **ModuleValue.call 参数求值**：修复已求值参数被二次 `eval` 导致列表值作为代码执行的 bug
+- **evaluator.py 重复键**：修复 `_OP_DISPATCH` 中 `pow` 键重复导致三进制幂运算被覆盖
+- **repl.py :maxloop**：修复 `:maxloop` 命令嵌套在 `:lang` 分支内不可达的问题
+- **stdlib/test.san 断言**：断言失败时不再静默通过，改为返回错误消息触发异常
+- **stdlib/list.san 空列表**：`最大值([])` 和 `最小值([])` 不再因 `空` 未定义而崩溃
+- **stdlib/string.san 计数**：修复 `计数` 函数切片后位置计算错误
+- **language/english.json**：补充缺失的 `do` 关键字
+- **docs/manual.md**：删除重复的目录标题和重复的 4.6 节
 
 ---
 
@@ -147,42 +213,7 @@
 - 新增自动回归测试运行器 `tests/run_all.py`
 - 新增边界测试 `tests/test_edge.san`
 
-
 ---
 
-## [v3.5] — 2026-05-13
-
-### 新增
-- **`不大于` / `不小于` 运算符**：语义化比较运算符，分别等价于 `<=` / `>=`，支持中文和半角符号（`!>` / `!<`）
-- **双语法对照测试与示例**：所有测试和示例均提供糖语法 + S 表达式双版本（`_se` 后缀），方便对照学习
-- **测试框架增强**：新增 `断言不相等`、`断言大于`、`断言小于`、`断言大于等于`、`断言小于等于`、`断言错误`（支持可变参数）
-- **S 表达式语法检测**：`main.py` 自动识别 S 表达式文件，注释中的 `{` 不再误判为糖语法
-- **REPL 中文切换命令**：`切换中文`/`切换英文` 替代 `:lang chinese`/`:lang english`，同时支持 `:lang 中文`/`:lang 英文`
-- **模块路径解析**：`导入("test")` 自动查找 `stdlib/test.san`，无需写完整路径
-- **调试信息增强**：`调试()` 输出包含变量类型、调用栈深度和最近调用
-- **性能优化**：TritValue 对象池 + `__slots__` + `_apply` 方法缓存
-- **Lambda 闭包**：Lambda 自动捕获定义时的变量环境，支持闭包
-- **字典点号访问**：`学生.姓名` 等价于 `取键(学生, "姓名")`
-- **三进制字面量**：`三进制("+-0")` 将三进制字符串转为整数（即 6）
-- **#include 预处理器**：`#include "test"` 编译时展开文件内容
-- **REPL 历史记录**：上下键翻历史，Tab 键自动补全关键字和变量名
-- **基准测试**：`tests/benchmark.san` 测量运算/调用/列表/逻辑性能
-
-### 变更
-- **删除无用文件**：`greenhouse.log`、`__pycache__/`、`.github/workfliws/`、`tools/`、`tests/fuzz.py`
-- **版本号统一**：`main.py`、`repl.py` 版本号更新至 v3.5
-- **skin.py**：`switch_skin()` 支持中文参数（`'中文'`/`'英文'`）
-
-### 修复
-- **尾递归作用域重复弹出**：`commands.py` 中 `ReturnException` 触发时 `finally` 与 `except` 均调用 `pop_scope()`，修复为仅 `finally` 负责清理
-- **ModuleValue.call 参数求值**：修复已求值参数被二次 `eval` 导致列表值作为代码执行的 bug
-- **evaluator.py 重复键**：修复 `_OP_DISPATCH` 中 `pow` 键重复导致三进制幂运算被覆盖
-- **repl.py :maxloop**：修复 `:maxloop` 命令嵌套在 `:lang` 分支内不可达的问题
-- **stdlib/test.san 断言**：断言失败时不再静默通过，改为返回错误消息触发异常
-- **stdlib/list.san 空列表**：`最大值([])` 和 `最小值([])` 不再因 `空` 未定义而崩溃
-- **stdlib/string.san 计数**：修复 `计数` 函数切片后位置计算错误
-- **language/english.json**：补充缺失的 `do` 关键字
-- **docs/manual.md**：删除重复的目录标题和重复的 4.6 节
-
-### 变更
-- **删除无用文件**：`test_debug.py`、`test_repl.py`、`gen_pipeline.py`、`tests/test_debug2.san`、`tools/generate_clean_tests.py`、`tools/safe_fullwidth.py`
+## [v3.3] — 2025-05
+- 初始发布：平衡三进制核心、糖语法、S 表达式、高阶函数、IoT 抽象、温室示例

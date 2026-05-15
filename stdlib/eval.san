@@ -1,0 +1,302 @@
+// stdlib/eval.san — Pure Sanyan Metacircular Evaluator
+//
+// Usage:
+//   设 e = 导入("stdlib/eval.san")
+//   设 env = e.新建环境()
+//   e.求值(list("加", 3, 4), env)  // => 7
+//
+// NOTE: 内部操作使用英文名（list, dict, concat 等），
+// 因为中文名（列表, 字典, 连接 等）未经 skin 系统映射。
+
+// ==================== 内置操作包装（参数为单列表） ====================
+
+设 内置加 = 函数(参数) { 加(get(参数, 0), get(参数, 1)) }
+设 内置减 = 函数(参数) { 减(get(参数, 0), get(参数, 1)) }
+设 内置乘 = 函数(参数) { 乘(get(参数, 0), get(参数, 1)) }
+设 内置除 = 函数(参数) { 除(get(参数, 0), get(参数, 1)) }
+设 内置模 = 函数(参数) { 余(get(参数, 0), get(参数, 1)) }
+设 内置幂 = 函数(参数) { 幂(get(参数, 0), get(参数, 1)) }
+设 内置大于 = 函数(参数) { 大于(get(参数, 0), get(参数, 1)) }
+设 内置小于 = 函数(参数) { 小于(get(参数, 0), get(参数, 1)) }
+设 内置等于 = 函数(参数) { 等于(get(参数, 0), get(参数, 1)) }
+设 内置且 = 函数(参数) { 且(get(参数, 0), get(参数, 1)) }
+设 内置或 = 函数(参数) { 或(get(参数, 0), get(参数, 1)) }
+设 内置非 = 函数(参数) { 非(get(参数, 0)) }
+
+设 内置输出 = 函数(参数) { 输出(get(参数, 0)); 返回(get(参数, 0)) }
+设 内置concat = 函数(参数) { concat(get(参数, 0), get(参数, 1)) }
+设 内置length = 函数(参数) { length(get(参数, 0)) }
+设 内置list_len = 函数(参数) { list_len(get(参数, 0)) }
+设 内置get = 函数(参数) { get(get(参数, 0), get(参数, 1)) }
+设 内置slice = 函数(参数) {
+    若 (list_len(参数) == 3) { 返回(slice(get(参数, 0), get(参数, 1), get(参数, 2))) }
+    返回(slice(get(参数, 0), get(参数, 1)))
+}
+设 内置list_concat = 函数(参数) { list_concat(get(参数, 0), get(参数, 1)) }
+设 内置dict_contains = 函数(参数) { dict_contains(get(参数, 0), get(参数, 1)) }
+设 内置get_key = 函数(参数) { get_key(get(参数, 0), get(参数, 1)) }
+设 内置set_key = 函数(参数) { set_key(get(参数, 0), get(参数, 1), get(参数, 2)); 返回(get(参数, 2)) }
+设 内置is_number = 函数(参数) { is_number(get(参数, 0)) }
+设 内置is_string = 函数(参数) { is_string(get(参数, 0)) }
+设 内置str_equals = 函数(参数) { str_equals(get(参数, 0), get(参数, 1)) }
+设 内置map = 函数(参数) { map(get(参数, 0), get(参数, 1)) }
+设 内置filter = 函数(参数) { 过滤(get(参数, 0), get(参数, 1)) }
+设 内置reduce = 函数(参数) {
+    若 (list_len(参数) == 3) { 返回(归并(get(参数, 0), get(参数, 1), get(参数, 2))) }
+    返回(归并(get(参数, 0), get(参数, 1)))
+}
+设 内置contains = 函数(参数) { 包含(get(参数, 0), get(参数, 1)) }
+设 内置sort = 函数(参数) { 排序(get(参数, 0)) }
+设 内置reverse = 函数(参数) { 反转(get(参数, 0)) }
+设 内置unique = 函数(参数) { 去重(get(参数, 0)) }
+设 内置sum = 函数(参数) { 求和(get(参数, 0)) }
+设 内置list = 函数(参数) { 参数 }
+
+设 内置操作表 = dict(
+    "加", 内置加, "减", 内置减, "乘", 内置乘, "除", 内置除,
+    "余", 内置模, "幂", 内置幂,
+    "大于", 内置大于, "小于", 内置小于, "等于", 内置等于,
+    "且", 内置且, "或", 内置或, "非", 内置非,
+    "输出", 内置输出,
+    "concat", 内置concat, "length", 内置length,
+    "list_len", 内置list_len, "list_concat", 内置list_concat,
+    "get", 内置get, "slice", 内置slice,
+    "dict_contains", 内置dict_contains,
+    "get_key", 内置get_key, "set_key", 内置set_key,
+    "is_number", 内置is_number, "is_string", 内置is_string,
+    "str_equals", 内置str_equals,
+    "list", 内置list,
+    "map", 内置map, "filter", 内置filter, "reduce", 内置reduce,
+    "contains", 内置contains,
+    "sort", 内置sort, "reverse", 内置reverse,
+    "unique", 内置unique, "sum", 内置sum,
+)
+
+// ==================== 环境管理 ====================
+
+// 导出的函数用 定义 以便 ModuleValue.call 能找到
+
+定义 新建环境 () { list(dict()) }
+
+设 当前作用域 = 函数(env) { get(env, list_len(env) - 1) }
+
+定义 查变量 (env, name) {
+    设 i = list_len(env) - 1
+    循环 (i >= 0) {
+        设 scope = get(env, i)
+        若 (dict_contains(scope, name)) {
+            返回(get_key(scope, name))
+        }
+        i = i - 1
+    }
+    1 / 0
+}
+
+定义 设变量 (env, name, val) {
+    set_key(当前作用域(env), name, val)
+}
+
+定义 推作用域 (env) {
+    设 result = list()
+    设 i = 0
+    循环 (i < list_len(env)) {
+        result = list_concat(result, list(get(env, i)))
+        i = i + 1
+    }
+    list_concat(result, list(dict()))
+}
+
+// ==================== 辅助 ====================
+
+设 是列表 = 函数(x) {
+    尝试 { list_len(x); 返回(真) } 捕获 (e) { 返回(假) }
+}
+设 不是列表 = 函数(x) {
+    若 (是列表(x)) { 返回(假) }
+    返回(真)
+}
+
+设 取参 = 函数(ast) {
+    slice(ast, 1)
+}
+
+设 函数表示? = 函数(x) {
+    若 (不是列表(x)) { 返回(假) }
+    若 (list_len(x) < 4) { 返回(假) }
+    若 (str_equals(get(x, 0), "__fn") == 假) { 返回(假) }
+    返回(真)
+}
+
+// ==================== 特殊形式 ====================
+
+设 求值_若 = 函数(args, env) {
+    设 cond = 求值(get(args, 0), env)
+    若 (cond == 真) {
+        返回(求值(get(args, 1), env))
+    } 再若 (list_len(args) >= 3) {
+        返回(求值(get(args, 2), env))
+    } 否则 { 返回(0) }
+}
+
+设 求值_做 = 函数(args, env) {
+    设 result = 0
+    设 i = 0
+    循环 (i < list_len(args)) {
+        result = 求值(get(args, i), env)
+        i = i + 1
+    }
+    返回(result)
+}
+
+设 求值_设 = 函数(args, env) {
+    设 name = get(args, 0)
+    设 val = 求值(get(args, 1), env)
+    设变量(env, name, val)
+    返回(val)
+}
+
+设 求值_定义 = 函数(args, env) {
+    设 name = get(args, 0)
+    设 params = get(args, 1)
+    设 body = get(args, 2)
+    设 fn = list("__fn", params, body, env)
+    设变量(env, name, fn)
+    返回(fn)
+}
+
+设 求值_函数 = 函数(args, env) {
+    设 params = get(args, 0)
+    设 body = get(args, 1)
+    返回(list("__fn", params, body, env))
+}
+
+设 求值_循环 = 函数(args, env) {
+    设 cond_ast = get(args, 0)
+    设 body_asts = slice(args, 1)
+    设 result = 0
+    循环 (求值(cond_ast, env) == 真) {
+        result = 求值_做(body_asts, env)
+    }
+    返回(result)
+}
+
+设 求值_遍历 = 函数(args, env) {
+    设 var_name = get(args, 0)
+    设 start = 求值(get(args, 1), env)
+    设 end = 求值(get(args, 2), env)
+    设 body_asts = slice(args, 3)
+    设 result = 0
+    设 i = start
+    循环 (i <= end) {
+        设变量(env, var_name, i)
+        result = 求值_做(body_asts, env)
+        i = i + 1
+    }
+    返回(result)
+}
+
+设 求值_尝试捕获 = 函数(args, env) {
+    设 try_body = get(args, 0)
+    设 catch_spec = get(args, 1)
+    设 error_var = get(get(catch_spec, 1), 0)
+    设 catch_body_asts = slice(catch_spec, 2)
+    尝试 { 返回(求值(try_body, env)) }
+    捕获 (错误信息) {
+        设变量(env, error_var, 错误信息)
+        返回(求值_做(catch_body_asts, env))
+    }
+}
+
+设 求值_返回 = 函数(args, env) {
+    若 (list_len(args) >= 1) { 返回(求值(get(args, 0), env)) }
+    返回(0)
+}
+
+设 特殊形式表 = dict(
+    "若", 求值_若, "做", 求值_做, "设", 求值_设,
+    "定义", 求值_定义, "函数", 求值_函数,
+    "循环", 求值_循环, "遍历", 求值_遍历,
+    "尝试", 求值_尝试捕获, "返回", 求值_返回,
+)
+
+// ==================== 应用用户定义函数 ====================
+
+设 应用_函数 = 函数(fn, args, env) {
+    设 params = get(fn, 1)
+    设 body = get(fn, 2)
+    设 closure_env = get(fn, 3)
+    设 new_env = 推作用域(closure_env)
+    设 i = 0
+    循环 (i < list_len(params)) {
+        设变量(new_env, get(params, i), get(args, i))
+        i = i + 1
+    }
+    返回(求值(body, new_env))
+}
+
+// ==================== 主求值器 ====================
+
+定义 求值 (ast, env) {
+    若 (is_number(ast)) { 返回(ast) }
+    若 (is_string(ast)) {
+        尝试 { 返回(查变量(env, ast)) }
+        捕获 (e) { 返回(ast) }
+    }
+    若 (不是列表(ast)) { 返回(ast) }
+
+    若 (list_len(ast) == 0) { 返回(0) }
+
+    设 op = get(ast, 0)
+    设 args_ast = 取参(ast)
+
+    // 0) 若 op 本身是函数表示（列表），直接调用
+    若 (函数表示?(op)) {
+        设 evaluated = list()
+        设 i = 0
+        循环 (i < list_len(args_ast)) {
+            evaluated = list_concat(evaluated, list(求值(get(args_ast, i), env)))
+            i = i + 1
+        }
+        返回(应用_函数(op, evaluated, env))
+    }
+
+    // 1) 特殊形式（op 必须是字符串）
+    若 (is_string(op)) {
+        若 (dict_contains(特殊形式表, op)) {
+            设 handler = get_key(特殊形式表, op)
+            返回(handler(args_ast, env))
+        }
+
+        // 2) 内置操作
+        若 (dict_contains(内置操作表, op)) {
+            设 builtin = get_key(内置操作表, op)
+            设 evaluated = list()
+            设 i = 0
+            循环 (i < list_len(args_ast)) {
+                evaluated = list_concat(evaluated, list(求值(get(args_ast, i), env)))
+                i = i + 1
+            }
+            返回(builtin(evaluated))
+        }
+    }
+
+    // 3) 用户定义函数
+    设 fn = 查变量(env, op)
+    设 evaluated = list()
+    设 i = 0
+    循环 (i < list_len(args_ast)) {
+        evaluated = list_concat(evaluated, list(求值(get(args_ast, i), env)))
+        i = i + 1
+    }
+    若 (函数表示?(fn)) { 返回(应用_函数(fn, evaluated, env)) }
+}
+
+// ==================== 导出 ====================
+导出 求值
+导出 新建环境
+导出 查变量
+导出 设变量
+导出 推作用域
+导出 应用_函数
+导出 函数表示?
+导出 是列表

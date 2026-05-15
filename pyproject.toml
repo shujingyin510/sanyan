@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "sanyan"
-version = "3.7.0"
+version = "3.8.0"
 description = "A Chinese programming language based on balanced ternary logic"
 readme = "README.md"
 requires-python = ">=3.8"
@@ -50,3 +50,12 @@ ignore = ["E501", "E701", "E702", "E703"]
 
 [tool.ruff.format]
 quote-style = "single"
+
+[tool.coverage.run]
+source = ["."]
+omit = ["tests/*", "examples/*", ".github/*"]
+command_line = "-m pytest"
+
+[tool.coverage.report]
+exclude_lines = ["pragma: no cover", "if __name__ == .__main__.:"]
+show_missing = true

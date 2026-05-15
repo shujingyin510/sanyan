@@ -92,6 +92,18 @@ class ContainerOps:
         return d
 
     @staticmethod
+    def dict_contains(evaluator, args):
+        if len(args) != 2:
+            raise SanyanSyntaxError("含键 需要字典和键")
+        d = evaluator.eval(args[0])
+        if not isinstance(d, dict):
+            raise SanyanTypeError("第一个参数必须是字典")
+        key = evaluator.eval(args[1])
+        if isinstance(key, TritValue):
+            key = key.to_int()
+        return TritValue(1 if key in d else -1)
+
+    @staticmethod
     def dict_get(evaluator, args):
         if len(args) != 2:
             raise SanyanSyntaxError("取键 需要字典和键")
@@ -324,3 +336,31 @@ class ContainerOps:
             else:
                 parts.append(str(item))
         return delim.join(parts)
+
+# 注册容器操作
+from ops.registry import register
+register('list', ContainerOps.list_new)
+register('list_concat', ContainerOps.list_concat)
+register('list_len', ContainerOps.list_length)
+register('count', ContainerOps.list_count)
+register('array', ContainerOps.array_new)
+register('array_len', ContainerOps.array_length)
+register('array_to_list', ContainerOps.array_to_list)
+register('get', ContainerOps.generic_get)
+register('set_element', ContainerOps.generic_set)
+register('dict', ContainerOps.dict_new)
+register('dict_contains', ContainerOps.dict_contains)
+register('get_key', ContainerOps.dict_get)
+register('set_key', ContainerOps.dict_set)
+register('lambda', ContainerOps.make_lambda)
+register('apply', ContainerOps.apply)
+register('map', ContainerOps.map_op)
+register('filter', ContainerOps.filter_op)
+register('reduce', ContainerOps.reduce_op)
+register('sort', ContainerOps.list_sort)
+register('reverse', ContainerOps.list_reverse)
+register('contains', ContainerOps.list_contains)
+register('unique', ContainerOps.list_unique)
+register('slice', ContainerOps.list_slice)
+register('sum', ContainerOps.list_sum)
+register('join', ContainerOps.list_join)

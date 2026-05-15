@@ -78,15 +78,20 @@ class TernaryALU:
         for i in range(max_len - 1, -1, -1):
             s = a[i] + b[i] + carry
             if s == 2:
-                res.append(-1); carry = 1
+                res.append(-1)
+                carry = 1
             elif s == 3:
-                res.append(0); carry = 1
+                res.append(0)
+                carry = 1
             elif s == -2:
-                res.append(1); carry = -1
+                res.append(1)
+                carry = -1
             elif s == -3:
-                res.append(0); carry = -1
+                res.append(0)
+                carry = -1
             else:
-                res.append(s); carry = 0
+                res.append(s)
+                carry = 0
         if carry:
             res.append(carry)
         res.reverse()
@@ -271,6 +276,7 @@ class ArrayValue:
 
 
 # --- 三进制数学函数（定点、纯三进制运算）---
+# TODO: Taylor 系数仍依赖 Python float 中间量，后续应替换为纯 trit 定点运算
 
 _TAYLOR_TERMS = 12
 _TWO_PI = 6.283185307179586

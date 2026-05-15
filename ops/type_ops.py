@@ -46,3 +46,11 @@ class TypeOps:
         if isinstance(a, str) and isinstance(b, str):
             return TritValue(1 if a == b else -1)
         return TritValue(-1)
+
+# 注册类型操作
+from ops.registry import register
+register('time', TypeOps.time_now)
+register('sleep', TypeOps.sleep_op)
+register('is_number', TypeOps.is_number)
+register('is_string', TypeOps.is_string)
+register('str_equals', TypeOps.str_equals)

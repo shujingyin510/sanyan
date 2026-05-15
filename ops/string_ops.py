@@ -149,3 +149,18 @@ class StringOps:
         if not isinstance(suffix, str):
             suffix = str(suffix)
         return TritValue(1 if val.endswith(suffix) else -1)
+
+# 注册字符串操作
+from ops.registry import register
+register('concat', StringOps.string_concat)
+register('length', StringOps.string_length)
+register('str_to_list', StringOps.str_to_list)
+register('substring', StringOps.string_substring)
+register('replace', StringOps.string_replace)
+register('split', StringOps.string_split)
+register('find', StringOps.string_find)
+register('trim', StringOps.string_trim)
+register('upper', StringOps.string_upper)
+register('lower', StringOps.string_lower)
+register('startswith', StringOps.string_startswith)
+register('endswith', StringOps.string_endswith)

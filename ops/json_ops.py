@@ -48,3 +48,8 @@ class JsonOps:
             return convert(data)
         except Exception as e:
             raise SanyanValueError(f"JSON 解析失败: {e}")
+
+# 注册 JSON 操作
+from ops.registry import register
+register('to_json', JsonOps.to_json)
+register('from_json', JsonOps.from_json)

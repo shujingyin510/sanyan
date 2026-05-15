@@ -79,7 +79,7 @@ class SanyanRuntime:
         for scope in reversed(self._scopes):
             if name in scope:
                 return scope[name]
-        return None
+        raise SanyanNameError(f"未定义的符号: {name}")
 
     def has_var(self, name: str) -> bool:
         for scope in reversed(self._scopes):

@@ -1,36 +1,39 @@
-"""操作注册表：装饰器驱动的内置命令分派系统"""
+"""操作注册表：统一的内置命令分派系统
+所有 ops/*.py 模块在加载时向此表注册各自的操作。
+evaluator.py 通过 get_op() 查询此表，不再维护自有的 _OP_DISPATCH。
+"""
 from __future__ import annotations
+from typing import Callable, Any
 
-_OP_DISPATCH: dict[str, tuple] = {}
-_op_cache: dict[str, tuple] = {}
+_OP_DISPATCH: dict[str, tuple[Callable, Any]] = {}
 
+def register(name: str, func: Callable, extra: Any = False) -> None:
+    """注册一个操作名到其实现函数。
 
-def register_op(name: str, extra=None):
-    """装饰器：将方法注册为三言内置操作。"""
-    def decorator(func):
-        _OP_DISPATCH[name] = (func, extra)
-        return func
-    return decorator
-
-
-def register(name: str, func, extra=None):
-    """直接注册操作（非装饰器形式）。"""
+    Args:
+        name: 操作名（内部标识，如 'if', 'add'）
+        func: 实现函数 (evaluator, args) -> result
+        extra: 额外参数，如算术操作的类型标识。若为 truthy，
+               调用时传 func(evaluator, extra, args)
+    """
     _OP_DISPATCH[name] = (func, extra)
 
+def register_alias(alias: str, target: str) -> None:
+    """为已注册的操作创建一个别名。"""
+    if target not in _OP_DISPATCH:
+        raise KeyError(f"别名目标 '{target}' 尚未注册")
+    _OP_DISPATCH[alias] = _OP_DISPATCH[target]
 
-def get_op(name: str):
-    if name in _op_cache:
-        return _op_cache[name]
-    entry = _OP_DISPATCH.get(name)
-    if entry is None:
-        return None
-    _op_cache[name] = entry
-    return entry
-
+def get_op(name: str) -> tuple[Callable, Any] | None:
+    return _OP_DISPATCH.get(name)
 
 def has_op(name: str) -> bool:
     return name in _OP_DISPATCH
 
-
 def all_ops() -> list[str]:
     return list(_OP_DISPATCH.keys())
+
+def clear() -> None:
+    """清空注册表，主要用于测试隔离。"""
+    _OP_DISPATCH.clear()
+    _op_cache.clear()

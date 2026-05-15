@@ -4,20 +4,28 @@ from ternary_core import TritValue
 from values import SanyanSyntaxError, SanyanValueError, ModuleValue
 
 _SAFE_PATH_SEPARATORS = frozenset({'/', '\\'})
-_module_cache = {}
-_import_stack = set()
+_module_cache: dict = {}
+_import_stack: set = set()
+
+
+def clear_cache():
+    """清理模块缓存，用于测试隔离。"""
+    _module_cache.clear()
+    _import_stack.clear()
 
 
 def _resolve_path(raw_path, auto_stdlib=True):
     path = str(raw_path)
-    parts = path.replace('\\', '/').split('/')
+    # 先规范化，再检查路径穿越
+    norm = os.path.normpath(path)
+    parts = norm.replace('\\', '/').split('/')
     if '..' in parts:
-            raise SanyanValueError(f"路径不允许包含 '..': {raw_path}")
+        raise SanyanValueError(f"路径不允许包含 '..': {raw_path}")
     if auto_stdlib and not any(s in path for s in _SAFE_PATH_SEPARATORS) and not path.endswith('.san'):
         candidate = os.path.join('stdlib', path + '.san')
         if os.path.exists(candidate):
             return candidate
-    return path
+    return norm
 
 
 def _parse_and_eval_file(code, evaluator):
@@ -151,3 +159,10 @@ class FileOps:
         module = ModuleValue(module_env.vars, module_env.commands, exports)
         _module_cache[abs_path] = module
         return module
+
+# 注册文件操作
+from ops.registry import register
+register('read_file', FileOps.read_file_op)
+register('write_file', FileOps.write_file_op)
+register('load', FileOps._load_file)
+register('import', FileOps.import_module)

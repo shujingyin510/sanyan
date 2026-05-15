@@ -51,10 +51,10 @@ class IOOps:
         if args:
             prompt = str(args[0])
         user_input = input(prompt).strip()
-        if user_input.replace('.', '', 1).isdigit() or (user_input.startswith('-') and user_input[1:].replace('.', '', 1).isdigit()):
-            if '.' in user_input:
-                return TritValue(float(user_input))
-            return TritValue(int(user_input))
+        try:
+            return TritValue(float(user_input))
+        except ValueError:
+            pass
         if user_input in TritValue.STATE_MAP:
             return TritValue.from_string(user_input)
         raise SanyanValueError(f"无法识别的输入: {user_input}")
@@ -158,3 +158,9 @@ class IOOps:
                     print(f"  错误: {e}")
 
         return TritValue(0)
+
+# 注册 IO 操作
+from ops.registry import register
+register('print', IOOps.output)
+register('input', IOOps.input_op)
+register('debug', IOOps.debug_op)

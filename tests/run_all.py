@@ -3,7 +3,6 @@ import subprocess
 import sys
 import os
 
-# 强制使用 UTF-8 编码输出，避免中文乱码
 if sys.platform == "win32":
     try:
         sys.stdout.reconfigure(encoding='utf-8')
@@ -13,42 +12,40 @@ if sys.platform == "win32":
 
 TEST_DIR = "tests"
 EXAMPLES_DIR = "examples"
-
-# 预期崩溃的测试文件（手动验证用，不在自动化中运行）
 EXCLUDE_TESTS = set()
 
-def run_san(filepath):
+
+def run_san(filepath: str) -> tuple[bool, str]:
     """运行一个 .san 文件，返回 (成功, 输出)"""
     try:
         result = subprocess.run(
-            [sys.executable, "main.py", filepath],
+            [sys.executable, "-X", "utf8", "main.py", filepath],
             capture_output=True, text=True, timeout=30,
             encoding="utf-8", errors="replace"
         )
-        success = result.returncode == 0
-        return success, result.stdout + result.stderr
+        output = (result.stdout + result.stderr).strip()
+        return result.returncode == 0, output
     except subprocess.TimeoutExpired:
         return False, "测试超时 (>30s)"
     except Exception as e:
         return False, str(e)
 
+
 def main():
     test_files = []
 
-    # 收集 tests/ 目录下的 .san 文件
     if os.path.isdir(TEST_DIR):
         for f in os.listdir(TEST_DIR):
             if f.endswith('.san') and f not in EXCLUDE_TESTS:
                 test_files.append(os.path.join(TEST_DIR, f))
 
-    # 收集示例文件作为功能测试
-    example_files = [
+    example_names = [
         "greenhouse.san", "greenhouse_se.san",
         "voting.san", "voting_se.san",
         "data_clean.san", "data_clean_se.san",
         "sensor_pipeline_simple.san", "sensor_pipeline_simple_se.san",
     ]
-    for f in example_files:
+    for f in example_names:
         fp = os.path.join(EXAMPLES_DIR, f)
         if os.path.exists(fp):
             test_files.append(fp)
@@ -57,7 +54,7 @@ def main():
     passed = 0
     failed = []
 
-    for filepath in test_files:
+    for filepath in sorted(test_files):
         print(f"运行: {filepath} ... ", end="", flush=True)
         ok, output = run_san(filepath)
         if ok:
@@ -72,9 +69,10 @@ def main():
         print("失败的测试:")
         for filepath, output in failed:
             print(f"  [{filepath}]")
-            # 仅显示前 300 字符，避免刷屏
-            print(output[:300])
+            for line in output.split('\n')[:10]:
+                print(f"    {line}")
     return len(failed)
+
 
 if __name__ == "__main__":
     sys.exit(main())

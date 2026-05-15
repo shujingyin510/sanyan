@@ -1,4 +1,4 @@
-# 三言 Sanyan v3.7.1
+# 三言 Sanyan v3.8.0
 
 [![VS Code Marketplace](https://img.shields.io/badge/VS%20Code-Marketplace-%23007ACC?logo=visualstudiocode)](https://marketplace.visualstudio.com/items?itemName=sanyan-lang.sanyan-language)
 [![CI](https://github.com/shujingyin510/sanyan/actions/workflows/ci.yml/badge.svg)](https://github.com/shujingyin510/sanyan/actions)
@@ -275,7 +275,7 @@ tests/
 | `定义 f (x) { 返回(x+1) }` | `（定义 f （x） （返回 （+ x 1）））` |
 | `若 (x > 0) { … } 否则 { … }` | `（若 （大于 x 0） … …）` |
 
-## 新增特性速览（v3.7.1）
+## 新增特性速览（v3.8.0）
 
 | 特性 | 说明 |
 |---|---|
@@ -315,29 +315,7 @@ tests/
 
 ```text
 sanyan/
-├── main.py              # 入口
-├── pyproject.toml       # 项目配置（Ruff 规则、打包）
-├── CHANGELOG.md         # 版本历史
-├── AGENTS.md            # 维护约定
-├── CONTRIBUTING.md      # 贡献指南
-├── ternary_core.py      # 平衡三进制核心（含定点数）
-├── runtime.py           # 运行环境（作用域栈式链）
-├── commands.py          # 自定义命令调用
-├── preprocess.py        # #include 预处理器
-├── evaluator.py         # 求值器
-├── lexer.py             # S 表达式词法
-├── parser.py            # S 表达式语法
-├── sugar/               # 糖语法转换器（拆分版）
-│   ├── __init__.py      # 入口，自动回退 sugar_old
-│   ├── lexer.py         # 词法分析器
-│   ├── parser.py        # Pratt 语法分析器
-│   ├── errors.py        # 错误收集与报告
-│   └── sugar_old.py     # 旧版回退
-├── skin.py              # 皮肤管理器
-├── values.py            # 值类型与语言异常（Sanyan* 系列）
-├── repl.py              # REPL 交互环境
-├── lsp_server.py         # LSP 语言服务器
-├── doc_sync.py            # 文档自动同步
+├── main.py                # 入口
 ├── pyproject.toml         # 项目配置（Ruff 规则、打包）
 ├── CHANGELOG.md           # 版本历史
 ├── AGENTS.md              # 维护约定
@@ -346,7 +324,7 @@ sanyan/
 ├── runtime.py             # 运行环境（作用域栈式链）
 ├── commands.py            # 自定义命令调用（重构拆分版）
 ├── preprocess.py          # #include 预处理器
-├── evaluator.py           # 求值器（操作分发表→ops/registry.py）
+├── evaluator.py           # 求值器（操作分发表→_OP_DISPATCH）
 ├── lexer.py               # S 表达式词法
 ├── parser.py              # S 表达式语法
 ├── sugar/                 # 糖语法转换器（Pratt 解析器）
@@ -359,7 +337,7 @@ sanyan/
 ├── repl.py                # REPL 交互环境
 ├── ops/                   # 内置操作实现模块
 │   ├── __init__.py        # 模块文档
-│   ├── registry.py        # 装饰器操作注册表
+│   ├── registry.py        # 统一操作注册表
 │   ├── control_ops.py
 │   ├── math_ops.py
 │   ├── string_ops.py
@@ -369,6 +347,7 @@ sanyan/
 │   ├── type_ops.py
 │   ├── json_ops.py
 │   ├── iot_ops.py
+│   ├── package_ops.py     # 包管理器
 │   └── device_registry.py # 设备注册表
 ├── sanyan-vscode/         # VS Code 扩展
 │   ├── package.json
@@ -382,14 +361,21 @@ sanyan/
 │   ├── voting.san / voting_se.san
 │   ├── data_clean.san / data_clean_se.san
 │   └── sensor_pipeline_simple.san / sensor_pipeline_simple_se.san
-├── stdlib/                # 标准库（math, string, list, iot, logic, io, test）
+├── stdlib/                # 标准库
+│   ├── eval.san           # 纯 Sanyan 元循环求值器
+│   ├── math.san / string.san / list.san
+│   ├── iot.san / logic.san / io.san
+│   └── test.san           # 测试框架
 ├── tests/                 # 自动测试（双版本）
 │   ├── run_all.py         # 测试运行器
 │   ├── test_core.py       # Python 单测 44 项
+│   ├── test_ops.py        # ops 模块单测 66 项
+│   ├── test_lsp.py        # LSP 协议测试 6 项
+│   ├── test_package.py    # 包管理器测试 6 项
+│   ├── test_eval.san      # 元循环求值器测试
+│   ├── test_parser.py     # 解析器 AST 校验 22 项
 │   ├── test_*.san         # 糖语法测试
-│   ├── test_*_se.san      # S 表达式对照测试
-│   ├── regression.san / regression_se.san
-│   └── test_parser.py     # 解析器回归测试 23 项
+│   └── test_*_se.san      # S 表达式对照测试
 ├── docs/                  # 语言手册
 └── .vscode/               # VS Code 工作区配置
     └── settings.json

@@ -125,6 +125,8 @@ class ModuleValue:
             for p, v in zip(params, func_args):
                 evaluator.set_var(p, v)
 
+            saved_commands = dict(evaluator.commands)
+            evaluator.commands.update(self.commands)
             try:
                 result = None
                 for expr in body:
@@ -138,6 +140,8 @@ class ModuleValue:
                         self.vars[k] = evaluator.vars[k]
                 return result if result is not None else TritValue(0)
             finally:
+                evaluator.commands.clear()
+                evaluator.commands.update(saved_commands)
                 evaluator.pop_scope()
         else:
             raise SanyanNameError(f"模块中未定义操作: {func_name}")

@@ -221,6 +221,19 @@ class ControlOps:
 
     @staticmethod
     def export_op(evaluator, args):
-        # 导出语句在模块加载时由 _collect_exports 处理
-        # 运行时导出无操作，返回 0
         return TritValue(0)
+
+# 注册控制流操作
+from ops.registry import register
+register('if', ControlOps.if_op)
+register('do', ControlOps.do_op)
+register('loop', ControlOps.loop_op)
+register('for', ControlOps.traversal_op)
+register('forin', ControlOps.forin_op)
+register('return', ControlOps.return_op)
+register('break', ControlOps.break_op)
+register('continue', ControlOps.continue_op)
+register('try', ControlOps.try_catch)
+register('judge', ControlOps.judge_op)
+register('set', ControlOps.define_var)
+register('export', ControlOps.export_op)

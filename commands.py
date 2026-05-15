@@ -140,6 +140,10 @@ class Commands:
                     and arg_node not in TritValue.STATE_MAP \
                     and not evaluator.has_var(arg_node):
                 value = arg_node
+                # Strip surrounding quotes from string literals
+                if len(value) >= 2 and value[0] in ('"', "'", '\u201c', '\u2018') \
+                        and value[-1] in ('"', "'", '\u201d', '\u2019'):
+                    value = value[1:-1]
             else:
                 value = evaluator.eval(arg_node)
             if param in param_types:
@@ -215,3 +219,7 @@ class Commands:
             formatted_args = Commands._format_args(args)
             print(f"  at {op}({formatted_args})")
         print("==============\n")
+
+# 注册 fn（函数定义）操作
+from ops.registry import register
+register('fn', Commands.define)
