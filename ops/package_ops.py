@@ -179,7 +179,19 @@ class PackageOps:
 
     @staticmethod
     def _lookup_index(name: str) -> str | None:
-        """从包索引查找下载 URL。"""
+        """从包索引查找下载 URL。优先查本地，再查远程。"""
+        # 本地索引
+        local_idx = os.path.join(os.path.abspath(PACKAGES_DIR), "index.json")
+        if os.path.exists(local_idx):
+            try:
+                with open(local_idx, "r", encoding="utf-8") as f:
+                    index = json.load(f)
+                entry = index.get(name)
+                if entry:
+                    return entry.get("url") or entry.get("download")
+            except Exception:
+                pass
+        # 远程索引
         import urllib.request
         try:
             with urllib.request.urlopen(PACKAGE_INDEX_URL, timeout=10) as resp:
@@ -187,6 +199,6 @@ class PackageOps:
         except Exception:
             return None
         entry = index.get(name)
-        if entry and "download" in entry:
-            return entry["download"]
+        if entry:
+            return entry.get("url") or entry.get("download")
         return None

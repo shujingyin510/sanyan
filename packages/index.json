@@ -1,0 +1,22 @@
+{
+  "sample": {
+    "description": "示例包 — 问候工具",
+    "version": "0.1.0",
+    "url": "https://github.com/shujingyin510/sanyan-packages/raw/main/packages/sample.zip"
+  },
+  "math": {
+    "description": "数学扩展：复数、矩阵、向量",
+    "version": "0.1.0",
+    "url": "https://github.com/shujingyin510/sanyan-packages/raw/main/packages/math.zip"
+  },
+  "json": {
+    "description": "JSON 格式化与路径查询",
+    "version": "0.1.0",
+    "url": "https://github.com/shujingyin510/sanyan-packages/raw/main/packages/json.zip"
+  },
+  "iot": {
+    "description": "IoT 设备驱动：串口、HTTP、MQTT",
+    "version": "0.1.0",
+    "url": "https://github.com/shujingyin510/sanyan-packages/raw/main/packages/iot.zip"
+  }
+}
