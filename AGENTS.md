@@ -13,6 +13,12 @@ python tests/test_parser.py
 python tests/run_all.py
 ```
 
+Python 文档同步：首次或每次代码修改后建议运行：
+```bash
+python doc_sync.py
+```
+这会同步版本号、检查 BUILTIN_OPS 与手册一致性、检查异常体系。
+
 test_core.py 44/44 + test_parser.py 23/23 + run_all.py 33/33 全部通过才算成功。
 
 ## 文档自动维护

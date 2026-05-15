@@ -34,6 +34,17 @@
 - **CONTRIBUTING.md**: 贡献指南文档。
 - **ops/__init__.py**: 添加模块文档字符串。
 - **测试**: 新增 `TestPreprocess` 3 项、`TestTernaryEdge` 4 项（含定点数）。
+- **三进制数学库**: `sin`/`cos`/`tan`/`sqrt`/`exp`/`log`/`log10` 纯三进制定点实现（CORDIC + Taylor + Newton），替代 Python float 回退。
+- **LSP 语言服务器**: `lsp_server.py` 提供代码补全、诊断、悬停提示、跳转定义、签名帮助。
+- **`ops/registry.py`**: 装饰器驱动的操作注册表，替代 `_OP_DISPATCH` 手写分发表。
+- **`_name_cache` LRU 淘汰**: 全量清空 → 单条目 LRU 逐出。
+- **`commands.py:call()` 重构**: 108 行单方法拆分为 6 个子方法（`_resolve_command`/`_match_params`/`_evaluate_args`/`_detect_tail_call`/`_run_tail_call`/`_run_normal`）。
+- **VS Code 扩展**: `sanyan-vscode/` 扩展包，提供语法高亮 + LSP 客户端。
+- **`doc_sync.py`**: 文档自动同步脚本。
+- **移除 `sugar/sugar_old.py`**: 旧解析器 fallback 删除，减少 680 行遗留代码。
+- **全角 `<=` 等运算符修复**: `sugar/lexer.py` 多字符运算符检查改用 mapped 字符。
+- **`parse_if` 递归修复**: 再若/否则的双消费 token 问题。
+- **`.vscode/settings.json`**: VS Code 工作区配置。
 
 
 ## [v3.7] — 2026-05-14

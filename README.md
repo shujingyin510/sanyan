@@ -332,8 +332,30 @@ sanyan/
 ├── skin.py              # 皮肤管理器
 ├── values.py            # 值类型与语言异常（Sanyan* 系列）
 ├── repl.py              # REPL 交互环境
-├── ops/                 # 内置操作实现模块
-│   ├── __init__.py      # 模块文档
+├── lsp_server.py         # LSP 语言服务器
+├── doc_sync.py            # 文档自动同步
+├── pyproject.toml         # 项目配置（Ruff 规则、打包）
+├── CHANGELOG.md           # 版本历史
+├── AGENTS.md              # 维护约定
+├── CONTRIBUTING.md        # 贡献指南
+├── ternary_core.py        # 平衡三进制核心（含定点数学库）
+├── runtime.py             # 运行环境（作用域栈式链）
+├── commands.py            # 自定义命令调用（重构拆分版）
+├── preprocess.py          # #include 预处理器
+├── evaluator.py           # 求值器（操作分发表→ops/registry.py）
+├── lexer.py               # S 表达式词法
+├── parser.py              # S 表达式语法
+├── sugar/                 # 糖语法转换器（Pratt 解析器）
+│   ├── __init__.py        # 入口
+│   ├── lexer.py           # 词法分析器
+│   ├── parser.py          # Pratt 语法分析器
+│   └── errors.py          # 错误收集与报告
+├── skin.py                # 皮肤管理器
+├── values.py              # 值类型与语言异常（Sanyan* 系列）
+├── repl.py                # REPL 交互环境
+├── ops/                   # 内置操作实现模块
+│   ├── __init__.py        # 模块文档
+│   ├── registry.py        # 装饰器操作注册表
 │   ├── control_ops.py
 │   ├── math_ops.py
 │   ├── string_ops.py
@@ -343,27 +365,30 @@ sanyan/
 │   ├── type_ops.py
 │   ├── json_ops.py
 │   ├── iot_ops.py
-│   └── device_registry.py  # 设备注册表
-├── tools/               # 辅助开发工具
-│   ├── fix_quotes.py
-│   ├── fix_strings.py
-│   └── convert_to_fullwidth.py
-├── language/            # 皮肤文件（chinese.json / english.json）
-├── examples/            # 示例（糖语法 + S 表达式双版本）
+│   └── device_registry.py # 设备注册表
+├── sanyan-vscode/         # VS Code 扩展
+│   ├── package.json
+│   ├── extension.js
+│   ├── language-configuration.json
+│   └── syntaxes/
+│       └── sanyan.tmLanguage.json
+├── language/              # 皮肤文件（chinese.json / english.json）
+├── examples/              # 示例（糖语法 + S 表达式双版本）
 │   ├── greenhouse.san / greenhouse_se.san
 │   ├── voting.san / voting_se.san
 │   ├── data_clean.san / data_clean_se.san
 │   └── sensor_pipeline_simple.san / sensor_pipeline_simple_se.san
-├── stdlib/              # 标准库（math, string, list, iot, logic, io, test）
-├── tests/               # 自动测试（双版本）
-│   ├── run_all.py       # 测试运行器
-│   ├── test_core.py     # Python 单测（三进制核心/作用域/异常体系）
-│   ├── test_*.san       # 糖语法测试
-│   ├── test_*_se.san    # S 表达式对照测试
+├── stdlib/                # 标准库（math, string, list, iot, logic, io, test）
+├── tests/                 # 自动测试（双版本）
+│   ├── run_all.py         # 测试运行器
+│   ├── test_core.py       # Python 单测 44 项
+│   ├── test_*.san         # 糖语法测试
+│   ├── test_*_se.san      # S 表达式对照测试
 │   ├── regression.san / regression_se.san
-│   └── test_parser.py   # 解析器回归测试 23 项
-└── docs/                # 语言手册
-```
+│   └── test_parser.py     # 解析器回归测试 23 项
+├── docs/                  # 语言手册
+└── .vscode/               # VS Code 工作区配置
+    └── settings.json
 
 ## 三态词表
 
