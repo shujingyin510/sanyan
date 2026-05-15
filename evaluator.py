@@ -4,7 +4,7 @@ from typing import Any
 from ternary_core import TritValue, ArrayValue
 from runtime import SanyanRuntime
 from commands import Commands
-from values import FunctionValue, ModuleValue, call_function, SanyanNameError
+from values import FunctionValue, ModuleValue, SanyanNameError
 from values import SanyanSyntaxError, SanyanTypeError, SanyanKeyError, SanyanAttributeError, SanyanRuntimeError
 
 # 直接导入 ops 模块的方法
