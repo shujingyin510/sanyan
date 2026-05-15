@@ -6,7 +6,7 @@ import os
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import unittest
-from ternary_core import BT, TernaryALU, TritValue
+from ternary_core import BT, TernaryALU, TritValue, ternary_sin, ternary_sqrt, ternary_exp, ternary_log
 from values import (
     SanyanError, SanyanNameError, SanyanSyntaxError, SanyanTypeError,
     SanyanValueError, SanyanRuntimeError, SanyanKeyError, SanyanAttributeError,
@@ -251,6 +251,41 @@ class TestTernaryEdge(unittest.TestCase):
         v = TritValue(3.14)
         self.assertTrue(v.is_float())
         self.assertAlmostEqual(v.to_float(), 3.14, places=1)
+
+    def test_ternary_sin_zero(self):
+        s = ternary_sin(BT.from_float(0.0, 16), 16)
+        self.assertAlmostEqual(BT.to_float(s, 16), 0.0, places=2)
+
+    def test_ternary_sin_half_pi(self):
+        s = ternary_sin(BT.from_float(1.5708, 16), 16)
+        self.assertAlmostEqual(BT.to_float(s, 16), 1.0, places=1)
+
+    def test_ternary_sqrt_four(self):
+        s = ternary_sqrt(BT.from_float(4.0, 16), 16)
+        self.assertAlmostEqual(BT.to_float(s, 16), 2.0, places=1)
+
+    def test_ternary_exp_one(self):
+        e = ternary_exp(BT.from_float(1.0, 16), 16)
+        self.assertAlmostEqual(BT.to_float(e, 16), 2.718, places=1)
+
+    def test_ternary_log_e(self):
+        l = ternary_log(BT.from_float(2.71828, 16), 16)
+        self.assertAlmostEqual(BT.to_float(l, 16), 1.0, places=1)
+
+    def test_ternary_cos_zero(self):
+        from ternary_core import ternary_cos
+        c = ternary_cos(BT.from_float(0.0, 16), 16)
+        self.assertAlmostEqual(BT.to_float(c, 16), 1.0, places=1)
+
+    def test_ternary_tan_zero(self):
+        from ternary_core import ternary_tan
+        t = ternary_tan(BT.from_float(0.0, 16), 16)
+        self.assertAlmostEqual(BT.to_float(t, 16), 0.0, places=1)
+
+    def test_ternary_log10_100(self):
+        from ternary_core import ternary_log10
+        l10 = ternary_log10(BT.from_float(100.0, 16), 16)
+        self.assertAlmostEqual(BT.to_float(l10, 16), 2.0, places=1)
 
     def test_negative_multiplication(self):
         self.assertEqual(BT.to_int(TernaryALU.multiply(BT.from_int(-1), BT.from_int(-1))), 1)

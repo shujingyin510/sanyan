@@ -13,7 +13,7 @@ python tests/test_parser.py
 python tests/run_all.py
 ```
 
-test_core.py 36/36 + test_parser.py 23/23 + run_all.py 33/33 全部通过才算成功。
+test_core.py 44/44 + test_parser.py 23/23 + run_all.py 33/33 全部通过才算成功。
 
 ## 文档自动维护
 
