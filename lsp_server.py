@@ -1,9 +1,10 @@
-"""三言语言服务器 (LSP) — 提供代码补全、诊断、悬停提示。
+"""三言语言服务器 (LSP) — 提供代码补全、诊断、悬停提示、跳转定义、签名帮助。
 
 用法: python lsp_server.py  然后编辑器连接 stdio LSP。
 """
 from __future__ import annotations
 import json
+import re
 import sys
 import traceback
 from typing import Any, Optional
@@ -41,13 +42,17 @@ def _read() -> Optional[dict]:
 _CAPABILITIES = {
     "textDocumentSync": {
         "openClose": True,
-        "change": {"syncKind": 1},  # Full
+        "change": {"syncKind": 1},
     },
     "completionProvider": {
         "triggerCharacters": [".", "（", "(", "："],
         "resolveProvider": False,
     },
     "hoverProvider": True,
+    "definitionProvider": True,
+    "signatureHelpProvider": {
+        "triggerCharacters": ["(", "（"],
+    },
 }
 
 # 三言关键字和内置命令
@@ -135,6 +140,130 @@ _TYPED_HOVER: dict[str, str] = {
     "对数": "log(x, base?) — 三进制定点",
     "常用对数": "log10(x) — 三进制定点",
 }
+
+
+# --- 源码分析（用于跳转定义和签名帮助）---
+
+_FUNC_SIGS: dict[str, str] = {
+    "输出": "输出(表达式)",
+    "输入": "输入(\"提示\")",
+    "若": "若 (条件) { 真分支 } 再若 (条件) { ... } 否则 { ... }",
+    "设": "设 变量名 = 值",
+    "定义": "定义 函数名 (参数列表) { 函数体 }",
+    "判": "判 值 { 真 {...} 可能 {...} 假 {...} }",
+    "循环": "循环 (条件) { 循环体 }",
+    "遍历": "遍历 变量 从 起点 到 终点 { 循环体 } | 遍历 元素 在 容器 { 循环体 }",
+    "读": "读 传感器名",
+    "置": "置 设备名 = 状态",
+    "查": "查 设备名",
+    "导入": "导入(\"模块路径\")",
+    "导出": "导出 名称1 名称2",
+    "加载": "加载(\"模块路径\")",
+    "加": "加(a, b) | a + b",
+    "减": "减(a, b) | a - b",
+    "乘": "乘(a, b) | a * b",
+    "除": "除(a, b) | a / b",
+    "正弦": "正弦(x)",
+    "余弦": "余弦(x)",
+    "正切": "正切(x)",
+    "平方根": "平方根(x)",
+    "对数": "对数(x [, base])",
+    "常用对数": "常用对数(x)",
+    "绝对值": "绝对值(x)",
+    "最大值": "最大值(a, b, ...)",
+    "最小值": "最小值(a, b, ...)",
+    "随机数": "随机数([start], end)",
+    "随机态": "随机态()",
+    "三进制": "三进制(\"+-0\")",
+    "映射": "映射(函数, 容器)",
+    "过滤": "过滤(谓词, 容器)",
+    "归并": "归并(函数, 容器)",
+    "应用": "应用(函数, 参数...)",
+    "连接": "连接(字符串...)",
+    "取长": "取长(值)",
+    "子串": "子串(字符串, 开始[, 长度])",
+    "替换": "替换(字符串, 旧, 新)",
+    "分割": "分割(字符串, 分隔符)",
+    "查找": "查找(字符串, 子串)",
+    "列表": "列表(元素...)",
+    "数组": "数组(长度)",
+    "字典": "字典(键, 值, ...)",
+    "取": "取(容器, 索引)",
+    "转JSON": "转JSON(值)",
+    "解析JSON": "解析JSON(JSON字符串)",
+    "注册设备": "注册设备 名称 为 类型(参数)",
+}
+
+
+def _extract_definitions(text: str) -> dict[str, int]:
+    """从源码中提取用户定义函数的行号。"""
+    defs: dict[str, int] = {}
+    for i, line in enumerate(text.split("\n")):
+        # 匹配: 定义 函数名 (参数) 或 fn 函数名 (参数)
+        m = re.search(r"(定义|fn)\s+(\S+)\s*\(", line)
+        if m:
+            defs[m.group(2)] = i
+    return defs
+
+
+def _do_definition(text: str, pos: dict) -> Optional[list[dict]]:
+    """跳转到定义。"""
+    lines = text.split("\n")
+    if pos["line"] >= len(lines):
+        return None
+    line = lines[pos["line"]]
+    col = pos["character"]
+    # 提取光标所在 word
+    start = col
+    while start > 0 and (line[start - 1].isalnum() or line[start - 1] in "_\u4e00-\u9fff"):
+        start -= 1
+    end = col
+    while end < len(line) and (line[end].isalnum() or line[end] in "_\u4e00-\u9fff"):
+        end += 1
+    word = line[start:end]
+    if not word:
+        return None
+    # 在用户自定义函数中查找
+    defs = _extract_definitions(text)
+    if word in defs:
+        return [{
+            "uri": _open_doc_uri,
+            "range": {
+                "start": {"line": defs[word], "character": 0},
+                "end": {"line": defs[word], "character": len(lines[defs[word]])},
+            },
+        }]
+    return None
+
+
+_open_doc_uri: str = ""
+
+
+def _do_signature_help(text: str, pos: dict) -> Optional[dict]:
+    """签名帮助：当光标在函数括号内时显示参数信息。"""
+    lines = text.split("\n")
+    if pos["line"] >= len(lines):
+        return None
+    line = lines[pos["line"]][:pos["character"]]
+    # 从光标往前查找最近的未闭合 (
+    paren = line.rfind("(")
+    if paren < 0:
+        return None
+    # 提取函数名
+    func_name = ""
+    i = paren - 1
+    while i >= 0 and (line[i].isalnum() or line[i] in "_\u4e00-\u9fff\u3400-\u4dbf"):
+        func_name = line[i] + func_name
+        i -= 1
+    if not func_name or func_name not in _FUNC_SIGS:
+        return None
+    sig = _FUNC_SIGS[func_name]
+    return {
+        "signatures": [{
+            "label": sig,
+            "parameters": [],
+        }]
+    }
 
 
 def _list_to_completion(items: list[str], kind: int = 14) -> list[dict[str, Any]]:
@@ -278,6 +407,22 @@ def _handle_message(msg: dict) -> None:
         _send({"id": msg_id, "result": result})
         return
 
+    if method == "textDocument/definition":
+        uri = params.get("textDocument", {}).get("uri", "")
+        text = _open_docs.get(uri, "")
+        pos = params.get("position", {})
+        result = _do_definition(text, pos)
+        _send({"id": msg_id, "result": result})
+        return
+
+    if method == "textDocument/signatureHelp":
+        uri = params.get("textDocument", {}).get("uri", "")
+        text = _open_docs.get(uri, "")
+        pos = params.get("position", {})
+        result = _do_signature_help(text, pos)
+        _send({"id": msg_id, "result": result})
+        return
+
     # 未知方法 → 返回空
     if msg_id is not None:
         _send({"id": msg_id, "result": None})
@@ -286,14 +431,16 @@ def _handle_message(msg: dict) -> None:
 _open_docs: dict[str, str] = {}
 
 def main() -> None:
+    global _open_doc_uri
     while True:
         msg = _read()
         if msg is None:
             break
-        # 跟踪打开的文档
         params = msg.get("params", {})
         td = params.get("textDocument", {})
         uri = td.get("uri", "")
+        if uri:
+            _open_doc_uri = uri
         if msg.get("method") == "textDocument/didOpen":
             _open_docs[uri] = td.get("text", "")
         elif msg.get("method") == "textDocument/didChange":
