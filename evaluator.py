@@ -1,9 +1,10 @@
 """求值器主类：组合运行环境、内置操作、自定义命令"""
+from __future__ import annotations
 from typing import Any
 from ternary_core import TritValue, ArrayValue
 from runtime import SanyanRuntime
 from commands import Commands
-from values import FunctionValue, ModuleValue, SanyanNameError
+from values import FunctionValue, ModuleValue, call_function, SanyanNameError
 from values import SanyanSyntaxError, SanyanTypeError, SanyanKeyError, SanyanAttributeError, SanyanRuntimeError
 
 # 直接导入 ops 模块的方法
@@ -21,127 +22,72 @@ from ops.json_ops import JsonOps
 class SanyanEvaluator(SanyanRuntime):
     # 操作名 → (模块, 方法名, 额外参数) 的静态映射
     _OP_DISPATCH = {
-        # 控制
-        'if': (ControlOps, 'if_op', False),
-        'do': (ControlOps, 'do_op', False),
-        'loop': (ControlOps, 'loop_op', False),
-        'for': (ControlOps, 'traversal_op', False),
-        'forin': (ControlOps, 'forin_op', False),
-        'return': (ControlOps, 'return_op', False),
-        'break': (ControlOps, 'break_op', False),
-        'continue': (ControlOps, 'continue_op', False),
-        'try': (ControlOps, 'try_catch', False),
-        'judge': (ControlOps, 'judge_op', False),
-        # 变量
-        'set': (ControlOps, 'define_var', False),
-        'fn': (Commands, 'define', False),
+        'if': (ControlOps, 'if_op', False), 'do': (ControlOps, 'do_op', False),
+        'loop': (ControlOps, 'loop_op', False), 'for': (ControlOps, 'traversal_op', False),
+        'forin': (ControlOps, 'forin_op', False), 'return': (ControlOps, 'return_op', False),
+        'break': (ControlOps, 'break_op', False), 'continue': (ControlOps, 'continue_op', False),
+        'try': (ControlOps, 'try_catch', False), 'judge': (ControlOps, 'judge_op', False),
+        'set': (ControlOps, 'define_var', False), 'fn': (Commands, 'define', False),
         'export': (ControlOps, 'export_op', False),
         'register_device': (IotOps, 'register_device_op', False),
-        # 逻辑
-        'and': (MathOps, 'logic_op', 'and'),
-        'or': (MathOps, 'logic_op', 'or'),
+        'and': (MathOps, 'logic_op', 'and'), 'or': (MathOps, 'logic_op', 'or'),
         'not': (MathOps, 'logic_op', 'not'),
-        # 算术
-        'add': (MathOps, 'arithmetic', 'add'),
-        'sub': (MathOps, 'arithmetic', 'sub'),
-        'mul': (MathOps, 'arithmetic', 'mul'),
-        'div': (MathOps, 'arithmetic', 'div'),
-        'mod': (MathOps, 'arithmetic', 'mod'),
-        'pow': (MathOps, 'arithmetic', 'pow'),
+        'add': (MathOps, 'arithmetic', 'add'), 'sub': (MathOps, 'arithmetic', 'sub'),
+        'mul': (MathOps, 'arithmetic', 'mul'), 'div': (MathOps, 'arithmetic', 'div'),
+        'mod': (MathOps, 'arithmetic', 'mod'), 'pow': (MathOps, 'arithmetic', 'pow'),
         'digit': (MathOps, 'arithmetic', 'digit'),
-        # 比较
-        'eq': (MathOps, 'comparison', 'eq'),
-        'gt': (MathOps, 'comparison', 'gt'),
-        'lt': (MathOps, 'comparison', 'lt'),
-        'ne': (MathOps, 'comparison', 'ne'),
-        'gte': (MathOps, 'comparison', 'gte'),
-        'lte': (MathOps, 'comparison', 'lte'),
-        'ngt': (MathOps, 'comparison', 'ngt'),
-        'nlt': (MathOps, 'comparison', 'nlt'),
+        'eq': (MathOps, 'comparison', 'eq'), 'gt': (MathOps, 'comparison', 'gt'),
+        'lt': (MathOps, 'comparison', 'lt'), 'ne': (MathOps, 'comparison', 'ne'),
+        'gte': (MathOps, 'comparison', 'gte'), 'lte': (MathOps, 'comparison', 'lte'),
+        'ngt': (MathOps, 'comparison', 'ngt'), 'nlt': (MathOps, 'comparison', 'nlt'),
         'same': (MathOps, 'equals_op', False),
-        # 数学函数
-        'abs': (MathOps, 'math_abs', False),
-        'max': (MathOps, 'math_max', False),
-        'min': (MathOps, 'math_min', False),
-        'sqrt': (MathOps, 'math_sqrt', False),
+        'abs': (MathOps, 'math_abs', False), 'max': (MathOps, 'math_max', False),
+        'min': (MathOps, 'math_min', False), 'sqrt': (MathOps, 'math_sqrt', False),
         'random': (MathOps, 'math_random', False),
         'random_state': (MathOps, 'math_random_state', False),
-        'sin': (MathOps, 'math_sin', False),
-        'cos': (MathOps, 'math_cos', False),
-        'tan': (MathOps, 'math_tan', False),
-        'log': (MathOps, 'math_log', False),
+        'sin': (MathOps, 'math_sin', False), 'cos': (MathOps, 'math_cos', False),
+        'tan': (MathOps, 'math_tan', False), 'log': (MathOps, 'math_log', False),
         'log10': (MathOps, 'math_log10', False),
-        'floor': (MathOps, 'math_floor', False),
-        'ceil': (MathOps, 'math_ceil', False),
+        'floor': (MathOps, 'math_floor', False), 'ceil': (MathOps, 'math_ceil', False),
         'round': (MathOps, 'math_round', False),
-        'math_pow': (MathOps, 'math_pow', False),
-        'ternary': (MathOps, 'ternary_parse', False),
-        # 字符串
-        'concat': (StringOps, 'string_concat', False),
-        'length': (StringOps, 'string_length', False),
+        'math_pow': (MathOps, 'math_pow', False), 'ternary': (MathOps, 'ternary_parse', False),
+        'concat': (StringOps, 'string_concat', False), 'length': (StringOps, 'string_length', False),
         'str_to_list': (StringOps, 'str_to_list', False),
         'substring': (StringOps, 'string_substring', False),
-        'replace': (StringOps, 'string_replace', False),
-        'split': (StringOps, 'string_split', False),
-        'find': (StringOps, 'string_find', False),
-        'trim': (StringOps, 'string_trim', False),
-        'upper': (StringOps, 'string_upper', False),
-        'lower': (StringOps, 'string_lower', False),
+        'replace': (StringOps, 'string_replace', False), 'split': (StringOps, 'string_split', False),
+        'find': (StringOps, 'string_find', False), 'trim': (StringOps, 'string_trim', False),
+        'upper': (StringOps, 'string_upper', False), 'lower': (StringOps, 'string_lower', False),
         'startswith': (StringOps, 'string_startswith', False),
         'endswith': (StringOps, 'string_endswith', False),
-        # 容器
-        'list': (ContainerOps, 'list_new', False),
-        'list_concat': (ContainerOps, 'list_concat', False),
+        'list': (ContainerOps, 'list_new', False), 'list_concat': (ContainerOps, 'list_concat', False),
         'list_len': (ContainerOps, 'list_length', False),
-        'array': (ContainerOps, 'array_new', False),
-        'array_len': (ContainerOps, 'array_length', False),
+        'array': (ContainerOps, 'array_new', False), 'array_len': (ContainerOps, 'array_length', False),
         'array_to_list': (ContainerOps, 'array_to_list', False),
-        'get': (ContainerOps, 'generic_get', False),
-        'set_element': (ContainerOps, 'generic_set', False),
-        'dict': (ContainerOps, 'dict_new', False),
-        'get_key': (ContainerOps, 'dict_get', False),
-        'set_key': (ContainerOps, 'dict_set', False),
-        'lambda': (ContainerOps, 'make_lambda', False),
+        'get': (ContainerOps, 'generic_get', False), 'set_element': (ContainerOps, 'generic_set', False),
+        'dict': (ContainerOps, 'dict_new', False), 'get_key': (ContainerOps, 'dict_get', False),
+        'set_key': (ContainerOps, 'dict_set', False), 'lambda': (ContainerOps, 'make_lambda', False),
         'apply': (ContainerOps, 'apply', False),
-        'map': (ContainerOps, 'map_op', False),
-        'filter': (ContainerOps, 'filter_op', False),
+        'map': (ContainerOps, 'map_op', False), 'filter': (ContainerOps, 'filter_op', False),
         'reduce': (ContainerOps, 'reduce_op', False),
-        'sort': (ContainerOps, 'list_sort', False),
-        'reverse': (ContainerOps, 'list_reverse', False),
-        'contains': (ContainerOps, 'list_contains', False),
-        'unique': (ContainerOps, 'list_unique', False),
-        'slice': (ContainerOps, 'list_slice', False),
-        'sum': (ContainerOps, 'list_sum', False),
-        'join': (ContainerOps, 'list_join', False),
-        'count': (ContainerOps, 'list_count', False),
-        '读取': (IotOps, 'sensor_read', False),
-        '写入': (IotOps, 'set_sensor', False),
-        '查询': (IotOps, 'query', False),
-        # IO
-        'print': (IOOps, 'output', False),
-        'input': (IOOps, 'input_op', False),
+        'sort': (ContainerOps, 'list_sort', False), 'reverse': (ContainerOps, 'list_reverse', False),
+        'contains': (ContainerOps, 'list_contains', False), 'unique': (ContainerOps, 'list_unique', False),
+        'slice': (ContainerOps, 'list_slice', False), 'sum': (ContainerOps, 'list_sum', False),
+        'join': (ContainerOps, 'list_join', False), 'count': (ContainerOps, 'list_count', False),
+        'print': (IOOps, 'output', False), 'input': (IOOps, 'input_op', False),
         'debug': (IOOps, 'debug_op', False),
-        'time': (TypeOps, 'time_now', False),
-        'sleep': (TypeOps, 'sleep_op', False),
+        'time': (TypeOps, 'time_now', False), 'sleep': (TypeOps, 'sleep_op', False),
         'read_file': (FileOps, 'read_file_op', False),
         'write_file': (FileOps, 'write_file_op', False),
-        'is_number': (TypeOps, 'is_number', False),
-        'is_string': (TypeOps, 'is_string', False),
+        'is_number': (TypeOps, 'is_number', False), 'is_string': (TypeOps, 'is_string', False),
         'str_equals': (TypeOps, 'str_equals', False),
-        'load': (FileOps, '_load_file', False),
-        'import': (FileOps, 'import_module', False),
-        # IoT
-        'write': (IotOps, 'set_sensor', False),
-        'query': (IotOps, 'query', False),
-        'context': (IotOps, 'context_op', False),
-        'read': (IotOps, 'sensor_read', False),
-        # Chinese aliases for S-expression mode
-        '置': (IotOps, 'set_sensor', False),
-        '查': (IotOps, 'query', False),
+        'load': (FileOps, '_load_file', False), 'import': (FileOps, 'import_module', False),
+        'write': (IotOps, 'set_sensor', False), 'query': (IotOps, 'query', False),
+        'context': (IotOps, 'context_op', False), 'read': (IotOps, 'sensor_read', False),
+        'to_json': (JsonOps, 'to_json', False), 'from_json': (JsonOps, 'from_json', False),
+        '置': (IotOps, 'set_sensor', False), '查': (IotOps, 'query', False),
         '读': (IotOps, 'sensor_read', False),
-        # JSON
-        'to_json': (JsonOps, 'to_json', False),
-        'from_json': (JsonOps, 'from_json', False),
+        '读取': (IotOps, 'sensor_read', False), '写入': (IotOps, 'set_sensor', False),
+        '查询': (IotOps, 'query', False),
     }
 
 
@@ -150,6 +96,14 @@ class SanyanEvaluator(SanyanRuntime):
         self._op_cache = {}
         self._name_cache = {}
         self._name_cache_max = 5000
+
+    def _name_cache_put(self, key: str, value: str) -> None:
+        """LRU 语义缓存：超过上限时淘汰最早使用的条目。"""
+        if key in self._name_cache:
+            self._name_cache.pop(key)
+        elif len(self._name_cache) >= self._name_cache_max:
+            self._name_cache.pop(next(iter(self._name_cache)))
+        self._name_cache[key] = value
 
     def eval(self, node: Any) -> Any:
         if isinstance(node, (TritValue, ArrayValue, FunctionValue, ModuleValue)):
@@ -215,7 +169,7 @@ class SanyanEvaluator(SanyanRuntime):
                     internal = kw
 
             if len(self._name_cache) >= self._name_cache_max:
-                self._name_cache.clear()
+                self._name_cache.pop(next(iter(self._name_cache)))
             self._name_cache[op] = internal
 
         # 使用静态分派表（带缓存）

@@ -299,14 +299,15 @@ class _Parser:
             self.advance()
         return expr
 
-    def parse_if(self) -> Any:
-        self.advance()
+    def parse_if(self, advance_kw: bool = True) -> Any:
+        if advance_kw:
+            self.advance()  # consume 'if'/'elif' keyword
         cond = self.parse_expression()
         then_body = self.parse_block()
         else_body = None
         if self.peek() and self._kw(self.peek()) == 'elif':
-            self.advance()
-            else_body = self.parse_if()
+            self.advance()  # consume 'elif'
+            else_body = self.parse_if(advance_kw=False)
         elif self.peek() and self._kw(self.peek()) == 'else':
             self.advance()
             else_body = self.parse_block()

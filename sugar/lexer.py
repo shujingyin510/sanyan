@@ -126,13 +126,15 @@ def tokenize(code: str) -> list[Token]:
             continue
 
         # Multi-character operators: !=, >=, <=, !>, !<
-        if c == '!' and i + 1 < length and code[i + 1] in ('=', '>', '<'):
-            tokens.append(Token('OP', c + code[i + 1], line, col))
+        next_c = code[i + 1] if i + 1 < length else ''
+        next_mapped = FULLWIDTH_MAP.get(next_c, next_c)
+        if c == '!' and next_mapped in ('=', '>', '<'):
+            tokens.append(Token('OP', c + next_mapped, line, col))
             i += 2
             col += 2
             continue
-        if c in ('>', '<', '=') and i + 1 < length and code[i + 1] == '=':
-            tokens.append(Token('OP', c + code[i + 1], line, col))
+        if c in ('>', '<', '=') and next_mapped == '=':
+            tokens.append(Token('OP', c + next_mapped, line, col))
             i += 2
             col += 2
             continue
