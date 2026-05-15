@@ -22,9 +22,18 @@
 - **CHANGELOG.md**: 新增 v3.7.1 条目。
 
 ### 新增
+- **模块导出系统**: `导出 name1 name2` 控制模块可见性；`import_module` 循环依赖检测。
+- **设备注册表**: `Device` 协议 + `MockDevice`/`FileDevice` + `DeviceRegistry`；`注册设备 名称 为 类型` 语法。
+- **糖语法解析器拆分**: `sugar.py` 拆分为 `sugar/` 包（`lexer.py`、`parser.py`、`errors.py`），Pratt 解析替代手写递归。
+- **三进制定点数**: `BT.from_float()` / `BT.to_float()` 将浮点转为平衡三进制 trits 表示。
+- **`#` 行注释**: 新增 `#` 注释语法。
+- **全角引号定界符**: 新增 `「」`、`『』`、`""`、`''` 六种字符串定界符。
+- **S 表达式 IoT 中文别名**: `读取`、`写入`、`查询` 直接可用。
+- **希腊字母 Lambda**: `λ(x) { ... }` 等价于 `函数(x) { ... }`。
+- **`BUILTIN_OPS` 补全**: 补充 `跳出`/`继续`/`判`/`导入`/`导出`/`注册设备`/`读取`/`写入`/`查询`/`从`/`到`/`在`。
 - **CONTRIBUTING.md**: 贡献指南文档。
 - **ops/__init__.py**: 添加模块文档字符串。
-- **tests/test_core.py**: 新增 `TestPreprocess` 测试类（3 项）、`TestTernaryEdge` 测试类（4 项）。
+- **测试**: 新增 `TestPreprocess` 3 项、`TestTernaryEdge` 4 项（含定点数）。
 
 
 ## [v3.7] — 2026-05-14

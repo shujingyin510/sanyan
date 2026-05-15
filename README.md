@@ -1,4 +1,4 @@
-# 三言 Sanyan v3.7
+# 三言 Sanyan v3.7.1
 
 > **面向不确定决策的三值编程语言。** 不确定不是 bug，是合法的计算状态。
 
@@ -272,41 +272,18 @@ tests/
 | `定义 f (x) { 返回(x+1) }` | `（定义 f （x） （返回 （+ x 1）））` |
 | `若 (x > 0) { … } 否则 { … }` | `（若 （大于 x 0） … …）` |
 
-## 新增特性速览（v3.5）
+## 新增特性速览（v3.7.1）
 
-| 特性 | 示例 |
+| 特性 | 说明 |
 |---|---|
-| 🔀 不大于/不小于 | `5 不大于 3` → 假，`3 不小于 5` → 假 |
-| 📖 双语法对照 | 所有测试和示例均提供糖语法 + S 表达式双版本 |
-| 🧪 测试框架增强 | 断言不相等/大于/小于/大于等于/小于等于 |
-| 🔢 数学函数扩展 | `正弦`/`余弦`/`正切`/`对数`/`常用对数`/`向下取整`/`向上取整`/`四舍五入` |
-| ⚙️ REPL :maxloop | `:maxloop 1000` 设置最大循环步数 |
-| 🐛 调试断点 | `调试("断点")` 进入交互式调试模式 |
-| 📐 类型标注 | `定义 f(x: 数字)` 函数参数类型检查 |
-| 🔄 尾递归优化 | 尾调用自动转循环，避免栈溢出 |
-| 📞 调用栈追踪 | 递归超限时打印完整调用栈 |
-| 📦 模块路径解析 | `导入("test")` 自动查找 `stdlib/test.san` |
-| 🔗 Lambda 闭包 | Lambda 自动捕获定义时的变量环境 |
-| 📖 字典点号访问 | `学生.姓名` 等价于 `取键(学生, "姓名")` |
-| 🔢 三进制字面量 | `三进制("+-0")` 将三进制字符串转为整数 |
-| 📄 #include 预处理 | `#include "test"` 编译时展开文件内容 |
-| ⌨️ REPL 增强 | 上下键翻历史，Tab 键自动补全 |
-
-## 新增特性速览（v3.4）
-
-| 特性 | 示例 |
-|---|---|
-| 🌐 母语皮肤 | `切换英文`/`:lang english` 切换英文，关键字可自定义 JSON |
-| ⌨️ 全角符号兼容 | 纯中文输入法直接写 `设 a＝5；输出（a＋2）` |
-| 📝 字符串插值 | `模板{温度: ${x}°C}` 自动展开为 `连接` 调用 |
-| 🔀 三态分支 判 | `判 x { 真 {…} 可能 {…} 假 {…} }` 原生三态匹配 |
-| 🚪 跳出 / 继续 | `跳出` 退出循环，`继续` 跳过当前迭代 |
-| 🛟 窄异常捕获 | 只捕获语言错误，系统错误直接暴露以利调试 |
-| 🛡️ 解析器回归测试 | 24 项核心语法测试 + 模糊测试 500 轮全部通过 |
-| 📖 双语法对照 | 所有测试和示例均提供糖语法 + S 表达式双版本 |
-| 🖨️ 中文状态查询 | `查 灯` 输出"开/守/关"而非 +/-/0 |
-| 📋 列表字面量与生成式 | `[1,2,3]`、`[x*2 遍历 x in lst]`、带 `若` 过滤 |
-| 🔁 遍历-在 | `遍历 值 在 容器` 直接迭代列表/数组/字符串 |
+| 🧩 **语法解析器拆分为包** | `sugar.py` → `sugar/` 包（lexer + Pratt parser + error reporter） |
+| 🚪 **模块导出** | `导出 name1 name2` 控制模块对外可见的符号 |
+| 📟 **设备注册表** | `注册设备 名称 为 mock` / `注册设备 名称 为 file("path")` |
+| 🔢 **三进制定点数** | `BT.from_float()` 将浮点转为平衡三进制定点表示 |
+| 🌐 **全角引号** | 支持 `「」`、`『』`、`""` 等六种字符串定界符 |
+| 💬 **`#` 行注释** | 新增 `#` 注释语法，与 `//` 等价 |
+| 🔗 **S 表达式中文别名** | `(读取 人体)`、`(写入 灯 亮)`、`(查询 灯)` |
+| λ **希腊字母 Lambda** | `λ(x) { x * 2 }` 等价于 `函数(x) { x * 2 }` |
 
 ## 三进制不是模拟
 
@@ -334,19 +311,29 @@ tests/
 
 ```text
 sanyan/
-├── main.py            # 入口
-├── ternary_core.py    # 平衡三进制核心
-├── runtime.py         # 运行环境（作用域栈式链）
-├── commands.py        # 自定义命令调用
-├── preprocess.py      # #include 预处理器
-├── evaluator.py       # 求值器
-├── lexer.py           # S 表达式词法
-├── parser.py          # S 表达式语法
-├── sugar.py           # 糖语法转换器
-├── skin.py            # 皮肤管理器
-├── values.py          # 值类型与语言异常（Sanyan* 系列）
-├── repl.py            # REPL 交互环境
-├── ops/               # 内置操作实现模块
+├── main.py              # 入口
+├── pyproject.toml       # 项目配置（Ruff 规则、打包）
+├── CHANGELOG.md         # 版本历史
+├── AGENTS.md            # 维护约定
+├── CONTRIBUTING.md      # 贡献指南
+├── ternary_core.py      # 平衡三进制核心（含定点数）
+├── runtime.py           # 运行环境（作用域栈式链）
+├── commands.py          # 自定义命令调用
+├── preprocess.py        # #include 预处理器
+├── evaluator.py         # 求值器
+├── lexer.py             # S 表达式词法
+├── parser.py            # S 表达式语法
+├── sugar/               # 糖语法转换器（拆分版）
+│   ├── __init__.py      # 入口，自动回退 sugar_old
+│   ├── lexer.py         # 词法分析器
+│   ├── parser.py        # Pratt 语法分析器
+│   ├── errors.py        # 错误收集与报告
+│   └── sugar_old.py     # 旧版回退
+├── skin.py              # 皮肤管理器
+├── values.py            # 值类型与语言异常（Sanyan* 系列）
+├── repl.py              # REPL 交互环境
+├── ops/                 # 内置操作实现模块
+│   ├── __init__.py      # 模块文档
 │   ├── control_ops.py
 │   ├── math_ops.py
 │   ├── string_ops.py
@@ -355,26 +342,27 @@ sanyan/
 │   ├── file_ops.py
 │   ├── type_ops.py
 │   ├── json_ops.py
-│   └── iot_ops.py
-├── tools/             # 辅助开发工具
+│   ├── iot_ops.py
+│   └── device_registry.py  # 设备注册表
+├── tools/               # 辅助开发工具
 │   ├── fix_quotes.py
 │   ├── fix_strings.py
 │   └── convert_to_fullwidth.py
-├── language/          # 皮肤文件（chinese.json / english.json）
-├── examples/          # 示例（每个示例提供糖语法 + S 表达式双版本）
+├── language/            # 皮肤文件（chinese.json / english.json）
+├── examples/            # 示例（糖语法 + S 表达式双版本）
 │   ├── greenhouse.san / greenhouse_se.san
 │   ├── voting.san / voting_se.san
 │   ├── data_clean.san / data_clean_se.san
 │   └── sensor_pipeline_simple.san / sensor_pipeline_simple_se.san
-├── stdlib/            # 标准库（math, string, list, iot, logic, io, test）
-├── tests/             # 自动测试（每个测试提供糖语法 + S 表达式双版本）
-│   ├── run_all.py     # 测试运行器
-│   ├── test_core.py   # Python 单测（三进制核心/作用域/异常体系）
-│   ├── test_*.san     # 糖语法测试
-│   ├── test_*_se.san  # S 表达式测试（对照学习）
+├── stdlib/              # 标准库（math, string, list, iot, logic, io, test）
+├── tests/               # 自动测试（双版本）
+│   ├── run_all.py       # 测试运行器
+│   ├── test_core.py     # Python 单测（三进制核心/作用域/异常体系）
+│   ├── test_*.san       # 糖语法测试
+│   ├── test_*_se.san    # S 表达式对照测试
 │   ├── regression.san / regression_se.san
-│   └── test_parser.py # 解析器回归测试
-└── docs/              # 语言手册
+│   └── test_parser.py   # 解析器回归测试 23 项
+└── docs/                # 语言手册
 ```
 
 ## 三态词表
