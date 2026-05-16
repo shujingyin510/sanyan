@@ -1,14 +1,34 @@
-"""三言 —— 中文三进制编程语言 v3.10.0（主入口）"""
+"""三言 —— 中文三进制编程语言（主入口）"""
 import sys
 from repl import demo, repl
+from VERSION import VERSION
 from evaluator import SanyanEvaluator
 from sugar import SugarConverter
 from ternary_core import TritValue
 from skin import SkinManager
 
 def main():
-    if len(sys.argv) > 1:
-        filepath = sys.argv[1]
+    args = sys.argv[1:]
+
+    # --ast-json 标志：输出 AST JSON 并退出
+    if '--ast-json' in args:
+        idx = args.index('--ast-json')
+        if idx + 1 >= len(args):
+            print("错误: --ast-json 需要文件路径")
+            sys.exit(1)
+        filepath = args[idx + 1]
+        from ast_json import ast_from_file, ast_to_json
+        ast = ast_from_file(filepath)
+        import json
+        print(json.dumps(ast_to_json(ast), ensure_ascii=False, indent=2))
+        sys.exit(0)
+
+    # --profile 标志
+    profiling = '--profile' in args
+    positional = [a for a in args if not a.startswith('--')]
+
+    if positional:
+        filepath = positional[0]
         try:
             with open(filepath, 'r', encoding='utf-8') as f:
                 code = f.read()
@@ -27,6 +47,8 @@ def main():
 
         skin_mgr = SkinManager('chinese')
         env = SanyanEvaluator(skin_manager=skin_mgr)
+        if profiling:
+            env.profile_start()
 
         ast = None
         sugar_error = None
@@ -58,6 +80,9 @@ def main():
             print(f"执行错误: {e}")
             sys.exit(1)
 
+        if profiling:
+            print(env.profile_report())
+
         if result is not None:
             def _has_output_like(node):
                 if isinstance(node, list) and len(node) > 0:
@@ -78,7 +103,7 @@ def main():
                     print(f"结果: {result}")
         sys.exit(0)
     else:
-        print("欢迎来到「三言 v3.10.0」—— 母语可定制的三进制编程语言")
+        print(f"欢迎来到「三言 v{VERSION}」—— 母语可定制的三进制编程语言")
         print("=" * 50)
         demo(SkinManager('chinese'))
         repl()

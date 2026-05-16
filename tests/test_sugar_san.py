@@ -286,6 +286,30 @@ class TestSugarSanPythonCompat(unittest.TestCase):
     def test_nested_compat(self):
         self._compare_ast_loose('加(1, 乘(2, 3))')
 
+    def test_if_compat(self):
+        self._compare_ast_loose('若 (1 等于 2) { 输出("no") }')
+
+    def test_if_else_compat(self):
+        self._compare_ast_loose('若 (1 等于 2) { 输出("yes") } 其余 { 输出("no") }')
+
+    def test_fn_def_compat(self):
+        self._compare_ast_loose('定义 f(x) { 返回 x }')
+
+    def test_set_var_compat(self):
+        self._compare_ast_loose('设 x = 42')
+
+    def test_loop_compat(self):
+        self._compare_ast_loose('设 i = 0\n循环 (i < 10) { i = i + 1 }')
+
+    def test_annotation_compat(self):
+        self._compare_ast_loose('定义 f(a: 数字) { 返回 a }')
+
+    def test_and_or_compat(self):
+        self._compare_ast_loose('若 (真 且 假) { 输出("nope") }')
+
+    def test_not_compat(self):
+        self._compare_ast_loose('若 (非 真) { 输出("no") }')
+
 
 if __name__ == '__main__':
     unittest.main()

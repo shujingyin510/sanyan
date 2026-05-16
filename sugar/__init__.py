@@ -5,13 +5,20 @@
 from sugar.parser import parse_code
 from sugar.lexer import tokenize
 
+_last_comments: list[str] = []
+
 
 class SugarConverter:
     @staticmethod
     def convert(code: str, skin_mgr=None) -> list:
-        ast = parse_code(code, skin_mgr)
+        global _last_comments
+        ast, _last_comments = parse_code(code, skin_mgr)
         return ast
 
     @staticmethod
     def tokenize(code: str, skin_mgr=None) -> list:
         return tokenize(code)
+
+    @staticmethod
+    def get_last_comments() -> list[str]:
+        return _last_comments

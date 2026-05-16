@@ -2,25 +2,78 @@
 import os
 from lexer import tokenize
 from parser import parse
+from VERSION import VERSION
 from evaluator import SanyanEvaluator
 from sugar import SugarConverter
 from skin import SkinManager
 from runtime import BUILTIN_OPS
 from ops.io_ops import IOOps
 
+try:
+    from colorama import init, Fore, Style
+    init(autoreset=True)
+    _COLOR = True
+except ImportError:
+    _COLOR = False
+
+
+def _c(text: str, color: str = "") -> str:
+    """简单着色包装。"""
+    if not _COLOR:
+        return text
+    color_map = {
+        "green": Fore.GREEN, "red": Fore.RED, "yellow": Fore.YELLOW,
+        "blue": Fore.BLUE, "cyan": Fore.CYAN, "magenta": Fore.MAGENTA,
+        "reset": Style.RESET_ALL,
+    }
+    return color_map.get(color, "") + text + Style.RESET_ALL
+
+
+def _color_value(value) -> str:
+    """根据值类型着色输出。"""
+    try:
+        from ternary_core import TritValue
+        if value is None:
+            return _c("无", "cyan")
+        if isinstance(value, TritValue):
+            n = value.to_int()
+            if n > 0:
+                return _c(str(n), "green")
+            elif n < 0:
+                return _c(str(n), "red")
+            else:
+                return _c(str(n), "yellow")
+        if isinstance(value, str):
+            return _c(repr(value), "cyan")
+        if isinstance(value, (int, float)):
+            return _c(str(value), "blue")
+        if isinstance(value, list):
+            return _c(f"[{len(value)} 项]", "yellow")
+        return str(value)
+    except ImportError:
+        return str(value)
+
 # REPL 历史记录
-_history_file = os.path.expanduser('~/.sanyan_history')
+_history_file = os.path.expanduser(os.path.join(
+    os.path.expanduser('~'), '.sanyan_history'
+))
 try:
     import readline
     readline.set_history_length(1000)
     if os.path.exists(_history_file):
         readline.read_history_file(_history_file)
 except ImportError:
-    readline = None
+    try:
+        import pyreadline3 as readline
+        readline.set_history_length(1000)
+        if os.path.exists(_history_file):
+            readline.read_history_file(_history_file)
+    except ImportError:
+        readline = None
 
 
 def demo(skin_mgr: SkinManager) -> None:
-    print("\n========== 三言 v3.10.0 演示 ==========")
+    print(f"\n========== 三言 v{VERSION} 演示 ==========")
     env = SanyanEvaluator(skin_manager=skin_mgr)
 
     # 1. 智能设备控制
@@ -90,7 +143,8 @@ def _make_completer(env):
             if name.startswith(text):
                 matches.append(name)
         # REPL 命令
-        for cmd in [':lang', ':maxloop', 'exit', '退出']:
+        for cmd in [':lang', ':maxloop', ':step', ':continue', ':break', ':unbreak',
+                     ':watch', ':unwatch', ':profile', 'exit', '退出']:
             if cmd.startswith(text):
                 matches.append(cmd)
         matches.sort()
@@ -108,9 +162,10 @@ def repl() -> None:
         readline.set_completer(_make_completer(env))
         readline.parse_and_bind('tab: complete')
 
-    print("三言 v3.10.0 REPL (母语可定制)")
-    print("输入 切换英文/:lang english 切换英文，切换中文/:lang chinese 切换中文")
-    print("输入 退出/exit 离开，Tab 键自动补全")
+    print(f"三言 v{VERSION} REPL (母语可定制)")
+    print("输入 :lang english 切换英文，:lang chinese 切换中文")
+    print("输入 :step 单步调试  :break <函数名> 添加断点  :watch <变量> 监视变量")
+    print("输入 :profile 查看性能  exit/退出 离开，Tab 键自动补全")
     while True:
         try:
             code = input("三言> ").strip()
@@ -146,6 +201,51 @@ def repl() -> None:
                         print(f"皮肤已切换至 {skin_mgr.lang}")
                     else:
                         print("支持的语言：chinese/中文, english/英文")
+                continue
+            if code == ':step':
+                env.debug_mode = not env.debug_mode
+                env._break_all = env.debug_mode
+                print(f"单步模式: {'开' if env.debug_mode else '关'}")
+                continue
+            if code == ':continue' or code == ':c':
+                env.debug_mode = False
+                env._break_all = False
+                print("调试模式: 关")
+                continue
+            if code.startswith(':break'):
+                parts = code.split(maxsplit=1)
+                if len(parts) == 2:
+                    env.break_add(parts[1])
+                    print(f"断点已添加: {parts[1]}")
+                else:
+                    print("用法: :break <函数名>")
+                continue
+            if code.startswith(':unbreak'):
+                parts = code.split(maxsplit=1)
+                if len(parts) == 2:
+                    env.break_remove(parts[1])
+                    print(f"断点已移除: {parts[1]}")
+                continue
+            if code.startswith(':watch'):
+                parts = code.split(maxsplit=1)
+                if len(parts) == 2:
+                    env.watch_add(parts[1])
+                    print(f"监视已添加: {parts[1]}")
+                else:
+                    print("用法: :watch <变量名>")
+                continue
+            if code.startswith(':unwatch'):
+                parts = code.split(maxsplit=1)
+                if len(parts) == 2:
+                    env.watch_remove(parts[1])
+                    print(f"监视已移除: {parts[1]}")
+                continue
+            if code == ':profile':
+                if env._profiling:
+                    print(env.profile_report())
+                else:
+                    env.profile_start()
+                    print("性能追踪已开启")
                 continue
 
             # 多行输入支持
@@ -201,13 +301,14 @@ def repl() -> None:
                 if should_print:
                     try:
                         formatted = IOOps.format_value(result)
-                        print(f"  => {formatted}")
+                        colored = _color_value(result)
+                        print(f"  => {colored}" if _COLOR else f"  => {formatted}")
                     except Exception:
                         print(f"  => {result}")
         except KeyboardInterrupt:
             print("\n  操作已中断。")
         except Exception as e:
-            print(f"  错误: {e}")
+            print(f"  {_c('错误', 'red')}: {e}")
             print(f"    输入内容: {code}")
 
     # 保存历史记录

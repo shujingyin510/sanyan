@@ -51,14 +51,51 @@ class SanyanAttributeError(AttributeError, SanyanError):
 class ContinueException(Exception):
     pass
 
-class FunctionValue:
-    __slots__ = ('params', 'body', 'evaluator', 'closure_vars')
 
-    def __init__(self, params: list, body: list, evaluator=None, closure_vars: Optional[dict] = None) -> None:
+class SrcNode(list):
+    """带源码位置的 AST 节点。isinstance(node, list) 依然为 True。"""
+    __slots__ = ('line', 'col')
+
+    def __new__(cls, items=(), line=0, col=0):
+        obj = super().__new__(cls, items)
+        obj.line = line
+        obj.col = col
+        return obj
+
+def check_type(value, expected_type: str, param_name: str = "") -> None:
+    """检查值是否符合预期类型，不符则抛出 SanyanTypeError。"""
+    type_checks = {
+        '数字': lambda v: isinstance(v, TritValue),
+        '字符串': lambda v: isinstance(v, str),
+        '列表': lambda v: isinstance(v, list),
+        '字典': lambda v: isinstance(v, dict),
+        '布尔': lambda v: isinstance(v, TritValue) and v.to_int() in (1, -1),
+        '三态': lambda v: isinstance(v, TritValue),
+    }
+    if expected_type in type_checks:
+        if not type_checks[expected_type](value):
+            actual_type = '未知'
+            if isinstance(value, TritValue):
+                actual_type = '数字'
+            elif isinstance(value, str):
+                actual_type = '字符串'
+            elif isinstance(value, list):
+                actual_type = '列表'
+            elif isinstance(value, dict):
+                actual_type = '字典'
+            label = f"参数 '{param_name}' " if param_name else ""
+            raise SanyanTypeError(f"{label}期望类型 '{expected_type}'，但得到 '{actual_type}'")
+
+
+class FunctionValue:
+    __slots__ = ('params', 'body', 'evaluator', 'closure_vars', 'param_types')
+
+    def __init__(self, params: list, body: list, evaluator=None, closure_vars: Optional[dict] = None, param_types: Optional[dict] = None) -> None:
         self.params = params
         self.body = body
         self.evaluator = evaluator
         self.closure_vars = closure_vars
+        self.param_types = param_types or {}
 
     def call(self, evaluator, args: list) -> TritValue:
         if len(args) != len(self.params):
@@ -72,11 +109,12 @@ class FunctionValue:
                 evaluator.set_var(k, v)
 
         for param, arg_node in zip(self.params, args):
-            # 如果参数已经是值类型，直接使用；否则求值
             if isinstance(arg_node, (TritValue, ArrayValue, str, int, list, dict)):
                 val = arg_node
             else:
                 val = evaluator.eval(arg_node)
+            if param in self.param_types:
+                check_type(val, self.param_types[param], param)
             evaluator.set_var(param, val)
 
         try:

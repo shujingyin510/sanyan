@@ -1,0 +1,27 @@
+定义 is_prime(n) {
+  若 (n < 2) {
+    返回 假
+  }
+  设 i = 2
+  循环 (i * i <= n) {
+    若 (n % i == 0) {
+      返回 假
+    }
+    i = i + 1
+  }
+  返回 真
+}
+
+定义 count_primes(limit) {
+  设 count = 0
+  设 n = 2
+  循环 (n <= limit) {
+    若 (is_prime(n)) {
+      count = count + 1
+    }
+    n = n + 1
+  }
+  返回 count
+}
+
+输出(count_primes(5000))

@@ -1,10 +1,12 @@
 """求值器主类：组合运行环境、内置操作、自定义命令"""
 from __future__ import annotations
+import time
+import sys
 from typing import Any
 from ternary_core import TritValue, ArrayValue
 from runtime import SanyanRuntime
 from commands import Commands
-from values import FunctionValue, ModuleValue, SanyanNameError
+from values import FunctionValue, ModuleValue, SrcNode, SanyanNameError, SanyanError
 from values import SanyanSyntaxError, SanyanTypeError, SanyanKeyError, SanyanAttributeError, SanyanRuntimeError
 
 
@@ -48,22 +50,29 @@ class SanyanEvaluator(SanyanRuntime):
         raise SanyanRuntimeError(f"不支持的节点类型: {type(node).__name__}，内容: {ctx}")
 
     def _eval_list(self, node: list) -> Any:
+        if len(node) == 0:
+            return None
+        # 单元素列表：仅数值/字符串字面量直接求值，其他走 op 分派
         if len(node) == 1 and isinstance(node[0], str):
             s = node[0]
-            if s.isdigit() or (s.startswith('-') and s[1:].isdigit()):
-                return TritValue(int(s))
-            try:
-                return TritValue(float(s))
-            except ValueError:
-                pass
+            if len(s) >= 2 and s[0] in ('"', '\u201c', '\u2018', "'"):
+                return self._parse_string_literal(s[1:-1])
+            if s.replace('.', '', 1).replace('-', '', 1).isdigit():
+                return TritValue(float(s)) if '.' in s else TritValue(int(s))
         first = node[0]
         if isinstance(first, FunctionValue):
-            args = [self.eval(a) for a in node[1:]]
-            return first.call(self, args)
+            return Commands.call(self, first.func_name, first.args)
         if isinstance(first, ModuleValue):
-            evaluated_args = [self.eval(a) for a in node[1:]]
-            return first.call(self, evaluated_args)
-        return self._apply(node[0], node[1:])
+            target, method = node[1], node[2:]
+            return first.get_attr(target)(self, method)
+        try:
+            return self._apply(first, node[1:])
+        except SanyanError as e:
+            if isinstance(node, SrcNode) and (node.line or node.col):
+                pos_msg = f"第{node.line}行第{node.col}列: {e}"
+                if not e.args or not e.args[0].startswith('第'):
+                    e.args = (pos_msg,)
+            raise
 
     def _parse_string_literal(self, s: str) -> str:
         """解析字符串字面量的转义序列"""
@@ -181,18 +190,88 @@ class SanyanEvaluator(SanyanRuntime):
                 return val
         raise SanyanNameError(f"未定义的设备: {obj}")
 
+    def _pos(self, node) -> str:
+        """如果节点有源码位置，返回位置前缀。"""
+        if isinstance(node, SrcNode) and (node.line or node.col):
+            return f"第 {node.line} 行，第 {node.col} 列: "
+        return ""
+
     def _apply(self, op: str, args: list) -> TritValue:
         internal = self._resolve_op_name(op)
-        result = self._dispatch_op(internal, args)
-        if result is not None:
-            return result
-        result = self._handle_dot_access(op, args)
-        if result is not None:
-            return result
-        result = self._handle_variable_call(op, args)
-        if result is not None:
-            return result
-        return Commands.call(self, op, args)
+        self._debug_before(internal, op, args)
+        if self._profiling:
+            t0 = time.perf_counter()
+        try:
+            result = self._dispatch_op(internal, args)
+            if result is not None:
+                return result
+            result = self._handle_dot_access(op, args)
+            if result is not None:
+                return result
+            result = self._handle_variable_call(op, args)
+            if result is not None:
+                return result
+            return Commands.call(self, op, args)
+        finally:
+            if self._profiling:
+                dt = time.perf_counter() - t0
+                name = internal or op
+                if name not in self._profile:
+                    self._profile[name] = {"count": 0, "time": 0.0}
+                self._profile[name]["count"] += 1
+                self._profile[name]["time"] += dt
+            self._debug_after(internal, op, args)
+
+    def _debug_before(self, internal: str, op: str, args: list) -> None:
+        if not self.debug_mode:
+            return
+        if not self._break_all and op not in self._break_ops and internal not in self._break_ops:
+            return
+        self._debug_prompt(internal or op, args)
+
+    def _debug_after(self, internal: str, op: str, args: list) -> None:
+        if not self._watched_vars:
+            return
+        name = internal or op
+        if name in self._watched_vars:
+            return
+        for v in self._watched_vars:
+            if self.has_var(v):
+                print(f"  [监视] {v} = {self.get_var(v)}")
+
+    def _debug_prompt(self, cur_op: str, args: list) -> None:
+        from ops.io_ops import IOOps
+        fargs = ', '.join(IOOps.format_value(a) if not isinstance(a, str) else a for a in args)
+        print(f"\n⏸ [断点] {cur_op}({fargs})")
+        while True:
+            try:
+                cmd = input("调试> ").strip()
+            except (KeyboardInterrupt, EOFError):
+                print()
+                self.debug_mode = False
+                return
+            if cmd in ('', 'n', 'next'):
+                return
+            if cmd in ('c', 'continue'):
+                self.debug_mode = False
+                return
+            if cmd.startswith('p ') or cmd.startswith('print '):
+                var = cmd.split(maxsplit=1)[1].strip()
+                if self.has_var(var):
+                    val = self.get_var(var)
+                    print(f"  {var} = {IOOps.format_value(val) if not isinstance(val, str) else val}")
+                else:
+                    print(f"  {var}: 未定义")
+            elif cmd == 'bt':
+                print("\n  === 调用栈 ===")
+                for oname, oargs in self.call_stack:
+                    fa = ', '.join(str(a) for a in oargs)
+                    print(f"    at {oname}({fa})")
+                print("  =============")
+            elif cmd == 'q':
+                sys.exit(0)
+            else:
+                print("  命令: [Enter]/n=下一步  c=继续  p 变量  bt=调用栈  q=退出")
 
     def _resolve_op_name(self, op: str) -> str:
         cached = self._name_cache.get(op)

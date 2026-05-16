@@ -5,6 +5,7 @@ import os
 from typing import Optional, Any
 from sugar.lexer import Token, tokenize
 from sugar.errors import SugarErrorReporter
+from values import SrcNode
 
 
 def _build_keyword_map() -> dict[str, str]:
@@ -84,11 +85,31 @@ class _Parser:
         self.pos = 0
         self.reporter = reporter
         self.source = source
+        self._comments: list[str] = []
+
+    def _node(self, items: list, tok: Optional[Token] = None) -> SrcNode:
+        if tok is None:
+            tok = self.tokens[max(0, min(self.pos - 1, len(self.tokens) - 1))] if self.tokens else Token('', '', 0, 0)
+        return SrcNode(items, line=tok.line, col=tok.col)
+
+    def _wrap(self, items):
+        """Wrap list returns with SrcNode when they are plain lists."""
+        if isinstance(items, list) and not isinstance(items, SrcNode):
+            tok = self.peek() or (self.tokens[-1] if self.tokens else Token('', '', 0, 0))
+            return SrcNode(items, line=tok.line, col=tok.col)
+        return items
+
+    def _skip_comments(self) -> None:
+        while self.pos < len(self.tokens) and self.tokens[self.pos].kind == 'COMMENT':
+            self._comments.append(self.tokens[self.pos].value)
+            self.pos += 1
 
     def peek(self) -> Optional[Token]:
+        self._skip_comments()
         return self.tokens[self.pos] if self.pos < len(self.tokens) else None
 
     def advance(self) -> Optional[Token]:
+        self._skip_comments()
         tok = self.peek()
         if tok:
             self.pos += 1
@@ -202,18 +223,22 @@ class _Parser:
             self.advance()
             name = self.advance()
             params = []
+            param_types = {}
             if self.peek() and self.peek().value == '(':
                 self.advance()
                 while self.peek() and self.peek().value != ')':
                     p = self.advance()
                     if self.peek() and self.peek().value == ':':
                         self.advance()
-                        self.advance()
+                        t = self.advance()
+                        param_types[p.value] = t.value
                     params.append(p.value)
                     if self.peek() and self.peek().value == ',':
                         self.advance()
                 self._expect(')')
             body = self.parse_block()
+            if param_types:
+                return ['fn', name.value, params, param_types, body]
             return ['fn', name.value, params, body]
 
         if kw == 'return':
@@ -466,12 +491,46 @@ class _Parser:
         return tok.value
 
 
+def _annotate_ast(ast, tokens):
+    """Post-process: wrap list nodes with SrcNode using token positions.
+
+    Walks the AST and for each list node, finds its first string element
+    and looks up the matching token's position.
+    """
+    if not tokens:
+        return ast
+
+    # Build quick lookup: first occurrence of each string value
+    first_pos = {}
+    for tok in tokens:
+        if tok.kind != 'COMMENT' and tok.value not in first_pos:
+            first_pos[tok.value] = (tok.line, tok.col)
+
+    def _walk(node):
+        if isinstance(node, list) and not isinstance(node, SrcNode):
+            line, col = 0, 0
+            if node and isinstance(node[0], str) and node[0] in first_pos:
+                line, col = first_pos[node[0]]
+            wrapped = SrcNode(node, line=line, col=col)
+            for i, child in enumerate(wrapped):
+                wrapped[i] = _walk(child)
+            return wrapped
+        if isinstance(node, list):
+            for i, child in enumerate(node):
+                node[i] = _walk(child)
+        return node
+
+    return _walk(ast)
+
+
 def parse_tokens(tokens: list[Token], reporter: SugarErrorReporter, source: str = "") -> Any:
     parser = _Parser(tokens, reporter, source)
-    return parser.parse_program()
+    ast = parser.parse_program()
+    ast = _annotate_ast(ast, tokens)
+    return ast, parser._comments
 
 
-def parse_code(code: str, skin_mgr=None) -> Any:
+def parse_code(code: str, skin_mgr=None) -> tuple[Any, list[str]]:
     reporter = SugarErrorReporter(code)
     tokens = tokenize(code)
 
@@ -486,6 +545,6 @@ def parse_code(code: str, skin_mgr=None) -> Any:
                 elif internal_op:
                     tok.value = internal_op
 
-    ast = parse_tokens(tokens, reporter, code)
+    ast, comments = parse_tokens(tokens, reporter, code)
     reporter.raise_if_any()
-    return ast
+    return ast, comments

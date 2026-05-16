@@ -5,17 +5,36 @@
 ## [v3.10.0] — 2026-05-16
 
 ### 新增
-- **5 个 stdlib 文件文档** (`docs/manual.md` 第 15 节): 新增 `stat.san`（三态统计）、`tokenize.san`（词法分析器）、`parse.san`（S 表达式解析器）、`eval.san`（元循环求值器）、`sugar.san`（糖语法解析器）的 API 说明。
-- **3 个互动示例** (`examples/`): `text_analysis.san`（文本分析）、`guess_number.san`（猜数字游戏）、`fizzbuzz.san`（FizzBuzz）——验证糖语法、作用域、逻辑判断、异常处理、字典操作、`含键`/`计数` 等特性。
-- **新功能测试** (`tests/test_new_features.san`, `tests/test_new_features_se.san`): 含键、计数、范围、字典键存在检查、浮点数序列化。
+- **类型标注系统**: `values.py:check_type()` 函数，`FunctionValue.param_types`，糖语法解析器保留 `a: 数字` 标注，`commands.py` 调用时自动校验参数类型。
+- **文档注释 → LSP Hover**: `lsp_server.py:_extract_docstrings()` 正则提取 `//` 注释块 + `定义 funcName(` → Markdown hover 提示。
+- **性能剖析**: `runtime.py` 新增 `profile_start/stop/report()`，`evaluator._apply` 通过 `try/finally` 计时，`main.py --profile` 标志，REPL `:profile` 命令。
+- **表达式断点调试**: `runtime.py` 新增 `debug_mode`、`break_add/remove`、`watch_add/remove`，`evaluator._debug_before/after` 钩子 + `调试>` 交互提示，REPL `:step/:break/:watch/:continue` 命令。
+- **AST 序列化**: `ast_json.py` 新增 `ast_to_json()` / `ast_from_file()`，`main.py --ast-json FILE` 导出 JSON。
+- **源码格式化器**: `sanfmt.py` — 类 black/prettier 格式器，中缀二元运算、中文关键字显示、if-elif-else 链、`a: 类型` 标注保留、`--check` 模式、stdin 模式、幂等输出。
+- **注释保留**: 糖语法词法分析器新增 `COMMENT` token 发射，解析器 `_Parser.peek/advance` 跳过注释并收集到 `_comments` 列表，`sanfmt.py` 通过 `_reinsert_inline_comments()` 恢复行内和独立 `//` 注释。
+- **SrcNode 源码位置**: `values.SrcNode` (list 子类，带 `line/col`)，`sugar/parser.py:_annotate_ast()` 后处理 AST 注入位置，`evaluator._eval_list` 异常时自动注入「第N行第M列」前缀。
+- **LSP 增强** (`lsp_server.py`): 新增 `documentFormattingProvider`（接入 sanfmt）、`documentSymbolProvider`（函数+变量）、`foldingRangeProvider`（{} 块）、`referencesProvider`（符号引用查找）、`renameProvider`（批量重命名）、语义补全（用户定义变量/函数）、诊断增强（重复参数检测）。
+- **LSP 跳转到变量定义** (`lsp_server.py`): `_do_definition` 现在同时支持 `设 var =` 和 `定义 func(` 的跳转。
+- **DAP 调试适配器** (`dap_server.py`): 完整的 DAP 协议服务器，支持 VS Code 断点/单步/变量查看/栈帧/continue/next/stepIn。
+- **性能基准套件** (`benchmark/`): fib/primes/fizzbuzz/fib_iter 基准文件 + `run_benchmark.py`（`--quick` / `--profile`）。
+- **包管理器 URL 白名单** (`ops/package_ops.py`): `PACKAGE_ALLOWLIST` 限制允许的下载域名。
+- **模块相对路径** (`preprocess.py`): `#include "../lib.san"` 支持 `../` 相对路径解析，`_resolve_include_path()` 做越界安全检查，递归展开传递 `_base_dir`。
+- **REPL 历史持久化** (`repl.py`): Windows 下自动尝试 `pyreadline3` 回退链。
+- **REPL 语法高亮** (`repl.py`): 检测 `colorama`，按值类型着色输出（绿=正数、红=负数、黄=零、青=字符串）。
+- **sugar.san 对比测试** (`tests/test_sugar_san.py`): 新增 8 个 Python 兼容性测试（if/else/fn/set/loop/annotation/and/or/not）。
 
 ### 修复
-- **全角负号解析** (`sugar/lexer.py:123`): NEGATIVE NUMBER 词法单元中的全角减号 `－` 现在正确转换为半角 `-`。
-- **test_fullwidth.san** (`tests/test_fullwidth.san`): 重写为完整的全角字符测试套件，覆盖全角数字/运算符/注释/方括号。
+- **LSP 括号配对映射**: `} → {` 修正。
+- **全角冒号词法分析器**: 全角冒号不触发操作符误判。
+- **list_sum 类型错误**: 修复 list_sum 的 TritValue 类型检查。
+- **测试缺失导入**: `test_ops.py`、`test_iot.py` 补充缺失导入。
+- **fizzbuzz for 参数**: 起始值从 0 修正为 1。
+- **`_safe_include_path` 向后兼容**: 保留旧函数别名。
 
 ### 文档
-- **stdlib 文档补全**: `docs/manual.md` 新增 5 个缺失 stdlib 模块的 API 参考。
-- **run_all.py 更新**: `tests/run_all.py` 新增新示例，共 35 项集成测试。
+- **README.md**: 新增 v3.10.0 特性表格、更新测试数量（44→52, 66→78, 22→28）、路线图补充、文件树补充 `benchmark/`。
+- **CONTRIBUTING.md**: `sugar.py` 引用更新为 `sugar/` 包。
+- **AGENTS.md, CONTRIBUTING.md**: 测试数量同步更新。
 
 ---
 

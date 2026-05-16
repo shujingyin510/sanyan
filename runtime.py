@@ -66,6 +66,14 @@ class SanyanRuntime:
         self.max_call_depth: int = 200
         self.skin_manager: Any = skin_manager
         self.call_stack: List[Any] = []
+        # 性能追踪
+        self._profiling: bool = False
+        self._profile: Dict[str, dict] = {}
+        # 断点调试
+        self.debug_mode: bool = False
+        self._break_all: bool = False
+        self._break_ops: set = set()
+        self._watched_vars: set = set()
 
     @property
     def scope_vars(self):
@@ -129,5 +137,42 @@ class SanyanRuntime:
                 raise SanyanSyntaxError(f"无法解析的批量设置项: 从 {items[i]} 开始")
             pairs.append((obj, val))
         return pairs
+
+    # --- 性能追踪 ---
+    def profile_start(self) -> None:
+        self._profiling = True
+        self._profile = {}
+
+    def profile_stop(self) -> dict:
+        self._profiling = False
+        return dict(self._profile)
+
+    def profile_report(self) -> str:
+        if not self._profile:
+            return "(无性能数据)"
+        lines = ["\n=== 性能追踪 ===",
+                 f"{'操作':<16} {'调用次数':<10} {'总耗时(ms)':<12} {'平均(ms)':<10}"]
+        items = sorted(self._profile.items(), key=lambda x: -x[1]['time'])
+        for name, d in items:
+            count = d['count']
+            total_ms = d['time'] * 1000
+            avg_ms = total_ms / count if count else 0
+            lines.append(f"{name:<16} {count:<10} {total_ms:<12.3f} {avg_ms:<10.3f}")
+        lines.append("=" * 48)
+        return '\n'.join(lines)
+
+    # --- 断点调试 ---
+    def break_add(self, name: str) -> None:
+        self._break_ops.add(name)
+        self.debug_mode = True
+
+    def break_remove(self, name: str) -> None:
+        self._break_ops.discard(name)
+
+    def watch_add(self, name: str) -> None:
+        self._watched_vars.add(name)
+
+    def watch_remove(self, name: str) -> None:
+        self._watched_vars.discard(name)
 
     # _eval_symbol 已移至 evaluator.py（求值逻辑归属求值器）

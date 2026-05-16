@@ -66,18 +66,28 @@ def tokenize(code: str) -> list[Token]:
         if c == '/' and i + 1 < length:
             next_c = code[i + 1]
             if next_c == '/' or next_c == '／':
+                start_col = col
                 i += 2
                 col += 2
+                text = ''
                 while i < length and code[i] != '\n':
+                    text += code[i]
                     i += 1
+                    col += 1
+                tokens.append(Token('COMMENT', text, line, start_col))
                 continue
 
         # Comments: #
         if c == '#':
+            start_col = col
             i += 1
             col += 1
+            text = ''
             while i < length and code[i] != '\n':
+                text += code[i]
                 i += 1
+                col += 1
+            tokens.append(Token('COMMENT', text, line, start_col))
             continue
 
         # Strings: "..." 、「...」、『...』、'...'

@@ -1,6 +1,6 @@
 """自定义命令：定义与调用"""
 from typing import Any
-from values import ReturnException, SanyanError, SanyanSyntaxError, SanyanNameError, SanyanRuntimeError
+from values import ReturnException, SanyanError, SanyanSyntaxError, SanyanNameError, SanyanRuntimeError, check_type
 from ternary_core import TritValue
 from ops.registry import register
 
@@ -25,31 +25,6 @@ class Commands:
             body = args[2:]
         evaluator.commands[cmd_name] = (params, body, param_types)
         return TritValue(0)
-
-    @staticmethod
-    def _check_type(value: Any, expected_type: str, param_name: str) -> None:
-        """检查值是否符合预期类型"""
-        from values import SanyanTypeError
-        type_checks = {
-            '数字': lambda v: isinstance(v, TritValue),
-            '字符串': lambda v: isinstance(v, str),
-            '列表': lambda v: isinstance(v, list),
-            '字典': lambda v: isinstance(v, dict),
-            '布尔': lambda v: isinstance(v, TritValue) and v.to_int() in (1, -1),
-            '三态': lambda v: isinstance(v, TritValue),
-        }
-        if expected_type in type_checks:
-            if not type_checks[expected_type](value):
-                actual_type = '未知'
-                if isinstance(value, TritValue):
-                    actual_type = '数字'
-                elif isinstance(value, str):
-                    actual_type = '字符串'
-                elif isinstance(value, list):
-                    actual_type = '列表'
-                elif isinstance(value, dict):
-                    actual_type = '字典'
-                raise SanyanTypeError(f"参数 '{param_name}' 期望类型 '{expected_type}'，但得到 '{actual_type}'")
 
     @staticmethod
     def _is_tail_call(expr: list, func_name: str) -> bool:
@@ -148,7 +123,7 @@ class Commands:
             else:
                 value = evaluator.eval(arg_node)
             if param in param_types:
-                Commands._check_type(value, param_types[param], param)
+                check_type(value, param_types[param], param)
             evaluated.append(value)
         return evaluated
 

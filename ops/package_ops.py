@@ -8,6 +8,13 @@ from ops.registry import register
 
 PACKAGES_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "packages")
 PACKAGE_INDEX_URL = "https://raw.githubusercontent.com/shujingyin510/sanyan-packages/main/index.json"
+PACKAGE_ALLOWLIST: set[str] = {
+    "github.com",
+    "raw.githubusercontent.com",
+    "gitlab.com",
+    "gitee.com",
+}
+"""允许的包下载域名白名单。空 set 表示不限制。"""
 _installed_cache: dict[str, bool] = {}
 _index_cache = None  # (timestamp, index_data)
 
@@ -62,6 +69,15 @@ class PackageOps:
         if url:
             if not url.startswith('https://'):
                 raise SanyanValueError(f"安装包仅支持 HTTPS 地址: {url}")
+            # 白名单检查
+            if PACKAGE_ALLOWLIST:
+                from urllib.parse import urlparse
+                hostname = urlparse(url).hostname
+                if hostname and not any(hostname.endswith(domain) for domain in PACKAGE_ALLOWLIST):
+                    raise SanyanValueError(
+                        f"域名 '{hostname}' 不在下载白名单中。"
+                        f"允许的域名: {', '.join(sorted(PACKAGE_ALLOWLIST))}"
+                    )
             PackageOps._download_and_install(name, url)
         else:
             # 尝试从索引查找

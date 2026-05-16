@@ -35,17 +35,14 @@ class TestCommandsDefine(unittest.TestCase):
 
 
 class TestCheckType(unittest.TestCase):
-    def setUp(self):
-        self.env = SanyanEvaluator(skin_manager=SkinManager('chinese'))
-
     def test_type_check_passes(self):
-        from commands import Commands
-        Commands._check_type(TritValue(42), '数字', 'x')
+        from values import check_type
+        check_type(TritValue(42), '数字', 'x')
 
     def test_type_check_fails(self):
-        from commands import Commands
+        from values import check_type
         with self.assertRaises(SanyanTypeError):
-            Commands._check_type("hello", '数字', 'x')
+            check_type("hello", '数字', 'x')
 
 
 class TestMatchParams(unittest.TestCase):

@@ -3,24 +3,48 @@ import os
 from typing import Optional
 
 
-def _safe_include_path(raw_path: str) -> None:
+def _resolve_include_path(raw_path: str, base_dir: str = None) -> str:
+    """解析 #include 路径，支持 ../ 相对路径。
+
+    安全检查：最终绝对路径必须在项目根目录内。
+    """
+    if base_dir is None:
+        base_dir = os.path.dirname(os.path.abspath(__file__))
+    project_root = os.path.abspath(base_dir)
+
+    # 标准化路径：允许 ../ 但防止越界
     normalized = raw_path.replace('\\', '/')
-    if '..' in normalized.split('/'):
-        raise ValueError(f"#include 路径不允许包含 '..': {raw_path}")
-    abspath = os.path.abspath(normalized)
-    project_root = os.path.abspath(os.path.join(os.path.dirname(__file__)))
-    if not abspath.startswith(project_root):
-        raise ValueError(f"#include 路径不在项目目录内: {raw_path}")
+    if not normalized.endswith('.san'):
+        cand = os.path.join(project_root, 'stdlib', normalized + '.san')
+        if os.path.exists(cand):
+            return cand
+    # 相对路径解析
+    if os.sep not in normalized and not normalized.startswith('stdlib/'):
+        cand = os.path.join(project_root, 'stdlib', normalized)
+        if os.path.exists(cand):
+            return cand
+    # 允许 ../ 相对路径
+    abspath = os.path.abspath(os.path.join(project_root, normalized))
+    if not abspath.startswith(os.path.abspath(project_root)):
+        raise ValueError(f"#include 路径越界: {raw_path} -> {abspath}")
+    return abspath
+
+
+def _safe_include_path(raw_path: str) -> None:
+    """验证 #include 路径安全（兼容旧接口）。"""
+    _resolve_include_path(raw_path)
 
 
 def preprocess_includes(code: str, add_comment: bool = False,
-                        _seen: Optional[set] = None) -> str:
+                        _seen: Optional[set] = None,
+                        _base_dir: Optional[str] = None) -> str:
     """展开 #include 指令，将外部文件内容内联到代码中。
 
     Args:
         code: 源代码
         add_comment: 是否在展开内容前添加注释行标记
         _seen: 内部递归使用，检测循环引用
+        _base_dir: 当前文件的目录（用于解析相对路径）
 
     Returns:
         展开后的源代码
@@ -30,6 +54,8 @@ def preprocess_includes(code: str, add_comment: bool = False,
     """
     if _seen is None:
         _seen = set()
+    if _base_dir is None:
+        _base_dir = os.path.dirname(os.path.abspath(__file__))
     lines = code.split('\n')
     processed = []
     for line in lines:
@@ -38,17 +64,16 @@ def preprocess_includes(code: str, add_comment: bool = False,
             parts = stripped.split(None, 1)
             if len(parts) == 2:
                 path = parts[1].strip('"').strip("'").strip('＂').strip('＇')
-                _safe_include_path(path)
-                if os.sep not in path and not path.endswith('.san'):
-                    candidate = os.path.join('stdlib', path + '.san')
-                    if os.path.exists(candidate):
-                        path = candidate
-                abspath = os.path.abspath(path)
+                try:
+                    abspath = _resolve_include_path(path, _base_dir)
+                except ValueError as e:
+                    processed.append(f'／／ #include {path} ({e})')
+                    continue
                 if abspath in _seen:
                     raise ValueError(f"检测到循环 #include: {path}")
-                if os.path.exists(path):
+                if os.path.exists(abspath):
                     try:
-                        with open(path, 'r', encoding='utf-8') as f:
+                        with open(abspath, 'r', encoding='utf-8') as f:
                             included = f.read()
                     except (IOError, OSError):
                         processed.append(f'／／ #include {path} (文件读取失败，已跳过)')
@@ -56,7 +81,9 @@ def preprocess_includes(code: str, add_comment: bool = False,
                     if add_comment:
                         processed.append(f'／／ #include {path}')
                     _seen.add(abspath)
-                    processed.append(preprocess_includes(included, add_comment, _seen))
+                    # 递归展开时使用 included 文件所在目录作为 base_dir
+                    included_dir = os.path.dirname(abspath)
+                    processed.append(preprocess_includes(included, add_comment, _seen, included_dir))
                     _seen.discard(abspath)
                 else:
                     processed.append(f'／／ #include {path} (文件不存在，已跳过)')

@@ -68,7 +68,7 @@ ruff format .    # 自动格式化
 | `SanyanKeyError` | 字典键访问错误 |
 | `SanyanAttributeError` | 属性/方法不存在错误 |
 
-仅 `parser.py` 和 `sugar.py`（解析阶段）可用 Python 原生 `SyntaxError`。
+仅 `parser.py` 和 `sugar/` 包（解析阶段）可用 Python 原生 `SyntaxError`。
 
 ## 作用域
 

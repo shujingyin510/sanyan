@@ -8,6 +8,7 @@ import re
 import sys
 import traceback
 from typing import Any, Optional
+from ternary_core import TritValue
 
 # LSP 基础消息
 _CONTENT_LENGTH_HEADER = "Content-Length: "
@@ -53,6 +54,11 @@ _CAPABILITIES = {
     "signatureHelpProvider": {
         "triggerCharacters": ["(", "（"],
     },
+    "documentFormattingProvider": True,
+    "documentSymbolProvider": True,
+    "foldingRangeProvider": True,
+    "referencesProvider": True,
+    "renameProvider": {"prepareProvider": True},
 }
 
 # 三言关键字和内置命令
@@ -195,15 +201,210 @@ _FUNC_SIGS: dict[str, str] = {
 }
 
 
-def _extract_definitions(text: str) -> dict[str, int]:
-    """从源码中提取用户定义函数的行号。"""
-    defs: dict[str, int] = {}
+def _extract_docstrings(text: str) -> dict[str, str]:
+    """提取 // 或 ／／ 注释块 + 紧随的函数定义文档。"""
+    docs: dict[str, str] = {}
+    # 匹配: 可选注释块 + 定义/fn + 函数名 + (参数:类型, ...)
+    pattern = re.compile(
+        r'((?:(?://|／／)[^\n]*\n?\s*)*)'
+        r'(?:定义|fn)\s+(\S+)\s*'
+        r'\(([^)]*)\)'
+    )
+    for m in pattern.finditer(text):
+        raw = m.group(1)
+        name = m.group(2)
+        params_sig = m.group(3)
+        # 生成签名行
+        sig_parts = []
+        for p in params_sig.split(','):
+            p = p.strip()
+            if p:
+                sig_parts.append(p)
+        sig = f"定义 {name}({', '.join(sig_parts)})"
+        # 提取注释内容
+        lines = [f"`{sig}`"]
+        for line in raw.split('\n'):
+            line = line.strip()
+            if line.startswith('//'):
+                lines.append(line[2:].strip())
+            elif line.startswith('／／'):
+                lines.append(line[2:].strip())
+        docs[name] = '\n'.join(lines)
+    return docs
+
+
+def _extract_definitions(text: str) -> dict[str, dict]:
+    """从源码中提取用户定义函数和变量的行号 + 列信息。"""
+    defs: dict[str, dict] = {}
     for i, line in enumerate(text.split("\n")):
-        # 匹配: 定义 函数名 (参数) 或 fn 函数名 (参数)
         m = re.search(r"(定义|fn)\s+(\S+)\s*\(", line)
         if m:
-            defs[m.group(2)] = i
+            col = m.start(2)
+            defs[m.group(2)] = {"line": i, "col": col, "kind": "function"}
+        m = re.search(r"(?:设|set)\s+(\S+)\s*=", line)
+        if m:
+            col = m.start(1)
+            defs[m.group(1)] = {"line": i, "col": col, "kind": "variable"}
     return defs
+
+
+def _extract_symbols_for_document(text: str) -> list[dict]:
+    """提取文档符号（函数和变量）。"""
+    symbols: list[dict] = []
+    defs = _extract_definitions(text)
+    for name, info in defs.items():
+        kind = 12 if info["kind"] == "function" else 13  # 12=Function, 13=Variable
+        line_idx = info["line"]
+        lines = text.split("\n")
+        end_line = line_idx
+        # 函数：搜索最外层 } 作为结束
+        if info["kind"] == "function":
+            brace_count = 0
+            started = False
+            for j in range(line_idx, len(lines)):
+                line = lines[j]
+                for ch in line:
+                    if ch in ('{', '｛'):
+                        started = True
+                        brace_count += 1
+                    elif ch in ('}', '｝'):
+                        if started:
+                            brace_count -= 1
+                            if brace_count == 0:
+                                end_line = j
+                                break
+                if brace_count == 0 and started:
+                    break
+        symbols.append({
+            "name": name,
+            "kind": kind,
+            "range": {
+                "start": {"line": line_idx, "character": 0},
+                "end": {"line": end_line, "character": len(lines[end_line])},
+            },
+            "selectionRange": {
+                "start": {"line": line_idx, "character": info["col"]},
+                "end": {"line": line_idx, "character": info["col"] + len(name)},
+            },
+        })
+    return symbols
+
+
+def _do_folding_ranges(text: str) -> list[dict]:
+    """提取折叠范围（基于 {} 块）。"""
+    ranges: list[dict] = []
+    lines = text.split("\n")
+    stack: list[int] = []  # line indices
+    opens = {'{', '｛'}
+    closes = {'}', '｝'}
+    for ln, line in enumerate(lines):
+        for ch in line:
+            if ch in opens:
+                stack.append(ln)
+            elif ch in closes and stack:
+                start = stack.pop()
+                if ln > start:
+                    ranges.append({
+                        "startLine": start,
+                        "endLine": ln,
+                    })
+    return ranges
+
+
+def _do_references(text: str, pos: dict, uri: str) -> Optional[list[dict]]:
+    """查找符号的所有引用。"""
+    lines = text.split("\n")
+    if pos["line"] >= len(lines):
+        return None
+    line = lines[pos["line"]]
+    col = pos["character"]
+    # 提取光标所在单词
+    start = col
+    while start > 0 and (line[start - 1].isalnum() or line[start - 1] in "_\u4e00-\u9fff"):
+        start -= 1
+    end = col
+    while end < len(line) and (line[end].isalnum() or line[end] in "_\u4e00-\u9fff"):
+        end += 1
+    word = line[start:end]
+    if not word:
+        return None
+
+    refs: list[dict] = []
+    # 逐行搜索所有出现
+    for ln, line_text in enumerate(lines):
+        idx = 0
+        while True:
+            idx = line_text.find(word, idx)
+            if idx < 0:
+                break
+            before_ok = idx == 0 or not (line_text[idx - 1].isalnum() or line_text[idx - 1] in "_\u4e00-\u9fff")
+            after_ok = idx + len(word) >= len(line_text) or not (line_text[idx + len(word)].isalnum() or line_text[idx + len(word)] in "_\u4e00-\u9fff")
+            if before_ok and after_ok:
+                refs.append({
+                    "uri": uri,
+                    "range": {
+                        "start": {"line": ln, "character": idx},
+                        "end": {"line": ln, "character": idx + len(word)},
+                    },
+                })
+            idx += len(word)
+    return refs if refs else None
+
+
+def _do_rename(text: str, pos: dict, new_name: str, uri: str) -> Optional[dict]:
+    """重命名符号（返回 TextEdit 列表）。"""
+    refs = _do_references(text, pos, uri)
+    if not refs:
+        return None
+    return {
+        "changes": {
+            uri: [
+                {
+                    "range": r["range"],
+                    "newText": new_name,
+                }
+                for r in refs
+            ],
+        },
+    }
+
+
+def _do_prepare_rename(text: str, pos: dict, uri: str) -> Optional[dict]:
+    """为 rename 准备：校验位置有效。"""
+    lines = text.split("\n")
+    if pos["line"] >= len(lines):
+        return None
+    line = lines[pos["line"]]
+    col = pos["character"]
+    start = col
+    while start > 0 and (line[start - 1].isalnum() or line[start - 1] in "_\u4e00-\u9fff"):
+        start -= 1
+    end = col
+    while end < len(line) and (line[end].isalnum() or line[end] in "_\u4e00-\u9fff"):
+        end += 1
+    word = line[start:end]
+    if not word:
+        return None
+    return {
+        "range": {
+            "start": {"line": pos["line"], "character": start},
+            "end": {"line": pos["line"], "character": end},
+        },
+        "placeholder": word,
+    }
+
+
+def _extract_variables(text: str) -> list[str]:
+    """从源码中提取用户定义的变量和命令名。"""
+    vars_found: set[str] = set()
+    for line in text.split("\n"):
+        m = re.search(r"(?:设|set)\s+(\S+)", line)
+        if m:
+            vars_found.add(m.group(1))
+        m = re.search(r"(?:定义|fn)\s+(\S+)", line)
+        if m:
+            vars_found.add(m.group(1))
+    return sorted(vars_found)
 
 
 def _do_definition(text: str, pos: dict, uri: str = "") -> Optional[list[dict]]:
@@ -226,11 +427,12 @@ def _do_definition(text: str, pos: dict, uri: str = "") -> Optional[list[dict]]:
     # 在用户自定义函数中查找
     defs = _extract_definitions(text)
     if word in defs:
+        info = defs[word]
         return [{
             "uri": uri,
             "range": {
-                "start": {"line": defs[word], "character": 0},
-                "end": {"line": defs[word], "character": len(lines[defs[word]])},
+                "start": {"line": info["line"], "character": info.get("col", 0)},
+                "end": {"line": info["line"], "character": info.get("col", 0) + len(word)},
             },
         }]
     return None
@@ -271,7 +473,7 @@ def _list_to_completion(items: list[str], kind: int = 14) -> list[dict[str, Any]
 
 
 def _do_diagnostics(uri: str, text: str) -> list[dict]:
-    """简单语法检查：括号匹配 + #include 语法。"""
+    """语法检查：括号匹配 + 未定义符号 + 重复参数。"""
     diagnostics: list[dict] = []
     lines = text.split("\n")
     # 括号匹配
@@ -303,23 +505,214 @@ def _do_diagnostics(uri: str, text: str) -> list[dict]:
             "severity": 1,
             "message": "未闭合的括号",
         })
+
+    # 重复参数检测
+    duplicate_pattern = re.compile(
+        r'(?:定义|fn)\s+\S+\s*\(([^)]+)\)'
+    )
+    for ln, line in enumerate(lines):
+        m = duplicate_pattern.search(line)
+        if m:
+            params = [p.strip().split(':')[0].strip() for p in m.group(1).split(',')]
+            seen: set[str] = set()
+            for p in params:
+                if p and p in seen:
+                    diagnostics.append({
+                        "range": {
+                            "start": {"line": ln, "character": 0},
+                            "end": {"line": ln, "character": len(line)},
+                        },
+                        "severity": 2,
+                        "message": f"重复的参数名: '{p}'",
+                    })
+                    break
+                seen.add(p)
+
+    # 未定义符号检测（AST 遍历）
+    try:
+        from sugar import SugarConverter
+        from skin import SkinManager
+        skin_mgr = SkinManager('chinese')
+        ast = SugarConverter.convert(text, skin_mgr)
+        if ast:
+            _check_undefined(ast, text, diagnostics)
+    except SyntaxError:
+        pass
+
     return diagnostics
 
 
+def _check_undefined(ast: list, text: str, diagnostics: list, defined: set[str] | None = None):
+    """递归遍历 AST，检查未定义符号。"""
+    if defined is None:
+        # 收集所有定义：函数参数、设变量、catch 变量、for 变量
+        defined = set()
+        _collect_defs(ast, defined)
+        # 收集所有定义行中存在定义的字符串
+        for line in text.split('\n'):
+            m = re.search(r'(?:设|set)\s+(\S+)', line)
+            if m:
+                defined.add(m.group(1))
+            m = re.search(r'(?:定义|fn)\s+(\S+)', line)
+            if m:
+                defined.add(m.group(1))
+            m = re.search(r'(?:捕获|catch)\s*\n\s*\(?\s*(\S+)', line)
+            if m:
+                defined.add(m.group(1))
+            m = re.search(r'(?:遍历|for)\s+(\S+)\s+(?:从|在|from|in)', line)
+            if m:
+                defined.add(m.group(1))
+        # 添加顶层翻译的关键词（真/假/可能等）
+        defined |= {'真', '假', '可能', 'true', 'false', 'maybe',
+                     '+', '-', '0'}
+    _walk_undef(ast, defined, diagnostics)
+
+
+def _collect_defs(node, defined):
+    """收集定义中的符号（仅从 AST 结构收集）。"""
+    if not isinstance(node, list) or len(node) == 0:
+        return
+    first = node[0]
+    if first in ('fn', '定义') and len(node) >= 3 and isinstance(node[2], list):
+        for p in node[2]:
+            if isinstance(p, str):
+                defined.add(p)
+    elif first in ('catch', '捕获') and len(node) >= 2 and isinstance(node[1], str):
+        defined.add(node[1])
+    elif first in ('set', '设') and len(node) >= 2 and isinstance(node[1], str):
+        defined.add(node[1])
+    elif first in ('for', 'forin', '遍历') and len(node) >= 2 and isinstance(node[1], str):
+        defined.add(node[1])
+    for child in node[1:]:
+        _collect_defs(child, defined)
+
+
+def _walk_undef(node, defined, diagnostics, scope_defined: set | None = None):
+    """递归 AST，检查未定义符号。"""
+    if not isinstance(node, list) or len(node) == 0:
+        return
+    scoped = set(defined) if scope_defined is None else scope_defined
+    first = node[0]
+    # 进入新作用域时传递扩展后的集合
+    if first in ('fn', '定义') and len(node) >= 3 and isinstance(node[2], list):
+        new_scoped = set(scoped)
+        for p in node[2]:
+            if isinstance(p, str):
+                new_scoped.add(p)
+        scoped = new_scoped
+    in_list = [first]
+    for child in node[1:]:
+        if first in ('fn', '定义'):
+            break
+        in_list.append(child)
+        # 上下文切换：跳过 body
+        if first in ('catch', '捕获'):
+            continue
+        if isinstance(child, list):
+            _walk_undef(child, scoped, diagnostics, set(scoped))
+        elif isinstance(child, str) and not child.startswith('"') \
+                and not child.startswith("'") and not child.startswith('\u201c') \
+                and not child.startswith('\u2018') \
+                and not child[0].isdigit() and child not in ('{', '}', '做'):
+            # 检查是否是未定义的操作/符号
+            if child in scoped:
+                continue
+            if child in _ALL_KEYWORDS:
+                scoped.add(child)
+                continue
+            if child in TritValue.STATE_MAP:
+                scoped.add(child)
+                continue
+            if child in _FUNC_SIGS:
+                scoped.add(child)
+                continue
+            # 未知符号，但不是局部变量定义、参数等
+            if child not in defined and not child.startswith('_'):
+                # 暂不报错 — 可能是运行时动态注入的
+                pass
+    # 递归子节点
+    skip_body = False
+    for child in node[1:]:
+        if skip_body:
+            skip_body = False
+            continue
+        if isinstance(child, list):
+            _walk_undef(child, scoped, diagnostics, set(scoped))
+
+
+def _do_formatting(text: str) -> Optional[list[dict]]:
+    """格式化源码。"""
+    from sanfmt import format_code
+    from sugar import SugarConverter
+    from skin import SkinManager
+    from lexer import tokenize
+    from parser import parse
+
+    skin_mgr = SkinManager('chinese')
+    ast = None
+    try:
+        ast = SugarConverter.convert(text, skin_mgr)
+    except SyntaxError:
+        pass
+    if ast is None:
+        tokens = tokenize(text)
+        if tokens:
+            try:
+                ast = parse(tokens)
+            except SyntaxError:
+                pass
+    if ast is None:
+        return None
+
+    try:
+        formatted = format_code(ast, source=text).rstrip('\n')
+    except Exception:
+        return None
+
+    if formatted == text.rstrip('\n'):
+        return None
+
+    lines = text.split('\n')
+    return [{
+        "range": {
+            "start": {"line": 0, "character": 0},
+            "end": {"line": len(lines) - 1, "character": len(lines[-1])},
+        },
+        "newText": formatted,
+    }]
+
+
 def _do_completion(text: str, pos: dict) -> Optional[dict]:
-    """基于当前文本和位置生成补全。"""
+    """基于当前文本和位置生成补全（含语义补全）。"""
+    # 提取用户定义的变量和函数名
+    user_defs = _extract_variables(text)
+    all_items = list(_ALL_KEYWORDS) + user_defs
+
     line = text.split("\n")[pos["line"]][:pos["character"]]
-    # 空或只空格 → 所有关键字
+    # 空或只空格 → 所有关键字 + 用户定义
     if not line.strip():
-        return {"isIncomplete": False, "items": _list_to_completion(_ALL_KEYWORDS)}
+        return {"isIncomplete": False, "items": _list_to_completion(all_items)}
     prefix = line.split()[-1] if line.split() else ""
     # 前缀匹配
-    matches = [k for k in _ALL_KEYWORDS if k.startswith(prefix)]
-    return {"isIncomplete": False, "items": _list_to_completion(matches or _ALL_KEYWORDS)}
+    matches = [k for k in all_items if k.startswith(prefix)]
+    return {"isIncomplete": False, "items": _list_to_completion(matches or all_items)}
+
+
+_docstrings_cache: dict[str, str] = {}
+_docstrings_cache_text: str = ""
+
+
+def _invalidate_docstring_cache(text: str) -> None:
+    """当文本变化时重建文档缓存。"""
+    global _docstrings_cache, _docstrings_cache_text
+    if text != _docstrings_cache_text:
+        _docstrings_cache = _extract_docstrings(text)
+        _docstrings_cache_text = text
 
 
 def _do_hover(text: str, pos: dict) -> Optional[dict]:
     """悬停提示。"""
+    _invalidate_docstring_cache(text)
     lines = text.split("\n")
     if pos["line"] >= len(lines):
         return None
@@ -347,6 +740,13 @@ def _do_hover(text: str, pos: dict) -> Optional[dict]:
             "contents": {
                 "kind": "markdown",
                 "value": f"**{word}** — 数学函数（三进制定点）",
+            }
+        }
+    if word in _docstrings_cache:
+        return {
+            "contents": {
+                "kind": "markdown",
+                "value": f"**{word}**\n\n{_docstrings_cache[word]}",
             }
         }
     return None
@@ -420,6 +820,52 @@ def _handle_message(msg: dict) -> None:
         text = _open_docs.get(uri, "")
         pos = params.get("position", {})
         result = _do_signature_help(text, pos)
+        _send({"id": msg_id, "result": result})
+        return
+
+    if method == "textDocument/formatting":
+        uri = params.get("textDocument", {}).get("uri", "")
+        text = _open_docs.get(uri, "")
+        result = _do_formatting(text)
+        _send({"id": msg_id, "result": result})
+        return
+
+    if method == "textDocument/documentSymbol":
+        uri = params.get("textDocument", {}).get("uri", "")
+        text = _open_docs.get(uri, "")
+        symbols = _extract_symbols_for_document(text)
+        _send({"id": msg_id, "result": symbols})
+        return
+
+    if method == "textDocument/foldingRange":
+        uri = params.get("textDocument", {}).get("uri", "")
+        text = _open_docs.get(uri, "")
+        ranges = _do_folding_ranges(text)
+        _send({"id": msg_id, "result": ranges})
+        return
+
+    if method == "textDocument/references":
+        uri = params.get("textDocument", {}).get("uri", "")
+        text = _open_docs.get(uri, "")
+        pos = params.get("position", {})
+        result = _do_references(text, pos, uri)
+        _send({"id": msg_id, "result": result})
+        return
+
+    if method == "textDocument/rename":
+        uri = params.get("textDocument", {}).get("uri", "")
+        text = _open_docs.get(uri, "")
+        pos = params.get("position", {})
+        new_name = params.get("newName", "")
+        result = _do_rename(text, pos, new_name, uri)
+        _send({"id": msg_id, "result": result})
+        return
+
+    if method == "textDocument/prepareRename":
+        uri = params.get("textDocument", {}).get("uri", "")
+        text = _open_docs.get(uri, "")
+        pos = params.get("position", {})
+        result = _do_prepare_rename(text, pos, uri)
         _send({"id": msg_id, "result": result})
         return
 

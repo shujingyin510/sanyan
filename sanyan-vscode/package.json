@@ -12,6 +12,7 @@
   "engines": { "vscode": "^1.85.0" },
   "categories": ["Programming Languages"],
   "main": "./extension.js",
+  "activationEvents": ["onLanguage:sanyan"],
   "contributes": {
     "languages": [
       {
@@ -28,5 +29,8 @@
         "path": "./syntaxes/sanyan.tmLanguage.json"
       }
     ]
+  },
+  "dependencies": {
+    "vscode-languageclient": "^9.0.1"
   }
 }

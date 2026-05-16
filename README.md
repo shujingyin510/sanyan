@@ -275,6 +275,19 @@ tests/
 | `定义 f (x) { 返回(x+1) }` | `（定义 f （x） （返回 （+ x 1）））` |
 | `若 (x > 0) { … } 否则 { … }` | `（若 （大于 x 0） … …）` |
 
+## 新增特性速览（v3.10.0）
+
+| 特性 | 说明 |
+|---|---|
+| 🧩 **类型标注** | `定义 f(x: 数字, y: 字符串) { ... }` — 参数类型标注，运行时自动校验 |
+| 🔍 **LSP 语言服务器增强** | 新增格式化、引用查找、重命名、文档符号、折叠范围、语义补全、hover 文档注释 |
+| 🎨 **源码格式化器** | `sanfmt.py` — 类 black/prettier 的 `.san` 格式化器，保留注释 |
+| 🐛 **表达式断点调试** | `:step` / `:break` / `:watch` / `:continue` — REPL 交互式调试 |
+| ⏱ **性能剖析** | `--profile` 标志 + `:profile` — 追踪每个操作的调用次数和耗时 |
+| 📝 **AST JSON 导出** | `--ast-json` — 将解析后的 AST 导出为 JSON |
+| 📌 **源码位置追踪** | 错误消息携带行号列号：`第3行第5列: 未定义的符号: x` |
+| 🎯 **DAP 调试适配器** | `dap_server.py` — VS Code 断点调试协议支持 |
+
 ## 新增特性速览（v3.8.0）
 
 | 特性 | 说明 |
@@ -368,15 +381,20 @@ sanyan/
 │   └── test.san           # 测试框架
 ├── tests/                 # 自动测试（双版本）
 │   ├── run_all.py         # 测试运行器
-│   ├── test_core.py       # Python 单测 44 项
-│   ├── test_ops.py        # ops 模块单测 66 项
+│   ├── test_core.py       # Python 单测 52 项
+│   ├── test_ops.py        # ops 模块单测 78 项
 │   ├── test_lsp.py        # LSP 协议测试 6 项
 │   ├── test_package.py    # 包管理器测试 6 项
 │   ├── test_eval.san      # 元循环求值器测试
-│   ├── test_parser.py     # 解析器 AST 校验 22 项
+│   ├── test_parser.py     # 解析器 AST 校验 28 项
 │   ├── test_*.san         # 糖语法测试
 │   └── test_*_se.san      # S 表达式对照测试
 ├── docs/                  # 语言手册
+├── benchmark/             # 性能基准测试套件
+│   ├── run_benchmark.py
+│   ├── fibonacci.san
+│   ├── primes.san
+│   └── fizzbuzz.san
 └── .vscode/               # VS Code 工作区配置
     └── settings.json
 ```
@@ -417,6 +435,13 @@ sanyan/
 - [x] 模块导入（命名空间隔离）
 - [x] 测试框架（断言相等/不相等/真/假/包含/大于/小于/大于等于/小于等于）
 - [x] 双语法对照测试与示例
+- [x] 类型标注与运行时校验（v3.10.0）
+- [x] LSP 增强：格式化/引用/重命名/文档符号/折叠（v3.10.0）
+- [x] 源码格式化器 sanfmt.py（v3.10.0）
+- [x] 表达式断点调试（v3.10.0）
+- [x] 性能剖析 --profile（v3.10.0）
+- [x] AST JSON 导出（v3.10.0）
+- [x] DAP 调试适配器（v3.10.0）
 - [ ] GPIO 真实硬件控制
 - [ ] Web IDE
 - [ ] 标准库扩展（更多自举模块）
