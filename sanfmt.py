@@ -1,4 +1,5 @@
 """三言源码格式化器 — 类似 black/prettier"""
+from __future__ import annotations
 import sys
 
 _INTERNAL_TO_DISPLAY = {
