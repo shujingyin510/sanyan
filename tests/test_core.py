@@ -299,5 +299,47 @@ class TestTernaryEdge(unittest.TestCase):
         self.assertIs(a, b)
 
 
+class TestParsePairs(unittest.TestCase):
+    def test_dot_format(self):
+        r = SanyanRuntime()
+        result = r._parse_pairs(['灯.亮', '风扇.关'])
+        self.assertEqual(result, [('灯', '亮'), ('风扇', '关')])
+
+    def test_alternating_dot_format(self):
+        r = SanyanRuntime()
+        result = r._parse_pairs(['灯', '.', '亮', '风扇', '.', '关'])
+        self.assertEqual(result, [('灯', '亮'), ('风扇', '关')])
+
+    def test_mixed_formats(self):
+        r = SanyanRuntime()
+        result = r._parse_pairs(['灯.亮', '风扇', '.', '关'])
+        self.assertEqual(result, [('灯', '亮'), ('风扇', '关')])
+
+    def test_empty_list_returns_empty(self):
+        r = SanyanRuntime()
+        result = r._parse_pairs([])
+        self.assertEqual(result, [])
+
+    def test_single_pair_dot(self):
+        r = SanyanRuntime()
+        result = r._parse_pairs(['灯.亮'])
+        self.assertEqual(result, [('灯', '亮')])
+
+    def test_single_pair_alternating(self):
+        r = SanyanRuntime()
+        result = r._parse_pairs(['灯', '.', '亮'])
+        self.assertEqual(result, [('灯', '亮')])
+
+    def test_invalid_format_raises(self):
+        r = SanyanRuntime()
+        with self.assertRaises(SanyanSyntaxError):
+            r._parse_pairs(['灯'])
+
+    def test_non_string_raises(self):
+        r = SanyanRuntime()
+        with self.assertRaises(SanyanSyntaxError):
+            r._parse_pairs([42, '.', '亮'])
+
+
 if __name__ == '__main__':
     unittest.main()

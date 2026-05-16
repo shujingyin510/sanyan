@@ -276,7 +276,7 @@ def _do_diagnostics(uri: str, text: str) -> list[dict]:
     lines = text.split("\n")
     # 括号匹配
     stack: list[tuple[int, int]] = []  # (line, col)
-    pairs = {")": "(", "）": "（", "}": "}", "｝": "｛"}
+    pairs = {")": "(", "）": "（", "}": "{", "｝": "｛"}
     opens = {"(", "（", "{", "｛"}
     for ln, line in enumerate(lines):
         for cn, ch in enumerate(line):

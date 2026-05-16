@@ -4,6 +4,7 @@ from values import ReturnException, BreakException, ContinueException, SanyanErr
 from ops.registry import register
 
 class ControlOps:
+    """控制流操作：条件、循环、遍历、变量设置"""
     @staticmethod
     def if_op(evaluator, args):
         if len(args) < 2:

@@ -5,6 +5,7 @@ from ops.device_registry import MockDevice
 from ops.registry import register
 
 class IotOps:
+    """IoT 操作：传感器读取、执行器控制、设备注册"""
     @staticmethod
     def set_sensor(evaluator, args):
         if not args:

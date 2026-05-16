@@ -4,6 +4,7 @@ from values import SanyanSyntaxError, SanyanTypeError
 from ops.registry import register
 
 class StringOps:
+    """字符串操作：查找、截取、拼接、替换等"""
     @staticmethod
     def string_concat(evaluator, args):
         if len(args) < 2:

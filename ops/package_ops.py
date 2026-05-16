@@ -1,5 +1,5 @@
 """包管理器：安装、查询、管理三言包。"""
-from __future__ import annotations
+
 import json
 import os
 from ternary_core import TritValue
@@ -9,6 +9,7 @@ from ops.registry import register
 PACKAGES_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "packages")
 PACKAGE_INDEX_URL = "https://raw.githubusercontent.com/shujingyin510/sanyan-packages/main/index.json"
 _installed_cache: dict[str, bool] = {}
+_index_cache = None  # (timestamp, index_data)
 
 
 def _resolve_package_path(name: str) -> str:
@@ -28,6 +29,7 @@ def _resolve_package_path(name: str) -> str:
 
 
 class PackageOps:
+    """包管理器：安装、查询、管理三言包"""
     @staticmethod
     def install(evaluator, args):
         """安装包：安装("包名") 或 安装("包名", "下载URL")
@@ -162,10 +164,11 @@ class PackageOps:
             with tempfile.TemporaryFile() as tmp:
                 tmp.write(data)
                 tmp.seek(0)
+                pkg_dir_real = os.path.realpath(pkg_dir)
                 with zipfile.ZipFile(tmp) as z:
                     for info in z.infolist():
-                        safe_path = os.path.normpath(os.path.join(pkg_dir, info.filename))
-                        if not safe_path.startswith(os.path.normpath(pkg_dir)):
+                        safe_path = os.path.realpath(os.path.join(pkg_dir, info.filename))
+                        if not safe_path.startswith(pkg_dir_real):
                             raise SanyanValueError(f"zip-slip 攻击检测: {info.filename}")
                         z.extract(info, pkg_dir)
             print(f"包 '{name}' 已安装到 {pkg_dir}")
@@ -177,7 +180,9 @@ class PackageOps:
 
     @staticmethod
     def _lookup_index(name: str) -> str | None:
-        """从包索引查找下载 URL。优先查本地，再查远程。"""
+        """从包索引查找下载 URL。优先查本地缓存，再查远程（每 5 分钟刷新）。"""
+        global _index_cache
+        import time
         # 本地索引
         local_idx = os.path.join(os.path.abspath(PACKAGES_DIR), "index.json")
         if os.path.exists(local_idx):
@@ -189,12 +194,18 @@ class PackageOps:
                     return entry.get("url") or entry.get("download")
             except (IOError, OSError, json.JSONDecodeError):
                 pass
-        import urllib.request
-        try:
-            with urllib.request.urlopen(PACKAGE_INDEX_URL, timeout=10) as resp:
-                index = json.loads(resp.read().decode("utf-8"))
-        except (urllib.error.URLError, IOError, OSError, json.JSONDecodeError):
-            return None
+        # 远程索引（缓存 5 分钟）
+        now = time.time()
+        if _index_cache is not None and now - _index_cache[0] < 300:
+            index = _index_cache[1]
+        else:
+            import urllib.request
+            try:
+                with urllib.request.urlopen(PACKAGE_INDEX_URL, timeout=10) as resp:
+                    index = json.loads(resp.read().decode("utf-8"))
+                _index_cache = (now, index)
+            except (urllib.error.URLError, IOError, OSError, json.JSONDecodeError):
+                return None
         entry = index.get(name)
         if entry:
             return entry.get("url") or entry.get("download")

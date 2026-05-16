@@ -1,5 +1,12 @@
 """REPL 交互环境与演示程序"""
 import os
+from lexer import tokenize
+from parser import parse
+from evaluator import SanyanEvaluator
+from sugar import SugarConverter
+from skin import SkinManager
+from runtime import BUILTIN_OPS
+from ops.io_ops import IOOps
 
 # REPL 历史记录
 _history_file = os.path.expanduser('~/.sanyan_history')
@@ -11,16 +18,9 @@ try:
 except ImportError:
     readline = None
 
-from lexer import tokenize  # noqa: E402
-from parser import parse  # noqa: E402
-from evaluator import SanyanEvaluator  # noqa: E402
-from sugar import SugarConverter  # noqa: E402
-from skin import SkinManager  # noqa: E402
-from runtime import BUILTIN_OPS  # noqa: E402
-
 
 def demo(skin_mgr: SkinManager) -> None:
-    print("\n========== 三言 v3.7 演示 ==========")
+    print("\n========== 三言 v3.10.0 演示 ==========")
     env = SanyanEvaluator(skin_manager=skin_mgr)
 
     # 1. 智能设备控制
@@ -108,12 +108,16 @@ def repl() -> None:
         readline.set_completer(_make_completer(env))
         readline.parse_and_bind('tab: complete')
 
-    print("三言 v3.7 REPL (母语可定制)")
+    print("三言 v3.10.0 REPL (母语可定制)")
     print("输入 切换英文/:lang english 切换英文，切换中文/:lang chinese 切换中文")
     print("输入 退出/exit 离开，Tab 键自动补全")
     while True:
         try:
             code = input("三言> ").strip()
+        except (KeyboardInterrupt, EOFError):
+            print()
+            break
+        try:
             code = code.replace('\u3000', ' ')   # 全角空格 → 半角空格
             if not code:
                 continue
@@ -157,7 +161,7 @@ def repl() -> None:
                         break
                 try:
                     next_line = input("...   ").strip()
-                except EOFError:
+                except (KeyboardInterrupt, EOFError):
                     break
                 if not next_line:
                     continue
@@ -168,7 +172,7 @@ def repl() -> None:
             try:
                 ast = SugarConverter.convert(code, skin_mgr)
             except SyntaxError:
-                pass   # 糖语法失败属于正常情况（如用户输入 S 表达式），不回显错误
+                pass
 
             if ast is None:
                 tokens = tokenize(code)
@@ -182,15 +186,7 @@ def repl() -> None:
             if ast is None:
                 continue
 
-            try:
-                result = env.eval(ast)
-            except KeyboardInterrupt:
-                print("\n  操作已中断（Ctrl+C）。")
-                continue
-            except Exception as e:
-                print(f"  错误: {e}")
-                print(f"    输入内容: {code}")
-                continue
+            result = env.eval(ast)
 
             if result is not None:
                 should_print = True
@@ -204,14 +200,12 @@ def repl() -> None:
                             should_print = False
                 if should_print:
                     try:
-                        from ops.io_ops import IOOps
                         formatted = IOOps.format_value(result)
                         print(f"  => {formatted}")
                     except Exception:
                         print(f"  => {result}")
         except KeyboardInterrupt:
             print("\n  操作已中断。")
-            continue
         except Exception as e:
             print(f"  错误: {e}")
             print(f"    输入内容: {code}")

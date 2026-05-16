@@ -13,13 +13,22 @@ pip install -e ".[dev]"
 ## 运行测试
 
 ```bash
-# Python 单测（26 项）
+# Python 单测（44 项）
 python tests/test_core.py -v
 
-# 糖语法解析器回归测试（24 项）
+# 糖语法解析器 AST 校验（28 项）
 python tests/test_parser.py
 
-# 三言集成测试（33 项）
+# ops 模块单测（66 项）
+python tests/test_ops.py -v
+
+# LSP 测试（6 项）
+python tests/test_lsp.py -v
+
+# 包管理器测试（6 项）
+python tests/test_package.py -v
+
+# 三言集成测试（动态发现）
 python tests/run_all.py
 ```
 

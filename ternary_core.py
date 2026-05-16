@@ -181,7 +181,7 @@ class TritValue:
 
     _pool = OrderedDict()
     _pool_lock = threading.Lock()
-    _MAX_POOL_SIZE = int(os.environ.get('TRIT_POOL_SIZE', '10000'))
+    _MAX_POOL_SIZE = max(1, int(os.environ.get('TRIT_POOL_SIZE', '10000')))
 
     def __new__(cls, value, precision: int = None):
         def _hashable(v):

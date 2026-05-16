@@ -40,19 +40,12 @@ def main():
             if f.endswith('.san') and f not in EXCLUDE_TESTS:
                 test_files.append(os.path.join(TEST_DIR, f))
 
-    example_names = [
-        "greenhouse.san", "greenhouse_se.san",
-        "voting.san", "voting_se.san",
-        "data_clean.san", "data_clean_se.san",
-        "sensor_pipeline_simple.san", "sensor_pipeline_simple_se.san",
-        "text_analysis.san",
-        "guess_number.san",
-        "fizzbuzz.san",
-    ]
-    for f in example_names:
-        fp = os.path.join(EXAMPLES_DIR, f)
-        if os.path.exists(fp):
-            test_files.append(fp)
+    if os.path.isdir(EXAMPLES_DIR):
+        for f in sorted(os.listdir(EXAMPLES_DIR)):
+            if f.endswith('.san'):
+                fp = os.path.join(EXAMPLES_DIR, f)
+                if os.path.exists(fp):
+                    test_files.append(fp)
 
     total = len(test_files)
     passed = 0

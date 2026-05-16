@@ -5,6 +5,7 @@ from values import SanyanSyntaxError, SanyanTypeError, SanyanValueError, SanyanK
 from ops.registry import register
 
 class ContainerOps:
+    """容器操作：列表、数组、字典、通用索引、映射/过滤/归并"""
     @staticmethod
     def list_new(evaluator, args):
         items = [evaluator.eval(a) for a in args]
@@ -298,6 +299,8 @@ class ContainerOps:
                     total += item.to_float()
                 elif isinstance(item, (int, float)):
                     total += float(item)
+                else:
+                    raise SanyanTypeError(f"求和遇到非数字元素: {type(item).__name__}")
             return TritValue(total)
         total = 0
         for item in container:
@@ -305,6 +308,8 @@ class ContainerOps:
                 total += item.to_int()
             elif isinstance(item, (int, float)):
                 total += int(item)
+            else:
+                raise SanyanTypeError(f"求和遇到非数字元素: {type(item).__name__}")
         return TritValue(total)
 
     @staticmethod

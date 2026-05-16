@@ -41,13 +41,16 @@
 
 定义 计数 （字符串， 子串） ｛
     设 count ＝ 0
-    设 pos ＝ 查找（字符串， 子串）
-    循环 （pos ＞＝ 0） ｛
-        count ＝ count ＋ 1
-        设 剩余 ＝ 子串（字符串， pos ＋ 取长（子串）， 取长（字符串））
-        pos ＝ 查找（剩余， 子串）
+    设 start ＝ 0
+    设 len_s ＝ 取长（字符串）
+    设 len_sub ＝ 取长（子串）
+    循环 （start ＋ len_sub ＜＝ len_s） ｛
+        设 pos ＝ 查找（子串（字符串， start， len_s）， 子串）
         若 （pos ＞＝ 0） ｛
-            pos ＝ pos ＋ 取长（字符串） － 取长（剩余）
+            count ＝ count ＋ 1
+            start ＝ start ＋ pos ＋ len_sub
+        ｝ 否则 ｛
+            跳出
         ｝
     ｝
     返回（count）

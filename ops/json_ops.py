@@ -5,6 +5,7 @@ from values import SanyanValueError, SanyanTypeError
 from ops.registry import register
 
 class JsonOps:
+    """JSON 序列化与反序列化"""
     @staticmethod
     def to_json(evaluator, args):
         if len(args) != 1:

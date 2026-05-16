@@ -7,6 +7,10 @@ def _safe_include_path(raw_path: str) -> None:
     normalized = raw_path.replace('\\', '/')
     if '..' in normalized.split('/'):
         raise ValueError(f"#include 路径不允许包含 '..': {raw_path}")
+    abspath = os.path.abspath(normalized)
+    project_root = os.path.abspath(os.path.join(os.path.dirname(__file__)))
+    if not abspath.startswith(project_root):
+        raise ValueError(f"#include 路径不在项目目录内: {raw_path}")
 
 
 def preprocess_includes(code: str, add_comment: bool = False,

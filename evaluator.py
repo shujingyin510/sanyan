@@ -7,20 +7,23 @@ from commands import Commands
 from values import FunctionValue, ModuleValue, SanyanNameError
 from values import SanyanSyntaxError, SanyanTypeError, SanyanKeyError, SanyanAttributeError, SanyanRuntimeError
 
-# 导入所有 ops 模块以触发模块级注册
-import ops.control_ops
-import ops.math_ops
-import ops.string_ops
-import ops.container_ops
-import ops.io_ops
-import ops.file_ops
-import ops.type_ops
-import ops.iot_ops
-import ops.json_ops
-import ops.package_ops  # noqa: F401 — triggers module-level op registrations
 
-# 也导入 commands.py 以触发 fn 注册
-import commands  # noqa: F401 — triggers module-level op registration
+def _init_ops():
+    """初始化所有操作模块的注册（仅在首次导入时执行一次）"""
+    import ops.control_ops
+    import ops.math_ops
+    import ops.string_ops
+    import ops.container_ops
+    import ops.io_ops
+    import ops.file_ops
+    import ops.type_ops
+    import ops.iot_ops
+    import ops.json_ops
+    import ops.package_ops  # noqa: F401
+    import commands  # noqa: F401
+
+
+_init_ops()
 
 
 class SanyanEvaluator(SanyanRuntime):

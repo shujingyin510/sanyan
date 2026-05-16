@@ -4,7 +4,7 @@ import os
 from ternary_core import TritValue
 
 class SkinManager:
-    def __init__(self, lang='zh'):
+    def __init__(self, lang='chinese'):
         self.lang = lang
         self.skin_data = {}
         self.ternary_map = dict(TritValue.STATE_MAP)  # 以 TritValue.STATE_MAP 为统一来源

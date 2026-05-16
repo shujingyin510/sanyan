@@ -7,6 +7,7 @@ from ops.registry import register
 _TCO_LOOP_MULTIPLIER = 10
 
 class Commands:
+    """自定义命令：定义、调用、类型检查、尾递归优化"""
     @staticmethod
     def define(evaluator, args: list) -> TritValue:
         if len(args) < 3:

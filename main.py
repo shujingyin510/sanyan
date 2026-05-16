@@ -1,4 +1,4 @@
-"""三言 —— 中文三进制编程语言 v3.7（主入口）"""
+"""三言 —— 中文三进制编程语言 v3.10.0（主入口）"""
 import sys
 from repl import demo, repl
 from evaluator import SanyanEvaluator
@@ -78,7 +78,7 @@ def main():
                     print(f"结果: {result}")
         sys.exit(0)
     else:
-        print("欢迎来到「三言 v3.7」—— 母语可定制的三进制编程语言")
+        print("欢迎来到「三言 v3.10.0」—— 母语可定制的三进制编程语言")
         print("=" * 50)
         demo(SkinManager('chinese'))
         repl()

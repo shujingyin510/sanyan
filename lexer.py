@@ -31,7 +31,7 @@ def tokenize(code: str) -> list:
                 attr += code[i]; i += 1
             if obj and attr: tokens.append(obj + '.' + attr)
             elif attr: tokens.append(attr)
-            i -= 1; i += 1; continue
+            continue
         if c in ('，', '\uff1b'):
             if current: tokens.append(current); current = ''
             i += 1; continue

@@ -4,6 +4,7 @@ from values import FunctionValue, ModuleValue, SanyanValueError, SanyanSyntaxErr
 from ops.registry import register
 
 class IOOps:
+    """I/O 操作：输出、格式化、打印、用户输入"""
     @staticmethod
     def format_value(val):
         """将三言值格式化为美观字符串，容器附三进制注释"""

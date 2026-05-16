@@ -5,17 +5,10 @@ from ternary_core import BT, TernaryALU, TritValue, ternary_sin, ternary_cos, te
 from values import SanyanSyntaxError, SanyanTypeError, SanyanValueError
 from ops.registry import register
 
-def _to_num(v):
-    """将 TritValue 或原始值转换为数值（保留浮点精度）"""
-    if isinstance(v, TritValue):
-        return v.to_float() if v.is_float() else v.to_int()
-    try:
-        s = str(v)
-        return float(s) if '.' in s else int(s)
-    except (ValueError, TypeError):
-        return float(v)
+from values import to_num as _to_num
 
 class MathOps:
+    """算术、比较、逻辑、数学函数、随机数"""
     @staticmethod
     def logic_op(evaluator, op, args):
         if op in ('and', 'or'):

@@ -4,6 +4,8 @@ from ternary_core import TritValue
 from values import SanyanSyntaxError, SanyanValueError, SanyanNameError, SanyanTypeError, ModuleValue
 from ops.registry import register
 
+# 项目根目录：文件操作不允许超越此目录
+_PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
 _SAFE_PATH_SEPARATORS = frozenset({'/', '\\'})
 _module_cache: dict = {}
 _import_stack: set = set()
@@ -20,11 +22,13 @@ def clear_cache():
 
 def _resolve_path(raw_path, auto_stdlib=True):
     path = str(raw_path)
-    # 先规范化，再检查路径穿越
     norm = os.path.normpath(path)
     parts = norm.replace('\\', '/').split('/')
     if '..' in parts:
         raise SanyanValueError(f"路径不允许包含 '..': {raw_path}")
+    abs_path = os.path.abspath(norm)
+    if not abs_path.startswith(os.path.abspath(_PROJECT_ROOT)):
+        raise SanyanValueError(f"路径不在项目根目录内: {raw_path}")
     if auto_stdlib and not any(s in path for s in _SAFE_PATH_SEPARATORS) and not path.endswith('.san'):
         candidate = os.path.join('stdlib', path + '.san')
         if os.path.exists(candidate):
@@ -122,6 +126,7 @@ def _collect_exports(ast):
 
 
 class FileOps:
+    """文件操作：读取、写出、模块加载与导入"""
     @staticmethod
     def read_file_op(evaluator, args):
         if len(args) != 1:
