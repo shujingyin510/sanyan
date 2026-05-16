@@ -1,5 +1,5 @@
 """包管理器：安装、查询、管理三言包。"""
-
+from __future__ import annotations
 import json
 import os
 from ternary_core import TritValue
