@@ -39,6 +39,15 @@ class TypeOps:
         return TritValue(-1)
 
     @staticmethod
+    def is_list(evaluator, args):
+        if len(args) != 1:
+            raise SanyanSyntaxError("是列表 需要一个参数")
+        val = evaluator.eval(args[0])
+        if isinstance(val, list):
+            return TritValue(1)
+        return TritValue(-1)
+
+    @staticmethod
     def str_equals(evaluator, args):
         if len(args) != 2:
             raise SanyanSyntaxError("字符串相等 需要两个参数")
@@ -53,4 +62,5 @@ register('time', TypeOps.time_now)
 register('sleep', TypeOps.sleep_op)
 register('is_number', TypeOps.is_number)
 register('is_string', TypeOps.is_string)
+register('is_list', TypeOps.is_list)
 register('str_equals', TypeOps.str_equals)

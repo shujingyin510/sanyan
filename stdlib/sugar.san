@@ -1,0 +1,617 @@
+// stdlib/sugar.san — 糖语法解析器（Sanyan 版）
+// 将糖语法源代码解析为 AST，输出格式与 Python sugar/parser.py 兼容
+// 注意：字符串比较必须用 str_equals，不能用 ==
+
+// ==================== 词法分析 ====================
+
+设 空白 = " \n\t\r\u3000"
+设 换行符 = "\n"
+
+设 全角映射 = 字典(
+    "（", "(", "）", ")", "｛", "{", "｝", "}", "［", "[", "］", "]",
+    "＝", "=", "＞", ">", "＜", "<", "＋", "+", "－", "-", "＊", "*", "／", "/",
+    "％", "%", "＾", "^", "，", ",", "；", ";", "：", ":", "！", "!",
+    "　", " ",
+    "０", "0", "１", "1", "２", "2", "３", "3", "４", "4",
+    "５", "5", "６", "6", "７", "7", "８", "8", "９", "9",
+)
+
+设 字符串开始 = "\"'\u201c\u2018\u300c\u300e"
+设 字符串结束 = 字典(
+    "\"", "\"", "'", "'",
+    "\u201c", "\u201d", "\u2018", "\u2019",
+    "\u300c", "\u300d", "\u300e", "\u300f",
+)
+
+定义 键取值 (d, key, fallback) {
+    尝试 {
+        返回(取键(d, key))
+    } 捕获 (e) {
+        返回(fallback)
+    }
+}
+
+定义 映射全角 (ch) {
+    返回(键取值(全角映射, ch, ch))
+}
+
+定义 生成token (类型, 值) { 列表(类型, 值) }
+
+定义 词法分析 (source) {
+    设 len = 取长(source)
+    设 chars = 字列(source)
+    设 tokens = 列表()
+    设 i = 0
+
+    循环 (i < len) {
+        设 c = 取(chars, i)
+
+        // 换行
+        若 (str_equals(c, 换行符)) { i = i + 1; 继续 }
+
+        // 空白
+        若 (查找(空白, c) >= 0) { i = i + 1; 继续 }
+
+        // 行注释 // 或 #
+        若 (str_equals(c, "/") 或 str_equals(c, "#")) {
+            设 is_comment = 假
+            若 (str_equals(c, "#")) { is_comment = 真 }
+            若 (非(is_comment) 且 i + 1 < len) {
+                设 nxt = 取(chars, i + 1)
+                若 (str_equals(nxt, "/") 或 str_equals(nxt, "／")) { is_comment = 真 }
+            }
+            若 (is_comment) {
+                循环 (i < len 且 非(str_equals(取(chars, i), 换行符))) { i = i + 1 }
+                继续
+            }
+        }
+
+        // 字符串
+        若 (查找(字符串开始, c) >= 0) {
+            设 quote = c
+            设 end_quote = 键取值(字符串结束, c, c)
+            设 start = i
+            i = i + 1
+            循环 (i < len 且 非(str_equals(取(chars, i), end_quote))) {
+                若 (str_equals(取(chars, i), "\\")) { i = i + 1 }
+                i = i + 1
+            }
+            若 (i < len) { i = i + 1 }
+            设 val = 子串(source, start, i - start)
+            tokens = 列表合(tokens, 列表(生成token("字符串", val)))
+            继续
+        }
+
+        // 全角映射
+        设 mapped = 映射全角(c)
+
+        // 符号
+        若 (str_equals(mapped, "(") 或 str_equals(mapped, ")") 或
+            str_equals(mapped, "{") 或 str_equals(mapped, "}") 或
+            str_equals(mapped, "[") 或 str_equals(mapped, "]") 或
+            str_equals(mapped, ",") 或 str_equals(mapped, ";") 或
+            str_equals(mapped, ":") 或 str_equals(mapped, ".")) {
+            tokens = 列表合(tokens, 列表(生成token("符号", mapped)))
+            i = i + 1
+            继续
+        }
+
+        // 运算符
+        若 (str_equals(mapped, "=") 或 str_equals(mapped, ">") 或
+            str_equals(mapped, "<") 或 str_equals(mapped, "+") 或
+            str_equals(mapped, "-") 或 str_equals(mapped, "*") 或
+            str_equals(mapped, "/") 或 str_equals(mapped, "%") 或
+            str_equals(mapped, "^") 或 str_equals(mapped, "!")) {
+            // 合并多字符运算符: >=, <=, !=
+            若 (i + 1 < len) {
+                设 next_c = 取(chars, i + 1)
+                设 next_mapped = 映射全角(next_c)
+                若 (str_equals(mapped, ">") 且 str_equals(next_mapped, "=")) {
+                    tokens = 列表合(tokens, 列表(生成token("运算符", ">=")))
+                    i = i + 2; 继续
+                }
+                若 (str_equals(mapped, "<") 且 str_equals(next_mapped, "=")) {
+                    tokens = 列表合(tokens, 列表(生成token("运算符", "<=")))
+                    i = i + 2; 继续
+                }
+                若 (str_equals(mapped, "!") 且 str_equals(next_mapped, "=")) {
+                    tokens = 列表合(tokens, 列表(生成token("运算符", "!=")))
+                    i = i + 2; 继续
+                }
+            }
+            tokens = 列表合(tokens, 列表(生成token("运算符", mapped)))
+            i = i + 1
+            继续
+        }
+
+        // 数字（含全角数字）
+        设 is_digit = 假
+        若 (查找("0123456789", mapped) >= 0) { is_digit = 真 }
+        // 处理全角数字
+        若 (str_equals(c, "０")) { mapped = "0"; is_digit = 真 }
+        若 (str_equals(c, "１")) { mapped = "1"; is_digit = 真 }
+        若 (str_equals(c, "２")) { mapped = "2"; is_digit = 真 }
+        若 (str_equals(c, "３")) { mapped = "3"; is_digit = 真 }
+        若 (str_equals(c, "４")) { mapped = "4"; is_digit = 真 }
+        若 (str_equals(c, "５")) { mapped = "5"; is_digit = 真 }
+        若 (str_equals(c, "６")) { mapped = "6"; is_digit = 真 }
+        若 (str_equals(c, "７")) { mapped = "7"; is_digit = 真 }
+        若 (str_equals(c, "８")) { mapped = "8"; is_digit = 真 }
+        若 (str_equals(c, "９")) { mapped = "9"; is_digit = 真 }
+
+        若 (is_digit) {
+            设 start = i
+            i = i + 1
+            设 is_float = 假
+            循环 (i < len) {
+                设 ch = 取(chars, i)
+                设 ch_mapped = 映射全角(ch)
+                若 (查找("0123456789", ch_mapped) >= 0) { i = i + 1; 继续 }
+                若 (str_equals(ch_mapped, ".") 且 非(is_float)) {
+                    is_float = 真; i = i + 1; 继续
+                }
+                跳出
+            }
+            设 val = 子串(source, start, i - start)
+            // 全角数字转为半角
+            设 converted = ""
+            设 j = 0
+            循环 (j < 取长(val)) {
+                设 ch = 子串(val, j, 1)
+                设 m = 映射全角(ch)
+                converted = 连接(converted, m)
+                j = j + 1
+            }
+            tokens = 列表合(tokens, 列表(生成token("数字", converted)))
+            继续
+        }
+
+        // 标识符 / 单词
+        设 start = i
+        循环 (i < len) {
+            设 ch = 取(chars, i)
+            设 is_break = 假
+            若 (查找(空白, ch) >= 0) { is_break = 真 }
+            若 (查找("(){)}[],;:.", ch) >= 0) { is_break = 真 }
+            // 全角符号也作为边界
+            若 (查找("（）｛｝［］，；：", ch) >= 0) { is_break = 真 }
+            若 (查找("＝＞＜＋－＊／％＾！", ch) >= 0) { is_break = 真 }
+            若 (查找(" \n\t\r\u3000", ch) >= 0) { is_break = 真 }
+            若 (is_break) { 跳出 }
+            i = i + 1
+        }
+        若 (i > start) {
+            设 val = 子串(source, start, i - start)
+            tokens = 列表合(tokens, 列表(生成token("标识符", val)))
+        }
+    }
+
+    返回(tokens)
+}
+
+// ==================== 语法分析 ====================
+
+定义 取当前 (tokens) {
+    若 (表长(tokens) == 0) { 返回(假) }
+    返回(取(tokens, 0))
+}
+
+定义 消耗 (tokens, 期望类型, 期望值) {
+    设 tok = 取当前(tokens)
+    若 (非(是列表(tok))) { 1 / 0 }
+    设 ttype = 取(tok, 0)
+    设 tval = 取(tok, 1)
+    若 (str_equals(ttype, 期望类型) 且 (非(是字符串(期望值)) 或 str_equals(tval, 期望值))) {
+        若 (表长(tokens) == 1) { 返回(列表()) }
+        返回(切片(tokens, 1))
+    }
+    1 / 0
+}
+
+定义 匹配 (tokens, 期望类型, 期望值) {
+    设 tok = 取当前(tokens)
+    若 (非(是列表(tok))) { 返回(假) }
+    设 ttype = 取(tok, 0)
+    设 tval = 取(tok, 1)
+    若 (str_equals(ttype, 期望类型) 且 (非(是字符串(期望值)) 或 str_equals(tval, 期望值))) {
+        返回(真)
+    }
+    返回(假)
+}
+
+// 解析括号分组 (expr) 或函数调用 fn(expr, ...)
+定义 解析主表达式 (tokens) {
+    设 tok = 取当前(tokens)
+    若 (非(是列表(tok))) { 1 / 0 }
+
+    设 ttype = 取(tok, 0)
+    设 tval = 取(tok, 1)
+
+    // 数字
+    若 (str_equals(ttype, "数字")) {
+        返回(列表(tval, 切片(tokens, 1)))
+    }
+
+    // 字符串
+    若 (str_equals(ttype, "字符串")) {
+        返回(列表(tval, 切片(tokens, 1)))
+    }
+
+    // 符号 '(' — 分组或 S 表达式
+    若 (str_equals(ttype, "符号") 且 str_equals(tval, "(")) {
+        设 rest = 切片(tokens, 1)
+        设 result = 解析表达式(rest, 0)
+        设 node = 取(result, 0)
+        设 rest2 = 取(result, 1)
+        rest2 = 消耗(rest2, "符号", ")")
+        返回(列表(node, rest2))
+    }
+
+    // 符号 '[' — 列表字面量
+    若 (str_equals(ttype, "符号") 且 str_equals(tval, "[")) {
+        设 rest = 切片(tokens, 1)
+        设 elems = 列表()
+        循环 (真) {
+            若 (匹配(rest, "符号", "]")) {
+                rest = 消耗(rest, "符号", "]")
+                跳出
+            }
+            若 (匹配(rest, "符号", ",")) {
+                rest = 消耗(rest, "符号", ",")
+                继续
+            }
+            设 r = 解析表达式(rest, 0)
+            elems = 列表合(elems, 列表(取(r, 0)))
+            rest = 取(r, 1)
+        }
+        设 node = 列表合(列表("列表"), elems)
+        返回(列表(node, rest))
+    }
+
+    // 符号 '.' — 错误
+    若 (str_equals(ttype, "符号") 且 str_equals(tval, ".")) {
+        1 / 0
+    }
+
+    // 标识符
+    若 (str_equals(ttype, "标识符")) {
+        设 rest = 切片(tokens, 1)
+        // 检查是否是函数调用 fn(...)
+        若 (匹配(rest, "符号", "(")) {
+            // 消耗 '('
+            rest = 消耗(rest, "符号", "(")
+            设 args = 列表()
+            循环 (真) {
+                若 (匹配(rest, "符号", ")")) {
+                    rest = 消耗(rest, "符号", ")")
+                    跳出
+                }
+                若 (匹配(rest, "符号", ",")) {
+                    rest = 消耗(rest, "符号", ",")
+                    继续
+                }
+                设 r = 解析表达式(rest, 0)
+                args = 列表合(args, 列表(取(r, 0)))
+                rest = 取(r, 1)
+            }
+            设 node = 列表合(列表(tval), args)
+            返回(列表(node, rest))
+        }
+        // 点号访问 a.b
+        若 (匹配(rest, "符号", ".")) {
+            rest = 消耗(rest, "符号", ".")
+            设 r = 解析主表达式(rest)
+            设 rhs = 取(r, 0)
+            rest = 取(r, 1)
+            若 (是字符串(rhs)) {
+                设 node = 连接(tval, ".", rhs)
+                返回(列表(node, rest))
+            }
+            1 / 0
+        }
+        返回(列表(tval, rest))
+    }
+
+    // 符号 '{' — 代码块
+    若 (str_equals(ttype, "符号") 且 str_equals(tval, "{")) {
+        设 rest = 切片(tokens, 1)
+        设 stmts = 列表()
+        循环 (真) {
+            若 (匹配(rest, "符号", "}")) {
+                rest = 消耗(rest, "符号", "}")
+                跳出
+            }
+            若 (匹配(rest, "符号", ";")) {
+                rest = 消耗(rest, "符号", ";")
+                继续
+            }
+            设 r = 解析表达式(rest, 0)
+            stmts = 列表合(stmts, 列表(取(r, 0)))
+            rest = 取(r, 1)
+        }
+        设 node = 列表合(列表("做"), stmts)
+        返回(列表(node, rest))
+    }
+
+    1 / 0
+}
+
+// 运算符优先级
+设 前缀运算符 = 列表("-", "!")
+
+设 运算符映射 = 字典(
+    "+", "加", "-", "减", "*", "乘", "/", "除", "%", "余", "^", "幂",
+    ">", "大于", "<", "小于", ">=", "大于等于", "<=", "小于等于",
+    "=", "等于", "!=", "不等于", "!", "非",
+)
+
+定义 映射运算符 (op) {
+    返回(键取值(运算符映射, op, op))
+}
+
+定义 获取优先级 (op) {
+    若 (str_equals(op, ".")) { 返回(80) }
+    若 (str_equals(op, "!") 或 str_equals(op, "非")) { 返回(70) }
+    若 (str_equals(op, "*") 或 str_equals(op, "/") 或 str_equals(op, "%")) { 返回(60) }
+    若 (str_equals(op, "+") 或 str_equals(op, "-")) { 返回(50) }
+    若 (str_equals(op, ">") 或 str_equals(op, "<") 或
+        str_equals(op, ">=") 或 str_equals(op, "<=")) { 返回(40) }
+    若 (str_equals(op, "=") 或 str_equals(op, "!=")) { 返回(30) }
+    若 (str_equals(op, "且")) { 返回(20) }
+    若 (str_equals(op, "或")) { 返回(10) }
+    返回(0)
+}
+
+定义 解析表达式 (tokens, 最小优先级) {
+    设 tok = 取当前(tokens)
+    若 (非(是列表(tok))) { 1 / 0 }
+
+    设 ttype = 取(tok, 0)
+    设 tval = 取(tok, 1)
+
+    // 前缀运算符
+    若 (str_equals(ttype, "运算符") 且 包含(前缀运算符, tval)) {
+        设 rest = 切片(tokens, 1)
+        设 r = 解析表达式(rest, 70)
+        设 mapped = 映射运算符(tval)
+        设 node = 列表(mapped, 取(r, 0))
+        rest = 取(r, 1)
+        返回(列表(node, rest))
+    }
+
+    // 主表达式
+    设 result = 解析主表达式(tokens)
+    设 left = 取(result, 0)
+    设 rest = 取(result, 1)
+
+    // 处理中缀运算符
+    循环 (真) {
+        设 tok2 = 取当前(rest)
+        若 (非(是列表(tok2))) { 跳出 }
+        设 ttype2 = 取(tok2, 0)
+        设 tval2 = 取(tok2, 1)
+        设 is_op = 假
+
+        若 (str_equals(ttype2, "运算符") 或
+            (str_equals(ttype2, "标识符") 且
+             (str_equals(tval2, "且") 或 str_equals(tval2, "或") 或
+              str_equals(tval2, "非")))) {
+            is_op = 真
+        }
+
+        若 (非(is_op)) { 跳出 }
+
+        设 prec = 获取优先级(tval2)
+        若 (prec < 最小优先级) { 跳出 }
+
+        rest = 切片(rest, 1)
+
+        // 特殊处理 '='
+        若 (str_equals(tval2, "=")) {
+            // a = b → ["设", a, b]
+            设 r = 解析表达式(rest, prec)
+            left = 列表("设", left, 取(r, 0))
+            rest = 取(r, 1)
+            继续
+        }
+
+        设 r = 解析表达式(rest, prec + 1)
+        设 right = 取(r, 0)
+        rest = 取(r, 1)
+        设 mapped_op = 映射运算符(tval2)
+        left = 列表(mapped_op, left, right)
+    }
+
+    返回(列表(left, rest))
+}
+
+定义 解析语句 (tokens) {
+    设 tok = 取当前(tokens)
+    若 (非(是列表(tok))) { 返回(列表(假, 列表())) }
+
+    设 ttype = 取(tok, 0)
+    设 tval = 取(tok, 1)
+
+    // 若 ... { ... } 否则 { ... }
+    若 (str_equals(ttype, "标识符") 且 str_equals(tval, "若")) {
+        设 rest = 切片(tokens, 1)
+        设 cond_r = 解析表达式(rest, 0)
+        设 cond = 取(cond_r, 0)
+        rest = 取(cond_r, 1)
+        设 then_r = 解析主表达式(rest)
+        设 then_body = 取(then_r, 0)
+        rest = 取(then_r, 1)
+
+        设 else_body = 假
+        // 处理 再若 (elif) → 构造嵌套 if
+        若 (匹配(rest, "标识符", "再若")) {
+            rest = 消耗(rest, "标识符", "再若")
+            设 elif_r = 解析表达式(rest, 0)
+            设 elif_cond = 取(elif_r, 0)
+            rest = 取(elif_r, 1)
+            设 elif_body_r = 解析主表达式(rest)
+            设 elif_body = 取(elif_body_r, 0)
+            rest = 取(elif_body_r, 1)
+            else_body = 列表("若", elif_cond, elif_body)
+            // 检查再若/否则后缀
+            若 (匹配(rest, "标识符", "否则")) {
+                rest = 消耗(rest, "标识符", "否则")
+                设 el_r = 解析主表达式(rest)
+                设 el_body = 取(el_r, 0)
+                rest = 取(el_r, 1)
+                else_body = 列表合(else_body, 列表(el_body))
+            }
+        } 否则 若 (匹配(rest, "标识符", "否则")) {
+            rest = 消耗(rest, "标识符", "否则")
+            设 else_r = 解析主表达式(rest)
+            else_body = 取(else_r, 0)
+            rest = 取(else_r, 1)
+        }
+
+        设 node = 列表("若", cond, then_body)
+        若 (是列表(else_body)) { node = 列表合(node, 列表(else_body)) }
+        返回(列表(node, rest))
+    }
+
+    // 循环 (cond) { body }
+    若 (str_equals(ttype, "标识符") 且 str_equals(tval, "循环")) {
+        设 rest = 切片(tokens, 1)
+        设 cond_r = 解析表达式(rest, 0)
+        设 cond = 取(cond_r, 0)
+        rest = 取(cond_r, 1)
+        设 body_r = 解析主表达式(rest)
+        设 body = 取(body_r, 0)
+        rest = 取(body_r, 1)
+        返回(列表(列表("循环", cond, body), rest))
+    }
+
+    // 设 x = val
+    若 (str_equals(ttype, "标识符") 且 str_equals(tval, "设")) {
+        设 rest = 切片(tokens, 1)
+        设 name_tok = 取当前(rest)
+        若 (非(是列表(name_tok))) { 1 / 0 }
+        设 name = 取(name_tok, 1)
+        rest = 切片(rest, 1)
+
+        // 检查 '='
+        若 (匹配(rest, "运算符", "=")) {
+            rest = 消耗(rest, "运算符", "=")
+        }
+
+        设 val_r = 解析表达式(rest, 0)
+        设 val = 取(val_r, 0)
+        返回(列表(列表("设", name, val), 取(val_r, 1)))
+    }
+
+    // 定义 fn (params) { body }
+    若 (str_equals(ttype, "标识符") 且 str_equals(tval, "定义")) {
+        设 rest = 切片(tokens, 1)
+        设 name_tok = 取当前(rest)
+        若 (非(是列表(name_tok))) { 1 / 0 }
+        设 name = 取(name_tok, 1)
+        rest = 切片(rest, 1)
+
+        // 参数列表 (params)
+        rest = 消耗(rest, "符号", "(")
+        设 params = 列表()
+        循环 (真) {
+            若 (匹配(rest, "符号", ")")) {
+                rest = 消耗(rest, "符号", ")")
+                跳出
+            }
+            若 (匹配(rest, "符号", ",")) {
+                rest = 消耗(rest, "符号", ",")
+                继续
+            }
+            设 p_tok = 取当前(rest)
+            若 (非(是列表(p_tok))) { 1 / 0 }
+            params = 列表合(params, 列表(取(p_tok, 1)))
+            rest = 切片(rest, 1)
+        }
+
+        // 函数体
+        设 body_r = 解析主表达式(rest)
+        设 body = 取(body_r, 0)
+        rest = 取(body_r, 1)
+        返回(列表(列表("定义", name, params, body), rest))
+    }
+
+    // 函数 (params) { body } — 匿名函数
+    若 (str_equals(ttype, "标识符") 且 str_equals(tval, "函数")) {
+        设 rest = 切片(tokens, 1)
+        rest = 消耗(rest, "符号", "(")
+        设 params = 列表()
+        循环 (真) {
+            若 (匹配(rest, "符号", ")")) {
+                rest = 消耗(rest, "符号", ")")
+                跳出
+            }
+            若 (匹配(rest, "符号", ",")) {
+                rest = 消耗(rest, "符号", ",")
+                继续
+            }
+            设 p_tok = 取当前(rest)
+            若 (非(是列表(p_tok))) { 1 / 0 }
+            params = 列表合(params, 列表(取(p_tok, 1)))
+            rest = 切片(rest, 1)
+        }
+        设 body_r = 解析主表达式(rest)
+        设 body = 取(body_r, 0)
+        rest = 取(body_r, 1)
+        返回(列表(列表("函数", params, body), rest))
+    }
+
+    // 尝试 { body } 捕获 (e) { handler }
+    若 (str_equals(ttype, "标识符") 且 str_equals(tval, "尝试")) {
+        设 rest = 切片(tokens, 1)
+        设 try_r = 解析主表达式(rest)
+        设 try_body = 取(try_r, 0)
+        rest = 取(try_r, 1)
+        设 catch_var = 假
+        设 catch_body = 假
+        设 has_catch = 假
+        若 (匹配(rest, "标识符", "捕获")) {
+            rest = 消耗(rest, "标识符", "捕获")
+            // 支持 捕获 (e) { body } 和 捕获 { body }
+            若 (匹配(rest, "符号", "(")) {
+                rest = 消耗(rest, "符号", "(")
+                设 cv = 取当前(rest)
+                若 (是列表(cv)) { catch_var = 取(cv, 1); rest = 切片(rest, 1) }
+                rest = 消耗(rest, "符号", ")")
+            }
+            设 ch_r = 解析主表达式(rest)
+            catch_body = 取(ch_r, 0)
+            rest = 取(ch_r, 1)
+            has_catch = 真
+        }
+        设 node = 列表("尝试", try_body)
+        若 (has_catch) {
+            node = 列表合(node, 列表(列表("捕获", catch_var, catch_body)))
+        }
+        返回(列表(node, rest))
+    }
+
+    // 通用表达式
+    返回(解析表达式(tokens, 0))
+}
+
+定义 解析 (source) {
+    设 tokens = 词法分析(source)
+    设 asts = 列表()
+    循环 (表长(tokens) > 0) {
+        设 r = 解析语句(tokens)
+    设 node = 取(r, 0)
+    若 (非(是列表(node))) {
+        asts = 列表合(asts, 列表(node))
+        跳出
+    }
+    asts = 列表合(asts, 列表(node))
+        tokens = 取(r, 1)
+    }
+    若 (表长(asts) == 0) { 返回(假) }
+    若 (表长(asts) == 1) { 返回(取(asts, 0)) }
+    返回(列表合(列表("做"), asts))
+}
+
+导出 词法分析
+导出 解析

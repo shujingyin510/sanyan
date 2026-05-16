@@ -51,6 +51,10 @@
 设 内置unique = 函数(参数) { 去重(get(参数, 0)) }
 设 内置sum = 函数(参数) { 求和(get(参数, 0)) }
 设 内置list = 函数(参数) { 参数 }
+设 内置子串 = 函数(参数) {
+    若 (list_len(参数) == 3) { 返回(子串(get(参数, 0), get(参数, 1), get(参数, 2))) }
+    返回(子串(get(参数, 0), get(参数, 1)))
+}
 
 设 内置操作表 = dict(
     "加", 内置加, "减", 内置减, "乘", 内置乘, "除", 内置除,
@@ -58,18 +62,28 @@
     "大于", 内置大于, "小于", 内置小于, "等于", 内置等于,
     "且", 内置且, "或", 内置或, "非", 内置非,
     "输出", 内置输出,
-    "concat", 内置concat, "length", 内置length,
-    "list_len", 内置list_len, "list_concat", 内置list_concat,
-    "get", 内置get, "slice", 内置slice,
-    "dict_contains", 内置dict_contains,
-    "get_key", 内置get_key, "set_key", 内置set_key,
-    "is_number", 内置is_number, "is_string", 内置is_string,
-    "str_equals", 内置str_equals,
-    "list", 内置list,
-    "map", 内置map, "filter", 内置filter, "reduce", 内置reduce,
-    "contains", 内置contains,
-    "sort", 内置sort, "reverse", 内置reverse,
-    "unique", 内置unique, "sum", 内置sum,
+    "concat", 内置concat, "连接", 内置concat,
+    "length", 内置length, "取长", 内置length,
+    "list_len", 内置list_len, "表长", 内置list_len,
+    "list_concat", 内置list_concat, "列表合", 内置list_concat,
+    "get", 内置get, "取", 内置get,
+    "slice", 内置slice, "切片", 内置slice,
+    "dict_contains", 内置dict_contains, "含键", 内置dict_contains,
+    "get_key", 内置get_key, "取键", 内置get_key,
+    "set_key", 内置set_key, "置键", 内置set_key,
+    "is_number", 内置is_number, "是数字", 内置is_number,
+    "is_string", 内置is_string, "是字符串", 内置is_string,
+    "str_equals", 内置str_equals, "字符串相等", 内置str_equals,
+    "substring", 内置子串, "子串", 内置子串,
+    "list", 内置list, "列表", 内置list,
+    "map", 内置map, "映射", 内置map,
+    "filter", 内置filter, "过滤", 内置filter,
+    "reduce", 内置reduce, "归并", 内置reduce,
+    "contains", 内置contains, "包含", 内置contains,
+    "sort", 内置sort, "排序", 内置sort,
+    "reverse", 内置reverse, "反转", 内置reverse,
+    "unique", 内置unique, "去重", 内置unique,
+    "sum", 内置sum, "求和", 内置sum,
 )
 
 // ==================== 环境管理 ====================
@@ -236,9 +250,23 @@
 
 // ==================== 主求值器 ====================
 
+// 检查并去除字符串字面量的引号
+设 去掉引号 = 函数(s) {
+    设 len = 取长(s)
+    若 (len < 2) { 返回(假) }
+    设 first = 子串(s, 0, 1)
+    设 last = 子串(s, len - 1, 1)
+    若 (且(str_equals(first, "\""), str_equals(last, "\""))) { 返回(子串(s, 1, len - 2)) }
+    若 (且(str_equals(first, "「"), str_equals(last, "」"))) { 返回(子串(s, 1, len - 2)) }
+    若 (且(str_equals(first, "『"), str_equals(last, "』"))) { 返回(子串(s, 1, len - 2)) }
+    返回(假)
+}
+
 定义 求值 (ast, env) {
     若 (is_number(ast)) { 返回(ast) }
     若 (is_string(ast)) {
+    设 stripped = 去掉引号(ast)
+    若 (是字符串(stripped)) { 返回(stripped) }
         尝试 { 返回(查变量(env, ast)) }
         捕获 (e) { 返回(ast) }
     }

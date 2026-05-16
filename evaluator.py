@@ -64,7 +64,35 @@ class SanyanEvaluator(SanyanRuntime):
 
     def _eval_str(self, node: str) -> Any:
         if len(node) >= 2 and node[0] in ('"', '\u201c', '\u2018', "'"):
-            return node[1:-1]
+            s = node[1:-1]
+            result = []
+            i = 0
+            while i < len(s):
+                if s[i] == '\\' and i + 1 < len(s):
+                    esc = s[i + 1]
+                    if esc == 'n':
+                        result.append('\n'); i += 2
+                    elif esc == 't':
+                        result.append('\t'); i += 2
+                    elif esc == 'r':
+                        result.append('\r'); i += 2
+                    elif esc == '\\':
+                        result.append('\\'); i += 2
+                    elif esc == '"':
+                        result.append('"'); i += 2
+                    elif esc == "'":
+                        result.append("'"); i += 2
+                    elif esc == 'u' and i + 5 < len(s):
+                        try:
+                            result.append(chr(int(s[i+2:i+6], 16)))
+                            i += 6
+                        except ValueError:
+                            result.append(s[i]); i += 1
+                    else:
+                        result.append(s[i]); i += 1
+                else:
+                    result.append(s[i]); i += 1
+            return ''.join(result)
         if node.replace('.', '', 1).replace('-', '', 1).isdigit():
             return TritValue(float(node)) if '.' in node else TritValue(int(node))
         if self._is_valid_identifier(node):

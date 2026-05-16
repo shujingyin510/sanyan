@@ -7,12 +7,15 @@ from ops.registry import register
 _SAFE_PATH_SEPARATORS = frozenset({'/', '\\'})
 _module_cache: dict = {}
 _import_stack: set = set()
+_sugar_parser_module = None
 
 
 def clear_cache():
     """清理模块缓存，用于测试隔离。"""
     _module_cache.clear()
     _import_stack.clear()
+    global _sugar_parser_module
+    _sugar_parser_module = None
 
 
 def _resolve_path(raw_path, auto_stdlib=True):
@@ -29,18 +32,76 @@ def _resolve_path(raw_path, auto_stdlib=True):
     return norm
 
 
-def _parse_and_eval_file(code, evaluator):
-    """解析并执行文件代码（sugar 优先，fallback S 表达式）。"""
-    from sugar import SugarConverter
-    from lexer import tokenize
-    from parser import parse
+def _load_sugar_parser(evaluator):
+    """预加载 stdlib/sugar.san 作为 Sanyan 模块（Python 引导），缓存备用。"""
+    global _sugar_parser_module
+    if _sugar_parser_module is not None:
+        return _sugar_parser_module
+
+    sugar_path = os.path.join('stdlib', 'sugar.san')
+    if not os.path.exists(sugar_path):
+        return None
 
     try:
-        ast = SugarConverter.convert(code, evaluator.skin_manager)
-    except SyntaxError:
-        tokens = tokenize(code)
-        ast = parse(tokens)
+        with open(sugar_path, 'r', encoding='utf-8') as f:
+            code = f.read()
+    except (IOError, OSError):
+        return None
+    if not code.strip():
+        return None
 
+    from sugar import SugarConverter
+    from skin import SkinManager
+    skin_mgr = evaluator.skin_manager if evaluator and evaluator.skin_manager else SkinManager('chinese')
+    ast = SugarConverter.convert(code, skin_mgr)
+    if ast is None:
+        return None
+
+    from evaluator import SanyanEvaluator
+    module_env = SanyanEvaluator(skin_manager=skin_mgr)
+    module_env.eval(ast)
+    exports = _collect_exports(ast) or {'词法分析', '解析'}
+    _sugar_parser_module = ModuleValue(module_env.vars, module_env.commands, exports)
+    return _sugar_parser_module
+
+
+def _parse_with_sugar_san(code, evaluator):
+    """使用 stdlib/sugar.san 的 解析 函数解析糖语法代码。"""
+    parser = _load_sugar_parser(evaluator)
+    if parser is None:
+        return None
+    try:
+        from evaluator import SanyanEvaluator
+        temp_env = SanyanEvaluator(skin_manager=evaluator.skin_manager)
+        result = parser.call(temp_env, ['解析', code])
+        if isinstance(result, TritValue):
+            iv = result.to_int()
+            if iv == -1 or iv == 0:
+                return None
+        return result
+    except Exception:
+        return None
+
+
+def _parse_code(code, evaluator):
+    """解析代码：sugar.san 自举 → Python SugarConverter → S-表达式降级。"""
+    ast = _parse_with_sugar_san(code, evaluator)
+    if ast is not None:
+        return ast
+    from sugar import SugarConverter
+    try:
+        return SugarConverter.convert(code, evaluator.skin_manager)
+    except SyntaxError:
+        pass
+    from lexer import tokenize
+    from parser import parse
+    tokens = tokenize(code)
+    return parse(tokens)
+
+
+def _parse_and_eval_file(code, evaluator):
+    """解析并执行文件代码（sugar.san 自举优先 → Python SugarConverter → S 表达式）。"""
+    ast = _parse_code(code, evaluator)
     return evaluator.eval(ast) if ast is not None else TritValue(0)
 
 
@@ -138,14 +199,7 @@ class FileOps:
 
         from evaluator import SanyanEvaluator
         module_env = SanyanEvaluator(skin_manager=evaluator.skin_manager)
-        try:
-            from sugar import SugarConverter
-            ast = SugarConverter.convert(code, module_env.skin_manager)
-        except SyntaxError:
-            from lexer import tokenize
-            from parser import parse
-            tokens = tokenize(code)
-            ast = parse(tokens)
+        ast = _parse_code(code, module_env)
 
         # 收集导出声明
         exports = _collect_exports(ast)

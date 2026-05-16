@@ -2,6 +2,24 @@
 
 ---
 
+## [v3.9.0] — 2026-05-16
+
+### 新增
+- **sugar.san 接入导入管线** (`ops/file_ops.py`): `import_module()` 和 `_parse_and_eval_file()` 统一经过 `_parse_code()`，按序尝试 sugar.san → Python SugarConverter → S 表达式回退。sugar.san 通过 `_load_sugar_parser()` 自举（Python SugarConverter 编译 → SanyanEvaluator 执行注册 `解析`/`词法分析` 命令）。
+- **sugar.san 性能优化** (`stdlib/sugar.san`): `词法分析` 开头调用 `设 chars = 字列(source)` 将字符串拆为字符列表，后续所有单字符访问 `子串(source, i, 1)` 替换为 `取(chars, i)`，复杂度从 O(n²) 降至 O(n)。
+- **sugar.san 鲁棒性**: 修复注释 `/` 误判、全角数字识别、运算符映射、`再若`/`elif` 支持、`捕获` 不带 `(var)` 语法。
+- **sugar.san 测试** (`tests/test_sugar_san.py`): 37 项测试覆盖加载、基础解析、控制流、列表/字典、try/catch、运算符优先级、边界条件、全角、点号访问、结构校验、Python 兼容性。
+- **`含键`/`计数` 内置操作**: `runtime.py` BUILTIN_OPS 新增 `'含键'`、`'计数'`；`language/chinese.json` 新增 `"dict_contains": "含键"`。
+- **文档同步**: `docs/manual.md` 第 17 节新增 `含键` 条目。
+
+### 修复
+- **eval.san 语义** (`stdlib/eval.san:269`): 分析确认 `是字符串(stripped)` 正确，未做改动。
+
+### 基础
+- 全部 6 项技术债清理完毕，176 项测试（含 37 项 sugar.san 测试）全部通过。
+
+---
+
 ## [v3.8.0] — 2026-05-16
 
 ### 新增

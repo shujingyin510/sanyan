@@ -1,0 +1,91 @@
+// stdlib/tokenize.san — 词法分析器（Sanyan 版）
+// 将源代码字符串切割成 flat token 列表
+// 注意：字符串比较必须用 str_equals，不能用 ==（== 是数值比较）
+
+定义 词法分析 (source) {
+    设 len = 取长(source)
+    设 tokens = 列表()
+    设 i = 0
+    设 空白 = " \n\t\u3000"
+    设 分隔 = "，；"
+
+    循环 (i < len) {
+        设 c = 子串(source, i, 1)
+
+        // 跳过空白
+        若 (查找(空白, c) >= 0) { i = i + 1; 继续 }
+
+        // 跳过分隔符（全角逗号、全角分号）
+        若 (查找(分隔, c) >= 0) { i = i + 1; 继续 }
+
+        // 括号
+        若 (str_equals(c, "（") 或 str_equals(c, "(")) {
+            tokens = 列表合(tokens, 列表("("))
+            i = i + 1
+            继续
+        }
+        若 (str_equals(c, "）") 或 str_equals(c, ")")) {
+            tokens = 列表合(tokens, 列表(")"))
+            i = i + 1
+            继续
+        }
+
+        // 跳过全角冒号（简化处理，不处理 obj.attr 语法）
+        若 (str_equals(c, "：")) { i = i + 1; 继续 }
+
+        // 行注释 // 或 ／／
+        若 (str_equals(c, "/") 或 str_equals(c, "／")) {
+            若 (i + 1 < len) {
+                设 next = 子串(source, i + 1, 1)
+                若 (str_equals(next, c)) {
+                    循环 (i < len 且 非(str_equals(子串(source, i, 1), "\n"))) { i = i + 1 }
+                    继续
+                }
+            }
+        }
+
+        // 字符串字面量：保留原始引号字符
+        若 (str_equals(c, "\"") 或 str_equals(c, "「") 或 str_equals(c, "『")) {
+            设 end_c = c
+            若 (str_equals(c, "「")) { end_c = "」" }
+            若 (str_equals(c, "『")) { end_c = "』" }
+
+            设 str_start = i
+            i = i + 1
+            循环 (i < len 且 非(str_equals(子串(source, i, 1), end_c))) {
+                若 (str_equals(子串(source, i, 1), "\\")) { i = i + 1 }
+                i = i + 1
+            }
+            若 (i < len) { i = i + 1 }
+            设 token = 子串(source, str_start, i - str_start)
+            tokens = 列表合(tokens, 列表(token))
+            继续
+        }
+
+        // 收集单词 token
+        设 word_start = i
+        循环 (i < len) {
+            设 ch = 子串(source, i, 1)
+            // 检查是否遇到 token 边界
+            若 (查找(空白, ch) >= 0) { 跳出 }
+            若 (查找(分隔, ch) >= 0) { 跳出 }
+            若 (str_equals(ch, "（") 或 str_equals(ch, "）") 或
+                str_equals(ch, "(") 或 str_equals(ch, ")") 或
+                str_equals(ch, "：") 或 str_equals(ch, "，")) { 跳出 }
+            若 (str_equals(ch, "\"") 或 str_equals(ch, "「") 或 str_equals(ch, "『")) { 跳出 }
+            // // 或 ／／ 注释开始
+            若 (str_equals(ch, "/") 或 str_equals(ch, "／")) {
+                若 (i + 1 < len 且 str_equals(子串(source, i + 1, 1), ch)) { 跳出 }
+            }
+            i = i + 1
+        }
+        若 (i > word_start) {
+            设 word = 子串(source, word_start, i - word_start)
+            tokens = 列表合(tokens, 列表(word))
+        }
+    }
+
+    返回(tokens)
+}
+
+导出 词法分析

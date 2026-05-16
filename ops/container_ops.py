@@ -1,7 +1,7 @@
 """容器操作：列表、数组、字典、通用索引、映射/过滤/归并"""
 from ternary_core import TritValue, ArrayValue
 from values import FunctionValue, call_function
-from values import SanyanSyntaxError, SanyanTypeError, SanyanValueError
+from values import SanyanSyntaxError, SanyanTypeError, SanyanValueError, SanyanKeyError
 from ops.registry import register
 
 class ContainerOps:
@@ -114,7 +114,10 @@ class ContainerOps:
         key = evaluator.eval(args[1])
         if isinstance(key, TritValue):
             key = key.to_int()
-        return d[key]
+        try:
+            return d[key]
+        except KeyError:
+            raise SanyanKeyError(f"键不存在: {key}")
 
     @staticmethod
     def dict_set(evaluator, args):

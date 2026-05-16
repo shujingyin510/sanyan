@@ -1,0 +1,61 @@
+// stdlib/parse.san — S 表达式解析器（Sanyan 版）
+// 将 token 列表解析为嵌套 AST
+// 依赖：tokenize.san、切片、列表合、列表、取、表长、str_equals
+
+设 t = 导入("stdlib/tokenize.san")
+
+// 解析单个 S 表达式，返回 [ast, remaining_tokens]
+定义 解析一次 (tokens) {
+    若 (表长(tokens) == 0) { 返回(列表(0, 列表())) }
+
+    设 first = 取(tokens, 0)
+    设 rest = 切片(tokens, 1)
+
+    若 (str_equals(first, ")")) { 1 / 0 }
+
+    若 (str_equals(first, "(")) {
+        设 elems = 列表()
+        循环 (真) {
+            若 (表长(rest) == 0) { 1 / 0 }
+            设 next = 取(rest, 0)
+            若 (str_equals(next, ")")) {
+                返回(列表(elems, 切片(rest, 1)))
+            }
+            设 r = 解析一次(rest)
+            设 elem = 取(r, 0)
+            设 rest = 取(r, 1)
+            elems = 列表合(elems, 列表(elem))
+        }
+    }
+
+    返回(列表(first, rest))
+}
+
+// 解析全部顶层表达式，返回 AST 列表
+定义 解析全部 (tokens) {
+    设 results = 列表()
+    设 remaining = tokens
+    循环 (表长(remaining) > 0) {
+        设 r = 解析一次(remaining)
+        设 ast = 取(r, 0)
+        设 remaining = 取(r, 1)
+        results = 列表合(results, 列表(ast))
+    }
+    返回(results)
+}
+
+// 便捷函数：源代码 → AST（单个用 `做` 包装）
+定义 解析源代码 (source) {
+    设 tokens = t.词法分析(source)
+    设 asts = 解析全部(tokens)
+    若 (表长(asts) == 0) { 返回(0) }
+    若 (表长(asts) == 1) { 返回(取(asts, 0)) }
+    返回(列表合(列表("做"), asts))
+}
+
+// 重新导出词法分析器（用 定义 以便 ModuleValue 能找到）
+定义 词法分析 (source) { t.词法分析(source) }
+导出 词法分析
+导出 解析一次
+导出 解析全部
+导出 解析源代码
