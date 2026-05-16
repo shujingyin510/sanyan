@@ -206,7 +206,7 @@ def _extract_definitions(text: str) -> dict[str, int]:
     return defs
 
 
-def _do_definition(text: str, pos: dict) -> Optional[list[dict]]:
+def _do_definition(text: str, pos: dict, uri: str = "") -> Optional[list[dict]]:
     """跳转到定义。"""
     lines = text.split("\n")
     if pos["line"] >= len(lines):
@@ -227,7 +227,7 @@ def _do_definition(text: str, pos: dict) -> Optional[list[dict]]:
     defs = _extract_definitions(text)
     if word in defs:
         return [{
-            "uri": _open_doc_uri,
+            "uri": uri,
             "range": {
                 "start": {"line": defs[word], "character": 0},
                 "end": {"line": defs[word], "character": len(lines[defs[word]])},
@@ -411,7 +411,7 @@ def _handle_message(msg: dict) -> None:
         uri = params.get("textDocument", {}).get("uri", "")
         text = _open_docs.get(uri, "")
         pos = params.get("position", {})
-        result = _do_definition(text, pos)
+        result = _do_definition(text, pos, uri)
         _send({"id": msg_id, "result": result})
         return
 

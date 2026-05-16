@@ -1,7 +1,7 @@
 """文件读取、写出、模块加载与导入"""
 import os
 from ternary_core import TritValue
-from values import SanyanSyntaxError, SanyanValueError, ModuleValue
+from values import SanyanSyntaxError, SanyanValueError, SanyanNameError, SanyanTypeError, ModuleValue
 from ops.registry import register
 
 _SAFE_PATH_SEPARATORS = frozenset({'/', '\\'})
@@ -61,7 +61,7 @@ def _load_sugar_parser(evaluator):
     module_env = SanyanEvaluator(skin_manager=skin_mgr)
     module_env.eval(ast)
     exports = _collect_exports(ast) or {'词法分析', '解析'}
-    _sugar_parser_module = ModuleValue(module_env.vars, module_env.commands, exports)
+    _sugar_parser_module = ModuleValue(module_env.scope_vars, module_env.commands, exports)
     return _sugar_parser_module
 
 
@@ -79,7 +79,7 @@ def _parse_with_sugar_san(code, evaluator):
             if iv == -1 or iv == 0:
                 return None
         return result
-    except Exception:
+    except (SanyanNameError, SanyanSyntaxError, SanyanTypeError, SanyanValueError, SyntaxError):
         return None
 
 
@@ -211,7 +211,7 @@ class FileOps:
         finally:
             _import_stack.discard(abs_path)
 
-        module = ModuleValue(module_env.vars, module_env.commands, exports)
+        module = ModuleValue(module_env.scope_vars, module_env.commands, exports)
         _module_cache[abs_path] = module
         return module
 

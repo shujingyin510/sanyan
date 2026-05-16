@@ -83,6 +83,8 @@
     "sort": "sort",
     "reverse": "reverse",
     "contains": "contains",
+    "dict_contains": "dict_contains",
+    "is_list": "is_list",
     "unique": "unique",
     "slice": "slice",
     "sum": "sum",

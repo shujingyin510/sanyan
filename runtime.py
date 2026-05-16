@@ -68,12 +68,12 @@ class SanyanRuntime:
         self.call_stack: List[Any] = []
 
     @property
-    def vars(self):
-        """兼容旧代码：返回当前最内层作用域。写操作直接用此属性。"""
+    def scope_vars(self):
+        """返回当前最内层作用域。写操作直接用此属性。"""
         return self._scopes[-1]
 
-    @vars.setter
-    def vars(self, value):
+    @scope_vars.setter
+    def scope_vars(self, value):
         self._scopes[-1] = value
 
     def get_var(self, name: str) -> Any:
@@ -130,47 +130,4 @@ class SanyanRuntime:
             pairs.append((obj, val))
         return pairs
 
-    def _eval_symbol(self, symbol: str):
-        if self.has_var(symbol):
-            return self.get_var(symbol)
-        if symbol.isdigit() or (symbol.startswith('-') and symbol[1:].isdigit()):
-            return TritValue(int(symbol))
-        # 使用皮肤判断三态词
-        if self.skin_manager:
-            state = self.skin_manager.is_ternary_word(symbol)
-            if state is not None:
-                return TritValue(state)
-        # 硬编码兜底（确保皮肤失效时仍能识别）
-        if symbol in TritValue.STATE_MAP:
-            return TritValue(TritValue.STATE_MAP[symbol])
-        if '.' in symbol:
-            obj, attr = symbol.split('.')
-            if obj in self.actuators:
-                val = TritValue.from_string(attr)
-                self.actuators[obj] = val
-                return val
-            if obj in self.sensors:
-                sensor_val = self.sensors[obj]
-                attr_val = TritValue.from_string(attr)
-                return TritValue(1 if sensor_val.symbol == attr_val.symbol else -1)
-            raise SanyanNameError(f"未定义的设备: {obj}")
-        if '：' in symbol:
-            obj, attr = symbol.split('：')
-            return self._eval_symbol(obj + '.' + attr)
-        if self.context_object is not None:
-            obj = self.context_object
-            if obj in self.actuators:
-                val = TritValue.from_string(symbol)
-                self.actuators[obj] = val
-                return val
-            if obj in self.sensors:
-                sensor_val = self.sensors[obj]
-                attr_val = TritValue.from_string(symbol)
-                return TritValue(1 if sensor_val.symbol == attr_val.symbol else -1)
-            if hasattr(self, 'device_registry'):
-                dev = self.device_registry.get(obj)
-                if dev:
-                    val = TritValue.from_string(symbol)
-                    dev.write(val)
-                    return val
-        raise SanyanNameError(f"未定义的符号: {symbol}")
+    # _eval_symbol 已移至 evaluator.py（求值逻辑归属求值器）

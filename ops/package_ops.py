@@ -65,7 +65,7 @@ class PackageOps:
             # 尝试从索引查找
             try:
                 url = PackageOps._lookup_index(name)
-            except Exception:
+            except (IOError, OSError, KeyError):
                 raise SanyanValueError(
                     f"包 '{name}' 未安装，且无法从索引获取。"
                     f"请先手动下载到 packages/{name}/ 目录，"
@@ -105,27 +105,20 @@ class PackageOps:
                 raise SanyanValueError(f"包 '{name}' 中没有找到 .san 文件")
             pkg_path = os.path.join(pkg_dir, san_files[0])
 
-        # 读取并执行包文件（隔离环境）
         from evaluator import SanyanEvaluator
         module_env = SanyanEvaluator(skin_manager=evaluator.skin_manager)
+        from ops.file_ops import _parse_code
         try:
-            code = open(pkg_path, "r", encoding="utf-8").read()
+            with open(pkg_path, "r", encoding="utf-8") as f:
+                code = f.read()
         except (IOError, OSError) as e:
             raise SanyanValueError(f"读取包文件失败: {e}")
-
-        from sugar import SugarConverter
-        from lexer import tokenize
-        from parser import parse
-        try:
-            ast = SugarConverter.convert(code, module_env.skin_manager)
-        except SyntaxError:
-            tokens = tokenize(code)
-            ast = parse(tokens)
+        ast = _parse_code(code, module_env)
 
         if ast is not None:
             module_env.eval(ast)
 
-        return ModuleValue(module_env.vars, module_env.commands)
+        return ModuleValue(module_env.scope_vars, module_env.commands)
 
     @staticmethod
     def list_packages(evaluator, args):
@@ -157,24 +150,26 @@ class PackageOps:
         pkg_dir = os.path.join(base, name.replace(".", "_").replace("/", "_"))
 
         try:
-            # 下载
             print(f"正在下载包 '{name}'...")
             with urllib.request.urlopen(url, timeout=30) as resp:
                 data = resp.read()
-        except Exception as e:
+        except (urllib.error.URLError, IOError, OSError) as e:
             raise SanyanValueError(f"下载包失败: {e}")
 
-        # 解压
+        # 解压（带 zip-slip 防护）
         try:
             os.makedirs(pkg_dir, exist_ok=True)
             with tempfile.TemporaryFile() as tmp:
                 tmp.write(data)
                 tmp.seek(0)
                 with zipfile.ZipFile(tmp) as z:
-                    z.extractall(pkg_dir)
+                    for info in z.infolist():
+                        safe_path = os.path.normpath(os.path.join(pkg_dir, info.filename))
+                        if not safe_path.startswith(os.path.normpath(pkg_dir)):
+                            raise SanyanValueError(f"zip-slip 攻击检测: {info.filename}")
+                        z.extract(info, pkg_dir)
             print(f"包 '{name}' 已安装到 {pkg_dir}")
         except (zipfile.BadZipFile, IOError, OSError) as e:
-            # 不是 zip？尝试保存为单个文件
             if not os.path.exists(os.path.join(pkg_dir, "package.san")):
                 with open(os.path.join(pkg_dir, f"{name}.san"), "wb") as f:
                     f.write(data)
@@ -192,14 +187,13 @@ class PackageOps:
                 entry = index.get(name)
                 if entry:
                     return entry.get("url") or entry.get("download")
-            except Exception:
+            except (IOError, OSError, json.JSONDecodeError):
                 pass
-        # 远程索引
         import urllib.request
         try:
             with urllib.request.urlopen(PACKAGE_INDEX_URL, timeout=10) as resp:
                 index = json.loads(resp.read().decode("utf-8"))
-        except Exception:
+        except (urllib.error.URLError, IOError, OSError, json.JSONDecodeError):
             return None
         entry = index.get(name)
         if entry:

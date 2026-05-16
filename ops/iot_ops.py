@@ -16,7 +16,7 @@ class IotOps:
                 return val
             try:
                 return TritValue.from_string(str(val))
-            except Exception:
+            except (ValueError, KeyError):
                 return TritValue(0)
 
         def sync_device(name, state):
@@ -78,7 +78,7 @@ class IotOps:
             if not isinstance(val, TritValue):
                 try:
                     val = TritValue.from_string(str(val))
-                except Exception:
+                except (ValueError, KeyError):
                     val = TritValue(0)
                 device_dict[key] = val
             return val
@@ -195,3 +195,5 @@ register('读', IotOps.sensor_read)
 register('读取', IotOps.sensor_read)
 register('写入', IotOps.set_sensor)
 register('查询', IotOps.query)
+register('对', IotOps.context_op)
+register('注册设备', IotOps.register_device_op)

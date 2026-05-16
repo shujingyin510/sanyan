@@ -1,6 +1,21 @@
 """三言中的值类型和异常"""
 from typing import Any, Optional
-from ternary_core import TritValue
+from ternary_core import TritValue, ArrayValue
+
+
+def to_num(v):
+    """将 TritValue 或可数值化的值转为 int/float。
+    若无法数值化则原样返回（兼容非数值相等比较）。
+    """
+    if isinstance(v, TritValue):
+        return v.to_float() if v.is_float() else v.to_int()
+    if isinstance(v, (int, float)):
+        return v
+    try:
+        s = str(v)
+        return float(s) if '.' in s else int(s)
+    except (ValueError, TypeError):
+        return v
 
 class ReturnException(Exception):
     def __init__(self, value: Any) -> None:
@@ -58,7 +73,7 @@ class FunctionValue:
 
         for param, arg_node in zip(self.params, args):
             # 如果参数已经是值类型，直接使用；否则求值
-            if isinstance(arg_node, (TritValue, str, int, list, dict)):
+            if isinstance(arg_node, (TritValue, ArrayValue, str, int, list, dict)):
                 val = arg_node
             else:
                 val = evaluator.eval(arg_node)
@@ -76,8 +91,8 @@ class FunctionValue:
         finally:
             if self.closure_vars:
                 for k in self.closure_vars:
-                    if k in evaluator.vars:
-                        self.closure_vars[k] = evaluator.vars[k]
+                    if k in evaluator.scope_vars:
+                        self.closure_vars[k] = evaluator.scope_vars[k]
             evaluator.pop_scope()
 
     def __repr__(self):
@@ -136,8 +151,8 @@ class ModuleValue:
                         result = ret.value
                         break
                 for k in self.vars.keys():
-                    if k in evaluator.vars:
-                        self.vars[k] = evaluator.vars[k]
+                    if k in evaluator.scope_vars:
+                        self.vars[k] = evaluator.scope_vars[k]
                 return result if result is not None else TritValue(0)
             finally:
                 evaluator.commands.clear()

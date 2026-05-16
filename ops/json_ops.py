@@ -22,7 +22,7 @@ class JsonOps:
 
         try:
             return json.dumps(convert(val), ensure_ascii=False)
-        except Exception as e:
+        except (TypeError, ValueError, OverflowError) as e:
             raise SanyanTypeError(f"无法转换为 JSON: {e}")
 
     @staticmethod
@@ -47,7 +47,7 @@ class JsonOps:
         try:
             data = json.loads(s)
             return convert(data)
-        except Exception as e:
+        except (json.JSONDecodeError, TypeError, ValueError) as e:
             raise SanyanValueError(f"JSON 解析失败: {e}")
 
 # 注册 JSON 操作

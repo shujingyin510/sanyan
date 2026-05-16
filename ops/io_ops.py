@@ -1,6 +1,6 @@
 """输入/输出、调试、值格式化"""
 from ternary_core import TritValue
-from values import FunctionValue, ModuleValue, SanyanValueError
+from values import FunctionValue, ModuleValue, SanyanValueError, SanyanSyntaxError
 from ops.registry import register
 
 class IOOps:
@@ -155,7 +155,7 @@ class IOOps:
                     if result is not None:
                         formatted = IOOps.format_value(result)
                         print(f"  => {formatted}")
-                except Exception as e:
+                except (SyntaxError, SanyanValueError, SanyanSyntaxError) as e:
                     print(f"  错误: {e}")
 
         return TritValue(0)

@@ -55,7 +55,7 @@ class MathOps:
                         return state
                 try:
                     return float(v) if '.' in v else int(v)
-                except Exception:
+                except (ValueError, TypeError):
                     pass
             raise SanyanTypeError(f"无法将 '{v}' 转换为数值用于比较")
 
@@ -386,6 +386,8 @@ register('min', MathOps.math_min)
 register('sqrt', MathOps.math_sqrt)
 register('random', MathOps.math_random)
 register('random_state', MathOps.math_random_state)
+register('随机数', MathOps.math_random)
+register('随机态', MathOps.math_random_state)
 register('sin', MathOps.math_sin)
 register('cos', MathOps.math_cos)
 register('tan', MathOps.math_tan)

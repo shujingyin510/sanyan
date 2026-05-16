@@ -45,6 +45,9 @@ def main():
         "voting.san", "voting_se.san",
         "data_clean.san", "data_clean_se.san",
         "sensor_pipeline_simple.san", "sensor_pipeline_simple_se.san",
+        "text_analysis.san",
+        "guess_number.san",
+        "fizzbuzz.san",
     ]
     for f in example_names:
         fp = os.path.join(EXAMPLES_DIR, f)

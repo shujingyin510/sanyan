@@ -1,39 +1,52 @@
 """Pratt 语法分析器：运算符优先级、错误恢复"""
 from __future__ import annotations
+import json
+import os
 from typing import Optional, Any
 from sugar.lexer import Token, tokenize
 from sugar.errors import SugarErrorReporter
 
 
-# 关键字映射
-KEYWORD_MAP = {
-    '设': 'set', '若': 'if', '再若': 'elif', '否则': 'else',
-    '循环': 'loop', '遍历': 'for', '定义': 'fn', '返回': 'return',
-    '跳出': 'break', '继续': 'continue', '尝试': 'try', '捕获': 'catch',
-    '判': 'judge', '函数': 'lambda', 'λ': 'lambda', '在': 'in',
-    '导入': 'import', '输出': 'print', '加载': 'load', '计数': 'count',
-    '对': 'context', '置': 'write', '读': 'read', '查': 'query',
-    '从': 'from', '到': 'to', '导出': 'export', '安装': 'install',
-    '包列表': 'list_packages', '加载包': 'load_package',
-    '注册设备': 'register_device',
-    'set': 'set', 'if': 'if', 'elif': 'elif', 'else': 'else',
-    'loop': 'loop', 'for': 'for', 'fn': 'fn', 'return': 'return',
-    'break': 'break', 'continue': 'continue', 'try': 'try', 'catch': 'catch',
-    'judge': 'judge', 'lambda': 'lambda', 'in': 'in', 'import': 'import',
-    'print': 'print', 'load': 'load', 'count': 'count', 'context': 'context',
-    'write': 'write', 'read': 'read', 'query': 'query',
-}
+def _build_keyword_map() -> dict[str, str]:
+    """从皮肤文件构建关键字映射（仅构建一次）。"""
+    maps: dict[str, str] = {}
+    for lang_file in ['chinese.json', 'english.json']:
+        path = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'language', lang_file)
+        try:
+            with open(path, 'r', encoding='utf-8') as f:
+                data = json.load(f)
+            for internal, keyword in data.get('keywords', {}).items():
+                maps[keyword] = internal
+        except (FileNotFoundError, json.JSONDecodeError):
+            pass
+    # 关键字自映射（支持直接使用英文内部名）
+    for internal in ['set', 'if', 'elif', 'else', 'loop', 'for', 'fn',
+                     'return', 'break', 'continue', 'try', 'catch',
+                     'judge', 'lambda', 'in', 'import', 'print', 'load',
+                     'count', 'context', 'write', 'read', 'query',
+                     'export', 'install', 'list_packages', 'load_package',
+                     'register_device']:
+        maps[internal] = internal
+    return maps
 
-# 运算符映射
-OP_MAP = {
-    '大于': 'gt', '小于': 'lt', '等于': 'eq', '不等于': 'ne',
-    '大于等于': 'gte', '小于等于': 'lte', '不大于': 'ngt', '不小于': 'nlt',
-    '加': 'add', '减': 'sub', '乘': 'mul', '除': 'div', '余': 'mod', '幂': 'pow',
-    '且': 'and', '或': 'or', '非': 'not', '取位': 'digit',
-    '>': 'gt', '<': 'lt', '==': 'eq', '!=': 'ne', '>=': 'gte', '<=': 'lte',
-    '+': 'add', '-': 'sub', '*': 'mul', '/': 'div', '%': 'mod', '^': 'pow',
-    '!>': 'ngt', '!<': 'nlt',
-}
+
+def _build_op_map() -> dict[str, str]:
+    """从皮肤文件构建运算符映射。"""
+    maps: dict[str, str] = {}
+    for lang_file in ['chinese.json', 'english.json']:
+        path = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'language', lang_file)
+        try:
+            with open(path, 'r', encoding='utf-8') as f:
+                data = json.load(f)
+            for internal, op in data.get('operators', {}).items():
+                maps[op] = internal
+        except (FileNotFoundError, json.JSONDecodeError):
+            pass
+    return maps
+
+
+KEYWORD_MAP = _build_keyword_map()
+OP_MAP = _build_op_map()
 
 # 运算符优先级
 PREC = {

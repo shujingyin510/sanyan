@@ -2,7 +2,7 @@
 from __future__ import annotations
 from abc import ABC, abstractmethod
 from typing import Optional
-from ternary_core import TritValue
+from ternary_core import BT, TritValue
 from values import SanyanNameError, SanyanValueError
 
 
@@ -40,6 +40,8 @@ class FileDevice(Device):
                 content = f.read().strip()
             if not content:
                 return TritValue(0)
+            if content in BT.REVERSE:
+                return TritValue(BT.REVERSE[content])
             if content in TritValue.STATE_MAP:
                 return TritValue(TritValue.STATE_MAP[content])
             raise SanyanValueError(f"设备文件 '{self.path}' 内容无法识别: '{content}'")

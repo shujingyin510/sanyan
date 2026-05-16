@@ -6,6 +6,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import unittest
 from ternary_core import TritValue, ArrayValue
 from evaluator import SanyanEvaluator
+from values import SanyanValueError, SanyanTypeError, SanyanSyntaxError, SanyanNameError
 
 
 class TestArithmetic(unittest.TestCase):
@@ -395,6 +396,64 @@ class TestFileOps(unittest.TestCase):
         self.env.eval(['write_file', '"_test_tmp.txt"', '"hello world"'])
         result = self.env.eval(['read_file', '"_test_tmp.txt"'])
         self.assertEqual(result, 'hello world')
+
+
+class TestNegativeCases(unittest.TestCase):
+    """负面测试：错误路径和边界条件"""
+    def setUp(self):
+        self.env = SanyanEvaluator()
+
+    def test_div_by_zero(self):
+        with self.assertRaises(SanyanValueError):
+            self.env.eval(['div', 1, 0])
+
+    def test_type_error_list(self):
+        with self.assertRaises(SanyanTypeError):
+            self.env.eval(['list_len', '"not_a_list"'])
+
+    def test_syntax_error_wrong_arg_count(self):
+        with self.assertRaises(SanyanSyntaxError):
+            self.env.eval(['sub'])
+
+    def test_name_error(self):
+        with self.assertRaises(SanyanNameError):
+            self.env.eval(['undefined_symbol'])
+
+    def test_empty_list_concat(self):
+        result = self.env.eval(['list_concat', ['list'], ['list']])
+        self.assertEqual(result, [])
+
+    def test_string_find_not_found(self):
+        result = self.env.eval(['find', '"hello"', '"xyz"'])
+        self.assertEqual(result.to_int(), -1)
+
+    def test_string_startswith_false(self):
+        result = self.env.eval(['startswith', '"hello"', '"xyz"'])
+        self.assertEqual(result.to_int(), -1)
+
+    def test_contains_negative(self):
+        self.env.eval(['set', 'lst', ['list', 1, 2, 3]])
+        result = self.env.eval(['contains', 'lst', 99])
+        self.assertEqual(result.to_int(), -1)
+
+    def test_mixed_type_contains(self):
+        self.env.eval(['set', 'lst', ['list', 1, '"hello"', 3]])
+        result = self.env.eval(['contains', 'lst', '"hello"'])
+        self.assertEqual(result.to_int(), 1)
+
+    def test_get_out_of_range(self):
+        self.env.eval(['set', 'lst', ['list', 1, 2]])
+        with self.assertRaises(SanyanValueError):
+            self.env.eval(['get', 'lst', 99])
+
+    def test_dict_contains_missing(self):
+        self.env.eval(['set', 'd', ['dict', '"a"', 1]])
+        result = self.env.eval(['dict_contains', 'd', '"b"'])
+        self.assertEqual(result.to_int(), -1)
+
+    def test_abs_negative(self):
+        result = self.env.eval(['abs', -5])
+        self.assertEqual(result.to_int(), 5)
 
 
 if __name__ == '__main__':

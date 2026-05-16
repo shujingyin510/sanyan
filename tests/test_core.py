@@ -110,7 +110,7 @@ class TestScopes(unittest.TestCase):
         self.assertTrue(self.rt.has_var('x'))
 
     def test_cross_scope_lookup(self):
-        self.rt.vars['global_x'] = TritValue(100)
+        self.rt.scope_vars['global_x'] = TritValue(100)
         self.rt.push_scope()
         self.rt.set_var('local_x', TritValue(50))
         # 可以从内层查找外层
@@ -118,7 +118,7 @@ class TestScopes(unittest.TestCase):
         self.assertEqual(self.rt.get_var('local_x').to_int(), 50)
 
     def test_inner_shadows_outer(self):
-        self.rt.vars['x'] = TritValue(1)
+        self.rt.scope_vars['x'] = TritValue(1)
         self.rt.push_scope()
         self.rt.set_var('x', TritValue(2))
         self.assertEqual(self.rt.get_var('x').to_int(), 2)  # 内层覆盖
@@ -126,7 +126,7 @@ class TestScopes(unittest.TestCase):
         self.assertEqual(self.rt.get_var('x').to_int(), 1)  # 外层恢复
 
     def test_all_scoped_vars(self):
-        self.rt.vars['a'] = TritValue(1)
+        self.rt.scope_vars['a'] = TritValue(1)
         self.rt.push_scope()
         self.rt.set_var('b', TritValue(2))
         all_vars = self.rt.all_scoped_vars()
@@ -134,11 +134,11 @@ class TestScopes(unittest.TestCase):
         self.assertEqual(all_vars['b'].to_int(), 2)
 
     def test_vars_property_write(self):
-        self.rt.vars['x'] = TritValue(42)
+        self.rt.scope_vars['x'] = TritValue(42)
         self.assertEqual(self.rt.get_var('x').to_int(), 42)
         self.rt.push_scope()
-        self.rt.vars['y'] = TritValue(99)
-        self.assertEqual(self.rt.vars['y'].to_int(), 99)
+        self.rt.scope_vars['y'] = TritValue(99)
+        self.assertEqual(self.rt.scope_vars['y'].to_int(), 99)
         self.rt.pop_scope()
         self.assertFalse(self.rt.has_var('y'))  # 局部变量已清理
 

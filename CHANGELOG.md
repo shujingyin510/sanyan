@@ -2,6 +2,23 @@
 
 ---
 
+## [v3.10.0] — 2026-05-16
+
+### 新增
+- **5 个 stdlib 文件文档** (`docs/manual.md` 第 15 节): 新增 `stat.san`（三态统计）、`tokenize.san`（词法分析器）、`parse.san`（S 表达式解析器）、`eval.san`（元循环求值器）、`sugar.san`（糖语法解析器）的 API 说明。
+- **3 个互动示例** (`examples/`): `text_analysis.san`（文本分析）、`guess_number.san`（猜数字游戏）、`fizzbuzz.san`（FizzBuzz）——验证糖语法、作用域、逻辑判断、异常处理、字典操作、`含键`/`计数` 等特性。
+- **新功能测试** (`tests/test_new_features.san`, `tests/test_new_features_se.san`): 含键、计数、范围、字典键存在检查、浮点数序列化。
+
+### 修复
+- **全角负号解析** (`sugar/lexer.py:123`): NEGATIVE NUMBER 词法单元中的全角减号 `－` 现在正确转换为半角 `-`。
+- **test_fullwidth.san** (`tests/test_fullwidth.san`): 重写为完整的全角字符测试套件，覆盖全角数字/运算符/注释/方括号。
+
+### 文档
+- **stdlib 文档补全**: `docs/manual.md` 新增 5 个缺失 stdlib 模块的 API 参考。
+- **run_all.py 更新**: `tests/run_all.py` 新增新示例，共 35 项集成测试。
+
+---
+
 ## [v3.9.0] — 2026-05-16
 
 ### 新增
@@ -15,8 +32,17 @@
 ### 修复
 - **eval.san 语义** (`stdlib/eval.san:269`): 分析确认 `是字符串(stripped)` 正确，未做改动。
 
+### 重构
+- **代码重复清理** — 提取共享 `to_num()` 工具函数到 `values.py`，消除 `container_ops.py` 中 10+ 处重复的 `TritValue` 数值转换模式；`package_ops.py` 复用 `file_ops._parse_code` 消除文件解析逻辑重复。
+- **错误处理收紧** — 20 处 `except Exception` 替换为精确异常类型（`ValueError`, `TypeError`, `IOError`, `json.JSONDecodeError` 等）；`main.py` sugar 语法失败不再静默，错误信息叠加显示。
+- **安全隐患修复** — `package_ops.py` zip-slip 攻击防护（逐文件校验路径）；丢失的 `with open()` 上下文管理器补全。
+- **职责拆分** — `evaluator.py._eval_str` 拆分为 `_parse_string_literal` / `_parse_numeric_literal` / `_resolve_identifier` 三方法；`_eval_symbol` 从 `runtime.py` 移至 `evaluator.py`（求值逻辑归求值器）。
+- **TritValue 对象池** — 新增 `threading.Lock` 线程安全保护；池大小通过 `TRIT_POOL_SIZE` 环境变量可配置。
+- **`self.vars` 改名** — `runtime.py` 属性 `vars` → `scope_vars`，消除对 Python 内置 `vars()` 的遮蔽；波及 `control_ops.py`, `values.py`, `file_ops.py`, `package_ops.py`, `test_core.py`。
+- **测试深度提升** — `test_parser.py` 转为 unittest 格式（28 项）；`test_ops.py` 新增 12 项负面测试（除零、类型错误、参数缺失、边界条件、混合类型等）。
+
 ### 基础
-- 全部 6 项技术债清理完毕，176 项测试（含 37 项 sugar.san 测试）全部通过。
+- 全部 6 项技术债清理完毕，252 项测试（含 37 项 sugar.san 测试 + 28 项 parser unittest + 12 项负面测试）全部通过。
 
 ---
 

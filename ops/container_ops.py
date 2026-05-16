@@ -1,7 +1,7 @@
 """容器操作：列表、数组、字典、通用索引、映射/过滤/归并"""
 from ternary_core import TritValue, ArrayValue
 from values import FunctionValue, call_function
-from values import SanyanSyntaxError, SanyanTypeError, SanyanValueError, SanyanKeyError
+from values import SanyanSyntaxError, SanyanTypeError, SanyanValueError, SanyanKeyError, to_num
 from ops.registry import register
 
 class ContainerOps:
@@ -64,7 +64,10 @@ class ContainerOps:
         container = evaluator.eval(args[0])
         index = evaluator.eval(args[1]).to_int()
         if isinstance(container, (list, ArrayValue)):
-            return container[index]
+            try:
+                return container[index]
+            except IndexError:
+                raise SanyanValueError(f"索引 {index} 超出范围，容器长度 {len(container)}")
         raise SanyanTypeError("第一个参数必须是列表或数组")
 
     @staticmethod
@@ -211,13 +214,7 @@ class ContainerOps:
         if not isinstance(container, (list, ArrayValue)):
             raise SanyanTypeError("参数必须是列表或数组")
         lst = list(container) if isinstance(container, ArrayValue) else container[:]
-        def sort_key(x):
-            if isinstance(x, TritValue):
-                return x.to_float() if x.is_float() else x.to_int()
-            if isinstance(x, str):
-                return x
-            return 0
-        lst.sort(key=sort_key)
+        lst.sort(key=lambda x: to_num(x) if not isinstance(x, str) else x)
         return lst
 
     @staticmethod
@@ -240,11 +237,9 @@ class ContainerOps:
         container = evaluator.eval(args[0])
         if not isinstance(container, (list, ArrayValue)):
             raise SanyanTypeError("第一个参数必须是列表或数组")
-        item = evaluator.eval(args[1])
-        target = item.to_float() if isinstance(item, TritValue) and item.is_float() else item.to_int() if isinstance(item, TritValue) else item
+        target = to_num(evaluator.eval(args[1]))
         for elem in container:
-            val = elem.to_float() if isinstance(elem, TritValue) and elem.is_float() else elem.to_int() if isinstance(elem, TritValue) else elem
-            if val == target:
+            if to_num(elem) == target:
                 return TritValue(1)
         return TritValue(-1)
 
@@ -259,7 +254,7 @@ class ContainerOps:
         seen = []
         result = []
         for item in container:
-            key = item.to_float() if isinstance(item, TritValue) and item.is_float() else item.to_int() if isinstance(item, TritValue) else item
+            key = to_num(item)
             if key not in seen:
                 seen.append(key)
                 result.append(item)
@@ -283,16 +278,9 @@ class ContainerOps:
     def list_count(evaluator, args):
         if len(args) != 2: raise SanyanSyntaxError("计数 需要两个参数")
         lst = evaluator.eval(args[0])
-        item = evaluator.eval(args[1])
         if not isinstance(lst, list): return TritValue(0)
-
-        target = item.to_float() if isinstance(item, TritValue) and item.is_float() else item.to_int() if isinstance(item, TritValue) else item
-        n = 0
-        for elem in lst:
-            val = elem.to_float() if isinstance(elem, TritValue) and elem.is_float() else elem.to_int() if isinstance(elem, TritValue) else elem
-            if val == target:
-                n += 1
-        return TritValue(n)
+        target = to_num(evaluator.eval(args[1]))
+        return TritValue(sum(1 for elem in lst if to_num(elem) == target))
 
     @staticmethod
     def list_sum(evaluator, args):

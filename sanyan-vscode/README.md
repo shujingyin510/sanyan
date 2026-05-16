@@ -16,5 +16,4 @@ code --install-extension sanyan-language-0.1.0.vsix
 
 功能：
 - 语法高亮（关键字、字符串、数字、注释）
-- 自动补全、诊断、悬停提示（通过 LSP）
-- 跳转定义、签名帮助
+- 基础关键字补全

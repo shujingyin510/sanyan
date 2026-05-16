@@ -118,9 +118,10 @@ def tokenize(code: str) -> list[Token]:
                 i += 1
                 col += 1
             num_str = code[start:i]
-            # Convert fullwidth digits
+            # Convert fullwidth digits and fullwidth symbols
             converted = ''
             for ch in num_str:
+                ch = FULLWIDTH_MAP.get(ch, ch)
                 converted += FULLWIDTH_DIGITS.get(ch, ch)
             tokens.append(Token('NUMBER', converted, line, start_col))
             continue

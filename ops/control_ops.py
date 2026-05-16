@@ -35,7 +35,7 @@ class ControlOps:
             last_val = TritValue(0)
             for var, val_str in pairs:
                 val = TritValue.from_string(val_str)
-                evaluator.vars[var] = val
+                evaluator.scope_vars[var] = val
                 last_val = val
             return last_val
         if len(args) < 2:
@@ -49,7 +49,7 @@ class ControlOps:
             value = TritValue(int(value_node[0]))
         else:
             value = evaluator.eval(value_node)
-        evaluator.vars[var_name] = value
+        evaluator.scope_vars[var_name] = value
         return value
 
     @staticmethod
@@ -83,7 +83,7 @@ class ControlOps:
         body = args[3:]
         result = TritValue(0)
         for i in range(start, end + 1):
-            evaluator.vars[var_name] = TritValue(i)
+            evaluator.scope_vars[var_name] = TritValue(i)
             try:
                 for expr in body:
                     result = evaluator.eval(expr)
@@ -124,9 +124,9 @@ class ControlOps:
         except SanyanError as e:
             # 只捕获语言层异常
             saved = None
-            if error_var in evaluator.vars:
-                saved = evaluator.vars[error_var]
-            evaluator.vars[error_var] = str(e)
+            if error_var in evaluator.scope_vars:
+                saved = evaluator.scope_vars[error_var]
+            evaluator.scope_vars[error_var] = str(e)
             try:
                 result = None
                 for expr in catch_body:
@@ -134,10 +134,10 @@ class ControlOps:
                 return result if result is not None else TritValue(0)
             finally:
                 if saved is not None:
-                    evaluator.vars[error_var] = saved
+                    evaluator.scope_vars[error_var] = saved
                 else:
-                    if error_var in evaluator.vars:
-                        del evaluator.vars[error_var]
+                    if error_var in evaluator.scope_vars:
+                        del evaluator.scope_vars[error_var]
         # 其他异常（如 AttributeError）不捕获，直接向上抛出
 
     @staticmethod
@@ -197,7 +197,7 @@ class ControlOps:
         result = TritValue(0)
         if isinstance(container, (list, ArrayValue)):
             for item in container:
-                evaluator.vars[var_name] = item
+                evaluator.scope_vars[var_name] = item
                 try:
                     for expr in body:
                         result = evaluator.eval(expr)
@@ -208,7 +208,7 @@ class ControlOps:
         elif isinstance(container, str):
             # 字符串遍历：每个字符（已通过字列转为列表，或直接迭代字符）
             for ch in container:
-                evaluator.vars[var_name] = ch
+                evaluator.scope_vars[var_name] = ch
                 try:
                     for expr in body:
                         result = evaluator.eval(expr)

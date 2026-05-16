@@ -29,10 +29,11 @@ def main():
         env = SanyanEvaluator(skin_manager=skin_mgr)
 
         ast = None
+        sugar_error = None
         try:
             ast = SugarConverter.convert(code, skin_mgr)
-        except SyntaxError:
-            pass
+        except SyntaxError as e:
+            sugar_error = str(e)
 
         if ast is None:
             from lexer import tokenize
@@ -41,13 +42,13 @@ def main():
                 tokens = tokenize(code)
                 ast = parse(tokens)
             except SyntaxError as e:
-                print(f"语法错误: {e}")
+                msg = str(e)
+                if sugar_error:
+                    msg = f"{msg}\n  (sugar 语法解析也失败: {sugar_error})"
+                print(f"语法错误: {msg}")
                 import traceback
                 traceback.print_exc()
                 sys.exit(1)
-
-            if ast is None:
-                ast = []
 
         try:
             result = env.eval(ast)

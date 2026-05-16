@@ -25,8 +25,14 @@ jobs:
         pip install .[dev]
     - name: Run Python unit tests
       run: python tests/test_core.py -v
+    - name: Run ops module tests
+      run: python -X utf8 tests/test_ops.py -v
     - name: Run parser regression tests
       run: python tests/test_parser.py
+    - name: Run LSP tests
+      run: python -X utf8 tests/test_lsp.py -v
+    - name: Run package manager tests
+      run: python -X utf8 tests/test_package.py -v
     - name: Run Sanyan integration tests
       run: python tests/run_all.py
     - name: Lint with ruff

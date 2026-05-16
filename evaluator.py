@@ -62,54 +62,121 @@ class SanyanEvaluator(SanyanRuntime):
             return first.call(self, evaluated_args)
         return self._apply(node[0], node[1:])
 
-    def _eval_str(self, node: str) -> Any:
-        if len(node) >= 2 and node[0] in ('"', '\u201c', '\u2018', "'"):
-            s = node[1:-1]
-            result = []
-            i = 0
-            while i < len(s):
-                if s[i] == '\\' and i + 1 < len(s):
-                    esc = s[i + 1]
-                    if esc == 'n':
-                        result.append('\n'); i += 2
-                    elif esc == 't':
-                        result.append('\t'); i += 2
-                    elif esc == 'r':
-                        result.append('\r'); i += 2
-                    elif esc == '\\':
-                        result.append('\\'); i += 2
-                    elif esc == '"':
-                        result.append('"'); i += 2
-                    elif esc == "'":
-                        result.append("'"); i += 2
-                    elif esc == 'u' and i + 5 < len(s):
-                        try:
-                            result.append(chr(int(s[i+2:i+6], 16)))
-                            i += 6
-                        except ValueError:
-                            result.append(s[i]); i += 1
-                    else:
+    def _parse_string_literal(self, s: str) -> str:
+        """解析字符串字面量的转义序列"""
+        result = []
+        i = 0
+        while i < len(s):
+            if s[i] == '\\' and i + 1 < len(s):
+                esc = s[i + 1]
+                if esc == 'n':
+                    result.append('\n'); i += 2
+                elif esc == 't':
+                    result.append('\t'); i += 2
+                elif esc == 'r':
+                    result.append('\r'); i += 2
+                elif esc == '\\':
+                    result.append('\\'); i += 2
+                elif esc == '"':
+                    result.append('"'); i += 2
+                elif esc == "'":
+                    result.append("'"); i += 2
+                elif esc == 'u' and i + 5 < len(s):
+                    try:
+                        result.append(chr(int(s[i+2:i+6], 16)))
+                        i += 6
+                    except ValueError:
                         result.append(s[i]); i += 1
                 else:
                     result.append(s[i]); i += 1
-            return ''.join(result)
+            else:
+                result.append(s[i]); i += 1
+        return ''.join(result)
+
+    def _parse_numeric_literal(self, node: str):
+        """解析数值字面量字符串"""
         if node.replace('.', '', 1).replace('-', '', 1).isdigit():
             return TritValue(float(node)) if '.' in node else TritValue(int(node))
+        return None
+
+    def _resolve_identifier(self, node: str):
+        """解析标识符：字典点号访问 → 符号求值 → 中文字符串降级"""
+        if '.' in node:
+            parts = node.split('.', 1)
+            var_name, key = parts[0], parts[1]
+            if self.has_var(var_name):
+                var = self.get_var(var_name)
+                if isinstance(var, dict) and key in var:
+                    return var[key]
+        try:
+            return self._eval_symbol(node)
+        except SanyanNameError:
+            if any('\u4e00' <= c <= '\u9fff' for c in node):
+                return node
+            raise
+
+    def _eval_str(self, node: str) -> Any:
+        if len(node) >= 2 and node[0] in ('"', '\u201c', '\u2018', "'"):
+            return self._parse_string_literal(node[1:-1])
+        numeric = self._parse_numeric_literal(node)
+        if numeric is not None:
+            return numeric
         if self._is_valid_identifier(node):
-            if '.' in node:
-                parts = node.split('.', 1)
-                var_name, key = parts[0], parts[1]
-                if self.has_var(var_name):
-                    var = self.get_var(var_name)
-                    if isinstance(var, dict) and key in var:
-                        return var[key]
-            try:
-                return self._eval_symbol(node)
-            except SanyanNameError:
-                if any('\u4e00' <= c <= '\u9fff' for c in node):
-                    return node
-                raise
+            return self._resolve_identifier(node)
         return node
+
+    def _eval_symbol(self, symbol: str):
+        """求值符号：变量 → 字面量 → 三态词 → IoT 设备 → 上下文对象"""
+        if self.has_var(symbol):
+            return self.get_var(symbol)
+        if symbol.isdigit() or (symbol.startswith('-') and symbol[1:].isdigit()):
+            return TritValue(int(symbol))
+        if self.skin_manager:
+            state = self.skin_manager.is_ternary_word(symbol)
+            if state is not None:
+                return TritValue(state)
+        if symbol in TritValue.STATE_MAP:
+            return TritValue(TritValue.STATE_MAP[symbol])
+        if '.' in symbol:
+            return self._eval_dot_symbol(symbol)
+        if '：' in symbol:
+            obj, attr = symbol.split('：')
+            return self._eval_symbol(obj + '.' + attr)
+        if self.context_object is not None:
+            return self._eval_context_symbol(symbol)
+        raise SanyanNameError(f"未定义的符号: {symbol}")
+
+    def _eval_dot_symbol(self, symbol: str):
+        """解析 对象.属性 形式的 IoT 设备访问"""
+        obj, attr = symbol.split('.')
+        if obj in self.actuators:
+            val = TritValue.from_string(attr)
+            self.actuators[obj] = val
+            return val
+        if obj in self.sensors:
+            sensor_val = self.sensors[obj]
+            attr_val = TritValue.from_string(attr)
+            return TritValue(1 if sensor_val.symbol == attr_val.symbol else -1)
+        raise SanyanNameError(f"未定义的设备: {obj}")
+
+    def _eval_context_symbol(self, symbol: str):
+        """在 对 作用域内解析符号为 IoT 设备操作"""
+        obj = self.context_object
+        if obj in self.actuators:
+            val = TritValue.from_string(symbol)
+            self.actuators[obj] = val
+            return val
+        if obj in self.sensors:
+            sensor_val = self.sensors[obj]
+            attr_val = TritValue.from_string(symbol)
+            return TritValue(1 if sensor_val.symbol == attr_val.symbol else -1)
+        if hasattr(self, 'device_registry'):
+            dev = self.device_registry.get(obj)
+            if dev:
+                val = TritValue.from_string(symbol)
+                dev.write(val)
+                return val
+        raise SanyanNameError(f"未定义的设备: {obj}")
 
     def _apply(self, op: str, args: list) -> TritValue:
         internal = self._resolve_op_name(op)

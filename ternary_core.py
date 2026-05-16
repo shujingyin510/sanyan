@@ -1,4 +1,6 @@
 """三进制核心库：平衡三进制整数、算术逻辑单元、三值对象"""
+import os
+import threading
 from collections import OrderedDict
 from typing import Union
 
@@ -178,7 +180,8 @@ class TritValue:
     }
 
     _pool = OrderedDict()
-    _MAX_POOL_SIZE = 10000
+    _pool_lock = threading.Lock()
+    _MAX_POOL_SIZE = int(os.environ.get('TRIT_POOL_SIZE', '10000'))
 
     def __new__(cls, value, precision: int = None):
         def _hashable(v):
@@ -186,14 +189,15 @@ class TritValue:
                 return tuple(_hashable(x) for x in v)
             return v
         key = (value, precision) if isinstance(value, (int, float)) else (_hashable(value), precision) if isinstance(value, list) else (value, precision)
-        if key in cls._pool:
-            cls._pool.move_to_end(key)
-            return cls._pool[key]
-        if len(cls._pool) >= cls._MAX_POOL_SIZE:
-            cls._pool.popitem(last=False)
-        obj = super().__new__(cls)
-        cls._pool[key] = obj
-        return obj
+        with cls._pool_lock:
+            if key in cls._pool:
+                cls._pool.move_to_end(key)
+                return cls._pool[key]
+            if len(cls._pool) >= cls._MAX_POOL_SIZE:
+                cls._pool.popitem(last=False)
+            obj = super().__new__(cls)
+            cls._pool[key] = obj
+            return obj
 
     def __init__(self, value: Union[int, float, list], precision: int = None):
         if hasattr(self, '_initialized'):
