@@ -1,6 +1,6 @@
 """自定义命令：定义与调用"""
 from typing import Any
-from values import ReturnException, BreakException, SanyanError, SanyanSyntaxError, SanyanNameError, SanyanRuntimeError
+from values import ReturnException, SanyanError, SanyanSyntaxError, SanyanNameError, SanyanRuntimeError
 from ternary_core import TritValue
 from ops.registry import register
 
@@ -100,7 +100,7 @@ class Commands:
                     evaluator, params, tail_body, last_expr, op, evaluated_args
                 )
             return Commands._run_normal(evaluator, params, body, evaluated_args)
-        except SanyanError as e:
+        except SanyanError:
             Commands._print_call_stack(evaluator, op, args)
             raise
         finally:
