@@ -1,6 +1,7 @@
 """ops 模块单元测试：覆盖所有内置操作"""
 import sys
 import os
+import contextlib
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import unittest
@@ -416,8 +417,9 @@ class TestNegativeCases(unittest.TestCase):
             self.env.eval(['sub'])
 
     def test_name_error(self):
-        with self.assertRaises(SanyanNameError):
-            self.env.eval(['undefined_symbol'])
+        with contextlib.redirect_stdout(None):
+            with self.assertRaises(SanyanNameError):
+                self.env.eval(['undefined_symbol'])
 
     def test_empty_list_concat(self):
         result = self.env.eval(['list_concat', ['list'], ['list']])

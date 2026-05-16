@@ -28,7 +28,6 @@ class ControlOps:
 
     @staticmethod
     def define_var(evaluator, args):
-        from ternary_core import TritValue
         if not args:
             raise SanyanSyntaxError("设 需要参数，格式: (设 变量名 值)")
         if len(args) == 1 and isinstance(args[0], list):

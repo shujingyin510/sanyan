@@ -13,13 +13,16 @@ pip install -e ".[dev]"
 ## 运行测试
 
 ```bash
-# Python 单测（44 项）
+# 运行时核心单测（52 项）
 python tests/test_core.py -v
+
+# 命令模块单测
+python tests/test_commands.py -v
 
 # 糖语法解析器 AST 校验（28 项）
 python tests/test_parser.py
 
-# ops 模块单测（66 项）
+# ops 模块单测（78 项）
 python tests/test_ops.py -v
 
 # LSP 测试（6 项）
@@ -27,6 +30,12 @@ python tests/test_lsp.py -v
 
 # 包管理器测试（6 项）
 python tests/test_package.py -v
+
+# IoT 测试（25 项）
+python tests/test_iot.py -v
+
+# sugar.san 测试（37 项）
+python tests/test_sugar_san.py -v
 
 # 三言集成测试（动态发现）
 python tests/run_all.py

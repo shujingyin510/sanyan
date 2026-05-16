@@ -33,6 +33,10 @@ jobs:
       run: python -X utf8 tests/test_lsp.py -v
     - name: Run package manager tests
       run: python -X utf8 tests/test_package.py -v
+    - name: Run IoT tests
+      run: python -X utf8 tests/test_iot.py -v
+    - name: Run sugar.san tests
+      run: python -X utf8 tests/test_sugar_san.py -v
     - name: Run Sanyan integration tests
       run: python tests/run_all.py
     - name: Lint with ruff

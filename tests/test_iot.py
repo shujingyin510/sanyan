@@ -79,7 +79,7 @@ class TestFileDevice(unittest.TestCase):
         self.assertEqual(dev.read().to_int(), 1)
 
     def test_read_nonexistent_file_returns_zero(self):
-        dev = FileDevice("_nonexistent_device_file_.tmp")
+        dev = FileDevice(self.tmp.name + "_nonexistent")
         self.assertEqual(dev.read().to_int(), 0)
 
 

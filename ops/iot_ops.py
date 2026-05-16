@@ -1,4 +1,5 @@
 """IoT 相关操作：置、查、读、对"""
+import os
 from ternary_core import TritValue
 from values import SanyanSyntaxError, SanyanNameError, SanyanValueError
 from ops.device_registry import MockDevice
@@ -178,7 +179,11 @@ class IotOps:
             device = MockDevice()
         elif device_type == 'file' or device_type == '文件':
             path = evaluator.eval(args[2]) if len(args) > 2 else f"device_{name}.txt"
-            device = FileDevice(str(path))
+            raw_path = str(path)
+            # 校验路径不包含 .. 穿越
+            if '..' in os.path.normpath(raw_path).replace('\\', '/').split('/'):
+                raise SanyanValueError(f"设备文件路径不允许包含 '..': {raw_path}")
+            device = FileDevice(raw_path)
         else:
             raise SanyanValueError(f"未知设备类型: {device_type}")
         evaluator.device_registry.register(name, device)

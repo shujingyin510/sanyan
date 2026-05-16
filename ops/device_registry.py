@@ -64,6 +64,10 @@ class DeviceRegistry:
     def register(self, name: str, device: Device) -> None:
         self._devices[name] = device
 
+    def unregister(self, name: str) -> None:
+        if name in self._devices:
+            del self._devices[name]
+
     def get(self, name: str) -> Optional[Device]:
         return self._devices.get(name)
 

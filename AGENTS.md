@@ -20,24 +20,30 @@
 
 ## 测试
 
-每次代码修改后必须运行全部测试（6 套，共 178 项）：
+每次代码修改后必须运行全部测试（9 套）：
 
 ```bash
-python -X utf8 tests/test_core.py -v     # Python 单测 44 项
-python -X utf8 tests/test_parser.py       # 解析器 AST 校验 22 项
-python -X utf8 tests/test_ops.py -v       # ops 模块单测 66 项
+python -X utf8 tests/test_core.py -v      # 运行时核心单测 52 项
+python -X utf8 tests/test_commands.py -v  # 命令模块单测
+python -X utf8 tests/test_parser.py       # 解析器 AST 校验 28 项
+python -X utf8 tests/test_ops.py -v       # ops 模块单测 78 项
 python -X utf8 tests/test_lsp.py -v       # LSP 测试 6 项
 python -X utf8 tests/test_package.py -v   # 包管理器测试 6 项
-python -X utf8 tests/run_all.py           # 集成测试 34 项
+python -X utf8 tests/test_iot.py -v       # IoT 测试 25 项
+python -X utf8 tests/test_sugar_san.py -v # sugar.san 测试 37 项
+python -X utf8 tests/run_all.py           # 集成测试
 ```
 
 全部通过才算成功：
-- test_core.py 44/44
-- test_parser.py 22/22
-- test_ops.py 66/66
+- test_core.py 52/52
+- test_commands.py 全部通过
+- test_parser.py 28/28
+- test_ops.py 78/78
 - test_lsp.py 6/6
 - test_package.py 6/6
-- run_all.py 34/34
+- test_iot.py 全部通过
+- test_sugar_san.py 全部通过
+- run_all.py 全部通过
 
 Python 文档同步：首次或每次代码修改后建议运行：
 ```bash
