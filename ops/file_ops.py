@@ -30,6 +30,15 @@ def _resolve_path(raw_path, auto_stdlib=True):
     if not abs_path.startswith(os.path.abspath(_PROJECT_ROOT)):
         raise SanyanValueError(f"路径不在项目根目录内: {raw_path}")
     if auto_stdlib and not any(s in path for s in _SAFE_PATH_SEPARATORS) and not path.endswith('.san'):
+        # 支持嵌套导入 a.b.c → stdlib/a/b/c.san 或 stdlib/a/b/c/package.san
+        if '.' in path:
+            dotted = path.replace('.', '/')
+            candidate = os.path.join('stdlib', dotted + '.san')
+            if os.path.exists(candidate):
+                return candidate
+            candidate_pkg = os.path.join('stdlib', dotted, 'package.san')
+            if os.path.exists(candidate_pkg):
+                return candidate_pkg
         candidate = os.path.join('stdlib', path + '.san')
         if os.path.exists(candidate):
             return candidate
