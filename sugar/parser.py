@@ -17,7 +17,11 @@ def _build_keyword_map() -> dict[str, str]:
             with open(path, 'r', encoding='utf-8') as f:
                 data = json.load(f)
             for internal, keyword in data.get('keywords', {}).items():
-                maps[keyword] = internal
+                if isinstance(keyword, list):
+                    for kw in keyword:
+                        maps[kw] = internal
+                else:
+                    maps[keyword] = internal
         except (FileNotFoundError, json.JSONDecodeError):
             pass
     # 关键字自映射（支持直接使用英文内部名）
@@ -40,7 +44,11 @@ def _build_op_map() -> dict[str, str]:
             with open(path, 'r', encoding='utf-8') as f:
                 data = json.load(f)
             for internal, op in data.get('operators', {}).items():
-                maps[op] = internal
+                if isinstance(op, list):
+                    for o in op:
+                        maps[o] = internal
+                else:
+                    maps[op] = internal
         except (FileNotFoundError, json.JSONDecodeError):
             pass
     return maps

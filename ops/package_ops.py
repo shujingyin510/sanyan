@@ -3,7 +3,7 @@ from __future__ import annotations
 import json
 import os
 from ternary_core import TritValue
-from values import SanyanSyntaxError, SanyanValueError, ModuleValue
+from values import SanyanSyntaxError, SanyanValueError, SanyanIOError, ModuleValue
 from ops.registry import register
 
 PACKAGES_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "packages")
@@ -130,7 +130,7 @@ class PackageOps:
             with open(pkg_path, "r", encoding="utf-8") as f:
                 code = f.read()
         except (IOError, OSError) as e:
-            raise SanyanValueError(f"读取包文件失败: {e}")
+            raise SanyanIOError(f"读取包文件失败: {e}")
         ast = _parse_code(code, module_env)
 
         if ast is not None:

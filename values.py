@@ -48,6 +48,10 @@ class SanyanKeyError(KeyError, SanyanError):
 class SanyanAttributeError(AttributeError, SanyanError):
     pass
 
+class SanyanIOError(OSError, SanyanError):
+    """文件/I/O 操作错误（如读取失败、写入失败）"""
+    pass
+
 class ContinueException(Exception):
     pass
 

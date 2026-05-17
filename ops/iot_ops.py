@@ -189,17 +189,9 @@ class IotOps:
         evaluator.device_registry.register(name, device)
         return TritValue(0)
 
-# 注册 IoT 操作及中文别名
+# 注册 IoT 操作（中文别名由皮肤系统统一映射）
 register('write', IotOps.set_sensor)
 register('query', IotOps.query)
 register('context', IotOps.context_op)
 register('read', IotOps.sensor_read)
 register('register_device', IotOps.register_device_op)
-register('置', IotOps.set_sensor)
-register('查', IotOps.query)
-register('读', IotOps.sensor_read)
-register('读取', IotOps.sensor_read)
-register('写入', IotOps.set_sensor)
-register('查询', IotOps.query)
-register('对', IotOps.context_op)
-register('注册设备', IotOps.register_device_op)

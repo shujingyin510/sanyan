@@ -1,7 +1,7 @@
 """文件读取、写出、模块加载与导入"""
 import os
 from ternary_core import TritValue
-from values import SanyanSyntaxError, SanyanValueError, SanyanNameError, SanyanTypeError, ModuleValue
+from values import SanyanSyntaxError, SanyanValueError, SanyanNameError, SanyanTypeError, SanyanIOError, ModuleValue
 from ops.registry import register
 
 # 项目根目录：文件操作不允许超越此目录
@@ -139,7 +139,7 @@ class FileOps:
             with open(str(path), 'r', encoding='utf-8') as f:
                 content = f.read()
         except (IOError, OSError) as e:
-            raise SanyanValueError(f"读文件失败: {e}")
+            raise SanyanIOError(f"读文件失败: {e}")
         return content
 
     @staticmethod
@@ -157,7 +157,7 @@ class FileOps:
             with open(str(path), 'w', encoding='utf-8') as f:
                 f.write(content)
         except (IOError, OSError) as e:
-            raise SanyanValueError(f"写文件失败: {e}")
+            raise SanyanIOError(f"写文件失败: {e}")
         return TritValue(0)
 
     @staticmethod
@@ -171,7 +171,7 @@ class FileOps:
             with open(path, 'r', encoding='utf-8') as f:
                 code = f.read()
         except (IOError, OSError) as e:
-            raise SanyanValueError(f"加载文件失败: {e}")
+            raise SanyanIOError(f"加载文件失败: {e}")
         if not code.strip():
             return TritValue(0)
         return _parse_and_eval_file(code, evaluator)
@@ -198,7 +198,7 @@ class FileOps:
             with open(path, 'r', encoding='utf-8') as f:
                 code = f.read()
         except (IOError, OSError) as e:
-            raise SanyanValueError(f"导入文件失败: {e}")
+            raise SanyanIOError(f"导入文件失败: {e}")
         if not code.strip():
             return ModuleValue({}, {})
 

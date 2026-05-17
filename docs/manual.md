@@ -1058,6 +1058,7 @@ sugar/
 | `SanyanRuntimeError` | 运行时错误 | 递归超深、执行中断等 |
 | `SanyanKeyError` | 键错误 | 字典中访问不存在的键 |
 | `SanyanAttributeError` | 属性错误 | 对非容器做点号访问 |
+| `SanyanIOError` | 文件/IO 错误 | 文件读取、写入、加载失败 |
 | `ReturnException` | 函数返回（内部控制流） | 由 `返回` 关键字触发 |
 | `BreakException` / `ContinueException` | 循环中断（内部控制流） | 由 `跳出`/`继续` 关键字触发 |
 

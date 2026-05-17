@@ -13,7 +13,10 @@ from values import SanyanSyntaxError, SanyanTypeError, SanyanKeyError, SanyanAtt
 def _init_ops():
     """初始化所有操作模块的注册（仅在首次导入时执行一次）"""
     import ops.control_ops
-    import ops.math_ops
+    import ops.logic_ops
+    import ops.comparison_ops
+    import ops.arithmetic_ops
+    import ops.math_funcs_ops
     import ops.string_ops
     import ops.container_ops
     import ops.io_ops
@@ -32,6 +35,9 @@ class SanyanEvaluator(SanyanRuntime):
 
 
     def __init__(self, max_loop_steps=None, skin_manager=None):
+        if skin_manager is None:
+            from skin import SkinManager
+            skin_manager = SkinManager('chinese')
         super().__init__(max_loop_steps=max_loop_steps, skin_manager=skin_manager)
         self._op_cache = {}
         self._name_cache = {}

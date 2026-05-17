@@ -528,7 +528,7 @@ def _do_diagnostics(uri: str, text: str) -> list[dict]:
                     break
                 seen.add(p)
 
-    # 未定义符号检测（AST 遍历）
+    # 未定义符号检测 + 未使用变量检测（AST 遍历）
     try:
         from sugar import SugarConverter
         from skin import SkinManager
@@ -536,6 +536,7 @@ def _do_diagnostics(uri: str, text: str) -> list[dict]:
         ast = SugarConverter.convert(text, skin_mgr)
         if ast:
             _check_undefined(ast, text, diagnostics)
+            _check_unused_vars(ast, text, diagnostics)
     except SyntaxError:
         pass
 
@@ -638,6 +639,53 @@ def _walk_undef(node, defined, diagnostics, scope_defined: set | None = None):
             continue
         if isinstance(child, list):
             _walk_undef(child, scoped, diagnostics, set(scoped))
+
+
+def _check_unused_vars(ast: list, text: str, diagnostics: list):
+    """检查定义了但从未使用的变量和命令名。"""
+    from collections import Counter
+    defined = {}
+    used = set()
+
+    def collect_defs_and_uses(node, defs_dict, uses_set):
+        if not isinstance(node, list) or len(node) == 0:
+            return
+        first = node[0]
+        if first in ('set', '设') and len(node) >= 2 and isinstance(node[1], str):
+            line_num = getattr(node, 'line', 0) or 0
+            if node[1] not in defs_dict:
+                defs_dict[node[1]] = line_num
+        elif first in ('fn', '定义') and len(node) >= 2 and isinstance(node[1], str):
+            line_num = getattr(node, 'line', 0) or 0
+            if node[1] not in defs_dict:
+                defs_dict[node[1]] = line_num
+        elif first in ('lambda', 'λ', '函数') and len(node) >= 2 and isinstance(node[1], list):
+            for p in node[1]:
+                if isinstance(p, str):
+                    uses_set.add(p)
+        for child in node[1:]:
+            if isinstance(child, list):
+                collect_defs_and_uses(child, defs_dict, uses_set)
+            elif isinstance(child, str) and child in defs_dict:
+                uses_set.add(child)
+
+    collect_defs_and_uses(ast, defined, used)
+
+    # 标记定义本身所在行也视为"使用"（跳过定义行自身）
+    for name in list(defined):
+        used.add(name)
+
+    unused = [name for name, line in defined.items()
+              if name not in used and not name.startswith('_')]
+    for name in unused:
+        diagnostics.append({
+            "range": {
+                "start": {"line": defined[name], "character": 0},
+                "end": {"line": defined[name], "character": len(name)},
+            },
+            "severity": 2,
+            "message": f"未使用的变量或命令: '{name}'",
+        })
 
 
 def _do_formatting(text: str) -> Optional[list[dict]]:

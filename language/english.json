@@ -94,7 +94,11 @@
     "to": "to",
     "ternary": "ternary",
     "to_json": "to_json",
-    "from_json": "from_json"
+    "from_json": "from_json",
+    "sensor_read": "sensor_read",
+    "sensor_write": "sensor_write",
+    "sensor_query": "sensor_query",
+    "register_device": "register_device"
   },
 
   "operators": {

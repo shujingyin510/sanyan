@@ -30,17 +30,35 @@ class SkinManager:
         for word in states.get('maybe', []):
             self.ternary_map[word] = 0
 
-        # 构建反向查找缓存
-        self._keyword_cache = {name: intern for intern, name in data.get('keywords', {}).items()}
-        self._op_cache = {name: intern for intern, name in data.get('operators', {}).items()}
+        # 构建反向查找缓存（支持列表多别名和单字符串两种格式）
+        self._keyword_cache = {}
+        for intern, name_or_names in data.get('keywords', {}).items():
+            if isinstance(name_or_names, list):
+                for name in name_or_names:
+                    self._keyword_cache[name] = intern
+            else:
+                self._keyword_cache[name_or_names] = intern
+        self._op_cache = {}
+        for intern, name_or_names in data.get('operators', {}).items():
+            if isinstance(name_or_names, list):
+                for name in name_or_names:
+                    self._op_cache[name] = intern
+            else:
+                self._op_cache[name_or_names] = intern
 
     def get_keyword(self, internal):
-        """内部标识 → 当前语言关键字"""
-        return self.skin_data.get('keywords', {}).get(internal, internal)
+        """内部标识 → 当前语言关键字（列表时取首个）"""
+        val = self.skin_data.get('keywords', {}).get(internal, internal)
+        if isinstance(val, list):
+            return val[0] if val else internal
+        return val
 
     def get_op(self, internal):
-        """内部标识 → 当前语言操作符"""
-        return self.skin_data.get('operators', {}).get(internal, internal)
+        """内部标识 → 当前语言操作符（列表时取首个）"""
+        val = self.skin_data.get('operators', {}).get(internal, internal)
+        if isinstance(val, list):
+            return val[0] if val else internal
+        return val
 
     def get_internal_keyword(self, word):
         """当前语言关键字 → 内部标识（反向查找）"""

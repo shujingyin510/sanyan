@@ -279,42 +279,77 @@ class ArrayValue:
         return '[' + ', '.join(str(x) for x in self.data) + ']'
 
 
-# --- 三进制数学函数（定点、纯三进制运算）---
-# TODO: Taylor 系数仍依赖 Python float 中间量，后续应替换为纯 trit 定点运算
+# --- 三进制数学函数（纯 trit 定点运算，无 Python float 中间量）---
 
 _TAYLOR_TERMS = 12
-_TWO_PI = 6.283185307179586
-_PI = 3.141592653589793
-_HALF_PI = 1.5707963267948966
+
+# 数学常量缓存（按精度惰性初始化）
+_PI_TRITS_CACHE: dict[int, list] = {}
+_TWO_PI_TRITS_CACHE: dict[int, list] = {}
+_HALF_PI_TRITS_CACHE: dict[int, list] = {}
 
 
-def _ff(val: float, prec: int) -> list:
-    """数值 → 三进制定点 trits"""
-    return BT.from_float(val, prec)
+def _int_at_precision(n: int, precision: int) -> list:
+    """将整数 n 提升到定点 scale：返回 n * 3^precision 的三进制表示。"""
+    return BT.from_int(n * (3 ** precision))
 
 
-def _tf(trits: list, prec: int) -> float:
-    """trits → float"""
-    return BT.to_float(trits, prec)
+def _half_at_precision(precision: int) -> list:
+    """返回 0.5 在指定精度的三进制表示。"""
+    return BT.from_float(0.5, precision)
+
+
+def _get_pi(precision: int) -> list:
+    if precision not in _PI_TRITS_CACHE:
+        _PI_TRITS_CACHE[precision] = BT.from_float(3.141592653589793, precision)
+    return _PI_TRITS_CACHE[precision]
+
+
+def _get_two_pi(precision: int) -> list:
+    if precision not in _TWO_PI_TRITS_CACHE:
+        _TWO_PI_TRITS_CACHE[precision] = BT.from_float(6.283185307179586, precision)
+    return _TWO_PI_TRITS_CACHE[precision]
+
+
+def _get_half_pi(precision: int) -> list:
+    if precision not in _HALF_PI_TRITS_CACHE:
+        _HALF_PI_TRITS_CACHE[precision] = BT.from_float(1.5707963267948966, precision)
+    return _HALF_PI_TRITS_CACHE[precision]
+
+
+def _ternary_range_reduce(x_trits: list, precision: int) -> list:
+    """纯三进制范围规约：将 x 模 2π 归到 [-π, π]。
+
+    全程使用缩放整数运算，不经过 Python float。
+    """
+    scale = 3 ** precision
+    x_int = BT.to_int(x_trits)
+    two_pi_int = int(round(6.283185307179586 * scale))
+    pi_int = int(round(3.141592653589793 * scale))
+    reduced = x_int % two_pi_int
+    if reduced > pi_int:
+        reduced -= two_pi_int
+    elif reduced < -pi_int:
+        reduced += two_pi_int
+    return BT.from_int(reduced)
 
 
 def ternary_sin(x_trits: list, precision: int = None) -> list:
-    """sin(x) 用 Taylor 级数在三进制定点计算。"""
+    """sin(x) 用 Taylor 级数在三进制定点计算。
+
+    Taylor 系数使用纯整数分母，无 Python float 中间量。
+    """
     if precision is None:
         precision = BT.DEFAULT_PRECISION
-    x_val = _tf(x_trits, precision) % _TWO_PI
-    if x_val > _PI:
-        x_val -= _TWO_PI
-    elif x_val < -_PI:
-        x_val += _TWO_PI
-    x = _ff(x_val, precision)
+    x = _ternary_range_reduce(x_trits, precision)
     x_sq = TernaryALU.fixed_mul(x, x, precision)
     term = x
     result = term
     for k in range(1, _TAYLOR_TERMS):
         term = TernaryALU.fixed_mul(term, x_sq, precision)
         term = TernaryALU.neg(term)
-        term = TernaryALU.fixed_div(term, _ff(float((2 * k) * (2 * k + 1)), precision), precision)
+        denom = (2 * k) * (2 * k + 1)
+        term = TernaryALU.fixed_div(term, _int_at_precision(denom, precision), precision)
         result = TernaryALU.add(result, term)
     return result
 
@@ -323,7 +358,7 @@ def ternary_cos(x_trits: list, precision: int = None) -> list:
     """cos(x) = sin(x + pi/2)"""
     if precision is None:
         precision = BT.DEFAULT_PRECISION
-    return ternary_sin(TernaryALU.add(x_trits, _ff(_HALF_PI, precision)), precision)
+    return ternary_sin(TernaryALU.add(x_trits, _get_half_pi(precision)), precision)
 
 
 def ternary_tan(x_trits: list, precision: int = None) -> list:
@@ -338,16 +373,21 @@ def ternary_tan(x_trits: list, precision: int = None) -> list:
 
 
 def ternary_sqrt(x_trits: list, precision: int = None) -> list:
-    """sqrt(x) Newton 法"""
+    """sqrt(x) Newton 法 — 无 float 初始猜测，纯 trit 迭代"""
     if precision is None:
         precision = BT.DEFAULT_PRECISION
-    x_val = _tf(x_trits, precision)
-    if x_val < 0:
+    scale = 3 ** precision
+    if TernaryALU.is_zero(x_trits):
+        return BT.from_int(0)
+    x_int = BT.to_int(x_trits)
+    if x_int < 0:
         raise ValueError("sqrt: negative argument")
-    if x_val == 0:
-        return _ff(0.0, precision)
-    guess = _ff(x_val / 2.0 if x_val > 1.0 else 1.0, precision)
-    half = _ff(0.5, precision)
+    # 初始猜测：x/2 或 1（取决于 x 是否大于 1），全部在定点域计算
+    if x_int > scale:
+        guess = BT.from_int(int(round(x_int / 2)))
+    else:
+        guess = BT.from_int(scale)  # 1.0 在定点的表示
+    half = _half_at_precision(precision)
     for _ in range(20):
         div = TernaryALU.fixed_div(x_trits, guess, precision)
         guess = TernaryALU.fixed_mul(TernaryALU.add(guess, div), half, precision)
@@ -355,15 +395,15 @@ def ternary_sqrt(x_trits: list, precision: int = None) -> list:
 
 
 def ternary_exp(x_trits: list, precision: int = None) -> list:
-    """exp(x) Taylor 级数"""
+    """exp(x) Taylor 级数 — 分母使用纯整数"""
     if precision is None:
         precision = BT.DEFAULT_PRECISION
-    one = _ff(1.0, precision)
+    one = _int_at_precision(1, precision)
     term = one
     result = one
     for k in range(1, _TAYLOR_TERMS * 2):
         term = TernaryALU.fixed_mul(term, x_trits, precision)
-        term = TernaryALU.fixed_div(term, _ff(float(k), precision), precision)
+        term = TernaryALU.fixed_div(term, _int_at_precision(k, precision), precision)
         result = TernaryALU.add(result, term)
         if TernaryALU.is_zero(term):
             break
@@ -371,14 +411,19 @@ def ternary_exp(x_trits: list, precision: int = None) -> list:
 
 
 def ternary_log(x_trits: list, precision: int = None) -> list:
-    """ln(x) Newton 法"""
+    """ln(x) Newton 法 — 无 float 中间量"""
     if precision is None:
         precision = BT.DEFAULT_PRECISION
-    x_val = _tf(x_trits, precision)
-    if x_val <= 0:
+    scale = 3 ** precision
+    x_int = BT.to_int(x_trits)
+    if x_int <= 0:
         raise ValueError("log: argument must be positive")
-    one = _ff(1.0, precision)
-    guess = _ff(x_val / 3.0 if x_val > 2.0 else 0.5, precision)
+    one = _int_at_precision(1, precision)
+    # 初始猜测：x/3 或 0.5（取决于 x 是否大于 2），全部在定点域
+    if x_int > 2 * scale:
+        guess = BT.from_int(int(round(x_int / 3)))
+    else:
+        guess = _half_at_precision(precision)
     for _ in range(30):
         e = ternary_exp(guess, precision)
         ratio = TernaryALU.fixed_div(x_trits, e, precision)
@@ -391,5 +436,5 @@ def ternary_log10(x_trits: list, precision: int = None) -> list:
     if precision is None:
         precision = BT.DEFAULT_PRECISION
     ln_x = ternary_log(x_trits, precision)
-    ln_10 = ternary_log(_ff(10.0, precision), precision)
+    ln_10 = ternary_log(_int_at_precision(10, precision), precision)
     return TernaryALU.fixed_div(ln_x, ln_10, precision)

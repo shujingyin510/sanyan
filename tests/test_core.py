@@ -10,7 +10,7 @@ from ternary_core import BT, TernaryALU, TritValue, ternary_sin, ternary_sqrt, t
 from values import (
     SanyanError, SanyanNameError, SanyanSyntaxError, SanyanTypeError,
     SanyanValueError, SanyanRuntimeError, SanyanKeyError, SanyanAttributeError,
-    ReturnException, BreakException, FunctionValue, ModuleValue,
+    SanyanIOError, ReturnException, BreakException, FunctionValue, ModuleValue,
 )
 from runtime import SanyanRuntime
 from skin import SkinManager
@@ -77,6 +77,7 @@ class TestExceptions(unittest.TestCase):
         self.assertTrue(issubclass(SanyanRuntimeError, SanyanError))
         self.assertTrue(issubclass(SanyanKeyError, SanyanError))
         self.assertTrue(issubclass(SanyanAttributeError, SanyanError))
+        self.assertTrue(issubclass(SanyanIOError, SanyanError))
 
     def test_value_error_message(self):
         e = SanyanValueError("除数不能为零")
