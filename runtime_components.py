@@ -10,10 +10,7 @@ class ScopeManager:
     """作用域栈管理：变量定义、查找、生命周期。"""
 
     def __init__(self, scopes_list: Optional[List[Dict[str, Any]]] = None):
-        if scopes_list is not None:
-            self._scopes = scopes_list
-        else:
-            self._scopes: List[Dict[str, Any]] = [{}]
+        self._scopes: List[Dict[str, Any]] = scopes_list if scopes_list is not None else [{}]
 
     @property
     def scope_vars(self):

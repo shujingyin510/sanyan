@@ -64,20 +64,17 @@ def _color_value(value) -> str:
 # REPL 历史记录
 _history_file = os.path.expanduser(os.path.join(os.path.expanduser('~'), '.sanyan_history'))
 try:
-    import readline
+    import readline  # type: ignore[no-redef]
+except ImportError:
+    try:
+        import pyreadline3 as readline  # type: ignore[no-redef]
+    except ImportError:
+        readline = None  # type: ignore[assignment]
 
+if readline is not None:
     readline.set_history_length(1000)
     if os.path.exists(_history_file):
         readline.read_history_file(_history_file)
-except ImportError:
-    try:
-        import pyreadline3 as readline
-
-        readline.set_history_length(1000)
-        if os.path.exists(_history_file):
-            readline.read_history_file(_history_file)
-    except ImportError:
-        readline = None
 
 
 def demo(skin_mgr: SkinManager) -> None:

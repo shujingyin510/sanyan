@@ -13,7 +13,7 @@ class BT:
     DEFAULT_PRECISION = 16  # 默认小数位数（三进制 trits）
 
     @staticmethod
-    def from_int(n: int, length: int = None) -> list:
+    def from_int(n: int, length: Optional[int] = None) -> list:
         if n == 0:
             trits = [0]
         else:
@@ -50,7 +50,7 @@ class BT:
         return [BT.REVERSE[c] for c in s]
 
     @staticmethod
-    def from_float(n: float, precision: int = None) -> list:
+    def from_float(n: float, precision: Optional[int] = None) -> list:
         """将浮点数转为平衡三进制定点表示。
 
         使用缩放整数法：将 n * 3^precision 转为整数，再转为平衡三进制。
@@ -62,7 +62,7 @@ class BT:
         return BT.from_int(scaled)
 
     @staticmethod
-    def to_float(trits: list, precision: int = None) -> float:
+    def to_float(trits: list, precision: Optional[int] = None) -> float:
         """将平衡三进制定点表示转回浮点数。"""
         if precision is None:
             precision = BT.DEFAULT_PRECISION
@@ -211,11 +211,11 @@ class TritValue:
         '未知': 0,
     }
 
-    _pool = OrderedDict()
+    _pool: OrderedDict = OrderedDict()
     _pool_lock = threading.Lock()
     _MAX_POOL_SIZE = max(1, int(os.environ.get('TRIT_POOL_SIZE', '10000')))
 
-    def __new__(cls, value, precision: int = None):
+    def __new__(cls, value, precision: Optional[int] = None):
         def _hashable(v):
             if isinstance(v, list):
                 return tuple(_hashable(x) for x in v)
@@ -238,7 +238,7 @@ class TritValue:
             cls._pool[key] = obj
             return obj
 
-    def __init__(self, value: Union[int, float, list], precision: int = None):
+    def __init__(self, value: Union[int, float, list], precision: Optional[int] = None):
         if hasattr(self, '_initialized'):
             return
         self._initialized = True
@@ -374,7 +374,7 @@ def _ternary_range_reduce(x_trits: list, precision: int) -> list:
     return BT.from_int(reduced)
 
 
-def ternary_sin(x_trits: list, precision: int = None) -> list:
+def ternary_sin(x_trits: list, precision: Optional[int] = None) -> list:
     """sin(x) 用 Taylor 级数在三进制定点计算。
 
     Taylor 系数使用纯整数分母，无 Python float 中间量。
@@ -394,14 +394,14 @@ def ternary_sin(x_trits: list, precision: int = None) -> list:
     return result
 
 
-def ternary_cos(x_trits: list, precision: int = None) -> list:
+def ternary_cos(x_trits: list, precision: Optional[int] = None) -> list:
     """cos(x) = sin(x + pi/2)"""
     if precision is None:
         precision = BT.DEFAULT_PRECISION
     return ternary_sin(TernaryALU.add(x_trits, _get_half_pi(precision)), precision)
 
 
-def ternary_tan(x_trits: list, precision: int = None) -> list:
+def ternary_tan(x_trits: list, precision: Optional[int] = None) -> list:
     """tan(x) = sin(x) / cos(x)"""
     if precision is None:
         precision = BT.DEFAULT_PRECISION
@@ -412,7 +412,7 @@ def ternary_tan(x_trits: list, precision: int = None) -> list:
     return TernaryALU.fixed_div(s, c, precision)
 
 
-def ternary_sqrt(x_trits: list, precision: int = None) -> list:
+def ternary_sqrt(x_trits: list, precision: Optional[int] = None) -> list:
     """sqrt(x) Newton 法 — 无 float 初始猜测，纯 trit 迭代"""
     if precision is None:
         precision = BT.DEFAULT_PRECISION
@@ -434,7 +434,7 @@ def ternary_sqrt(x_trits: list, precision: int = None) -> list:
     return guess
 
 
-def ternary_exp(x_trits: list, precision: int = None) -> list:
+def ternary_exp(x_trits: list, precision: Optional[int] = None) -> list:
     """exp(x) Taylor 级数 — 分母使用纯整数"""
     if precision is None:
         precision = BT.DEFAULT_PRECISION
@@ -450,7 +450,7 @@ def ternary_exp(x_trits: list, precision: int = None) -> list:
     return result
 
 
-def ternary_log(x_trits: list, precision: int = None) -> list:
+def ternary_log(x_trits: list, precision: Optional[int] = None) -> list:
     """ln(x) Newton 法 — 无 float 中间量"""
     if precision is None:
         precision = BT.DEFAULT_PRECISION
@@ -471,7 +471,7 @@ def ternary_log(x_trits: list, precision: int = None) -> list:
     return guess
 
 
-def ternary_log10(x_trits: list, precision: int = None) -> list:
+def ternary_log10(x_trits: list, precision: Optional[int] = None) -> list:
     """log10(x) = ln(x) / ln(10)"""
     if precision is None:
         precision = BT.DEFAULT_PRECISION

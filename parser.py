@@ -3,7 +3,7 @@
 from typing import Optional, Union
 
 
-def parse(tokens: list) -> Optional[list]:
+def parse(tokens: list) -> Optional[Union[list, str]]:
     if not tokens:
         return None
 

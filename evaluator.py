@@ -67,15 +67,15 @@ class SanyanEvaluator(SanyanRuntime):
                 return TritValue(float(s)) if '.' in s else TritValue(int(s))
         first = node[0]
         if isinstance(first, FunctionValue):
-            return Commands.call(self, first.func_name, first.args)
+            return Commands.call(self, first.func_name, first.args)  # type: ignore[attr-defined]
         if isinstance(first, ModuleValue):
             target, method = node[1], node[2:]
-            return first.get_attr(target)(self, method)
+            return first.get_attr(target)(self, method)  # type: ignore[attr-defined]
         try:
             return self._apply(first, node[1:])
         except SanyanError as e:
-            if isinstance(node, SrcNode) and (node.line or node.col):
-                pos_msg = f'第{node.line}行第{node.col}列: {e}'
+            if isinstance(node, SrcNode) and (node.line or node.col):  # type: ignore[attr-defined]
+                pos_msg = f'第{node.line}行第{node.col}列: {e}'  # type: ignore[attr-defined]
                 if not e.args or not e.args[0].startswith('第'):
                     e.args = (pos_msg,)
             raise
@@ -207,8 +207,8 @@ class SanyanEvaluator(SanyanRuntime):
 
     def _pos(self, node) -> str:
         """如果节点有源码位置，返回位置前缀。"""
-        if isinstance(node, SrcNode) and (node.line or node.col):
-            return f'第 {node.line} 行，第 {node.col} 列: '
+        if isinstance(node, SrcNode) and (node.line or node.col):  # type: ignore[attr-defined]
+            return f'第 {node.line} 行，第 {node.col} 列: '  # type: ignore[attr-defined]
         return ''
 
     def _apply(self, op: str, args: list) -> TritValue:

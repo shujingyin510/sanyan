@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 import os
-from typing import Optional, Any
+from typing import Any, Dict, List, Optional
 from values import SanyanSyntaxError
 from runtime_components import (
     ScopeManager,
@@ -143,7 +143,7 @@ class SanyanRuntime:
 
         # 组合子组件
         # _scopes 保持为 Runtime 直接属性（测试兼容），引用传给 ScopeManager
-        self._scopes = [{}]
+        self._scopes: List[Dict[str, Any]] = [{}]
         self._scope_mgr = ScopeManager(self._scopes)
         self._iot_mgr = IoTManager()
         self._debug_mgr = DebugManager()

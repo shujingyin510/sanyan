@@ -4,7 +4,7 @@ import os
 from typing import Optional
 
 
-def _resolve_include_path(raw_path: str, base_dir: str = None) -> str:
+def _resolve_include_path(raw_path: str, base_dir: Optional[str] = None) -> str:
     """解析 #include 路径，支持 ../ 相对路径。
 
     安全检查：最终绝对路径必须在项目根目录内。
