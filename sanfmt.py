@@ -395,7 +395,7 @@ def format_file(filepath: str, in_place: bool = False) -> str:
     if ast is None:
         tokens = tokenize(code)
         if tokens:
-            ast = parse(tokens)
+            ast = parse(tokens)  # type: ignore[assignment]
     if ast is None:
         raise ValueError('无法解析文件')
 
@@ -433,7 +433,7 @@ def main():
         if ast is None:
             tokens = tokenize(code)
             if tokens:
-                ast = parse(tokens)  # type: ignore[assignment]
+                ast = parse(tokens)
         if ast is None:
             print('解析失败', file=sys.stderr)
             sys.exit(1)
