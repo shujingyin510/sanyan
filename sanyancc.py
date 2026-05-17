@@ -2,8 +2,6 @@
 from __future__ import annotations
 import struct
 import sys
-import os
-from typing import Any
 
 # ── 字节码指令集 ──────────────────────────────────────────
 # 所有指令定长：1 字节 opcode + 0~4 字节立即数
