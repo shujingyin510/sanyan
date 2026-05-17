@@ -1,16 +1,19 @@
 """IoT 相关操作：置、查、读、对"""
+
 import os
 from ternary_core import TritValue
 from values import SanyanSyntaxError, SanyanNameError, SanyanValueError
 from ops.device_registry import MockDevice
 from ops.registry import register
 
+
 class IotOps:
     """IoT 操作：传感器读取、执行器控制、设备注册"""
+
     @staticmethod
     def set_sensor(evaluator, args):
         if not args:
-            raise SanyanSyntaxError("置 需要参数")
+            raise SanyanSyntaxError('置 需要参数')
         target = args[0]
 
         def ensure_trit(val):
@@ -57,11 +60,11 @@ class IotOps:
                 sensor_name, attr = target.split('：', 1)
                 state = ensure_trit(TritValue.from_string(attr))
             else:
-                raise SanyanSyntaxError("置 的用法: (置 对象 状态) 或 (置 (对象.状态 ...))")
+                raise SanyanSyntaxError('置 的用法: (置 对象 状态) 或 (置 (对象.状态 ...))')
             sync_device(sensor_name, state)
             return state
 
-        raise SanyanSyntaxError("置 的参数格式错误")
+        raise SanyanSyntaxError('置 的参数格式错误')
 
     @staticmethod
     def query(evaluator, args):
@@ -73,7 +76,7 @@ class IotOps:
                 results.append(result)
             return results[-1] if results else TritValue(0)
 
-        state_map = {1: "开", 0: "守", -1: "关", '+': "开", '0': "守", '-': "关"}
+        state_map = {1: '开', 0: '守', -1: '关', '+': '开', '0': '守', '-': '关'}
 
         def get_device_val(device_dict, key):
             val = device_dict.get(key, TritValue(0))
@@ -87,7 +90,7 @@ class IotOps:
 
         def print_state(name, val):
             state_word = state_map.get(val.to_int(), val.symbol)
-            print(f"  {name} 当前状态: {state_word} ({val.symbol})")
+            print(f'  {name} 当前状态: {state_word} ({val.symbol})')
             return val
 
         # 优先从 registry 读取
@@ -110,7 +113,7 @@ class IotOps:
                 if dev:
                     sensor_val = dev.read()
                     attr_val = TritValue.from_string(attr)
-                    print(f"  传感器 {obj} 当前值: {sensor_val.symbol}")
+                    print(f'  传感器 {obj} 当前值: {sensor_val.symbol}')
                     return TritValue(1 if sensor_val.symbol == attr_val.symbol else -1)
             if obj in evaluator.actuators:
                 val = get_device_val(evaluator.actuators, obj)
@@ -118,14 +121,14 @@ class IotOps:
             if obj in evaluator.sensors:
                 sensor_val = get_device_val(evaluator.sensors, obj)
                 attr_val = TritValue.from_string(attr)
-                print(f"  传感器 {obj} 当前值: {sensor_val.symbol}")
+                print(f'  传感器 {obj} 当前值: {sensor_val.symbol}')
                 return TritValue(1 if sensor_val.symbol == attr_val.symbol else -1)
 
         if isinstance(target, str) and '：' in target:
             obj, attr = target.split('：', 1)
             return IotOps.query(evaluator, [obj + '.' + attr])
 
-        raise SanyanNameError(f"无法查看: {target}（执行器、传感器中均不存在）")
+        raise SanyanNameError(f'无法查看: {target}（执行器、传感器中均不存在）')
 
     @staticmethod
     def context_op(evaluator, args):
@@ -163,31 +166,33 @@ class IotOps:
                 return dev.read()
         if sensor_name in evaluator.sensors:
             return evaluator.sensors[sensor_name]
-        raise SanyanNameError(f"未知传感器: {sensor_name}")
+        raise SanyanNameError(f'未知传感器: {sensor_name}')
 
     @staticmethod
     def register_device_op(evaluator, args):
         """注册设备到设备注册表。"""
         if len(args) < 2:
-            raise SanyanSyntaxError("注册设备 需要名称和类型")
+            raise SanyanSyntaxError('注册设备 需要名称和类型')
         name = args[0]
         device_type = args[1]
         if not hasattr(evaluator, 'device_registry'):
-            raise SanyanNameError("设备注册表不可用")
+            raise SanyanNameError('设备注册表不可用')
         from ops.device_registry import MockDevice, FileDevice
+
         if device_type == 'mock' or device_type == '模拟':
             device = MockDevice()
         elif device_type == 'file' or device_type == '文件':
-            path = evaluator.eval(args[2]) if len(args) > 2 else f"device_{name}.txt"
+            path = evaluator.eval(args[2]) if len(args) > 2 else f'device_{name}.txt'
             raw_path = str(path)
             # 校验路径不包含 .. 穿越
             if '..' in os.path.normpath(raw_path).replace('\\', '/').split('/'):
                 raise SanyanValueError(f"设备文件路径不允许包含 '..': {raw_path}")
             device = FileDevice(raw_path)
         else:
-            raise SanyanValueError(f"未知设备类型: {device_type}")
+            raise SanyanValueError(f'未知设备类型: {device_type}')
         evaluator.device_registry.register(name, device)
         return TritValue(0)
+
 
 # 注册 IoT 操作（中文别名由皮肤系统统一映射）
 register('write', IotOps.set_sensor)

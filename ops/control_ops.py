@@ -1,14 +1,17 @@
 """控制流操作：若、做、循环、遍历、返回、跳出、异常处理"""
+
 from ternary_core import BT, TritValue, ArrayValue
-from values import ReturnException, BreakException, ContinueException, SanyanError,SanyanSyntaxError
+from values import ReturnException, BreakException, ContinueException, SanyanError, SanyanSyntaxError
 from ops.registry import register
+
 
 class ControlOps:
     """控制流操作：条件、循环、遍历、变量设置"""
+
     @staticmethod
     def if_op(evaluator, args):
         if len(args) < 2:
-            raise SanyanSyntaxError("if 需要条件和真分支")
+            raise SanyanSyntaxError('if 需要条件和真分支')
         cond = evaluator.eval(args[0])
         if BT.to_int(cond.value) == 1:
             return evaluator.eval(args[1])
@@ -29,7 +32,7 @@ class ControlOps:
     @staticmethod
     def define_var(evaluator, args):
         if not args:
-            raise SanyanSyntaxError("设 需要参数，格式: (设 变量名 值)")
+            raise SanyanSyntaxError('设 需要参数，格式: (设 变量名 值)')
         if len(args) == 1 and isinstance(args[0], list):
             pairs = evaluator._parse_pairs(args[0])
             last_val = TritValue(0)
@@ -39,13 +42,17 @@ class ControlOps:
                 last_val = val
             return last_val
         if len(args) < 2:
-            raise SanyanSyntaxError("设 需要变量名和值，格式: (设 变量名 值)")
+            raise SanyanSyntaxError('设 需要变量名和值，格式: (设 变量名 值)')
         var_name = args[0]
         if isinstance(var_name, list):
             var_name = var_name[0]
         value_node = args[1]
-        if (isinstance(value_node, list) and len(value_node) == 1
-                and isinstance(value_node[0], str) and value_node[0].isdigit()):
+        if (
+            isinstance(value_node, list)
+            and len(value_node) == 1
+            and isinstance(value_node[0], str)
+            and value_node[0].isdigit()
+        ):
             value = TritValue(int(value_node[0]))
         else:
             value = evaluator.eval(value_node)
@@ -55,7 +62,7 @@ class ControlOps:
     @staticmethod
     def loop_op(evaluator, args):
         if len(args) < 2:
-            raise SanyanSyntaxError("loop 需要条件和体")
+            raise SanyanSyntaxError('loop 需要条件和体')
         body = args[1:]
         result = TritValue(0)
         local_count = 0
@@ -76,7 +83,7 @@ class ControlOps:
     @staticmethod
     def traversal_op(evaluator, args):
         if len(args) < 4:
-            raise SanyanSyntaxError("遍历 需要 变量名 起始 结束 体")
+            raise SanyanSyntaxError('遍历 需要 变量名 起始 结束 体')
         var_name = args[0]
         start = evaluator.eval(args[1]).to_int()
         end = evaluator.eval(args[2]).to_int()
@@ -90,7 +97,7 @@ class ControlOps:
             except BreakException:
                 break
             except ContinueException:
-                continue   # Python 的 continue，进入下一次 i 迭代
+                continue  # Python 的 continue，进入下一次 i 迭代
         return result
 
     @staticmethod
@@ -107,15 +114,15 @@ class ControlOps:
     @staticmethod
     def try_catch(evaluator, args):
         if len(args) != 2:
-            raise SanyanSyntaxError("尝试 需要两个参数：尝试体和捕获体")
+            raise SanyanSyntaxError('尝试 需要两个参数：尝试体和捕获体')
         try_body = args[0]
         catch_spec = args[1]
         if not isinstance(catch_spec, list) or len(catch_spec) < 2 or catch_spec[0] not in ('捕获', 'catch'):
-            raise SanyanSyntaxError("捕获体格式应为 (捕获 (错误变量) 体...)")
+            raise SanyanSyntaxError('捕获体格式应为 (捕获 (错误变量) 体...)')
         error_var = catch_spec[1]
         if isinstance(error_var, list):
             if len(error_var) != 1:
-                raise SanyanSyntaxError("捕获的错误变量必须是一个标识符")
+                raise SanyanSyntaxError('捕获的错误变量必须是一个标识符')
             error_var = error_var[0]
         catch_body = catch_spec[2:]
 
@@ -171,9 +178,9 @@ class ControlOps:
                     elif state == -1:
                         false_body = body
             if true_body is None or maybe_body is None or false_body is None:
-                raise SanyanSyntaxError("判 需要 真/可能/假 三个分支")
+                raise SanyanSyntaxError('判 需要 真/可能/假 三个分支')
         else:
-            raise SanyanSyntaxError("判 需要一个表达式和三个分支体")
+            raise SanyanSyntaxError('判 需要一个表达式和三个分支体')
         val = evaluator.eval(expr_node)
         int_val = val.to_int()
         if int_val == 1:
@@ -190,7 +197,7 @@ class ControlOps:
     @staticmethod
     def forin_op(evaluator, args):
         if len(args) < 3:
-            raise SanyanSyntaxError("遍历-在 需要 变量名 容器 体")
+            raise SanyanSyntaxError('遍历-在 需要 变量名 容器 体')
         var_name = args[0]
         container = evaluator.eval(args[1])
         body = args[2:]
@@ -217,12 +224,13 @@ class ControlOps:
                 except ContinueException:
                     continue
         else:
-            raise SanyanSyntaxError("遍历-在 只支持列表、数组或字符串")
+            raise SanyanSyntaxError('遍历-在 只支持列表、数组或字符串')
         return result
 
     @staticmethod
     def export_op(evaluator, args):
         return TritValue(0)
+
 
 # 注册控制流操作
 register('if', ControlOps.if_op)

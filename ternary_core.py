@@ -1,4 +1,5 @@
 """三进制核心库：平衡三进制整数、算术逻辑单元、三值对象"""
+
 from __future__ import annotations
 import os
 import threading
@@ -56,7 +57,7 @@ class BT:
         """
         if precision is None:
             precision = BT.DEFAULT_PRECISION
-        scale = 3 ** precision
+        scale = 3**precision
         scaled = int(round(n * scale))
         return BT.from_int(scaled)
 
@@ -65,7 +66,7 @@ class BT:
         """将平衡三进制定点表示转回浮点数。"""
         if precision is None:
             precision = BT.DEFAULT_PRECISION
-        scale = 3 ** precision
+        scale = 3**precision
         int_val = BT.to_int(trits)
         return int_val / scale
 
@@ -110,9 +111,15 @@ class TernaryALU:
         a = [0] * (max_len - len(a)) + a
         b = [0] * (max_len - len(b)) + b
         table = {
-            (1, 1): 1, (1, 0): 0, (1, -1): -1,
-            (0, 1): 0, (0, 0): 0, (0, -1): -1,
-            (-1, 1): -1, (-1, 0): -1, (-1, -1): -1,
+            (1, 1): 1,
+            (1, 0): 0,
+            (1, -1): -1,
+            (0, 1): 0,
+            (0, 0): 0,
+            (0, -1): -1,
+            (-1, 1): -1,
+            (-1, 0): -1,
+            (-1, -1): -1,
         }
         return [table[(x, y)] for x, y in zip(a, b)]
 
@@ -122,9 +129,15 @@ class TernaryALU:
         a = [0] * (max_len - len(a)) + a
         b = [0] * (max_len - len(b)) + b
         table = {
-            (1, 1): 1, (1, 0): 1, (1, -1): 1,
-            (0, 1): 1, (0, 0): 0, (0, -1): 0,
-            (-1, 1): 1, (-1, 0): 0, (-1, -1): -1,
+            (1, 1): 1,
+            (1, 0): 1,
+            (1, -1): 1,
+            (0, 1): 1,
+            (0, 0): 0,
+            (0, -1): 0,
+            (-1, 1): 1,
+            (-1, 0): 0,
+            (-1, -1): -1,
         }
         return [table[(x, y)] for x, y in zip(a, b)]
 
@@ -145,17 +158,17 @@ class TernaryALU:
     def div(a: list, b: list, precision: int = 0) -> list:
         """定点除法：a / b，精度 precision 位。"""
         if TernaryALU.is_zero(b):
-            raise ZeroDivisionError("ternary division by zero")
+            raise ZeroDivisionError('ternary division by zero')
         a_int = BT.to_int(a)
         b_int = BT.to_int(b)
-        return BT.from_int(int(round(a_int * (3 ** precision) / b_int)))
+        return BT.from_int(int(round(a_int * (3**precision) / b_int)))
 
     @staticmethod
     def fixed_mul(a: list, b: list, precision: int) -> list:
         """定点乘法：a * b / 3^precision"""
         a_int = BT.to_int(a)
         b_int = BT.to_int(b)
-        return BT.from_int(int(round(a_int * b_int / (3 ** precision))))
+        return BT.from_int(int(round(a_int * b_int / (3**precision))))
 
     @staticmethod
     def fixed_div(a: list, b: list, precision: int) -> list:
@@ -175,9 +188,27 @@ class TritValue:
     __slots__ = ('value', 'symbol', 'float_val', '_initialized', 'precision')
 
     STATE_MAP = {
-        '开': 1, '高': 1, '真': 1, '亮': 1, '启': 1, '通': 1, '有': 1, '是': 1,
-        '关': -1, '低': -1, '假': -1, '灭': -1, '停': -1, '断': -1, '无': -1, '否': -1,
-        '守': 0, '中': 0, '可能': 0, '待': 0, '未知': 0,
+        '开': 1,
+        '高': 1,
+        '真': 1,
+        '亮': 1,
+        '启': 1,
+        '通': 1,
+        '有': 1,
+        '是': 1,
+        '关': -1,
+        '低': -1,
+        '假': -1,
+        '灭': -1,
+        '停': -1,
+        '断': -1,
+        '无': -1,
+        '否': -1,
+        '守': 0,
+        '中': 0,
+        '可能': 0,
+        '待': 0,
+        '未知': 0,
     }
 
     _pool = OrderedDict()
@@ -189,7 +220,14 @@ class TritValue:
             if isinstance(v, list):
                 return tuple(_hashable(x) for x in v)
             return v
-        key = (value, precision) if isinstance(value, (int, float)) else (_hashable(value), precision) if isinstance(value, list) else (value, precision)
+
+        key = (
+            (value, precision)
+            if isinstance(value, (int, float))
+            else (_hashable(value), precision)
+            if isinstance(value, list)
+            else (value, precision)
+        )
         with cls._pool_lock:
             if key in cls._pool:
                 cls._pool.move_to_end(key)
@@ -223,51 +261,52 @@ class TritValue:
     def from_string(word: str) -> 'TritValue':
         if word in TritValue.STATE_MAP:
             return TritValue(TritValue.STATE_MAP[word])
-        raise ValueError(f"未知的三态词: {word}")
+        raise ValueError(f'未知的三态词: {word}')
 
-    def to_int(self):
+    def to_int(self) -> int:
         if self.float_val is not None:
             return int(round(self.float_val))
         if self.precision > 0:
             return int(BT.to_float(self.value, self.precision))
         return BT.to_int(self.value)
 
-    def to_float(self):
+    def to_float(self) -> float:
         if self.float_val is not None:
             return self.float_val
         if self.precision > 0:
             return BT.to_float(self.value, self.precision)
         return float(self.to_int())
 
-    def is_float(self):
+    def is_float(self) -> bool:
         return self.float_val is not None or self.precision > 0
 
     def __repr__(self):
         if self.float_val is not None:
-            return f"{self.float_val}"
-        return str(self.to_int())      # 只返回整数，如 "3"
+            return f'{self.float_val}'
+        return str(self.to_int())  # 只返回整数，如 "3"
 
 
 class ArrayValue:
     """固定长度数组，元素可以是任意值"""
+
     __slots__ = ('length', 'data')
 
-    def __init__(self, length, default=TritValue(0)):
+    def __init__(self, length: int, default: object = TritValue(0)) -> None:
         self.length = length
         self.data = [default] * length
 
-    def get(self, index):
+    def get(self, index: int) -> object:
         if index < 0 or index >= self.length:
-            raise IndexError(f"数组索引越界: {index} (长度 {self.length})")
+            raise IndexError(f'数组索引越界: {index} (长度 {self.length})')
         return self.data[index]
 
-    def set(self, index, value):
+    def set(self, index: int, value: object) -> 'ArrayValue':
         if index < 0 or index >= self.length:
-            raise IndexError(f"数组索引越界: {index} (长度 {self.length})")
+            raise IndexError(f'数组索引越界: {index} (长度 {self.length})')
         self.data[index] = value
         return self
 
-    def to_list(self):
+    def to_list(self) -> list:
         return self.data[:]
 
     def __getitem__(self, index):
@@ -292,7 +331,7 @@ _HALF_PI_TRITS_CACHE: dict[int, list] = {}
 
 def _int_at_precision(n: int, precision: int) -> list:
     """将整数 n 提升到定点 scale：返回 n * 3^precision 的三进制表示。"""
-    return BT.from_int(n * (3 ** precision))
+    return BT.from_int(n * (3**precision))
 
 
 def _half_at_precision(precision: int) -> list:
@@ -323,7 +362,7 @@ def _ternary_range_reduce(x_trits: list, precision: int) -> list:
 
     全程使用缩放整数运算，不经过 Python float。
     """
-    scale = 3 ** precision
+    scale = 3**precision
     x_int = BT.to_int(x_trits)
     two_pi_int = int(round(6.283185307179586 * scale))
     pi_int = int(round(3.141592653589793 * scale))
@@ -369,7 +408,7 @@ def ternary_tan(x_trits: list, precision: int = None) -> list:
     s = ternary_sin(x_trits, precision)
     c = ternary_cos(x_trits, precision)
     if TernaryALU.is_zero(c):
-        raise ValueError("tan(x): cos(x) is zero")
+        raise ValueError('tan(x): cos(x) is zero')
     return TernaryALU.fixed_div(s, c, precision)
 
 
@@ -377,12 +416,12 @@ def ternary_sqrt(x_trits: list, precision: int = None) -> list:
     """sqrt(x) Newton 法 — 无 float 初始猜测，纯 trit 迭代"""
     if precision is None:
         precision = BT.DEFAULT_PRECISION
-    scale = 3 ** precision
+    scale = 3**precision
     if TernaryALU.is_zero(x_trits):
         return BT.from_int(0)
     x_int = BT.to_int(x_trits)
     if x_int < 0:
-        raise ValueError("sqrt: negative argument")
+        raise ValueError('sqrt: negative argument')
     # 初始猜测：x/2 或 1（取决于 x 是否大于 1），全部在定点域计算
     if x_int > scale:
         guess = BT.from_int(int(round(x_int / 2)))
@@ -415,10 +454,10 @@ def ternary_log(x_trits: list, precision: int = None) -> list:
     """ln(x) Newton 法 — 无 float 中间量"""
     if precision is None:
         precision = BT.DEFAULT_PRECISION
-    scale = 3 ** precision
+    scale = 3**precision
     x_int = BT.to_int(x_trits)
     if x_int <= 0:
-        raise ValueError("log: argument must be positive")
+        raise ValueError('log: argument must be positive')
     one = _int_at_precision(1, precision)
     # 初始猜测：x/3 或 0.5（取决于 x 是否大于 2），全部在定点域
     if x_int > 2 * scale:

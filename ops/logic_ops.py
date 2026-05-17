@@ -1,4 +1,5 @@
 """三态逻辑操作：且、或、非"""
+
 from ternary_core import BT, TernaryALU, TritValue
 from values import SanyanValueError
 from ops.registry import register
@@ -23,7 +24,8 @@ class LogicOps:
             a = evaluator.eval(args[0])
             res = TernaryALU.tritwise_not(a.value)
             return TritValue(BT.to_int(res))
-        raise SanyanValueError(f"未知的逻辑操作: {op}")
+        raise SanyanValueError(f'未知的逻辑操作: {op}')
+
 
 register('and', LogicOps.logic_op, 'and')
 register('or', LogicOps.logic_op, 'or')

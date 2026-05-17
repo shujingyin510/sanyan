@@ -1,4 +1,5 @@
 """预处理：统一处理 #include 指令展开"""
+
 import os
 from typing import Optional
 
@@ -26,7 +27,7 @@ def _resolve_include_path(raw_path: str, base_dir: str = None) -> str:
     # 允许 ../ 相对路径
     abspath = os.path.abspath(os.path.join(project_root, normalized))
     if not abspath.startswith(os.path.abspath(project_root)):
-        raise ValueError(f"#include 路径越界: {raw_path} -> {abspath}")
+        raise ValueError(f'#include 路径越界: {raw_path} -> {abspath}')
     return abspath
 
 
@@ -35,9 +36,9 @@ def _safe_include_path(raw_path: str) -> None:
     _resolve_include_path(raw_path)
 
 
-def preprocess_includes(code: str, add_comment: bool = False,
-                        _seen: Optional[set] = None,
-                        _base_dir: Optional[str] = None) -> str:
+def preprocess_includes(
+    code: str, add_comment: bool = False, _seen: Optional[set] = None, _base_dir: Optional[str] = None
+) -> str:
     """展开 #include 指令，将外部文件内容内联到代码中。
 
     Args:
@@ -70,7 +71,7 @@ def preprocess_includes(code: str, add_comment: bool = False,
                     processed.append(f'／／ #include {path} ({e})')
                     continue
                 if abspath in _seen:
-                    raise ValueError(f"检测到循环 #include: {path}")
+                    raise ValueError(f'检测到循环 #include: {path}')
                 if os.path.exists(abspath):
                     try:
                         with open(abspath, 'r', encoding='utf-8') as f:

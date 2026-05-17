@@ -1,6 +1,8 @@
 """sugar.san 专项测试：AST 兼容性 + 解析正确性"""
+
 import sys
 import os
+
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import unittest
@@ -50,7 +52,7 @@ class TestSugarSanBasicParsing(unittest.TestCase):
 
     def assertParses(self, code):
         ast = _sugar_parse(code)
-        self.assertIsNotNone(ast, f"sugar.san failed to parse: {code}")
+        self.assertIsNotNone(ast, f'sugar.san failed to parse: {code}')
 
     def test_number(self):
         self.assertParses('42')
@@ -82,7 +84,7 @@ class TestSugarSanControlFlow(unittest.TestCase):
 
     def assertParses(self, code):
         ast = _sugar_parse(code)
-        self.assertIsNotNone(ast, f"sugar.san failed to parse: {code}")
+        self.assertIsNotNone(ast, f'sugar.san failed to parse: {code}')
 
     def test_if(self):
         self.assertParses('若 (1) { 输出(1) }')
@@ -114,7 +116,7 @@ class TestSugarSanListAndDict(unittest.TestCase):
 
     def assertParses(self, code):
         ast = _sugar_parse(code)
-        self.assertIsNotNone(ast, f"sugar.san failed to parse: {code}")
+        self.assertIsNotNone(ast, f'sugar.san failed to parse: {code}')
 
     def test_list_literal(self):
         ast = _sugar_parse('[1, 2, 3]')
@@ -135,7 +137,7 @@ class TestSugarSanTryCatch(unittest.TestCase):
 
     def assertParses(self, code):
         ast = _sugar_parse(code)
-        self.assertIsNotNone(ast, f"sugar.san failed to parse: {code}")
+        self.assertIsNotNone(ast, f'sugar.san failed to parse: {code}')
 
     def test_try_catch(self):
         self.assertParses('尝试 { 1 / 0 } 捕获 (e) { 输出(e) }')
@@ -152,7 +154,7 @@ class TestSugarSanOpPrecedence(unittest.TestCase):
 
     def assertParses(self, code):
         ast = _sugar_parse(code)
-        self.assertIsNotNone(ast, f"sugar.san failed to parse: {code}")
+        self.assertIsNotNone(ast, f'sugar.san failed to parse: {code}')
 
     def test_arithmetic_precedence(self):
         ast = _sugar_parse('1 + 2 * 3')
@@ -183,7 +185,7 @@ class TestSugarSanEdgeCases(unittest.TestCase):
 
     def assertParses(self, code):
         ast = _sugar_parse(code)
-        self.assertIsNotNone(ast, f"sugar.san failed to parse: {code}")
+        self.assertIsNotNone(ast, f'sugar.san failed to parse: {code}')
 
     def test_fullwidth_parens(self):
         self.assertParses('加（1, 2）')
@@ -273,17 +275,18 @@ class TestSugarSanPythonCompat(unittest.TestCase):
         """
         sugar_ast = _sugar_parse(code)
         py_ast = SugarConverter.convert(code, SkinManager('chinese'))
-        self.assertIsNotNone(py_ast, f"Python failed for: {code}")
+        self.assertIsNotNone(py_ast, f'Python failed for: {code}')
         if sugar_ast is None:
             # sugar.san 自举解析器尚未支持此语法，OK
             return
         norm_sugar = _normalize_block(sugar_ast)
+
         def depth(n):
             if isinstance(n, list):
                 return 1 + max((depth(x) for x in n), default=0)
             return 0
-        self.assertAlmostEqual(depth(norm_sugar), depth(py_ast), delta=1,
-                               msg=f"AST depth mismatch for: {code}")
+
+        self.assertAlmostEqual(depth(norm_sugar), depth(py_ast), delta=1, msg=f'AST depth mismatch for: {code}')
 
     def test_add_compat(self):
         self._compare_ast_loose('加(1, 2)')

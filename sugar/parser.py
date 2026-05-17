@@ -1,4 +1,5 @@
 """Pratt 语法分析器：运算符优先级、错误恢复"""
+
 from __future__ import annotations
 import json
 import os
@@ -25,12 +26,36 @@ def _build_keyword_map() -> dict[str, str]:
         except (FileNotFoundError, json.JSONDecodeError):
             pass
     # 关键字自映射（支持直接使用英文内部名）
-    for internal in ['set', 'if', 'elif', 'else', 'loop', 'for', 'fn',
-                     'return', 'break', 'continue', 'try', 'catch',
-                     'judge', 'lambda', 'in', 'import', 'print', 'load',
-                     'count', 'context', 'write', 'read', 'query',
-                     'export', 'install', 'list_packages', 'load_package',
-                     'register_device']:
+    for internal in [
+        'set',
+        'if',
+        'elif',
+        'else',
+        'loop',
+        'for',
+        'fn',
+        'return',
+        'break',
+        'continue',
+        'try',
+        'catch',
+        'judge',
+        'lambda',
+        'in',
+        'import',
+        'print',
+        'load',
+        'count',
+        'context',
+        'write',
+        'read',
+        'query',
+        'export',
+        'install',
+        'list_packages',
+        'load_package',
+        'register_device',
+    ]:
         maps[internal] = internal
     return maps
 
@@ -59,19 +84,50 @@ OP_MAP = _build_op_map()
 
 # 运算符优先级
 PREC = {
-    'and': 1, 'or': 1,
-    'eq': 2, 'ne': 2, 'gt': 2, 'lt': 2, 'gte': 2, 'lte': 2, 'ngt': 2, 'nlt': 2,
-    'add': 3, 'sub': 3,
-    'mul': 4, 'div': 4, 'mod': 4,
+    'and': 1,
+    'or': 1,
+    'eq': 2,
+    'ne': 2,
+    'gt': 2,
+    'lt': 2,
+    'gte': 2,
+    'lte': 2,
+    'ngt': 2,
+    'nlt': 2,
+    'add': 3,
+    'sub': 3,
+    'mul': 4,
+    'div': 4,
+    'mod': 4,
     'pow': 5,
 }
 RIGHT_ASSOC = {'pow'}
 
 # 可前缀的操作符
 PREFIXABLE_OPS = {
-    'add', 'sub', 'mul', 'div', 'mod', 'pow',
-    'gt', 'lt', 'eq', 'ne', 'gte', 'lte', 'ngt', 'nlt',
-    'not', 'and', 'or', 'digit', 'read', 'import', 'load', 'print', 'query',
+    'add',
+    'sub',
+    'mul',
+    'div',
+    'mod',
+    'pow',
+    'gt',
+    'lt',
+    'eq',
+    'ne',
+    'gte',
+    'lte',
+    'ngt',
+    'nlt',
+    'not',
+    'and',
+    'or',
+    'digit',
+    'read',
+    'import',
+    'load',
+    'print',
+    'query',
 }
 PREFIXABLE_SINGLE_ARG = {'read', 'not', 'digit', 'import', 'load', 'print', 'query'}
 
@@ -88,7 +144,7 @@ def _is_ident(tok: str) -> bool:
 
 
 class _Parser:
-    def __init__(self, tokens: list[Token], reporter: SugarErrorReporter, source: str = "") -> None:
+    def __init__(self, tokens: list[Token], reporter: SugarErrorReporter, source: str = '') -> None:
         self.tokens = tokens
         self.pos = 0
         self.reporter = reporter
@@ -285,10 +341,16 @@ class _Parser:
                 err_var = err_var_tok.value if err_var_tok else '_'
                 self._expect(')')
             catch_body = self.parse_block()
-            if not isinstance(catch_body, list) or (isinstance(catch_body, list) and len(catch_body) > 0 and catch_body[0] != 'do'):
+            if not isinstance(catch_body, list) or (
+                isinstance(catch_body, list) and len(catch_body) > 0 and catch_body[0] != 'do'
+            ):
                 catch_body_list = [catch_body]
             else:
-                catch_body_list = catch_body[1:] if isinstance(catch_body, list) and len(catch_body) > 0 and catch_body[0] == 'do' else [catch_body]
+                catch_body_list = (
+                    catch_body[1:]
+                    if isinstance(catch_body, list) and len(catch_body) > 0 and catch_body[0] == 'do'
+                    else [catch_body]
+                )
             return ['try', try_body, ['捕获', err_var] + catch_body_list]
 
         if kw == 'judge':
@@ -403,7 +465,7 @@ class _Parser:
         if self.peek() and self.peek().value == '.':
             self.advance()
             attr = self.advance()
-            return f"{tok.value}.{attr.value if attr else ''}"
+            return f'{tok.value}.{attr.value if attr else ""}'
 
         # 列表推导式 / 列表字面量
         if tok.value == '[':
@@ -531,7 +593,7 @@ def _annotate_ast(ast, tokens):
     return _walk(ast)
 
 
-def parse_tokens(tokens: list[Token], reporter: SugarErrorReporter, source: str = "") -> Any:
+def parse_tokens(tokens: list[Token], reporter: SugarErrorReporter, source: str = '') -> Any:
     parser = _Parser(tokens, reporter, source)
     ast = parser.parse_program()
     ast = _annotate_ast(ast, tokens)

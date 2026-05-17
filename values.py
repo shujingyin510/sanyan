@@ -1,4 +1,5 @@
 """三言中的值类型和异常"""
+
 from typing import Any, Optional
 from ternary_core import TritValue, ArrayValue
 
@@ -17,40 +18,53 @@ def to_num(v):
     except (ValueError, TypeError):
         return v
 
+
 class ReturnException(Exception):
     def __init__(self, value: Any) -> None:
         self.value = value
 
+
 class BreakException(Exception):
     pass
+
 
 class SanyanError(Exception):
     pass
 
+
 class SanyanNameError(NameError, SanyanError):
     pass
+
 
 class SanyanSyntaxError(SyntaxError, SanyanError):
     pass
 
+
 class SanyanTypeError(TypeError, SanyanError):
     pass
+
 
 class SanyanValueError(ValueError, SanyanError):
     pass
 
+
 class SanyanRuntimeError(RuntimeError, SanyanError):
     pass
+
 
 class SanyanKeyError(KeyError, SanyanError):
     pass
 
+
 class SanyanAttributeError(AttributeError, SanyanError):
     pass
 
+
 class SanyanIOError(OSError, SanyanError):
     """文件/I/O 操作错误（如读取失败、写入失败）"""
+
     pass
+
 
 class ContinueException(Exception):
     pass
@@ -58,6 +72,7 @@ class ContinueException(Exception):
 
 class SrcNode(list):
     """带源码位置的 AST 节点。isinstance(node, list) 依然为 True。"""
+
     __slots__ = ('line', 'col')
 
     def __new__(cls, items=(), line=0, col=0):
@@ -66,7 +81,8 @@ class SrcNode(list):
         obj.col = col
         return obj
 
-def check_type(value, expected_type: str, param_name: str = "") -> None:
+
+def check_type(value, expected_type: str, param_name: str = '') -> None:
     """检查值是否符合预期类型，不符则抛出 SanyanTypeError。"""
     type_checks = {
         '数字': lambda v: isinstance(v, TritValue),
@@ -87,14 +103,21 @@ def check_type(value, expected_type: str, param_name: str = "") -> None:
                 actual_type = '列表'
             elif isinstance(value, dict):
                 actual_type = '字典'
-            label = f"参数 '{param_name}' " if param_name else ""
+            label = f"参数 '{param_name}' " if param_name else ''
             raise SanyanTypeError(f"{label}期望类型 '{expected_type}'，但得到 '{actual_type}'")
 
 
 class FunctionValue:
     __slots__ = ('params', 'body', 'evaluator', 'closure_vars', 'param_types')
 
-    def __init__(self, params: list, body: list, evaluator=None, closure_vars: Optional[dict] = None, param_types: Optional[dict] = None) -> None:
+    def __init__(
+        self,
+        params: list,
+        body: list,
+        evaluator=None,
+        closure_vars: Optional[dict] = None,
+        param_types: Optional[dict] = None,
+    ) -> None:
         self.params = params
         self.body = body
         self.evaluator = evaluator
@@ -104,7 +127,7 @@ class FunctionValue:
     def call(self, evaluator, args: list) -> TritValue:
         if len(args) != len(self.params):
             raise SanyanSyntaxError(
-                f"函数 λ{self.params} 需要 {len(self.params)} 个参数，但提供了 {len(args)} 个: {args}"
+                f'函数 λ{self.params} 需要 {len(self.params)} 个参数，但提供了 {len(args)} 个: {args}'
             )
         evaluator.push_scope()
 
@@ -138,7 +161,7 @@ class FunctionValue:
             evaluator.pop_scope()
 
     def __repr__(self):
-        return f"<函数 λ {self.params}>"
+        return f'<函数 λ {self.params}>'
 
 
 def call_function(evaluator, func, args: list) -> Any:
@@ -151,7 +174,8 @@ def call_function(evaluator, func, args: list) -> Any:
     elif isinstance(func, FunctionValue):
         return func.call(evaluator, args)
     else:
-        raise SanyanTypeError(f"不可调用的对象: {type(func)}")
+        raise SanyanTypeError(f'不可调用的对象: {type(func)}')
+
 
 class ModuleValue:
     __slots__ = ('vars', 'commands', 'exports')
@@ -168,7 +192,7 @@ class ModuleValue:
 
     def call(self, evaluator, args: list) -> TritValue:
         if len(args) < 1:
-            raise SanyanSyntaxError("模块调用需要至少一个参数（函数名），但未提供")
+            raise SanyanSyntaxError('模块调用需要至少一个参数（函数名），但未提供')
         func_name = args[0]
         func_args = args[1:]
         if func_name in self.commands:
@@ -201,4 +225,4 @@ class ModuleValue:
                 evaluator.commands.update(saved_commands)
                 evaluator.pop_scope()
         else:
-            raise SanyanNameError(f"模块中未定义操作: {func_name}")
+            raise SanyanNameError(f'模块中未定义操作: {func_name}')

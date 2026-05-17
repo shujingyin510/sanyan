@@ -23,6 +23,12 @@ jobs:
       run: |
         python -m pip install --upgrade pip
         pip install .[dev]
+    - name: Check formatting with ruff
+      run: ruff format --check .
+    - name: Lint with ruff
+      run: ruff check .
+    - name: Static type checking with mypy
+      run: mypy .
     - name: Run Python unit tests
       run: python tests/test_core.py -v
     - name: Run ops module tests
@@ -39,5 +45,7 @@ jobs:
       run: python -X utf8 tests/test_sugar_san.py -v
     - name: Run Sanyan integration tests
       run: python tests/run_all.py
-    - name: Lint with ruff
-      run: ruff check .
+    - name: Measure code coverage
+      run: |
+        coverage run -m pytest tests/test_core.py tests/test_ops.py tests/test_lsp.py tests/test_package.py tests/test_iot.py tests/test_sugar_san.py tests/test_parser.py
+        coverage report --fail-under=80

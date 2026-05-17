@@ -1,4 +1,5 @@
 """AST 序列化：将三言 AST 转换为 JSON 安全的结构。"""
+
 import json
 import sys
 
@@ -44,11 +45,11 @@ def ast_from_file(filepath: str):
 
 def main():
     if len(sys.argv) < 2:
-        print("用法: python ast_json.py <文件.san>")
+        print('用法: python ast_json.py <文件.san>')
         sys.exit(1)
     ast = ast_from_file(sys.argv[1])
     if ast is None:
-        print("解析失败")
+        print('解析失败')
         sys.exit(1)
     print(json.dumps(ast_to_json(ast), ensure_ascii=False, indent=2))
 

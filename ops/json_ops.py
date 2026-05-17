@@ -1,15 +1,18 @@
 """JSON 解析与生成支持"""
+
 import json
 from ternary_core import TritValue
 from values import SanyanValueError, SanyanTypeError
 from ops.registry import register
 
+
 class JsonOps:
     """JSON 序列化与反序列化"""
+
     @staticmethod
     def to_json(evaluator, args):
         if len(args) != 1:
-            raise SanyanValueError("转JSON 需要一个参数")
+            raise SanyanValueError('转JSON 需要一个参数')
         val = evaluator.eval(args[0])
 
         def convert(obj):
@@ -24,15 +27,15 @@ class JsonOps:
         try:
             return json.dumps(convert(val), ensure_ascii=False)
         except (TypeError, ValueError, OverflowError) as e:
-            raise SanyanTypeError(f"无法转换为 JSON: {e}")
+            raise SanyanTypeError(f'无法转换为 JSON: {e}')
 
     @staticmethod
     def from_json(evaluator, args):
         if len(args) != 1:
-            raise SanyanValueError("解析JSON 需要一个参数")
+            raise SanyanValueError('解析JSON 需要一个参数')
         s = evaluator.eval(args[0])
         if not isinstance(s, str):
-            raise SanyanTypeError("解析JSON 需要字符串参数")
+            raise SanyanTypeError('解析JSON 需要字符串参数')
 
         def convert(obj):
             if isinstance(obj, bool):
@@ -49,7 +52,8 @@ class JsonOps:
             data = json.loads(s)
             return convert(data)
         except (json.JSONDecodeError, TypeError, ValueError) as e:
-            raise SanyanValueError(f"JSON 解析失败: {e}")
+            raise SanyanValueError(f'JSON 解析失败: {e}')
+
 
 # 注册 JSON 操作
 register('to_json', JsonOps.to_json)

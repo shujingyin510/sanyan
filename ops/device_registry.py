@@ -1,4 +1,5 @@
 """IoT 设备注册表与协议抽象"""
+
 from __future__ import annotations
 from abc import ABC, abstractmethod
 from typing import Optional
@@ -8,6 +9,7 @@ from values import SanyanNameError, SanyanValueError
 
 class Device(ABC):
     """设备协议：所有设备必须实现 read 和 write。"""
+
     @abstractmethod
     def read(self) -> TritValue:
         pass
@@ -19,6 +21,7 @@ class Device(ABC):
 
 class MockDevice(Device):
     """模拟设备：内存中的三态值。"""
+
     def __init__(self, initial: TritValue = TritValue(0)) -> None:
         self._value = initial
 
@@ -31,6 +34,7 @@ class MockDevice(Device):
 
 class FileDevice(Device):
     """文件模拟设备：用文件持久化状态。"""
+
     def __init__(self, path: str) -> None:
         self.path = path
 
@@ -53,11 +57,12 @@ class FileDevice(Device):
             with open(self.path, 'w', encoding='utf-8') as f:
                 f.write(value.symbol)
         except (IOError, OSError) as e:
-            raise SanyanValueError(f"设备写入失败: {e}")
+            raise SanyanValueError(f'设备写入失败: {e}')
 
 
 class DeviceRegistry:
     """设备注册表：管理所有 IoT 设备。"""
+
     def __init__(self) -> None:
         self._devices: dict[str, Device] = {}
 
@@ -74,13 +79,13 @@ class DeviceRegistry:
     def read(self, name: str) -> TritValue:
         device = self._devices.get(name)
         if device is None:
-            raise SanyanNameError(f"未注册的设备: {name}")
+            raise SanyanNameError(f'未注册的设备: {name}')
         return device.read()
 
     def write(self, name: str, value: TritValue) -> None:
         device = self._devices.get(name)
         if device is None:
-            raise SanyanNameError(f"未注册的设备: {name}")
+            raise SanyanNameError(f'未注册的设备: {name}')
         device.write(value)
 
     def list_devices(self) -> list[str]:

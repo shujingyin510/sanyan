@@ -2,6 +2,7 @@
 
 拆分为 lexer + parser + errors 模块。
 """
+
 from __future__ import annotations
 from sugar.parser import parse_code
 from sugar.lexer import tokenize

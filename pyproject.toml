@@ -19,6 +19,7 @@ dev = [
     "pytest>=7.0",
     "coverage>=6.0",
     "ruff>=0.1.0",
+    "mypy>=1.0",
 ]
 
 [project.scripts]
@@ -50,6 +51,25 @@ ignore = ["E501", "E701", "E702", "E703"]
 
 [tool.ruff.format]
 quote-style = "single"
+
+[tool.mypy]
+python_version = "3.8"
+ignore_missing_imports = true
+strict = false
+warn_unused_ignores = true
+exclude = [
+    "tests/",
+    "examples/",
+    ".github/",
+    "build/",
+]
+[[tool.mypy.overrides]]
+module = [
+    "sugar.*",
+    "ops.*",
+    "lsp.*",
+]
+ignore_errors = true
 
 [tool.coverage.run]
 source = ["."]

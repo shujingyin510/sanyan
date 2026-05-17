@@ -181,6 +181,9 @@ cython_debug/
 .cursorindexingignore
 *.vsix
 
+# Greenhouse test log
+greenhouse.log
+
 # STM32 firmware build artifacts
 examples/stm32-blinky/firmware.bin
 examples/stm32-blinky/firmware.elf

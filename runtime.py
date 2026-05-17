@@ -1,47 +1,140 @@
 """运行环境：组合模式下由 SocketManager/IoTManager/DebugManager/ProfileManager 组成"""
+
 from __future__ import annotations
 import os
 from typing import Optional, Any
 from values import SanyanSyntaxError
 from runtime_components import (
-    ScopeManager, IoTManager, DebugManager, ProfileManager,
+    ScopeManager,
+    IoTManager,
+    DebugManager,
+    ProfileManager,
 )
 
 # 模块级常量，供 lexer.py 等模块导入
 BUILTIN_OPS = {
-    '且', '或', '非',
-    '若', '做', '循环', '遍历', '判',
-    '设', '定义', '返回', '跳出', '继续',
-    '置', '查', '对', '读', '输出', '加载', '输入', '调试',
-    '导入', '导出', '注册设备',
-    '加', '减', '乘', '除', '余', '幂', '取位',
-    '等于', '大于', '小于', '不等于', '大于等于', '小于等于', '不大于', '不小于',
+    '且',
+    '或',
+    '非',
+    '若',
+    '做',
+    '循环',
+    '遍历',
+    '判',
+    '设',
+    '定义',
+    '返回',
+    '跳出',
+    '继续',
+    '置',
+    '查',
+    '对',
+    '读',
+    '输出',
+    '加载',
+    '输入',
+    '调试',
+    '导入',
+    '导出',
+    '注册设备',
+    '加',
+    '减',
+    '乘',
+    '除',
+    '余',
+    '幂',
+    '取位',
+    '等于',
+    '大于',
+    '小于',
+    '不等于',
+    '大于等于',
+    '小于等于',
+    '不大于',
+    '不小于',
     '同',
-    '绝对值', '最大值', '最小值', '平方根', '随机数', '随机态', '三进制',
-    '正弦', '余弦', '正切', '对数', '常用对数', '向下取整', '向上取整', '四舍五入',
-    '连接', '取长', '子串', '替换', '分割', '查找', '去空白',
-    '大写', '小写', '前缀', '后缀',
-    '排序', '反转', '包含', '去重', '切片', '求和', '合并',
-    '列表', '取', '置元素', '列表合', '表长', '字列',
-    '数组', '组长', '数组列',
-    '字典', '取键', '置键', '含键',
+    '绝对值',
+    '最大值',
+    '最小值',
+    '平方根',
+    '随机数',
+    '随机态',
+    '三进制',
+    '正弦',
+    '余弦',
+    '正切',
+    '对数',
+    '常用对数',
+    '向下取整',
+    '向上取整',
+    '四舍五入',
+    '连接',
+    '取长',
+    '子串',
+    '替换',
+    '分割',
+    '查找',
+    '去空白',
+    '大写',
+    '小写',
+    '前缀',
+    '后缀',
+    '排序',
+    '反转',
+    '包含',
+    '去重',
+    '切片',
+    '求和',
+    '合并',
+    '列表',
+    '取',
+    '置元素',
+    '列表合',
+    '表长',
+    '字列',
+    '数组',
+    '组长',
+    '数组列',
+    '字典',
+    '取键',
+    '置键',
+    '含键',
     '计数',
-    'λ', '函数', '映射', '过滤', '归并', '应用',
+    'λ',
+    '函数',
+    '映射',
+    '过滤',
+    '归并',
+    '应用',
     '当前时间',
-    '等待', '读文件', '写文件', '是数字', '是字符串', '字符串相等',
-    '转JSON', '解析JSON',
-    '尝试', '捕获',
-    '读取', '写入', '查询',
-    '从', '到', '在',
-    '安装', '包列表', '加载包',
+    '等待',
+    '读文件',
+    '写文件',
+    '是数字',
+    '是字符串',
+    '字符串相等',
+    '转JSON',
+    '解析JSON',
+    '尝试',
+    '捕获',
+    '读取',
+    '写入',
+    '查询',
+    '从',
+    '到',
+    '在',
+    '安装',
+    '包列表',
+    '加载包',
 }
+
 
 class SanyanRuntime:
     BUILTIN_OPS = BUILTIN_OPS
 
     def __init__(self, max_loop_steps: Optional[int] = None, skin_manager: Any = None):
         if max_loop_steps is None:
-            max_loop_steps = int(os.environ.get("MAX_LOOP_STEPS", "500"))
+            max_loop_steps = int(os.environ.get('MAX_LOOP_STEPS', '500'))
         self.max_loop_steps: int = max_loop_steps
         self.commands: dict = {}
         self.call_depth: int = 0
@@ -195,15 +288,15 @@ class SanyanRuntime:
         i = 0
         while i < len(items):
             if not isinstance(items[i], str):
-                raise SanyanSyntaxError(f"批量设置中发现了非字符串: {items[i]}")
+                raise SanyanSyntaxError(f'批量设置中发现了非字符串: {items[i]}')
             obj = items[i]
             if '.' in obj:
                 obj, val = obj.split('.')
                 i += 1
-            elif i + 2 < len(items) and items[i+1] == '.':
-                val = items[i+2]
+            elif i + 2 < len(items) and items[i + 1] == '.':
+                val = items[i + 2]
                 i += 3
             else:
-                raise SanyanSyntaxError(f"无法解析的批量设置项: 从 {items[i]} 开始")
+                raise SanyanSyntaxError(f'无法解析的批量设置项: 从 {items[i]} 开始')
             pairs.append((obj, val))
         return pairs

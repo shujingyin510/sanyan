@@ -1,16 +1,28 @@
 """Python 单测：覆盖运行时核心模块。
 运行方式：python tests/test_core.py
 """
+
 import sys
 import os
+
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import unittest
 from ternary_core import BT, TernaryALU, TritValue, ternary_sin, ternary_sqrt, ternary_exp, ternary_log
 from values import (
-    SanyanError, SanyanNameError, SanyanSyntaxError, SanyanTypeError,
-    SanyanValueError, SanyanRuntimeError, SanyanKeyError, SanyanAttributeError,
-    SanyanIOError, ReturnException, BreakException, FunctionValue, ModuleValue,
+    SanyanError,
+    SanyanNameError,
+    SanyanSyntaxError,
+    SanyanTypeError,
+    SanyanValueError,
+    SanyanRuntimeError,
+    SanyanKeyError,
+    SanyanAttributeError,
+    SanyanIOError,
+    ReturnException,
+    BreakException,
+    FunctionValue,
+    ModuleValue,
 )
 from runtime import SanyanRuntime
 from skin import SkinManager
@@ -21,9 +33,16 @@ class TestTernaryCore(unittest.TestCase):
     """三进制核心运算"""
 
     def test_int_conversion(self):
-        cases = [(0, [0]), (1, [1]), (-1, [-1]), (2, [1, -1]),
-                 (3, [1, 0]), (5, [1, -1, -1]), (10, [1, 0, 1]),
-                 (-5, [-1, 1, 1])]
+        cases = [
+            (0, [0]),
+            (1, [1]),
+            (-1, [-1]),
+            (2, [1, -1]),
+            (3, [1, 0]),
+            (5, [1, -1, -1]),
+            (10, [1, 0, 1]),
+            (-5, [-1, 1, 1]),
+        ]
         for dec, trits in cases:
             with self.subTest(dec=dec):
                 self.assertEqual(BT.from_int(dec), trits)
@@ -43,8 +62,7 @@ class TestTernaryCore(unittest.TestCase):
         self.assertEqual(BT.to_int(TernaryALU.multiply(BT.from_int(7), BT.from_int(0))), 0)
         self.assertEqual(BT.to_int(TernaryALU.multiply(BT.from_int(-3), BT.from_int(5))), -15)
         # 大数乘法（快速路径）
-        self.assertEqual(BT.to_int(TernaryALU.multiply(BT.from_int(12345), BT.from_int(67890))),
-                         12345 * 67890)
+        self.assertEqual(BT.to_int(TernaryALU.multiply(BT.from_int(12345), BT.from_int(67890))), 12345 * 67890)
 
     def test_logic(self):
         a, b = BT.from_int(1), BT.from_int(-1)
@@ -80,8 +98,8 @@ class TestExceptions(unittest.TestCase):
         self.assertTrue(issubclass(SanyanIOError, SanyanError))
 
     def test_value_error_message(self):
-        e = SanyanValueError("除数不能为零")
-        self.assertIn("除数不能为零", str(e))
+        e = SanyanValueError('除数不能为零')
+        self.assertIn('除数不能为零', str(e))
 
 
 class TestScopes(unittest.TestCase):
@@ -149,6 +167,7 @@ class TestFunctionValue(unittest.TestCase):
 
     def test_call_args_mismatch(self):
         from evaluator import SanyanEvaluator
+
         fn = FunctionValue(['x'], [['print', 'x']])
         rt = SanyanEvaluator()
         with self.assertRaises(SanyanSyntaxError):
@@ -156,6 +175,7 @@ class TestFunctionValue(unittest.TestCase):
 
     def test_closure_capture(self):
         from evaluator import SanyanEvaluator
+
         rt = SanyanEvaluator()
         rt.set_var('captured', TritValue(100))
         fn = FunctionValue([], [], closure_vars={'captured': TritValue(100)})
@@ -275,16 +295,19 @@ class TestTernaryEdge(unittest.TestCase):
 
     def test_ternary_cos_zero(self):
         from ternary_core import ternary_cos
+
         c = ternary_cos(BT.from_float(0.0, 16), 16)
         self.assertAlmostEqual(BT.to_float(c, 16), 1.0, places=1)
 
     def test_ternary_tan_zero(self):
         from ternary_core import ternary_tan
+
         t = ternary_tan(BT.from_float(0.0, 16), 16)
         self.assertAlmostEqual(BT.to_float(t, 16), 0.0, places=1)
 
     def test_ternary_log10_100(self):
         from ternary_core import ternary_log10
+
         l10 = ternary_log10(BT.from_float(100.0, 16), 16)
         self.assertAlmostEqual(BT.to_float(l10, 16), 2.0, places=1)
 

@@ -1,4 +1,5 @@
 """包管理器：安装、查询、管理三言包。"""
+
 from __future__ import annotations
 import json
 import os
@@ -6,13 +7,13 @@ from ternary_core import TritValue
 from values import SanyanSyntaxError, SanyanValueError, SanyanIOError, ModuleValue
 from ops.registry import register
 
-PACKAGES_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "packages")
-PACKAGE_INDEX_URL = "https://raw.githubusercontent.com/shujingyin510/sanyan-packages/main/index.json"
+PACKAGES_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'packages')
+PACKAGE_INDEX_URL = 'https://raw.githubusercontent.com/shujingyin510/sanyan-packages/main/index.json'
 PACKAGE_ALLOWLIST: set[str] = {
-    "github.com",
-    "raw.githubusercontent.com",
-    "gitlab.com",
-    "gitee.com",
+    'github.com',
+    'raw.githubusercontent.com',
+    'gitlab.com',
+    'gitee.com',
 }
 """允许的包下载域名白名单。空 set 表示不限制。"""
 _installed_cache: dict[str, bool] = {}
@@ -22,12 +23,12 @@ _index_cache = None  # (timestamp, index_data)
 def _resolve_package_path(name: str) -> str:
     """解析包路径：packages/name/package.san"""
     base = os.path.abspath(PACKAGES_DIR)
-    safe = name.replace(".", "_").replace("/", "_")
+    safe = name.replace('.', '_').replace('/', '_')
     pkg_dir = os.path.join(base, safe)
     candidates = [
-        os.path.join(pkg_dir, "package.san"),
-        os.path.join(pkg_dir, f"{safe}.san"),
-        os.path.join(pkg_dir, "main.san"),
+        os.path.join(pkg_dir, 'package.san'),
+        os.path.join(pkg_dir, f'{safe}.san'),
+        os.path.join(pkg_dir, 'main.san'),
     ]
     for path in candidates:
         if os.path.exists(path):
@@ -37,6 +38,7 @@ def _resolve_package_path(name: str) -> str:
 
 class PackageOps:
     """包管理器：安装、查询、管理三言包"""
+
     @staticmethod
     def install(evaluator, args):
         """安装包：安装("包名") 或 安装("包名", "下载URL")
@@ -46,9 +48,9 @@ class PackageOps:
         2. 安装("json", "http://...") — 指定 URL
         """
         if len(args) < 1:
-            raise SanyanSyntaxError("安装 需要包名")
+            raise SanyanSyntaxError('安装 需要包名')
         name = evaluator.eval(args[0])
-        if hasattr(name, "to_int"):
+        if hasattr(name, 'to_int'):
             name = str(name.to_int())
         name = str(name)
 
@@ -62,21 +64,21 @@ class PackageOps:
         url = None
         if len(args) >= 2:
             url = evaluator.eval(args[1])
-            if hasattr(url, "to_int"):
+            if hasattr(url, 'to_int'):
                 url = str(url.to_int())
             url = str(url)
 
         if url:
             if not url.startswith('https://'):
-                raise SanyanValueError(f"安装包仅支持 HTTPS 地址: {url}")
+                raise SanyanValueError(f'安装包仅支持 HTTPS 地址: {url}')
             # 白名单检查
             if PACKAGE_ALLOWLIST:
                 from urllib.parse import urlparse
+
                 hostname = urlparse(url).hostname
                 if hostname and not any(hostname.endswith(domain) for domain in PACKAGE_ALLOWLIST):
                     raise SanyanValueError(
-                        f"域名 '{hostname}' 不在下载白名单中。"
-                        f"允许的域名: {', '.join(sorted(PACKAGE_ALLOWLIST))}"
+                        f"域名 '{hostname}' 不在下载白名单中。允许的域名: {', '.join(sorted(PACKAGE_ALLOWLIST))}"
                     )
             PackageOps._download_and_install(name, url)
         else:
@@ -86,8 +88,8 @@ class PackageOps:
             except (IOError, OSError, KeyError):
                 raise SanyanValueError(
                     f"包 '{name}' 未安装，且无法从索引获取。"
-                    f"请先手动下载到 packages/{name}/ 目录，"
-                    f"或提供 URL: 安装(\"{name}\", \"下载地址\")"
+                    f'请先手动下载到 packages/{name}/ 目录，'
+                    f'或提供 URL: 安装("{name}", "下载地址")'
                 )
             if url:
                 PackageOps._download_and_install(name, url)
@@ -103,34 +105,34 @@ class PackageOps:
         将包作为模块导入，返回 ModuleValue。
         """
         if len(args) < 1:
-            raise SanyanSyntaxError("加载包 需要包名")
+            raise SanyanSyntaxError('加载包 需要包名')
         name = evaluator.eval(args[0])
-        if hasattr(name, "to_int"):
+        if hasattr(name, 'to_int'):
             name = str(name.to_int())
         name = str(name)
 
         pkg_path = _resolve_package_path(name)
         if not os.path.exists(os.path.dirname(pkg_path)):
-            raise SanyanValueError(
-                f"包 '{name}' 未安装。请先执行: 安装(\"{name}\")"
-            )
+            raise SanyanValueError(f'包 \'{name}\' 未安装。请先执行: 安装("{name}")')
 
         if not os.path.exists(pkg_path):
             # 尝试查找其他 .san 文件
             pkg_dir = os.path.dirname(pkg_path)
-            san_files = [f for f in os.listdir(pkg_dir) if f.endswith(".san")]
+            san_files = [f for f in os.listdir(pkg_dir) if f.endswith('.san')]
             if not san_files:
                 raise SanyanValueError(f"包 '{name}' 中没有找到 .san 文件")
             pkg_path = os.path.join(pkg_dir, san_files[0])
 
         from evaluator import SanyanEvaluator
+
         module_env = SanyanEvaluator(skin_manager=evaluator.skin_manager)
         from ops.file_ops import _parse_code
+
         try:
-            with open(pkg_path, "r", encoding="utf-8") as f:
+            with open(pkg_path, 'r', encoding='utf-8') as f:
                 code = f.read()
         except (IOError, OSError) as e:
-            raise SanyanIOError(f"读取包文件失败: {e}")
+            raise SanyanIOError(f'读取包文件失败: {e}')
         ast = _parse_code(code, module_env)
 
         if ast is not None:
@@ -147,14 +149,14 @@ class PackageOps:
         packages = []
         for name in sorted(os.listdir(base)):
             pkg_dir = os.path.join(base, name)
-            if os.path.isdir(pkg_dir) and not name.startswith("."):
+            if os.path.isdir(pkg_dir) and not name.startswith('.'):
                 packages.append(name)
         if packages:
-            print("已安装的包:")
+            print('已安装的包:')
             for p in packages:
-                print(f"  - {p}")
+                print(f'  - {p}')
         else:
-            print("没有已安装的包")
+            print('没有已安装的包')
         return TritValue(0)
 
     @staticmethod
@@ -165,14 +167,14 @@ class PackageOps:
         import tempfile
 
         base = os.path.abspath(PACKAGES_DIR)
-        pkg_dir = os.path.join(base, name.replace(".", "_").replace("/", "_"))
+        pkg_dir = os.path.join(base, name.replace('.', '_').replace('/', '_'))
 
         try:
             print(f"正在下载包 '{name}'...")
             with urllib.request.urlopen(url, timeout=30) as resp:
                 data = resp.read()
         except (urllib.error.URLError, IOError, OSError) as e:
-            raise SanyanValueError(f"下载包失败: {e}")
+            raise SanyanValueError(f'下载包失败: {e}')
 
         # 解压（带 zip-slip 防护）
         try:
@@ -185,29 +187,30 @@ class PackageOps:
                     for info in z.infolist():
                         safe_path = os.path.realpath(os.path.join(pkg_dir, info.filename))
                         if not safe_path.startswith(pkg_dir_real):
-                            raise SanyanValueError(f"zip-slip 攻击检测: {info.filename}")
+                            raise SanyanValueError(f'zip-slip 攻击检测: {info.filename}')
                         z.extract(info, pkg_dir)
             print(f"包 '{name}' 已安装到 {pkg_dir}")
         except (zipfile.BadZipFile, IOError, OSError) as e:
-            if not os.path.exists(os.path.join(pkg_dir, "package.san")):
-                with open(os.path.join(pkg_dir, f"{name}.san"), "wb") as f:
+            if not os.path.exists(os.path.join(pkg_dir, 'package.san')):
+                with open(os.path.join(pkg_dir, f'{name}.san'), 'wb') as f:
                     f.write(data)
-            raise SanyanValueError(f"解压包失败: {e}")
+            raise SanyanValueError(f'解压包失败: {e}')
 
     @staticmethod
     def _lookup_index(name: str) -> str | None:
         """从包索引查找下载 URL。优先查本地缓存，再查远程（每 5 分钟刷新）。"""
         global _index_cache
         import time
+
         # 本地索引
-        local_idx = os.path.join(os.path.abspath(PACKAGES_DIR), "index.json")
+        local_idx = os.path.join(os.path.abspath(PACKAGES_DIR), 'index.json')
         if os.path.exists(local_idx):
             try:
-                with open(local_idx, "r", encoding="utf-8") as f:
+                with open(local_idx, 'r', encoding='utf-8') as f:
                     index = json.load(f)
                 entry = index.get(name)
                 if entry:
-                    return entry.get("url") or entry.get("download")
+                    return entry.get('url') or entry.get('download')
             except (IOError, OSError, json.JSONDecodeError):
                 pass
         # 远程索引（缓存 5 分钟）
@@ -216,16 +219,18 @@ class PackageOps:
             index = _index_cache[1]
         else:
             import urllib.request
+
             try:
                 with urllib.request.urlopen(PACKAGE_INDEX_URL, timeout=10) as resp:
-                    index = json.loads(resp.read().decode("utf-8"))
+                    index = json.loads(resp.read().decode('utf-8'))
                 _index_cache = (now, index)
             except (urllib.error.URLError, IOError, OSError, json.JSONDecodeError):
                 return None
         entry = index.get(name)
         if entry:
-            return entry.get("url") or entry.get("download")
+            return entry.get('url') or entry.get('download')
         return None
+
 
 # 注册包管理操作
 register('install', PackageOps.install)

@@ -1,4 +1,5 @@
 """运行时组件：作用域管理、IoT 设备管理、调试管理、性能分析"""
+
 from __future__ import annotations
 from typing import Optional, Dict, List, Any
 from ternary_core import TritValue
@@ -7,6 +8,7 @@ from values import SanyanNameError
 
 class ScopeManager:
     """作用域栈管理：变量定义、查找、生命周期。"""
+
     def __init__(self, scopes_list: Optional[List[Dict[str, Any]]] = None):
         if scopes_list is not None:
             self._scopes = scopes_list
@@ -25,7 +27,7 @@ class ScopeManager:
         for scope in reversed(self._scopes):
             if name in scope:
                 return scope[name]
-        raise SanyanNameError(f"未定义的符号: {name}")
+        raise SanyanNameError(f'未定义的符号: {name}')
 
     def has_var(self, name: str) -> bool:
         for scope in reversed(self._scopes):
@@ -55,8 +57,10 @@ class ScopeManager:
 
 class IoTManager:
     """传感器、执行器、设备注册表管理。"""
+
     def __init__(self):
         from ops.device_registry import DeviceRegistry, MockDevice
+
         self.sensors: Dict[str, TritValue] = {
             '人体': TritValue(0),
             '光线': TritValue(0),
@@ -77,6 +81,7 @@ class IoTManager:
 
 class DebugManager:
     """断点调试管理：断点、监视变量、调试模式。"""
+
     def __init__(self):
         self.debug_mode: bool = False
         self._break_all: bool = False
@@ -103,6 +108,7 @@ class DebugManager:
 
 class ProfileManager:
     """性能分析追踪管理。"""
+
     def __init__(self):
         self._profiling: bool = False
         self._profile: Dict[str, dict] = {}
@@ -117,20 +123,19 @@ class ProfileManager:
 
     def record(self, name: str, dt: float) -> None:
         if name not in self._profile:
-            self._profile[name] = {"count": 0, "time": 0.0}
-        self._profile[name]["count"] += 1
-        self._profile[name]["time"] += dt
+            self._profile[name] = {'count': 0, 'time': 0.0}
+        self._profile[name]['count'] += 1
+        self._profile[name]['time'] += dt
 
     def report(self) -> str:
         if not self._profile:
-            return "(无性能数据)"
-        lines = ["\n=== 性能追踪 ===",
-                 f"{'操作':<16} {'调用次数':<10} {'总耗时(ms)':<12} {'平均(ms)':<10}"]
+            return '(无性能数据)'
+        lines = ['\n=== 性能追踪 ===', f'{"操作":<16} {"调用次数":<10} {"总耗时(ms)":<12} {"平均(ms)":<10}']
         items = sorted(self._profile.items(), key=lambda x: -x[1]['time'])
         for name, d in items:
             count = d['count']
             total_ms = d['time'] * 1000
             avg_ms = total_ms / count if count else 0
-            lines.append(f"{name:<16} {count:<10} {total_ms:<12.3f} {avg_ms:<10.3f}")
-        lines.append("=" * 48)
+            lines.append(f'{name:<16} {count:<10} {total_ms:<12.3f} {avg_ms:<10.3f}')
+        lines.append('=' * 48)
         return '\n'.join(lines)

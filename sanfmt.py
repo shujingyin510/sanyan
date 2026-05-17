@@ -1,75 +1,158 @@
 """三言源码格式化器 — 类似 black/prettier"""
+
 from __future__ import annotations
 import sys
 
 _INTERNAL_TO_DISPLAY = {
-    'if': '若', 'else': '否则', 'elif': '再若',
-    'for': '遍历', 'loop': '循环', 'forin': '遍历',
-    'fn': '定义', 'set': '设', 'print': '输出',
-    'return': '返回', 'break': '跳出', 'continue': '继续',
-    'try': '尝试', 'catch': '捕获',
-    'do': '做', 'query': '查', 'context': '对',
+    'if': '若',
+    'else': '否则',
+    'elif': '再若',
+    'for': '遍历',
+    'loop': '循环',
+    'forin': '遍历',
+    'fn': '定义',
+    'set': '设',
+    'print': '输出',
+    'return': '返回',
+    'break': '跳出',
+    'continue': '继续',
+    'try': '尝试',
+    'catch': '捕获',
+    'do': '做',
+    'query': '查',
+    'context': '对',
     'judge': '判',
-    'add': '加', 'sub': '减', 'mul': '乘', 'div': '除',
-    'mod': '余', 'pow': '幂',
-    'eq': '等于', 'neq': '不等于',
-    'gt': '大于', 'gte': '大于等于', 'lt': '小于', 'lte': '小于等于',
-    'ngt': '不大于', 'nlt': '不小于',
-    'and': '且', 'or': '或', 'not': '非',
+    'add': '加',
+    'sub': '减',
+    'mul': '乘',
+    'div': '除',
+    'mod': '余',
+    'pow': '幂',
+    'eq': '等于',
+    'neq': '不等于',
+    'gt': '大于',
+    'gte': '大于等于',
+    'lt': '小于',
+    'lte': '小于等于',
+    'ngt': '不大于',
+    'nlt': '不小于',
+    'and': '且',
+    'or': '或',
+    'not': '非',
 }
 
 _BINARY_OPS = {
-    'add', 'sub', 'mul', 'div', 'mod', 'pow',
-    'eq', 'neq', 'gt', 'gte', 'lt', 'lte',
-    'ngt', 'nlt', 'and', 'or', '同',
+    'add',
+    'sub',
+    'mul',
+    'div',
+    'mod',
+    'pow',
+    'eq',
+    'neq',
+    'gt',
+    'gte',
+    'lt',
+    'lte',
+    'ngt',
+    'nlt',
+    'and',
+    'or',
+    '同',
 }
 
 # 非二元操作但需要显示中文的
 _EXTRA_DISPLAY = {
-    'random': '随机数', 'random_state': '随机态',
-    'concat': '连接', 'length': '取长',
-    'substring': '子串', 'replace': '替换', 'split': '分割',
-    'find': '查找', 'trim': '去空白',
-    'upper': '大写', 'lower': '小写',
-    'starts': '前缀', 'ends': '后缀',
-    'sort': '排序', 'reverse': '反转',
-    'contains': '包含', 'unique': '去重',
-    'slice': '切片', 'sum': '求和', 'merge': '合并',
-    'list': '列表', 'get': '取', 'set_elem': '置元素',
-    'list_join': '列表合', 'list_len': '表长',
-    'array': '数组', 'arr_len': '组长',
-    'dict': '字典', 'get_key': '取键', 'set_key': '置键',
+    'random': '随机数',
+    'random_state': '随机态',
+    'concat': '连接',
+    'length': '取长',
+    'substring': '子串',
+    'replace': '替换',
+    'split': '分割',
+    'find': '查找',
+    'trim': '去空白',
+    'upper': '大写',
+    'lower': '小写',
+    'starts': '前缀',
+    'ends': '后缀',
+    'sort': '排序',
+    'reverse': '反转',
+    'contains': '包含',
+    'unique': '去重',
+    'slice': '切片',
+    'sum': '求和',
+    'merge': '合并',
+    'list': '列表',
+    'get': '取',
+    'set_elem': '置元素',
+    'list_join': '列表合',
+    'list_len': '表长',
+    'array': '数组',
+    'arr_len': '组长',
+    'dict': '字典',
+    'get_key': '取键',
+    'set_key': '置键',
     'has_key': '含键',
     'count': '计数',
-    'map': '映射', 'filter': '过滤', 'reduce': '归并',
+    'map': '映射',
+    'filter': '过滤',
+    'reduce': '归并',
     'apply': '应用',
-    'abs': '绝对值', 'max': '最大值', 'min': '最小值',
+    'abs': '绝对值',
+    'max': '最大值',
+    'min': '最小值',
     'sqrt': '平方根',
-    'sin': '正弦', 'cos': '余弦', 'tan': '正切',
-    'log': '对数', 'log10': '常用对数',
-    'floor': '向下取整', 'ceil': '向上取整', 'round': '四舍五入',
+    'sin': '正弦',
+    'cos': '余弦',
+    'tan': '正切',
+    'log': '对数',
+    'log10': '常用对数',
+    'floor': '向下取整',
+    'ceil': '向上取整',
+    'round': '四舍五入',
     'ternary': '三进制',
-    'time': '当前时间', 'sleep': '等待', 'wait': '等待',
-    'read_file': '读文件', 'write_file': '写文件',
-    'is_number': '是数字', 'is_string': '是字符串',
+    'time': '当前时间',
+    'sleep': '等待',
+    'wait': '等待',
+    'read_file': '读文件',
+    'write_file': '写文件',
+    'is_number': '是数字',
+    'is_string': '是字符串',
     'str_equals': '字符串相等',
-    'to_json': '转JSON', 'from_json': '解析JSON',
-    'read': '读取', 'write': '写入',
+    'to_json': '转JSON',
+    'from_json': '解析JSON',
+    'read': '读取',
+    'write': '写入',
     'register_device': '注册设备',
-    'import': '导入', 'export': '导出', 'load': '加载',
-    'input': '输入', 'debug': '调试',
-    'install': '安装', 'list_packages': '包列表', 'load_package': '加载包',
+    'import': '导入',
+    'export': '导出',
+    'load': '加载',
+    'input': '输入',
+    'debug': '调试',
+    'install': '安装',
+    'list_packages': '包列表',
+    'load_package': '加载包',
     'ter': '三进制',
 }
 
 _PRECEDENCE = {
     'pow': 40,
-    'mul': 30, 'div': 30, 'mod': 30,
-    'add': 20, 'sub': 20,
-    'eq': 10, 'neq': 10,
-    'gt': 10, 'gte': 10, 'lt': 10, 'lte': 10,
-    'ngt': 10, 'nlt': 10,
-    'and': 5, 'or': 5,
+    'mul': 30,
+    'div': 30,
+    'mod': 30,
+    'add': 20,
+    'sub': 20,
+    'eq': 10,
+    'neq': 10,
+    'gt': 10,
+    'gte': 10,
+    'lt': 10,
+    'lte': 10,
+    'ngt': 10,
+    'nlt': 10,
+    'and': 5,
+    'or': 5,
 }
 
 
@@ -314,7 +397,7 @@ def format_file(filepath: str, in_place: bool = False) -> str:
         if tokens:
             ast = parse(tokens)
     if ast is None:
-        raise ValueError("无法解析文件")
+        raise ValueError('无法解析文件')
 
     formatted = format_code(ast, source=original)
     if in_place:
@@ -325,6 +408,7 @@ def format_file(filepath: str, in_place: bool = False) -> str:
 
 def main():
     import argparse
+
     parser = argparse.ArgumentParser(description='三言源码格式化器')
     parser.add_argument('file', nargs='?', help='.san 文件路径')
     parser.add_argument('-i', '--in-place', action='store_true', help='直接修改文件')
@@ -339,6 +423,7 @@ def main():
         from skin import SkinManager
         from lexer import tokenize
         from parser import parse
+
         skin_mgr = SkinManager('chinese')
         ast = None
         try:
@@ -350,7 +435,7 @@ def main():
             if tokens:
                 ast = parse(tokens)
         if ast is None:
-            print("解析失败", file=sys.stderr)
+            print('解析失败', file=sys.stderr)
             sys.exit(1)
         print(format_code(ast, source=code))
         return
@@ -360,9 +445,9 @@ def main():
         with open(args.file, 'r', encoding='utf-8') as f:
             original = f.read()
         if original != formatted:
-            print(f"{args.file}: 格式不正确")
+            print(f'{args.file}: 格式不正确')
             sys.exit(1)
-        print(f"{args.file}: 格式正确")
+        print(f'{args.file}: 格式正确')
     elif not args.in_place:
         print(formatted)
 

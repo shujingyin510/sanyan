@@ -1,4 +1,5 @@
 """词法分析器：全角映射、token化、行号追踪"""
+
 from __future__ import annotations
 from dataclasses import dataclass
 
@@ -12,24 +13,52 @@ class Token:
 
 
 FULLWIDTH_MAP = {
-    '（': '(', '）': ')', '｛': '{', '｝': '}', '［': '[', '］': ']',
-    '＝': '=', '＞': '>', '＜': '<', '＋': '+', '－': '-', '＊': '*', '／': '/',
-    '％': '%', '＾': '^', '，': ',', '；': ';', '：': ':', '！': '!',
+    '（': '(',
+    '）': ')',
+    '｛': '{',
+    '｝': '}',
+    '［': '[',
+    '］': ']',
+    '＝': '=',
+    '＞': '>',
+    '＜': '<',
+    '＋': '+',
+    '－': '-',
+    '＊': '*',
+    '／': '/',
+    '％': '%',
+    '＾': '^',
+    '，': ',',
+    '；': ';',
+    '：': ':',
+    '！': '!',
     '　': ' ',
 }
 FULLWIDTH_DIGITS = {
-    '０': '0', '１': '1', '２': '2', '３': '3', '４': '4',
-    '５': '5', '６': '6', '７': '7', '８': '8', '９': '9',
+    '０': '0',
+    '１': '1',
+    '２': '2',
+    '３': '3',
+    '４': '4',
+    '５': '5',
+    '６': '6',
+    '７': '7',
+    '８': '8',
+    '９': '9',
 }
 SYMBOL_CHARS = frozenset('{ } ( ) ; , = > < + - * / % ^ . [ ] ! :'.split())
 
 
 STRING_OPEN = set('"\'') | {'\u201c', '\u2018', '\u300c', '\u300e'}
 STRING_CLOSE = {
-    '"': '"', "'": "'",
-    '\u201c': '\u201d', '\u2018': '\u2019',
-    '\u300c': '\u300d', '\u300e': '\u300f',
+    '"': '"',
+    "'": "'",
+    '\u201c': '\u201d',
+    '\u2018': '\u2019',
+    '\u300c': '\u300d',
+    '\u300e': '\u300f',
 }
+
 
 def tokenize(code: str) -> list[Token]:
     tokens: list[Token] = []
@@ -114,7 +143,7 @@ def tokenize(code: str) -> list[Token]:
             continue
 
         # Numbers
-        is_neg_num = (c == '-' and i + 1 < length and code[i + 1].isdigit())
+        is_neg_num = c == '-' and i + 1 < length and code[i + 1].isdigit()
         if c.isdigit() or c in FULLWIDTH_DIGITS or is_neg_num:
             start_col = col
             start = i
@@ -187,7 +216,7 @@ def tokenize(code: str) -> list[Token]:
                     else:
                         col += 1
                     i += 1
-                raw_content = code[b_start:i-1]
+                raw_content = code[b_start : i - 1]
                 tokens.append(Token('STRING', f'"{raw_content}"', line, start_col))
                 continue
 
@@ -243,7 +272,7 @@ def _parse_template(code: str, pos: int, line: int, col: int) -> list[Token]:
                 elif code[ptr] == '}':
                     braces -= 1
                 ptr += 1
-            var = code[expr_start:ptr-1]
+            var = code[expr_start : ptr - 1]
             tokens.append(Token('WORD', var, line, col))
             continue
         # 普通文本

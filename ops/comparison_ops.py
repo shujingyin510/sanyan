@@ -1,4 +1,5 @@
 """比较操作：等于、大于、小于等"""
+
 from ternary_core import TritValue
 from values import SanyanSyntaxError, SanyanTypeError
 from ops.registry import register
@@ -8,7 +9,7 @@ class ComparisonOps:
     @staticmethod
     def comparison(evaluator, op, args):
         if len(args) != 2:
-            raise SanyanSyntaxError(f"{op} 需要两个参数")
+            raise SanyanSyntaxError(f'{op} 需要两个参数')
         a_val = evaluator.eval(args[0])
         b_val = evaluator.eval(args[1])
 
@@ -31,14 +32,22 @@ class ComparisonOps:
         a = to_num(a_val)
         b = to_num(b_val)
         truth = False
-        if op == 'eq':   truth = a == b
-        elif op == 'gt': truth = a > b
-        elif op == 'lt': truth = a < b
-        elif op == 'ne': truth = a != b
-        elif op == 'gte': truth = a >= b
-        elif op == 'lte': truth = a <= b
-        elif op == 'ngt': truth = a <= b
-        elif op == 'nlt': truth = a >= b
+        if op == 'eq':
+            truth = a == b
+        elif op == 'gt':
+            truth = a > b
+        elif op == 'lt':
+            truth = a < b
+        elif op == 'ne':
+            truth = a != b
+        elif op == 'gte':
+            truth = a >= b
+        elif op == 'lte':
+            truth = a <= b
+        elif op == 'ngt':
+            truth = a <= b
+        elif op == 'nlt':
+            truth = a >= b
         return TritValue(1 if truth else -1)
 
     @staticmethod
@@ -46,6 +55,7 @@ class ComparisonOps:
         a = evaluator.eval(args[0])
         b = evaluator.eval(args[1])
         return TritValue(1 if a.symbol == b.symbol else -1)
+
 
 register('eq', ComparisonOps.comparison, 'eq')
 register('gt', ComparisonOps.comparison, 'gt')

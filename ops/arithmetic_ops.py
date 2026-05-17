@@ -1,4 +1,5 @@
 """算术操作：纯三进制加减乘除余幂取位"""
+
 from ternary_core import BT, TernaryALU, TritValue
 from ternary_core import _int_at_precision, ternary_log, ternary_exp
 from values import SanyanSyntaxError, SanyanValueError, SanyanTypeError
@@ -89,10 +90,10 @@ class ArithmeticOps:
 
         elif op == 'sub':
             if len(args) < 2:
-                raise SanyanSyntaxError("减 需要至少两个参数")
+                raise SanyanSyntaxError('减 需要至少两个参数')
             vals = [_to_tritvalue(evaluator.eval(arg)) for arg in args]
             if not all(isinstance(v, TritValue) for v in vals):
-                raise SanyanTypeError("减 的参数必须为数字")
+                raise SanyanTypeError('减 的参数必须为数字')
             trits_list = [v.value for v in vals]
             precs_list = [v.precision for v in vals]
             aligned, prec = _align_trits(trits_list, precs_list)
@@ -102,7 +103,7 @@ class ArithmeticOps:
         elif op == 'mul':
             vals = [_to_tritvalue(evaluator.eval(arg)) for arg in args]
             if not all(isinstance(v, TritValue) for v in vals):
-                raise SanyanTypeError("乘 的参数必须为数字")
+                raise SanyanTypeError('乘 的参数必须为数字')
             trits_list = [v.value for v in vals]
             precs_list = [v.precision for v in vals]
             aligned, prec = _align_trits(trits_list, precs_list)
@@ -116,19 +117,19 @@ class ArithmeticOps:
 
         elif op == 'div':
             if len(args) != 2:
-                raise SanyanSyntaxError("除 需要两个参数")
+                raise SanyanSyntaxError('除 需要两个参数')
             a = evaluator.eval(args[0])
             b = evaluator.eval(args[1])
             if not isinstance(a, TritValue) or not isinstance(b, TritValue):
-                raise SanyanTypeError("除 的参数必须为数字")
+                raise SanyanTypeError('除 的参数必须为数字')
             a_trits, b_trits = a.value, b.value
             if TernaryALU.is_zero(b_trits):
-                raise SanyanValueError("除数不能为零")
+                raise SanyanValueError('除数不能为零')
             a_prec, b_prec = a.precision, b.precision
             if a_prec == 0 and b_prec == 0:
                 result = TernaryALU.div(a_trits, b_trits, _DEFAULT_PRECISION)
                 val = BT.to_int(result)
-                scale = 3 ** _DEFAULT_PRECISION
+                scale = 3**_DEFAULT_PRECISION
                 if val % scale == 0:
                     return TritValue(val // scale)
                 return TritValue(result, _DEFAULT_PRECISION)
@@ -138,21 +139,21 @@ class ArithmeticOps:
                 a_trits, b_trits = aligned
             result = TernaryALU.fixed_div(a_trits, b_trits, prec)
             val = BT.to_int(result)
-            scale = 3 ** prec
+            scale = 3**prec
             if val % scale == 0:
                 return TritValue(val // scale)
             return TritValue(result, prec)
 
         elif op == 'mod':
             if len(args) != 2:
-                raise SanyanSyntaxError("余 需要两个参数")
+                raise SanyanSyntaxError('余 需要两个参数')
             a = evaluator.eval(args[0])
             b = evaluator.eval(args[1])
             if not isinstance(a, TritValue) or not isinstance(b, TritValue):
-                raise SanyanTypeError("余 的参数必须为数字")
+                raise SanyanTypeError('余 的参数必须为数字')
             a_trits, b_trits = a.value, b.value
             if TernaryALU.is_zero(b_trits):
-                raise SanyanValueError("除数不能为零")
+                raise SanyanValueError('除数不能为零')
             a_prec, b_prec = a.precision, b.precision
             if a_prec != b_prec:
                 aligned, _ = _align_trits([a_trits, b_trits], [a_prec, b_prec])
@@ -172,25 +173,25 @@ class ArithmeticOps:
 
         elif op == 'pow':
             if len(args) != 2:
-                raise SanyanSyntaxError("幂 需要两个参数")
+                raise SanyanSyntaxError('幂 需要两个参数')
             a = evaluator.eval(args[0])
             b = evaluator.eval(args[1])
             if not isinstance(a, TritValue) or not isinstance(b, TritValue):
-                raise SanyanTypeError("幂 的参数必须为数字")
+                raise SanyanTypeError('幂 的参数必须为数字')
             a_trits, b_trits = a.value, b.value
             a_prec, b_prec = a.precision, b.precision
 
             if b_prec == 0:
                 exp = BT.to_int(b_trits)
                 if exp < 0:
-                    raise SanyanValueError("幂指数暂不支持负数")
+                    raise SanyanValueError('幂指数暂不支持负数')
                 if a_prec == 0:
                     result = _ternary_pow_int(a_trits, exp)
                     return TritValue(BT.to_int(result))
                 prec = a_prec
                 result = _ternary_pow_int(a_trits, exp)
                 val = BT.to_int(result)
-                scale = 3 ** prec
+                scale = 3**prec
                 if val % scale == 0:
                     return TritValue(val // scale)
                 return TritValue(result, prec)
@@ -200,29 +201,30 @@ class ArithmeticOps:
                 aligned, _ = _align_trits([a_trits, b_trits], [a_prec, b_prec])
                 a_trits, b_trits = aligned
             if BT.to_int(a_trits) <= 0:
-                raise SanyanValueError("浮点幂的底数必须为正数")
+                raise SanyanValueError('浮点幂的底数必须为正数')
             ln_a = ternary_log(a_trits, prec)
             prod = TernaryALU.fixed_mul(b_trits, ln_a, prec)
             result = ternary_exp(prod, prec)
             val = BT.to_int(result)
-            scale = 3 ** prec
+            scale = 3**prec
             if val % scale == 0:
                 return TritValue(val // scale)
             return TritValue(result, prec)
 
         elif op == 'digit':
             if len(args) != 2:
-                raise SanyanSyntaxError("取位 需要数字和位置")
+                raise SanyanSyntaxError('取位 需要数字和位置')
             num = evaluator.eval(args[0])
             pos = evaluator.eval(args[1])
             if not isinstance(num, TritValue) or not isinstance(pos, TritValue):
-                raise SanyanTypeError("取位 的参数必须为数字")
+                raise SanyanTypeError('取位 的参数必须为数字')
             num_int = BT.to_int(num.value)
             pos_int = BT.to_int(pos.value)
-            digit = (abs(num_int) // (10 ** pos_int)) % 10
+            digit = (abs(num_int) // (10**pos_int)) % 10
             return TritValue(digit)
 
-        raise SanyanValueError(f"未知的算术操作: {op}")
+        raise SanyanValueError(f'未知的算术操作: {op}')
+
 
 register('add', ArithmeticOps.arithmetic, 'add')
 register('sub', ArithmeticOps.arithmetic, 'sub')

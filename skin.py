@@ -1,7 +1,9 @@
 """皮肤管理器：加载并切换语言皮肤，保护三态词根"""
+
 import json
 import os
 from ternary_core import TritValue
+
 
 class SkinManager:
     def __init__(self, lang='chinese'):
@@ -14,7 +16,7 @@ class SkinManager:
         """加载皮肤 JSON 文件，合并三态词表"""
         path = os.path.join('language', f'{lang}.json')
         if not os.path.exists(path):
-            raise FileNotFoundError(f"皮肤文件不存在: {path}")
+            raise FileNotFoundError(f'皮肤文件不存在: {path}')
         with open(path, 'r', encoding='utf-8') as f:
             data = json.load(f)
         self.skin_data = data

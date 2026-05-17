@@ -1,7 +1,9 @@
 """ops 模块单元测试：覆盖所有内置操作"""
+
 import sys
 import os
 import contextlib
+
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import unittest
@@ -401,6 +403,7 @@ class TestFileOps(unittest.TestCase):
 
 class TestNegativeCases(unittest.TestCase):
     """负面测试：错误路径和边界条件"""
+
     def setUp(self):
         self.env = SanyanEvaluator()
 

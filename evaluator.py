@@ -1,4 +1,5 @@
 """求值器主类：组合运行环境、内置操作、自定义命令"""
+
 from __future__ import annotations
 import time
 import sys
@@ -32,11 +33,10 @@ _init_ops()
 
 
 class SanyanEvaluator(SanyanRuntime):
-
-
     def __init__(self, max_loop_steps=None, skin_manager=None):
         if skin_manager is None:
             from skin import SkinManager
+
             skin_manager = SkinManager('chinese')
         super().__init__(max_loop_steps=max_loop_steps, skin_manager=skin_manager)
         self._op_cache = {}
@@ -53,7 +53,7 @@ class SanyanEvaluator(SanyanRuntime):
         if isinstance(node, str):
             return self._eval_str(node)
         ctx = repr(node)[:100] if not isinstance(node, str) else node[:100]
-        raise SanyanRuntimeError(f"不支持的节点类型: {type(node).__name__}，内容: {ctx}")
+        raise SanyanRuntimeError(f'不支持的节点类型: {type(node).__name__}，内容: {ctx}')
 
     def _eval_list(self, node: list) -> Any:
         if len(node) == 0:
@@ -75,7 +75,7 @@ class SanyanEvaluator(SanyanRuntime):
             return self._apply(first, node[1:])
         except SanyanError as e:
             if isinstance(node, SrcNode) and (node.line or node.col):
-                pos_msg = f"第{node.line}行第{node.col}列: {e}"
+                pos_msg = f'第{node.line}行第{node.col}列: {e}'
                 if not e.args or not e.args[0].startswith('第'):
                     e.args = (pos_msg,)
             raise
@@ -88,27 +88,36 @@ class SanyanEvaluator(SanyanRuntime):
             if s[i] == '\\' and i + 1 < len(s):
                 esc = s[i + 1]
                 if esc == 'n':
-                    result.append('\n'); i += 2
+                    result.append('\n')
+                    i += 2
                 elif esc == 't':
-                    result.append('\t'); i += 2
+                    result.append('\t')
+                    i += 2
                 elif esc == 'r':
-                    result.append('\r'); i += 2
+                    result.append('\r')
+                    i += 2
                 elif esc == '\\':
-                    result.append('\\'); i += 2
+                    result.append('\\')
+                    i += 2
                 elif esc == '"':
-                    result.append('"'); i += 2
+                    result.append('"')
+                    i += 2
                 elif esc == "'":
-                    result.append("'"); i += 2
+                    result.append("'")
+                    i += 2
                 elif esc == 'u' and i + 5 < len(s):
                     try:
-                        result.append(chr(int(s[i+2:i+6], 16)))
+                        result.append(chr(int(s[i + 2 : i + 6], 16)))
                         i += 6
                     except ValueError:
-                        result.append(s[i]); i += 1
+                        result.append(s[i])
+                        i += 1
                 else:
-                    result.append(s[i]); i += 1
+                    result.append(s[i])
+                    i += 1
             else:
-                result.append(s[i]); i += 1
+                result.append(s[i])
+                i += 1
         return ''.join(result)
 
     def _parse_numeric_literal(self, node: str):
@@ -162,7 +171,7 @@ class SanyanEvaluator(SanyanRuntime):
             return self._eval_symbol(obj + '.' + attr)
         if self.context_object is not None:
             return self._eval_context_symbol(symbol)
-        raise SanyanNameError(f"未定义的符号: {symbol}")
+        raise SanyanNameError(f'未定义的符号: {symbol}')
 
     def _eval_dot_symbol(self, symbol: str):
         """解析 对象.属性 形式的 IoT 设备访问"""
@@ -175,7 +184,7 @@ class SanyanEvaluator(SanyanRuntime):
             sensor_val = self.sensors[obj]
             attr_val = TritValue.from_string(attr)
             return TritValue(1 if sensor_val.symbol == attr_val.symbol else -1)
-        raise SanyanNameError(f"未定义的设备: {obj}")
+        raise SanyanNameError(f'未定义的设备: {obj}')
 
     def _eval_context_symbol(self, symbol: str):
         """在 对 作用域内解析符号为 IoT 设备操作"""
@@ -194,13 +203,13 @@ class SanyanEvaluator(SanyanRuntime):
                 val = TritValue.from_string(symbol)
                 dev.write(val)
                 return val
-        raise SanyanNameError(f"未定义的设备: {obj}")
+        raise SanyanNameError(f'未定义的设备: {obj}')
 
     def _pos(self, node) -> str:
         """如果节点有源码位置，返回位置前缀。"""
         if isinstance(node, SrcNode) and (node.line or node.col):
-            return f"第 {node.line} 行，第 {node.col} 列: "
-        return ""
+            return f'第 {node.line} 行，第 {node.col} 列: '
+        return ''
 
     def _apply(self, op: str, args: list) -> TritValue:
         internal = self._resolve_op_name(op)
@@ -223,9 +232,9 @@ class SanyanEvaluator(SanyanRuntime):
                 dt = time.perf_counter() - t0
                 name = internal or op
                 if name not in self._profile:
-                    self._profile[name] = {"count": 0, "time": 0.0}
-                self._profile[name]["count"] += 1
-                self._profile[name]["time"] += dt
+                    self._profile[name] = {'count': 0, 'time': 0.0}
+                self._profile[name]['count'] += 1
+                self._profile[name]['time'] += dt
             self._debug_after(internal, op, args)
 
     def _debug_before(self, internal: str, op: str, args: list) -> None:
@@ -243,15 +252,16 @@ class SanyanEvaluator(SanyanRuntime):
             return
         for v in self._watched_vars:
             if self.has_var(v):
-                print(f"  [监视] {v} = {self.get_var(v)}")
+                print(f'  [监视] {v} = {self.get_var(v)}')
 
     def _debug_prompt(self, cur_op: str, args: list) -> None:
         from ops.io_ops import IOOps
+
         fargs = ', '.join(IOOps.format_value(a) if not isinstance(a, str) else a for a in args)
-        print(f"\n⏸ [断点] {cur_op}({fargs})")
+        print(f'\n⏸ [断点] {cur_op}({fargs})')
         while True:
             try:
-                cmd = input("调试> ").strip()
+                cmd = input('调试> ').strip()
             except (KeyboardInterrupt, EOFError):
                 print()
                 self.debug_mode = False
@@ -265,19 +275,19 @@ class SanyanEvaluator(SanyanRuntime):
                 var = cmd.split(maxsplit=1)[1].strip()
                 if self.has_var(var):
                     val = self.get_var(var)
-                    print(f"  {var} = {IOOps.format_value(val) if not isinstance(val, str) else val}")
+                    print(f'  {var} = {IOOps.format_value(val) if not isinstance(val, str) else val}')
                 else:
-                    print(f"  {var}: 未定义")
+                    print(f'  {var}: 未定义')
             elif cmd == 'bt':
-                print("\n  === 调用栈 ===")
+                print('\n  === 调用栈 ===')
                 for oname, oargs in self.call_stack:
                     fa = ', '.join(str(a) for a in oargs)
-                    print(f"    at {oname}({fa})")
-                print("  =============")
+                    print(f'    at {oname}({fa})')
+                print('  =============')
             elif cmd == 'q':
                 sys.exit(0)
             else:
-                print("  命令: [Enter]/n=下一步  c=继续  p 变量  bt=调用栈  q=退出")
+                print('  命令: [Enter]/n=下一步  c=继续  p 变量  bt=调用栈  q=退出')
 
     def _resolve_op_name(self, op: str) -> str:
         cached = self._name_cache.get(op)
@@ -296,6 +306,7 @@ class SanyanEvaluator(SanyanRuntime):
 
     def _dispatch_op(self, internal: str, args: list):
         from ops.registry import get_op
+
         if internal in self._op_cache:
             method, extra = self._op_cache[internal]
         else:
@@ -348,7 +359,7 @@ class SanyanEvaluator(SanyanRuntime):
             return val.call(self, evaluated_args)
         if isinstance(val, (list, ArrayValue, dict)):
             if len(args) != 1:
-                raise SanyanSyntaxError(f"容器索引需要一个参数，但提供了 {len(args)} 个")
+                raise SanyanSyntaxError(f'容器索引需要一个参数，但提供了 {len(args)} 个')
             idx = self.eval(args[0])
             if isinstance(val, dict):
                 key = idx.to_int() if isinstance(idx, TritValue) else idx

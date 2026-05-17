@@ -1,4 +1,5 @@
 """LSP 语言服务器测试"""
+
 import sys
 import os
 import json
@@ -7,12 +8,13 @@ import unittest
 import threading
 import queue
 import time
+
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 
 def _encode_msg(msg: dict) -> bytes:
     body = json.dumps(msg, ensure_ascii=False)
-    header = f"Content-Length: {len(body.encode('utf-8'))}\r\n\r\n"
+    header = f'Content-Length: {len(body.encode("utf-8"))}\r\n\r\n'
     return header.encode() + body.encode()
 
 
@@ -39,9 +41,9 @@ class LspClient:
                 if not header_line:
                     break
                 header = header_line.decode().strip()
-                if not header.startswith("Content-Length: "):
+                if not header.startswith('Content-Length: '):
                     continue
-                length = int(header[len("Content-Length: "):])
+                length = int(header[len('Content-Length: ') :])
                 self.proc.stdout.readline()  # empty line
                 body = self.proc.stdout.read(length).decode()
                 self._msg_queue.put(json.loads(body))
@@ -50,17 +52,17 @@ class LspClient:
 
     def send_request(self, method, params=None):
         self._req_id += 1
-        msg = {"jsonrpc": "2.0", "id": self._req_id, "method": method}
+        msg = {'jsonrpc': '2.0', 'id': self._req_id, 'method': method}
         if params is not None:
-            msg["params"] = params
+            msg['params'] = params
         self.proc.stdin.write(_encode_msg(msg))
         self.proc.stdin.flush()
         return self._req_id
 
     def send_notification(self, method, params=None):
-        msg = {"jsonrpc": "2.0", "method": method}
+        msg = {'jsonrpc': '2.0', 'method': method}
         if params is not None:
-            msg["params"] = params
+            msg['params'] = params
         self.proc.stdin.write(_encode_msg(msg))
         self.proc.stdin.flush()
 
@@ -72,13 +74,13 @@ class LspClient:
                 msg = self._msg_queue.get(timeout=0.5)
             except queue.Empty:
                 continue
-            if msg.get("id") == req_id:
+            if msg.get('id') == req_id:
                 return msg
             # 通知消息（无 id）直接丢弃
         return None
 
     def close(self):
-        self.send_notification("shutdown")
+        self.send_notification('shutdown')
         self.proc.terminate()
         self.proc.wait(timeout=5)
 
@@ -88,10 +90,13 @@ class TestLspServer(unittest.TestCase):
     def setUpClass(cls):
         script = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'lsp_server.py')
         cls.client = LspClient(script)
-        req_id = cls.client.send_request("initialize", {
-            "processId": None,
-            "capabilities": {},
-        })
+        req_id = cls.client.send_request(
+            'initialize',
+            {
+                'processId': None,
+                'capabilities': {},
+            },
+        )
         cls.init_resp = cls.client.wait_for_response(req_id)
 
     @classmethod
@@ -100,50 +105,65 @@ class TestLspServer(unittest.TestCase):
 
     def test_initialize_response(self):
         self.assertIsNotNone(self.init_resp)
-        self.assertIn("capabilities", self.init_resp.get("result", {}))
+        self.assertIn('capabilities', self.init_resp.get('result', {}))
 
     def test_completion(self):
-        req_id = self.client.send_request("textDocument/completion", {
-            "textDocument": {"uri": "file:///test.san"},
-            "position": {"line": 0, "character": 0},
-        })
+        req_id = self.client.send_request(
+            'textDocument/completion',
+            {
+                'textDocument': {'uri': 'file:///test.san'},
+                'position': {'line': 0, 'character': 0},
+            },
+        )
         resp = self.client.wait_for_response(req_id)
         self.assertIsNotNone(resp)
-        self.assertIsNotNone(resp.get("result"))
+        self.assertIsNotNone(resp.get('result'))
 
     def test_hover(self):
-        req_id = self.client.send_request("textDocument/hover", {
-            "textDocument": {"uri": "file:///test.san"},
-            "position": {"line": 0, "character": 0},
-        })
+        req_id = self.client.send_request(
+            'textDocument/hover',
+            {
+                'textDocument': {'uri': 'file:///test.san'},
+                'position': {'line': 0, 'character': 0},
+            },
+        )
         resp = self.client.wait_for_response(req_id)
         self.assertIsNotNone(resp)
 
     def test_definition(self):
-        req_id = self.client.send_request("textDocument/definition", {
-            "textDocument": {"uri": "file:///test.san"},
-            "position": {"line": 0, "character": 0},
-        })
+        req_id = self.client.send_request(
+            'textDocument/definition',
+            {
+                'textDocument': {'uri': 'file:///test.san'},
+                'position': {'line': 0, 'character': 0},
+            },
+        )
         resp = self.client.wait_for_response(req_id)
         self.assertIsNotNone(resp)
 
     def test_signature_help(self):
-        req_id = self.client.send_request("textDocument/signatureHelp", {
-            "textDocument": {"uri": "file:///test.san"},
-            "position": {"line": 0, "character": 0},
-        })
+        req_id = self.client.send_request(
+            'textDocument/signatureHelp',
+            {
+                'textDocument': {'uri': 'file:///test.san'},
+                'position': {'line': 0, 'character': 0},
+            },
+        )
         resp = self.client.wait_for_response(req_id)
         self.assertIsNotNone(resp)
 
     def test_did_open_no_crash(self):
-        self.client.send_notification("textDocument/didOpen", {
-            "textDocument": {
-                "uri": "file:///test_doc.san",
-                "languageId": "sanyan",
-                "version": 1,
-                "text": "设 x = 10\n输出(x)\n",
-            }
-        })
+        self.client.send_notification(
+            'textDocument/didOpen',
+            {
+                'textDocument': {
+                    'uri': 'file:///test_doc.san',
+                    'languageId': 'sanyan',
+                    'version': 1,
+                    'text': '设 x = 10\n输出(x)\n',
+                }
+            },
+        )
         # 不返回响应，只是确认不崩溃
 
 

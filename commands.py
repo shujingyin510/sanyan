@@ -1,4 +1,5 @@
 """自定义命令：定义与调用"""
+
 from typing import Any
 from values import ReturnException, SanyanError, SanyanSyntaxError, SanyanNameError, SanyanRuntimeError, check_type
 from ternary_core import TritValue
@@ -6,12 +7,14 @@ from ops.registry import register
 
 _TCO_LOOP_MULTIPLIER = 10
 
+
 class Commands:
     """自定义命令：定义、调用、类型检查、尾递归优化"""
+
     @staticmethod
     def define(evaluator, args: list) -> TritValue:
         if len(args) < 3:
-            raise SanyanSyntaxError("定义 需要名称、参数列表和体")
+            raise SanyanSyntaxError('定义 需要名称、参数列表和体')
         cmd_name = args[0]
         if isinstance(cmd_name, list):
             cmd_name = cmd_name[0]
@@ -62,19 +65,15 @@ class Commands:
         if evaluator.call_depth > evaluator.max_call_depth:
             evaluator.call_depth -= 1
             Commands._print_call_stack(evaluator, op, args)
-            raise SanyanRuntimeError("命令调用超过了最大递归深度")
+            raise SanyanRuntimeError('命令调用超过了最大递归深度')
         evaluator.call_stack.append((op, args))
         try:
             params, body, param_types = Commands._resolve_command(evaluator, op)
             args = Commands._match_params(params, op, args)
             evaluated_args = Commands._evaluate_args(evaluator, params, args, param_types)
-            tail_body, last_expr, is_tco = Commands._detect_tail_call(
-                body, op, params, evaluated_args
-            )
+            tail_body, last_expr, is_tco = Commands._detect_tail_call(body, op, params, evaluated_args)
             if is_tco:
-                return Commands._run_tail_call(
-                    evaluator, params, tail_body, last_expr, op, evaluated_args
-                )
+                return Commands._run_tail_call(evaluator, params, tail_body, last_expr, op, evaluated_args)
             return Commands._run_normal(evaluator, params, body, evaluated_args)
         except SanyanError:
             Commands._print_call_stack(evaluator, op, args)
@@ -88,7 +87,7 @@ class Commands:
     def _resolve_command(evaluator, op: str):
         if op not in evaluator.commands:
             available = list(evaluator.commands.keys())[:10]
-            hint = f"，可用命令: {available}" if available else ""
+            hint = f'，可用命令: {available}' if available else ''
             raise SanyanNameError(f"未定义的操作: '{op}'{hint}")
         cmd_def = evaluator.commands[op]
         param_types = cmd_def[2] if len(cmd_def) > 2 else {}
@@ -104,21 +103,25 @@ class Commands:
                 return sole.split('.', 1)
             if '：' in sole:
                 return sole.split('：', 1)
-        raise SanyanSyntaxError(
-            f"命令 '{op}' 需要 {len(params)} 个参数，但提供了 {len(args)} 个"
-        )
+        raise SanyanSyntaxError(f"命令 '{op}' 需要 {len(params)} 个参数，但提供了 {len(args)} 个")
 
     @staticmethod
     def _evaluate_args(evaluator, params: list, args: list, param_types: dict) -> list:
         evaluated = []
         for param, arg_node in zip(params, args):
-            if isinstance(arg_node, str) and not arg_node.isdigit() \
-                    and arg_node not in TritValue.STATE_MAP \
-                    and not evaluator.has_var(arg_node):
+            if (
+                isinstance(arg_node, str)
+                and not arg_node.isdigit()
+                and arg_node not in TritValue.STATE_MAP
+                and not evaluator.has_var(arg_node)
+            ):
                 value = arg_node
                 # Strip surrounding quotes from string literals
-                if len(value) >= 2 and value[0] in ('"', "'", '\u201c', '\u2018') \
-                        and value[-1] in ('"', "'", '\u201d', '\u2019'):
+                if (
+                    len(value) >= 2
+                    and value[0] in ('"', "'", '\u201c', '\u2018')
+                    and value[-1] in ('"', "'", '\u201d', '\u2019')
+                ):
                     value = value[1:-1]
             else:
                 value = evaluator.eval(arg_node)
@@ -134,12 +137,11 @@ class Commands:
         if isinstance(last_expr, list) and len(last_expr) > 0 and last_expr[0] == 'do':
             tail_body = last_expr[1:] if len(last_expr) > 1 else []
             last_expr = tail_body[-1] if tail_body else None
-        is_tco = (last_expr is not None and Commands._is_tail_call(last_expr, op))
+        is_tco = last_expr is not None and Commands._is_tail_call(last_expr, op)
         return tail_body, last_expr, is_tco
 
     @staticmethod
-    def _run_tail_call(evaluator, params: list, tail_body: list,
-                       last_expr: list, op: str, args: list) -> TritValue:
+    def _run_tail_call(evaluator, params: list, tail_body: list, last_expr: list, op: str, args: list) -> TritValue:
         max_iterations = evaluator.max_loop_steps * _TCO_LOOP_MULTIPLIER
         iteration = 0
         while iteration < max_iterations:
@@ -162,11 +164,10 @@ class Commands:
             finally:
                 evaluator.pop_scope()
             iteration += 1
-        raise SanyanRuntimeError("尾递归超过了最大迭代次数")
+        raise SanyanRuntimeError('尾递归超过了最大迭代次数')
 
     @staticmethod
-    def _run_normal(evaluator, params: list, body: list,
-                    evaluated_args: list) -> TritValue:
+    def _run_normal(evaluator, params: list, body: list, evaluated_args: list) -> TritValue:
         evaluator.push_scope()
         for param, value in zip(params, evaluated_args):
             evaluator.set_var(param, value)
@@ -185,16 +186,17 @@ class Commands:
     @staticmethod
     def _print_call_stack(evaluator, current_op: str, current_args: list) -> None:
         """打印调用栈"""
-        print("\n=== 调用栈 ===")
+        print('\n=== 调用栈 ===')
         # 打印当前调用
         formatted_args = Commands._format_args(current_args)
-        print(f"  at {current_op}({formatted_args})")
+        print(f'  at {current_op}({formatted_args})')
         # 打印之前的调用（从栈顶到栈底）
         for i in range(len(evaluator.call_stack) - 1, -1, -1):
             op, args = evaluator.call_stack[i]
             formatted_args = Commands._format_args(args)
-            print(f"  at {op}({formatted_args})")
-        print("==============\n")
+            print(f'  at {op}({formatted_args})')
+        print('==============\n')
+
 
 # 注册 fn（函数定义）操作
 register('fn', Commands.define)
