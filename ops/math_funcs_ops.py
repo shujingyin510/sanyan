@@ -4,7 +4,6 @@ import random
 from ternary_core import BT, TernaryALU, TritValue, ternary_sin, ternary_cos, ternary_tan, ternary_sqrt, ternary_log, ternary_log10
 from values import SanyanSyntaxError, SanyanTypeError, SanyanValueError
 from ops.registry import register
-from values import to_num as _to_num
 
 
 class MathFuncsOps:

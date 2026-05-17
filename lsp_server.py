@@ -643,7 +643,6 @@ def _walk_undef(node, defined, diagnostics, scope_defined: set | None = None):
 
 def _check_unused_vars(ast: list, text: str, diagnostics: list):
     """检查定义了但从未使用的变量和命令名。"""
-    from collections import Counter
     defined = {}
     used = set()
 
