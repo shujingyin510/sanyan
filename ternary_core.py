@@ -1,4 +1,5 @@
 """三进制核心库：平衡三进制整数、算术逻辑单元、三值对象"""
+from __future__ import annotations
 import os
 import threading
 from collections import OrderedDict
