@@ -433,7 +433,7 @@ def main():
         if ast is None:
             tokens = tokenize(code)
             if tokens:
-            ast = parse(tokens)  # type: ignore[assignment]
+                ast = parse(tokens)  # type: ignore[assignment]
         if ast is None:
             print('解析失败', file=sys.stderr)
             sys.exit(1)
