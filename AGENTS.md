@@ -98,3 +98,45 @@ python doc_sync.py
 ### 预处理
 
 `#include` 展开统一使用 `preprocess.py` 中的 `preprocess_includes(code)` 函数。
+
+## STM32 固件开发
+
+交叉编译工具链：`sanyancc.py` → `firmware_data.h` → `arm-none-eabi-gcc`。
+
+### 关键教训：BSS 初始化
+
+**`_start()` 必须显式清零所有 BSS 段全局变量**。链接脚本 `_sbss`/`_ebss` 符号在 arm-none-eabi-gcc 上可能未正确定义，导致依赖 `.bss` 段清零的循环写出错误地址：
+
+```c
+void _start(void) {
+    /* 显式初始化每个 BSS 变量 */
+    _sp = 0;
+    _ticks = 0;
+    for (int i = 0; i < 16; i++) _read_devs[i] = 0;
+    for (int i = 0; i < 16; i++) _write_devs[i] = 0;
+    for (uint32_t i = 0; i < FIRMWARE_VARS; i++) _vars[i] = 0;
+    init();
+    vm_run();
+    while (1);
+}
+```
+
+不要依赖 `.data` 复制循环和 `.bss` 清零循环——STM32F103 链接脚本可能未正确生成 `_sdata`/`_edata`/`_sbss`/`_ebss` 符号。
+
+### 字节码解释器
+
+`runtime_stm32.c` 中的 VM 使用 `switch` 分派、`firmware_code[]` 字节码。所有指令定长定宽，栈式架构。关键设备：
+- ID 13: PC13 LED（active low）
+- SysTick @ 8MHz HSI：重装载值 8000-1 → 1ms 中断
+
+**不要在 delay 循环中使用 `__asm__("wfi")`**——WFI 让内核进入睡眠模式，ST-LINK SWD 连接会断开（"Unable to get core ID"）。纯忙等 `while (_ticks - start < ms);` 即可。
+
+### 编译烧录
+
+```bash
+export PATH="$PATH:/d/Program Files (x86)/GNU Arm Embedded Toolchain/10 2021.10/bin"
+arm-none-eabi-gcc -mcpu=cortex-m3 -mthumb -Os -ffreestanding -nostartfiles \
+  -I. -T stm32_flash.ld runtime_stm32.c -o firmware.elf
+arm-none-eabi-objcopy -O binary firmware.elf firmware.bin
+# 用 CubeProgrammer 或 st-flash 烧写 firmware.bin 到 0x08000000
+```

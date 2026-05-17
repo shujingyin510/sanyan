@@ -2,6 +2,33 @@
 
 ---
 
+## [v3.11.0] — 2026-05-17
+
+### 新增
+- **交叉编译工具链**: `sanyancc.py` — AST → 平坦字节码编译器（约 27 条指令，栈式 VM）；中文操作别名（加/减/乘/除/余/等于/不等/大于/小于/大等/小等/非/等待/io写/io读/做/设/循环/若/输出）
+- **STM32 固件** (`examples/stm32-blinky/`): `runtime_stm32.c` 完整 VM 解释器 + GPIO/SysTick/UART 驱动 + 中断向量表 + 链接脚本 + Makefile，已在 Blue Pill (STM32F103C8T6) 硬件运行（PC13 LED 200ms 闪烁）
+- **C 语言字节码解释器** (`runtime.c`): 主机端 C VM，与 STM32 共享指令集
+- **嵌套包导入**: `_resolve_path` 将 `.` 转为目录层级，顺序尝试 `stdlib/a/b/c.san` → `stdlib/a/b/c/package.san`
+- **纯三进制算术**: `TernaryALU` 实现全部 7 种操作（加/减/乘/除/余/幂/取位），`_ensure_trits()` / `_to_tritvalue()` 处理 TritValue 精度对齐
+- **纯三进制数学函数**: 删除 Python `math` 依赖，三角函数/平方根/对数全用 `ternary_sin/cos/tan/sqrt/log/log10` 纯三进制定点实现
+- **WAIT 指令** (0x18): 栈式操作数，pop ms → delay
+- **7 个比较指令**: EQ/NE/GT/LT/GTE/LTE/NOT
+- **栈式 IO 指令**: `IO_WRITE`/`IO_READ` 改为 pop device_id，不再使用编译期立即数
+- **组合模式重构**: `SanyanRuntime` 提取 `ScopeManager`/`IoTManager`/`DebugManager`/`ProfileManager` 到 `runtime_components.py`，委托属性保持全部向后兼容
+
+### 修复
+- **STM32 BSS 初始化**: `_sbss`/`_ebss` 链接符号未正确定义，`_start()` 改为显式清零所有全局变量（`_sp`/`_ticks`/设备表/`_vars`）
+- **STM32 WFI 掉线**: `delay_ms` 去掉 `__asm__("wfi")`，ST-LINK 不会断开（"Unable to get core ID"）
+- **设备数组越界**: 从 8 扩展到 16（ID=13 PC13 越界）
+- **向量表修正**: 第 15 项从 `Default_Handler` 改为 `SysTick_Handler`
+- **SysTick 重装载值**: 从 72000 修正为 8000（匹配实际 8MHz HSI）
+- **USART1 基地址**: 从 `0x40014800` 修正为 `0x40013800`
+
+### 文档
+- **AGENTS.md**: 新增 STM32 固件开发章节（BSS 初始化教训、WFI 禁用、编译烧录命令）
+- **README.md**: 更新 v3.11.0 特性表、项目结构树新增 `sanyancc.py`/`runtime.c`/`stm32-blinky/`
+- **CHANGELOG.md**: 新增 v3.11.0 条目
+
 ## [v3.10.0] — 2026-05-16
 
 ### 新增

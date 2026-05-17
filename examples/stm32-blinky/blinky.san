@@ -1,0 +1,12 @@
+(做
+  (设 led 13)
+  (设 delay_ms 200)
+  (循环 1
+    (做
+      (io写 led 1)
+      (等待 delay_ms)
+      (io写 led 0)
+      (等待 delay_ms)
+    )
+  )
+)

@@ -1,4 +1,4 @@
-# 三言 Sanyan v3.10.0
+# 三言 Sanyan v3.11.0
 
 [![VS Code Marketplace](https://img.shields.io/badge/VS%20Code-Marketplace-%23007ACC?logo=visualstudiocode)](https://marketplace.visualstudio.com/items?itemName=sanyan-lang.sanyan-language)
 [![CI](https://github.com/shujingyin510/sanyan/actions/workflows/ci.yml/badge.svg)](https://github.com/shujingyin510/sanyan/actions)
@@ -275,6 +275,16 @@ tests/
 | `定义 f (x) { 返回(x+1) }` | `（定义 f （x） （返回 （+ x 1）））` |
 | `若 (x > 0) { … } 否则 { … }` | `（若 （大于 x 0） … …）` |
 
+## 新增特性速览（v3.11.0）
+
+| 特性 | 说明 |
+|---|---|
+| 🔨 **交叉编译工具链** | `sanyancc.py` 将 `.san` 源码编译为平坦字节码，`runtime.c` / `runtime_stm32.c` 解释执行 |
+| 🖥️ **STM32 固件** | `examples/stm32-blinky/` — 完整 VM + GPIO(LED) + SysTick + UART，已在 Blue Pill 硬件运行 |
+| 🧮 **纯三进制算术** | 全部 7 种运算（加/减/乘/除/余/幂/取位）统一走 `TernaryALU`，无 Python `math` 后备 |
+| 📦 **嵌套包导入** | `导入("a.b.c")` 自动查找 `stdlib/a/b/c.san` → `stdlib/a/b/c/package.san` |
+| 🔧 **Runtime 组合模式重构** | `ScopeManager`/`IoTManager`/`DebugManager`/`ProfileManager` 提取到 `runtime_components.py` |
+
 ## 新增特性速览（v3.10.0）
 
 | 特性 | 说明 |
@@ -329,6 +339,9 @@ tests/
 ```text
 sanyan/
 ├── main.py                # 入口
+├── sanyancc.py            # 交叉编译器：.san → 平坦字节码
+├── runtime.c              # C 语言字节码解释器（主机端）
+├── VERSION.py             # 版本号
 ├── pyproject.toml         # 项目配置（Ruff 规则、打包）
 ├── CHANGELOG.md           # 版本历史
 ├── AGENTS.md              # 维护约定
@@ -373,7 +386,14 @@ sanyan/
 │   ├── greenhouse.san / greenhouse_se.san
 │   ├── voting.san / voting_se.san
 │   ├── data_clean.san / data_clean_se.san
-│   └── sensor_pipeline_simple.san / sensor_pipeline_simple_se.san
+│   ├── sensor_pipeline_simple.san / sensor_pipeline_simple_se.san
+│   └── stm32-blinky/      # STM32 点灯示例
+│       ├── blinky.san     # 三言源码
+│       ├── firmware_data.h# 编译后字节码
+│       ├── runtime_stm32.c# STM32F103 字节码解释器
+│       ├── stm32_flash.ld # 链接脚本
+│       ├── Makefile       # 一键编译烧录
+│       └── gen_header.py  # 字节码 → C 头文件
 ├── stdlib/                # 标准库
 │   ├── eval.san           # 纯 Sanyan 元循环求值器
 │   ├── math.san / string.san / list.san
