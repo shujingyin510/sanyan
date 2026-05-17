@@ -64,7 +64,7 @@ def _color_value(value) -> str:
 # REPL 历史记录
 _history_file = os.path.expanduser(os.path.join(os.path.expanduser('~'), '.sanyan_history'))
 try:
-    import readline  # type: ignore[no-redef]
+    import readline
 except ImportError:
     try:
         import pyreadline3 as readline  # type: ignore[no-redef]
@@ -307,7 +307,7 @@ def repl() -> None:
                 tokens = tokenize(code)
                 if tokens:
                     try:
-                        ast = parse(tokens)
+                        ast = parse(tokens)  # type: ignore[assignment]
                     except SyntaxError as e:
                         print(f'  语法错误: {e}')
                         continue
