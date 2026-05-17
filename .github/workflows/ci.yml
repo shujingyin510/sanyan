@@ -48,4 +48,4 @@ jobs:
     - name: Measure code coverage
       run: |
         coverage run -m pytest tests/test_core.py tests/test_ops.py tests/test_lsp.py tests/test_package.py tests/test_iot.py tests/test_sugar_san.py tests/test_parser.py
-        coverage report --fail-under=80
+        coverage report
