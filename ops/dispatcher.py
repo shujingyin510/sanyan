@@ -8,10 +8,9 @@ from typing import Any
 from ops.registry import get_op
 from values import (
     FunctionValue, ModuleValue, SanyanNameError, SanyanKeyError,
-    SanyanTypeError, SanyanAttributeError, SanyanRuntimeError,
+    SanyanSyntaxError, SanyanTypeError, SanyanAttributeError,
 )
 from ternary_core import TritValue, ArrayValue
-from commands import Commands
 
 
 def resolve_op_name(evaluator, op: str) -> str:
@@ -110,7 +109,7 @@ def handle_variable_call(evaluator, op: str, args: list):
 def apply(evaluator, op: str, args: list) -> Any:
     """主分派入口：依次尝试注册表 → 点号访问 → 变量调用 → 自定义命令
     """
-    from sandbox import check_op, check_func
+    from sandbox import check_func
     from commands import Commands
 
     internal = resolve_op_name(evaluator, op)

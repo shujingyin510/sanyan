@@ -1,6 +1,10 @@
 """模糊测试：随机输入抗性验证"""
 
-import sys, os, random, string, unittest
+import os
+import random
+import string
+import sys
+import unittest
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from lexer import tokenize

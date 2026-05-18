@@ -8,7 +8,7 @@ from ternary_core import TritValue, ArrayValue
 from runtime import SanyanRuntime
 from commands import Commands
 from values import FunctionValue, ModuleValue, SrcNode, SanyanNameError, SanyanError
-from values import SanyanSyntaxError, SanyanTypeError, SanyanKeyError, SanyanAttributeError, SanyanRuntimeError
+from values import SanyanRuntimeError
 
 
 def _init_ops():
@@ -28,6 +28,11 @@ def _init_ops():
     import ops.package_ops  # noqa: F401
     import commands  # noqa: F401
     import ops.sandbox_ops  # noqa: F401
+    import ops.time_ops  # noqa: F401
+    import ops.net_ops  # noqa: F401
+    import ops.crypto_ops  # noqa: F401
+    import ops.math_extra_ops  # noqa: F401
+    import ops.concurrent_ops  # noqa: F401
 
 
 _init_ops()

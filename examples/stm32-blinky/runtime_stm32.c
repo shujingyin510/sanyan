@@ -185,13 +185,20 @@ void (*const g_pfnVectors[48])(void) = {
     [16 ... 47] = Default_Handler,
 };
 
+/* 清零宏：确保所有 BSS 变量初始化，不依赖链接脚本符号 */
+#define ZERO_VAR(var) __builtin_memset(&(var), 0, sizeof(var))
+
 void _start(void) {
-    _sp = 0;
-    _ticks = 0;
-    _uart_ready = 0;
-    for (int i = 0; i < 16; i++) _read_devs[i] = 0;
-    for (int i = 0; i < 16; i++) _write_devs[i] = 0;
-    for (uint32_t i = 0; i < FIRMWARE_VARS; i++) _vars[i] = 0;
+    extern uint32_t _sbss[], _ebss[];
+    /* 标准 BSS 清零循环（若 _sbss/_ebss 链接正确） */
+    for (uint32_t *p = _sbss; p < _ebss; p++) *p = 0;
+    /* 防御性显式清零：防止链接脚本符号缺失 */
+    ZERO_VAR(_sp);
+    ZERO_VAR(_ticks);
+    ZERO_VAR(_uart_ready);
+    ZERO_VAR(_read_devs);
+    ZERO_VAR(_write_devs);
+    ZERO_VAR(_vars);
     init();
     vm_run();
     while (1);

@@ -33,5 +33,14 @@ SECTIONS
         _ebss = .;
     } > RAM
 
+    /* 强制导出 BSS 段符号，避免 arm-none-eabi-gcc 优化掉 */
+    PROVIDE(_sbss = _sbss);
+    PROVIDE(_ebss = _ebss);
+
     _estack = ORIGIN(RAM) + LENGTH(RAM);
 }
+
+/* 导出调试/监控用符号 */
+PROVIDE(_firmware_start = 0x08000000);
+PROVIDE(_flash_size = 64K);
+PROVIDE(_ram_size = 20K);

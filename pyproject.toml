@@ -56,6 +56,8 @@ quote-style = "single"
 python_version = "3.10"
 ignore_missing_imports = true
 strict = false
+check_untyped_defs = true
+warn_return_any = true
 warn_unused_ignores = true
 exclude = [
     "tests/",
@@ -66,7 +68,6 @@ exclude = [
 [[tool.mypy.overrides]]
 module = [
     "sugar.*",
-    "ops.*",
     "lsp.*",
 ]
 ignore_errors = true

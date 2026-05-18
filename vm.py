@@ -146,11 +146,11 @@ class VM:
                 val = self.stack.pop()
                 print(val)
             elif op == IO_READ:
-                dev_id = self.stack.pop()
+                self.stack.pop()  # dev_id (discard)
                 self.stack.append(0)
             elif op == IO_WRITE:
                 val = self.stack.pop()
-                dev_id = self.stack.pop()
+                self.stack.pop()  # dev_id (discard)
             elif op == EQ:
                 b = self.stack.pop()
                 a = self.stack.pop()
@@ -179,7 +179,7 @@ class VM:
                 a = self.stack.pop()
                 self.stack.append(1 if a == 0 else 0)
             elif op == WAIT:
-                ms = self.stack.pop()
+                self.stack.pop()  # ms (discard)
             elif op == HALT:
                 self.halted = True
                 return

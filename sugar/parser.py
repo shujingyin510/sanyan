@@ -153,7 +153,7 @@ def _is_ident(tok: str) -> bool:
 
 class _Parser:
     """Pratt 解析器：将 token 流 → AST。
-    
+
     核心流程：
     1. parse_program → parse_statement 循环（语句级分派）
     2. parse_expression → parse_primary（表达式级 Pratt 循环）
@@ -217,7 +217,7 @@ class _Parser:
 
     def parse_program(self) -> Any:
         """入口：解析整个程序（多语句列表）。
-        
+
         空程序返回 None，单语句直接返回节点，多语句用 'do' 包装。
         解析失败的语句通过跳过一个 token 恢复（错误恢复策略）。
         """
@@ -235,7 +235,7 @@ class _Parser:
 
     def parse_statement(self) -> Any:
         """分派语句解析：根据首 token 的关键字类型 dispatch。
-        
+
         支持：赋值、set、write、if、loop、for、fn、return、
         break、continue、try、judge、context、export、register_device。
         非关键字开头则回退到表达式语句。
@@ -465,7 +465,7 @@ class _Parser:
 
     def parse_expression(self, precedence: int = 0) -> Any:
         """Pratt 核心：表达式解析（中缀循环）。
-        
+
         - 先调用 parse_primary 获取「左值」（前缀 nud）
         - 循环检查下一个 token 是否为中缀操作符（led）
         - 若当前操作符优先级 >= precedence 则继续结合
@@ -487,7 +487,7 @@ class _Parser:
 
     def parse_primary(self) -> Any:
         """Pratt 前缀（nud）分派：字面量、括号、前缀操作、lambda、调用、索引。
-        
+
         按优先级依次检查：
         1. 括号表达式 (...)
         2. 点号属性访问 obj.attr

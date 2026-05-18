@@ -8,7 +8,7 @@ _FUNC_BLOCKED = frozenset()
 
 def restrict(ops: list[str] | None = None, funcs: list[str] | None = None) -> None:
     """设置沙箱限制：禁止调用指定操作或函数。
-    
+
     Args:
         ops: 禁止的内置操作名列表
         funcs: 禁止的自定义函数名列表
