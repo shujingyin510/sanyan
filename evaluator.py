@@ -33,6 +33,10 @@ def _init_ops():
     import ops.crypto_ops  # noqa: F401
     import ops.math_extra_ops  # noqa: F401
     import ops.concurrent_ops  # noqa: F401
+    import ops.random_ops  # noqa: F401
+    import ops.regex_ops  # noqa: F401
+    import ops.system_ops  # noqa: F401
+    import ops.unicode_ops  # noqa: F401
 
 
 _init_ops()
