@@ -1,4 +1,10 @@
-"""Pratt 语法分析器：运算符优先级、错误恢复"""
+"""Pratt 语法分析器：运算符优先级、错误恢复
+
+Pratt 解析用「前缀/中缀」统一处理所有表达式：
+- 前缀（null_denotation）: 字面量、标识符、括号、前缀操作符
+- 中缀（left_denotation）: 二元操作符、函数调用、索引
+- 优先级（PREC）控制结合性，避免手写左递归
+"""
 
 from __future__ import annotations
 import json
@@ -82,7 +88,8 @@ def _build_op_map() -> dict[str, str]:
 KEYWORD_MAP = _build_keyword_map()
 OP_MAP = _build_op_map()
 
-# 运算符优先级
+# Pratt 优先级表：数值越大绑定越紧
+# or/and(1) < 比较(2) < 加减(3) < 乘除(4) < 幂(5)
 PREC = {
     'and': 1,
     'or': 1,
@@ -103,7 +110,7 @@ PREC = {
 }
 RIGHT_ASSOC = {'pow'}
 
-# 可前缀的操作符
+# 可前缀的操作符（无关键字包装，直接出现在表达式开头）
 PREFIXABLE_OPS = {
     'add',
     'sub',
@@ -129,6 +136,7 @@ PREFIXABLE_OPS = {
     'print',
     'query',
 }
+# 单参数前缀操作符（不需要括号包裹参数）
 PREFIXABLE_SINGLE_ARG = {'read', 'not', 'digit', 'import', 'load', 'print', 'query'}
 
 
@@ -144,6 +152,14 @@ def _is_ident(tok: str) -> bool:
 
 
 class _Parser:
+    """Pratt 解析器：将 token 流 → AST。
+    
+    核心流程：
+    1. parse_program → parse_statement 循环（语句级分派）
+    2. parse_expression → parse_primary（表达式级 Pratt 循环）
+    3. parse_primary 处理字面量/标识符/前缀操作/lambda/调用/索引
+    """
+
     def __init__(self, tokens: list[Token], reporter: SugarErrorReporter, source: str = '') -> None:
         self.tokens = tokens
         self.pos = 0
@@ -200,6 +216,11 @@ class _Parser:
         return self.advance()
 
     def parse_program(self) -> Any:
+        """入口：解析整个程序（多语句列表）。
+        
+        空程序返回 None，单语句直接返回节点，多语句用 'do' 包装。
+        解析失败的语句通过跳过一个 token 恢复（错误恢复策略）。
+        """
         stmts = []
         while self.peek():
             stmt = self.parse_statement()
@@ -213,12 +234,18 @@ class _Parser:
         return ['do'] + stmts if len(stmts) > 1 else stmts[0]
 
     def parse_statement(self) -> Any:
+        """分派语句解析：根据首 token 的关键字类型 dispatch。
+        
+        支持：赋值、set、write、if、loop、for、fn、return、
+        break、continue、try、judge、context、export、register_device。
+        非关键字开头则回退到表达式语句。
+        """
         tok = self.peek()
         if tok is None:
             return None
         kw = self._kw(tok)
 
-        # 裸赋值
+        # 裸赋值（无关键字，形如 `x = 1`）
         if _is_ident(tok.value) and self.pos + 1 < len(self.tokens) and self.tokens[self.pos + 1].value == '=':
             var_name = self.advance()
             self.advance()  # skip '='
@@ -437,6 +464,13 @@ class _Parser:
             return self.parse_statement()
 
     def parse_expression(self, precedence: int = 0) -> Any:
+        """Pratt 核心：表达式解析（中缀循环）。
+        
+        - 先调用 parse_primary 获取「左值」（前缀 nud）
+        - 循环检查下一个 token 是否为中缀操作符（led）
+        - 若当前操作符优先级 >= precedence 则继续结合
+        - 右结合（RIGHT_ASSOC）维持同级优先级不递增
+        """
         left = self.parse_primary()
         while True:
             tok = self.peek()
@@ -452,6 +486,18 @@ class _Parser:
         return left
 
     def parse_primary(self) -> Any:
+        """Pratt 前缀（nud）分派：字面量、括号、前缀操作、lambda、调用、索引。
+        
+        按优先级依次检查：
+        1. 括号表达式 (...)
+        2. 点号属性访问 obj.attr
+        3. 列表推导式/字面量 [...]
+        4. 前缀操作符（read/not/digit 等）
+        5. lambda 表达式
+        6. 字符串/数字字面量
+        7. 函数调用 name(...) 或容器索引 name[...]
+        8. 纯标识符
+        """
         tok = self.advance()
         if tok is None:
             return None
@@ -562,10 +608,10 @@ class _Parser:
 
 
 def _annotate_ast(ast, tokens):
-    """Post-process: wrap list nodes with SrcNode using token positions.
+    """后处理：为 AST 列表节点挂载 SrcNode（行/列位置）。
 
-    Walks the AST and for each list node, finds its first string element
-    and looks up the matching token's position.
+    遍历 AST，对每个列表节点找到其第一个字符串元素，
+    在 token 序列中查找匹配位置。使求值器错误信息可溯源到源码位置。
     """
     if not tokens:
         return ast

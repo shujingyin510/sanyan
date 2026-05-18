@@ -27,6 +27,7 @@ def _init_ops():
     import ops.json_ops
     import ops.package_ops  # noqa: F401
     import commands  # noqa: F401
+    import ops.sandbox_ops  # noqa: F401
 
 
 _init_ops()
@@ -212,21 +213,14 @@ class SanyanEvaluator(SanyanRuntime):
         return ''
 
     def _apply(self, op: str, args: list) -> TritValue:
-        internal = self._resolve_op_name(op)
+        from ops.dispatcher import resolve_op_name, apply
+
+        internal = resolve_op_name(self, op)
         self._debug_before(internal, op, args)
         if self._profiling:
             t0 = time.perf_counter()
         try:
-            result = self._dispatch_op(internal, args)
-            if result is not None:
-                return result
-            result = self._handle_dot_access(op, args)
-            if result is not None:
-                return result
-            result = self._handle_variable_call(op, args)
-            if result is not None:
-                return result
-            return Commands.call(self, op, args)
+            return apply(self, op, args)
         finally:
             if self._profiling:
                 dt = time.perf_counter() - t0
@@ -289,86 +283,7 @@ class SanyanEvaluator(SanyanRuntime):
             else:
                 print('  命令: [Enter]/n=下一步  c=继续  p 变量  bt=调用栈  q=退出')
 
-    def _resolve_op_name(self, op: str) -> str:
-        cached = self._name_cache.get(op)
-        if cached is not None:
-            return cached
-        internal = op
-        skin = self.skin_manager
-        if skin:
-            kw = skin.get_internal_keyword(op) or skin.get_internal_op(op)
-            if kw:
-                internal = kw
-        if len(self._name_cache) >= self._name_cache_max:
-            self._name_cache.pop(next(iter(self._name_cache)))
-        self._name_cache[op] = internal
-        return internal
 
-    def _dispatch_op(self, internal: str, args: list):
-        from ops.registry import get_op
-
-        if internal in self._op_cache:
-            method, extra = self._op_cache[internal]
-        else:
-            entry = get_op(internal)
-            if entry is not None:
-                method, extra = entry
-                self._op_cache[internal] = entry
-            else:
-                return None
-        if extra:
-            return method(self, extra, args)
-        return method(self, args)
-
-    def _handle_dot_access(self, op: str, args: list):
-        if not isinstance(op, str) or '.' not in op:
-            return None
-        module_name, func_name = op.split('.', 1)
-        if not self.has_var(module_name):
-            return None
-        module_val = self.get_var(module_name)
-        if isinstance(module_val, ModuleValue):
-            if not module_val.is_exported(func_name):
-                raise SanyanNameError(f"模块 '{module_name}' 未导出 '{func_name}'")
-            evaluated_args = [self.eval(a) for a in args]
-            return module_val.call(self, [func_name] + evaluated_args)
-        if isinstance(module_val, dict):
-            if args:
-                raise SanyanTypeError(f"字典 '{module_name}' 不支持方法调用")
-            if func_name in module_val:
-                return module_val[func_name]
-            raise SanyanKeyError(f"字典 '{module_name}' 中没有键 '{func_name}'")
-        if isinstance(module_val, (list, ArrayValue)):
-            if func_name in ('length', '长度'):
-                return TritValue(len(module_val) if isinstance(module_val, list) else module_val.length)
-            try:
-                return module_val[int(func_name)]
-            except (ValueError, IndexError):
-                raise SanyanAttributeError(f"列表 '{module_name}' 没有属性 '{func_name}'")
-        return None
-
-    def _handle_variable_call(self, op: str, args: list):
-        if not self.has_var(op):
-            return None
-        val = self.get_var(op)
-        if isinstance(val, FunctionValue):
-            evaluated_args = [self.eval(a) for a in args]
-            return val.call(self, evaluated_args)
-        if isinstance(val, ModuleValue):
-            evaluated_args = [self.eval(a) for a in args]
-            return val.call(self, evaluated_args)
-        if isinstance(val, (list, ArrayValue, dict)):
-            if len(args) != 1:
-                raise SanyanSyntaxError(f'容器索引需要一个参数，但提供了 {len(args)} 个')
-            idx = self.eval(args[0])
-            if isinstance(val, dict):
-                key = idx.to_int() if isinstance(idx, TritValue) else idx
-                return val[key]
-            index_int = idx.to_int() if isinstance(idx, TritValue) else idx
-            return val[index_int]
-        if len(args) == 0:
-            return val
-        raise SanyanTypeError(f"变量 '{op}' 的值不可调用或索引")
 
     @staticmethod
     def _is_valid_identifier(s: str) -> bool:
