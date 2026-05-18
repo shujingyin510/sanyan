@@ -223,7 +223,7 @@ class ContainerOps:
         container = evaluator.eval(args[0])
         if not isinstance(container, (list, ArrayValue)):
             raise SanyanTypeError('参数必须是列表或数组')
-        lst = list(container) if isinstance(container, ArrayValue) else container[:]
+        lst = ContainerOps._as_list(container)[:]
         lst.sort(key=lambda x: to_num(x) if not isinstance(x, str) else x)
         return lst
 
@@ -235,7 +235,7 @@ class ContainerOps:
         container = evaluator.eval(args[0])
         if not isinstance(container, (list, ArrayValue)):
             raise SanyanTypeError('参数必须是列表或数组')
-        lst = list(container) if isinstance(container, ArrayValue) else container[:]
+        lst = ContainerOps._as_list(container)[:]
         lst.reverse()
         return lst
 
@@ -281,8 +281,8 @@ class ContainerOps:
         start = evaluator.eval(args[1]).to_int()
         if len(args) == 3:
             end = evaluator.eval(args[2]).to_int()
-            return list(container)[start:end]
-        return list(container)[start:]
+            return ContainerOps._as_list(container)[start:end]
+        return ContainerOps._as_list(container)[start:]
 
     @staticmethod
     def list_count(evaluator, args):
@@ -302,10 +302,11 @@ class ContainerOps:
         container = evaluator.eval(args[0])
         if not isinstance(container, (list, ArrayValue)):
             raise SanyanTypeError('参数必须是列表或数组')
+        container = ContainerOps._as_list(container)
         has_float = any(isinstance(item, TritValue) and item.is_float() for item in container)
         if has_float:
             total = 0.0
-            for item in container:  # type: ignore[union-attr]
+            for item in container:
                 if isinstance(item, TritValue):
                     total += item.to_float()
                 elif isinstance(item, (int, float)):
@@ -314,7 +315,7 @@ class ContainerOps:
                     raise SanyanTypeError(f'求和遇到非数字元素: {type(item).__name__}')
             return TritValue(total)
         total = 0
-        for item in container:  # type: ignore[union-attr]
+        for item in container:
             if isinstance(item, TritValue):
                 total += item.to_int()
             elif isinstance(item, (int, float)):

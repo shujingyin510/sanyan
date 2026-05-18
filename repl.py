@@ -72,9 +72,9 @@ except ImportError:
         readline = None  # type: ignore[assignment]
 
 if readline is not None:
-    readline.set_history_length(1000)
+    readline.set_history_length(1000)  # type: ignore[attr-defined]
     if os.path.exists(_history_file):
-        readline.read_history_file(_history_file)
+        readline.read_history_file(_history_file)  # type: ignore[attr-defined]
 
 
 def demo(skin_mgr: SkinManager) -> None:
@@ -188,8 +188,8 @@ def repl() -> None:
 
     # 设置自动补全
     if readline:
-        readline.set_completer(_make_completer(env))
-        readline.parse_and_bind('tab: complete')
+        readline.set_completer(_make_completer(env))  # type: ignore[attr-defined]
+        readline.parse_and_bind('tab: complete')  # type: ignore[attr-defined]
 
     print(f'三言 v{VERSION} REPL (母语可定制)')
     print('输入 :lang english 切换英文，:lang chinese 切换中文')
@@ -359,6 +359,6 @@ def repl() -> None:
     # 保存历史记录
     if readline:
         try:
-            readline.write_history_file(_history_file)
+            readline.write_history_file(_history_file)  # type: ignore[attr-defined]
         except Exception:
             pass
