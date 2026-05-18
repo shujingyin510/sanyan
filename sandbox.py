@@ -1,10 +1,11 @@
 """沙箱机制：限制运行时可用的操作"""
 
+from typing import FrozenSet
 from values import SanyanRuntimeError
 
 
-_BLOCKED_OPS = frozenset()
-_FUNC_BLOCKED = frozenset()
+_BLOCKED_OPS: FrozenSet[str] = frozenset()
+_FUNC_BLOCKED: FrozenSet[str] = frozenset()
 
 
 def restrict(ops: list[str] | None = None, funcs: list[str] | None = None) -> None:

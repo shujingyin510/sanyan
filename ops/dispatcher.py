@@ -21,7 +21,7 @@ from ternary_core import TritValue, ArrayValue
 def resolve_op_name(evaluator, op: str) -> str:
     """解析操作名为内部标识符（皮肤映射 + 缓存）。"""
     cached = evaluator._name_cache.get(op)
-    if cached is not None:
+    if isinstance(cached, str):
         return cached
     internal = op
     skin = evaluator.skin_manager

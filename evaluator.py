@@ -222,6 +222,7 @@ class SanyanEvaluator(SanyanRuntime):
         return ''
 
     def _apply(self, op: str, args: list) -> TritValue:
+        from typing import cast
         from ops.dispatcher import resolve_op_name, apply
 
         internal = resolve_op_name(self, op)
@@ -229,7 +230,7 @@ class SanyanEvaluator(SanyanRuntime):
         if self._profiling:
             t0 = time.perf_counter()
         try:
-            return apply(self, op, args)
+            return cast(TritValue, apply(self, op, args))
         finally:
             if self._profiling:
                 dt = time.perf_counter() - t0
