@@ -63,7 +63,8 @@ def op_exists(evaluator, args):
     """存在?(路径) — 检查文件或目录是否存在"""
     if not args:
         return TritValue(0)
-    path = args[0] if isinstance(args[0], str) else str(evaluator.eval(args[0]))
+    val = evaluator.eval(args[0])
+    path = str(val) if not isinstance(val, str) else val
     return TritValue(1 if os.path.exists(path) else 0)
 
 
@@ -71,7 +72,8 @@ def op_isfile(evaluator, args):
     """是文件?(路径) — 检查路径是否为文件"""
     if not args:
         return TritValue(0)
-    path = args[0] if isinstance(args[0], str) else str(evaluator.eval(args[0]))
+    val = evaluator.eval(args[0])
+    path = str(val) if not isinstance(val, str) else val
     return TritValue(1 if os.path.isfile(path) else 0)
 
 
@@ -79,7 +81,8 @@ def op_isdir(evaluator, args):
     """是目录?(路径) — 检查路径是否为目录"""
     if not args:
         return TritValue(0)
-    path = args[0] if isinstance(args[0], str) else str(evaluator.eval(args[0]))
+    val = evaluator.eval(args[0])
+    path = str(val) if not isinstance(val, str) else val
     return TritValue(1 if os.path.isdir(path) else 0)
 
 

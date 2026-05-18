@@ -1,4 +1,8 @@
-"""沙箱机制：限制运行时可用的操作"""
+"""沙箱机制：限制运行时可用的操作
+
+注意：沙箱状态是模块级全局变量，所有 evaluator 实例共享。
+在多实例场景（LSP/DAP）中，一个实例调用 restrict() 会影响其他实例。
+如需实例级隔离，需重构为实例化 Sandbox 类。"""
 
 from typing import FrozenSet
 from values import SanyanRuntimeError
