@@ -2,6 +2,7 @@
 
 from ternary_core import BT, TritValue, ArrayValue
 from values import ReturnException, BreakException, ContinueException, SanyanError, SanyanSyntaxError
+from ops.container_ops import ContainerOps
 from ops.registry import register
 
 
@@ -203,6 +204,7 @@ class ControlOps:
         body = args[2:]
         result = TritValue(0)
         if isinstance(container, (list, ArrayValue)):
+            container = ContainerOps._as_list(container)
             for item in container:
                 evaluator.scope_vars[var_name] = item
                 try:

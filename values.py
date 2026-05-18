@@ -76,9 +76,9 @@ class SrcNode(list):
     __slots__ = ('line', 'col')
 
     def __new__(cls, items=(), line=0, col=0):
-        obj = super().__new__(cls, items)
-        obj.line = line
-        obj.col = col
+        obj = super().__new__(cls)  # type: ignore[call-overload]
+        obj.line = line  # type: ignore[attr-defined]
+        obj.col = col  # type: ignore[attr-defined]
         return obj
 
 

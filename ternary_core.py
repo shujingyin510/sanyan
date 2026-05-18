@@ -68,7 +68,7 @@ class BT:
             precision = BT.DEFAULT_PRECISION
         scale = 3**precision
         int_val = BT.to_int(trits)
-        return int_val / scale
+        return int_val / scale  # type: ignore[no-any-return]
 
 
 class TernaryALU:

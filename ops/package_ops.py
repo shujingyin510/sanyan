@@ -210,7 +210,7 @@ class PackageOps:
                     index = json.load(f)
                 entry = index.get(name)
                 if entry:
-                    return entry.get('url') or entry.get('download')
+                    return entry.get('url') or entry.get('download')  # type: ignore[no-any-return]
             except (IOError, OSError, json.JSONDecodeError):
                 pass
         # 远程索引（缓存 5 分钟）
@@ -228,7 +228,7 @@ class PackageOps:
                 return None
         entry = index.get(name)
         if entry:
-            return entry.get('url') or entry.get('download')
+            return entry.get('url') or entry.get('download')  # type: ignore[no-any-return]
         return None
 
 

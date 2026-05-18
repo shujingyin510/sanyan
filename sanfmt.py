@@ -403,7 +403,7 @@ def format_file(filepath: str, in_place: bool = False) -> str:
     if in_place:
         with open(filepath, 'w', encoding='utf-8') as f:
             f.write(formatted)
-    return formatted
+    return formatted  # type: ignore[no-any-return]
 
 
 def main():
@@ -433,7 +433,7 @@ def main():
         if ast is None:
             tokens = tokenize(code)
             if tokens:
-                ast = parse(tokens)
+                ast = parse(tokens)  # type: ignore[assignment]
         if ast is None:
             print('解析失败', file=sys.stderr)
             sys.exit(1)

@@ -187,7 +187,7 @@ class IotOps:
             # 校验路径不包含 .. 穿越
             if '..' in os.path.normpath(raw_path).replace('\\', '/').split('/'):
                 raise SanyanValueError(f"设备文件路径不允许包含 '..': {raw_path}")
-            device = FileDevice(raw_path)
+            device = FileDevice(raw_path)  # type: ignore[assignment]
         else:
             raise SanyanValueError(f'未知设备类型: {device_type}')
         evaluator.device_registry.register(name, device)

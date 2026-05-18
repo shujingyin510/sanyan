@@ -10,6 +10,12 @@ class ContainerOps:
     """容器操作：列表、数组、字典、通用索引、映射/过滤/归并"""
 
     @staticmethod
+    def _as_list(val):
+        if isinstance(val, ArrayValue):
+            return val.data
+        return val
+
+    @staticmethod
     def list_new(evaluator, args):
         items = [evaluator.eval(a) for a in args]
         return items
@@ -71,7 +77,7 @@ class ContainerOps:
             try:
                 return container[index]
             except IndexError:
-                raise SanyanValueError(f'索引 {index} 超出范围，容器长度 {len(container)}')
+                raise SanyanValueError(f'索引 {index} 超出范围，容器长度 {len(container)}')  # type: ignore[arg-type]
         raise SanyanTypeError('第一个参数必须是列表或数组')
 
     @staticmethod
@@ -169,7 +175,7 @@ class ContainerOps:
         if not isinstance(container, (list, ArrayValue)):
             raise SanyanTypeError('第二个参数必须是列表或数组')
         result = []
-        for item in container:
+        for item in container:  # type: ignore[union-attr]
             res = call_function(evaluator, func, [item])
             result.append(res)
         return result
@@ -183,7 +189,7 @@ class ContainerOps:
         if not isinstance(container, (list, ArrayValue)):
             raise SanyanTypeError('第二个参数必须是列表或数组')
         result = []
-        for item in container:
+        for item in container:  # type: ignore[union-attr]
             res = call_function(evaluator, pred, [item])
             if isinstance(res, TritValue) and res.to_int() == 1:
                 result.append(item)
@@ -197,7 +203,7 @@ class ContainerOps:
         container = evaluator.eval(args[1])
         if not isinstance(container, (list, ArrayValue)):
             raise SanyanTypeError('第二个参数必须是列表或数组')
-        if len(container) == 0 and len(args) < 3:
+        if len(container) == 0 and len(args) < 3:  # type: ignore[arg-type]
             raise SanyanValueError('空容器且无初始值，无法归并')
         if len(args) == 3:
             accumulator = evaluator.eval(args[2])
@@ -205,7 +211,7 @@ class ContainerOps:
         else:
             accumulator = container[0]
             start_idx = 1
-        for i in range(start_idx, len(container)):
+        for i in range(start_idx, len(container)):  # type: ignore[arg-type]
             accumulator = call_function(evaluator, func, [accumulator, container[i]])
         return accumulator
 
@@ -242,7 +248,7 @@ class ContainerOps:
         if not isinstance(container, (list, ArrayValue)):
             raise SanyanTypeError('第一个参数必须是列表或数组')
         target = to_num(evaluator.eval(args[1]))
-        for elem in container:
+        for elem in container:  # type: ignore[union-attr]
             if to_num(elem) == target:
                 return TritValue(1)
         return TritValue(-1)
@@ -257,7 +263,7 @@ class ContainerOps:
             raise SanyanTypeError('参数必须是列表或数组')
         seen = []
         result = []
-        for item in container:
+        for item in container:  # type: ignore[union-attr]
             key = to_num(item)
             if key not in seen:
                 seen.append(key)
@@ -299,7 +305,7 @@ class ContainerOps:
         has_float = any(isinstance(item, TritValue) and item.is_float() for item in container)
         if has_float:
             total = 0.0
-            for item in container:
+            for item in container:  # type: ignore[union-attr]
                 if isinstance(item, TritValue):
                     total += item.to_float()
                 elif isinstance(item, (int, float)):
@@ -308,7 +314,7 @@ class ContainerOps:
                     raise SanyanTypeError(f'求和遇到非数字元素: {type(item).__name__}')
             return TritValue(total)
         total = 0
-        for item in container:
+        for item in container:  # type: ignore[union-attr]
             if isinstance(item, TritValue):
                 total += item.to_int()
             elif isinstance(item, (int, float)):
@@ -329,7 +335,7 @@ class ContainerOps:
         if not isinstance(delim, str):
             delim = str(delim)
         parts = []
-        for item in container:
+        for item in container:  # type: ignore[union-attr]
             if isinstance(item, TritValue):
                 if item.is_float():
                     parts.append(str(item.to_float()))

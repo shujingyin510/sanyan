@@ -71,12 +71,12 @@ class VM:
         return cls(code, vc)
 
     def _read_i16(self) -> int:
-        val = struct.unpack_from('<h', self.code, self.pc)[0]
+        val: int = struct.unpack_from('<h', self.code, self.pc)[0]
         self.pc += 2
         return val
 
     def _read_i32(self) -> int:
-        val = struct.unpack_from('<i', self.code, self.pc)[0]
+        val: int = struct.unpack_from('<i', self.code, self.pc)[0]
         self.pc += 4
         return val
 

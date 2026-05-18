@@ -32,7 +32,7 @@ def _c(text: str, color: str = '') -> str:
         'magenta': Fore.MAGENTA,
         'reset': Style.RESET_ALL,
     }
-    return color_map.get(color, '') + text + Style.RESET_ALL
+    return color_map.get(color, '') + text + Style.RESET_ALL  # type: ignore[no-any-return]
 
 
 def _color_value(value) -> str:

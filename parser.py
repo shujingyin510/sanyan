@@ -15,9 +15,9 @@ def parse(tokens: list) -> Optional[Union[list, str]]:
     def _parse_inner(tokens_list: list) -> Optional[Union[list, str]]:
         if not tokens_list:
             return None
-        token = tokens_list.pop(0)
+        token: str = tokens_list.pop(0)
         if token == '(':
-            L = []
+            L: list = []
             while tokens_list and tokens_list[0] != ')':
                 L.append(_parse_inner(tokens_list))
             if not tokens_list:

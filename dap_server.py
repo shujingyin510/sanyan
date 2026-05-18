@@ -76,7 +76,7 @@ class DapServer:
         if length == 0:
             return None
         body = sys.stdin.buffer.read(length).decode('utf-8', errors='replace')
-        return json.loads(body)
+        return json.loads(body)  # type: ignore[no-any-return]
 
     # --- Evaluator Hooks ---
 
@@ -299,7 +299,7 @@ class DapServer:
                 self._evaluator = evaluator
 
                 for path, code in self._source_code.items():
-                    evaluator._dap_source_path = path
+                    evaluator._dap_source_path = path  # type: ignore[attr-defined]
                     ast = SugarConverter.convert(code, skin_mgr)
                     evaluator.eval(ast)
 

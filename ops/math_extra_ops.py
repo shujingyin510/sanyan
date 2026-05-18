@@ -8,7 +8,7 @@ from ops.registry import register, register_alias
 def _to_float_list(val):
     """将 TritValue / ArrayValue / list 转为 float 列表"""
     if isinstance(val, ArrayValue):
-        return [float(v.to_int()) if isinstance(v, TritValue) else float(v) for v in val.data]
+        return [float(v.to_int()) if isinstance(v, TritValue) else float(v) for v in val.data]  # type: ignore[arg-type]
     if isinstance(val, list):
         return [float(v.to_int()) if isinstance(v, TritValue) else float(v) for v in val]
     if isinstance(val, TritValue):
