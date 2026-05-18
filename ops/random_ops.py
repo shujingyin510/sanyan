@@ -61,7 +61,7 @@ register('选取', op_choice)
 register('乱序', op_shuffle)
 register('随机字节', op_randbytes)
 
-register_alias('random', '随机')
+register_alias('rnd', '随机')
 register_alias('randint', '随机整数')
 register_alias('choice', '选取')
 register_alias('shuffle', '乱序')
