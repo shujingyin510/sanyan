@@ -3,6 +3,7 @@
 import os
 from ternary_core import TritValue
 from values import SanyanSyntaxError, SanyanValueError, SanyanNameError, SanyanTypeError, SanyanIOError, ModuleValue
+from skin import SkinManager
 from ops.registry import register
 
 # 项目根目录：文件操作不允许超越此目录
@@ -47,38 +48,97 @@ def _resolve_path(raw_path, auto_stdlib=True):
 
 
 def _load_sugar_parser(evaluator):
-    """预加载 stdlib/sugar.san 作为 Sanyan 模块（Python 引导），缓存备用。"""
+    """预加载 stdlib/sugar.san 作为 Sanyan 模块（自举引导），缓存备用。"""
     global _sugar_parser_module
     if _sugar_parser_module is not None:
         return _sugar_parser_module
 
     sugar_path = os.path.join('stdlib', 'sugar.san')
+    bootstrap_path = os.path.join('stdlib', '_bootstrap.san')
     if not os.path.exists(sugar_path):
         return None
 
     try:
         with open(sugar_path, 'r', encoding='utf-8') as f:
-            code = f.read()
+            sugar_code = f.read()
     except (IOError, OSError):
         return None
-    if not code.strip():
+    if not sugar_code.strip():
         return None
 
-    from sugar import SugarConverter
-    from skin import SkinManager
-
-    skin_mgr = evaluator.skin_manager if evaluator and evaluator.skin_manager else SkinManager('chinese')
-    ast = SugarConverter.convert(code, skin_mgr)
-    if ast is None:
-        return None
-
+    from values import ReturnException
+    from lexer import tokenize
+    from parser import parse
     from evaluator import SanyanEvaluator
 
+    skin_mgr = evaluator.skin_manager if evaluator and evaluator.skin_manager else SkinManager('chinese')
+
+    # Phase 1: 引导 — 用 Python 简单解析器加载 _bootstrap.san（S-表达式）
+    if not os.path.exists(bootstrap_path):
+        return _fallback_convert(sugar_code, skin_mgr)
+    with open(bootstrap_path, 'r', encoding='utf-8') as f:
+        bootstrap_code = f.read()
+    if not bootstrap_code.strip():
+        return _fallback_convert(sugar_code, skin_mgr)
+
+    try:
+        bootstrap_tokens = tokenize(bootstrap_code)
+        bootstrap_ast = parse(bootstrap_tokens)
+    except SyntaxError:
+        return _fallback_convert(sugar_code, skin_mgr)
+
+    bootstrap_env = SanyanEvaluator(skin_manager=skin_mgr, max_loop_steps=5000)
+    try:
+        bootstrap_env.eval(bootstrap_ast)
+    except Exception:
+        return _fallback_convert(sugar_code, skin_mgr)
+
+    # Phase 2: 用 bootstap 的 解析 解析 sugar.san
+    cmd_def = bootstrap_env.commands.get('解析')
+    if cmd_def is None:
+        return _fallback_convert(sugar_code, skin_mgr)
+
+    params, body = cmd_def[0], cmd_def[1]
+    sugar_ast = None
+    try:
+        bootstrap_env.push_scope()
+        bootstrap_env.set_var('source', sugar_code)
+        for expr in body:
+            try:
+                bootstrap_env.eval(expr)
+            except ReturnException as ret:
+                sugar_ast = ret.value
+                break
+        bootstrap_env.pop_scope()
+    except Exception:
+        return _fallback_convert(sugar_code, skin_mgr)
+
+    if sugar_ast is None:
+        return _fallback_convert(sugar_code, skin_mgr)
+
+    # Phase 3: 评估 sugar.san AST
+    module_env = SanyanEvaluator(skin_manager=skin_mgr, max_loop_steps=100000)
+    try:
+        module_env.eval(sugar_ast)
+    except Exception:
+        return _fallback_convert(sugar_code, skin_mgr)
+
+    exports = _collect_exports(sugar_ast) or {'词法分析', '解析'}
+    _sugar_parser_module = ModuleValue(module_env.scope_vars, module_env.commands, exports)
+    return _sugar_parser_module
+
+
+def _fallback_convert(sugar_code, skin_mgr):
+    """回退：使用 Python SugarConverter 转换 sugar.san（当 bootstrap 不可用/失败时）。"""
+    from sugar import SugarConverter
+    ast = SugarConverter.convert(sugar_code, skin_mgr)
+    if ast is None:
+        return None
+    from evaluator import SanyanEvaluator
     module_env = SanyanEvaluator(skin_manager=skin_mgr)
     module_env.eval(ast)
     exports = _collect_exports(ast) or {'词法分析', '解析'}
-    _sugar_parser_module = ModuleValue(module_env.scope_vars, module_env.commands, exports)
-    return _sugar_parser_module
+    return ModuleValue(module_env.scope_vars, module_env.commands, exports)
 
 
 def _parse_with_sugar_san(code, evaluator):
