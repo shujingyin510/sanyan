@@ -1,4 +1,5 @@
 """正则表达式操作"""
+
 import re
 from ternary_core import TritValue
 from values import SanyanSyntaxError

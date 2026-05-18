@@ -292,8 +292,6 @@ class SanyanEvaluator(SanyanRuntime):
             else:
                 print('  命令: [Enter]/n=下一步  c=继续  p 变量  bt=调用栈  q=退出')
 
-
-
     @staticmethod
     def _is_valid_identifier(s: str) -> bool:
         if not s:

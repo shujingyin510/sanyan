@@ -1,6 +1,8 @@
 """网络操作：HTTP 请求"""
+
 try:
     import urllib.request as _request
+
     _HAS_NET = True
 except ImportError:
     _HAS_NET = False

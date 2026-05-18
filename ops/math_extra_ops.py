@@ -1,4 +1,5 @@
 """扩展数学操作：统计"""
+
 from ternary_core import TritValue, ArrayValue
 from values import SanyanSyntaxError
 from ops.registry import register, register_alias
@@ -59,6 +60,7 @@ def math_stdev(evaluator, args):
     mean = sum(data) / len(data)
     var = sum((x - mean) ** 2 for x in data) / len(data)
     from math import sqrt
+
     return TritValue(sqrt(var))
 
 

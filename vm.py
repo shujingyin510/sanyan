@@ -67,7 +67,7 @@ class VM:
         magic, ver, vc, sz = struct.unpack_from('<4sBBH', data, 0)
         if magic != b'SAN0':
             raise VMError(f'无效的字节码文件: magic={magic!r}')
-        code = bytearray(data[8:8 + sz])
+        code = bytearray(data[8 : 8 + sz])
         return cls(code, vc)
 
     def _read_i16(self) -> int:

@@ -5,6 +5,7 @@ import random
 import string
 import sys
 import unittest
+
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from lexer import tokenize
@@ -15,8 +16,12 @@ from sugar import SugarConverter
 def _random_string(max_len=80):
     """生成随机字符串（含非法字符、全角、Unicode）"""
     chars = (
-        string.ascii_letters + string.digits + '　（）；：，。？！＂＃＄％＆＇＋－＊／＝＾＠～、｜｛｝【】《》'
-        + string.punctuation + ' \n\t\r' + 'αβγ你好世界abc123'
+        string.ascii_letters
+        + string.digits
+        + '　（）；：，。？！＂＃＄％＆＇＋－＊／＝＾＠～、｜｛｝【】《》'
+        + string.punctuation
+        + ' \n\t\r'
+        + 'αβγ你好世界abc123'
     )
     length = random.randint(0, max_len)
     return ''.join(random.choice(chars) for _ in range(length))

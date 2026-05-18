@@ -1,4 +1,5 @@
 """随机操作"""
+
 import random as _random
 from ternary_core import TritValue, ArrayValue
 from values import SanyanSyntaxError

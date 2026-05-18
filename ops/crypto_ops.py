@@ -1,4 +1,5 @@
 """密码学操作：哈希、编解码"""
+
 import hashlib
 import base64
 from ternary_core import TritValue

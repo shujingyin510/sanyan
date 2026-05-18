@@ -1,4 +1,5 @@
 """Unicode / URL 编码操作"""
+
 import urllib.parse
 from ternary_core import TritValue
 from ops.registry import register, register_alias

@@ -1,4 +1,5 @@
 """并发操作：并发执行、锁、延迟"""
+
 import threading
 from ternary_core import TritValue, ArrayValue
 from values import SanyanSyntaxError, SanyanRuntimeError
@@ -50,6 +51,7 @@ def delayed_run(evaluator, args):
     fn_node = args[1]
 
     import time
+
     time.sleep(ms / 1000.0)
     return evaluator.eval(fn_node)
 

@@ -7,8 +7,13 @@
 from typing import Any
 from ops.registry import get_op
 from values import (
-    FunctionValue, ModuleValue, SanyanNameError, SanyanKeyError,
-    SanyanSyntaxError, SanyanTypeError, SanyanAttributeError,
+    FunctionValue,
+    ModuleValue,
+    SanyanNameError,
+    SanyanKeyError,
+    SanyanSyntaxError,
+    SanyanTypeError,
+    SanyanAttributeError,
 )
 from ternary_core import TritValue, ArrayValue
 
@@ -107,8 +112,7 @@ def handle_variable_call(evaluator, op: str, args: list):
 
 
 def apply(evaluator, op: str, args: list) -> Any:
-    """主分派入口：依次尝试注册表 → 点号访问 → 变量调用 → 自定义命令
-    """
+    """主分派入口：依次尝试注册表 → 点号访问 → 变量调用 → 自定义命令"""
     from sandbox import check_func
     from commands import Commands
 
