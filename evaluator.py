@@ -252,7 +252,7 @@ class SanyanEvaluator(SanyanRuntime):
         if not self._watched_vars:
             return
         name = internal or op
-        if name in self._watched_vars:
+        if name not in self._watched_vars:
             return
         for v in self._watched_vars:
             if self.has_var(v):

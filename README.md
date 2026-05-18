@@ -338,85 +338,81 @@ tests/
 
 ```text
 sanyan/
-├── main.py                # 入口
-├── sanyancc.py            # 交叉编译器：.san → 平坦字节码
-├── runtime.c              # C 语言字节码解释器（主机端）
-├── VERSION.py             # 版本号
-├── pyproject.toml         # 项目配置（Ruff 规则、打包）
-├── CHANGELOG.md           # 版本历史
-├── AGENTS.md              # 维护约定
-├── CONTRIBUTING.md        # 贡献指南
-├── ternary_core.py        # 平衡三进制核心（含定点数学库）
-├── runtime.py             # 运行环境（作用域栈式链）
-├── commands.py            # 自定义命令调用（重构拆分版）
-├── preprocess.py          # #include 预处理器
-├── evaluator.py           # 求值器（操作分发表→_OP_DISPATCH）
-├── lexer.py               # S 表达式词法
-├── parser.py              # S 表达式语法
-├── sugar/                 # 糖语法转换器（Pratt 解析器）
-│   ├── __init__.py        # 入口
-│   ├── lexer.py           # 词法分析器
-│   ├── parser.py          # Pratt 语法分析器
-│   └── errors.py          # 错误收集与报告
-├── skin.py                # 皮肤管理器
-├── values.py              # 值类型与语言异常（Sanyan* 系列）
-├── repl.py                # REPL 交互环境
-├── ops/                   # 内置操作实现模块
-│   ├── __init__.py        # 模块文档
-│   ├── registry.py        # 统一操作注册表
-│   ├── control_ops.py
-│   ├── math_ops.py
-│   ├── string_ops.py
-│   ├── container_ops.py
-│   ├── io_ops.py
-│   ├── file_ops.py
-│   ├── type_ops.py
-│   ├── json_ops.py
-│   ├── iot_ops.py
-│   ├── package_ops.py     # 包管理器
-│   └── device_registry.py # 设备注册表
-├── sanyan-vscode/         # VS Code 扩展
+├── AGENTS.md
+├── CHANGELOG.md
+├── CONTRIBUTING.md
+├── README.md
+├── VERSION.py
+├── ast_json.py              # AST JSON 导出
+├── commands.py              # 自定义命令调用
+├── dap_server.py            # DAP 调试适配器
+├── doc_sync.py              # 文档同步检查
+├── evaluator.py             # 求值器
+├── lexer.py                 # S 表达式词法
+├── lsp_server.py            # LSP 服务器
+├── main.py                  # 入口
+├── parser.py                # S 表达式语法
+├── preprocess.py            # #include 预处理器
+├── pyproject.toml           # 项目配置
+├── repl.py                  # REPL 交互环境
+├── runtime.py               # 运行环境
+├── runtime_components.py    # 运行组件（作用域/IoT/调试/性能）
+├── sandbox.py               # 沙箱安全机制
+├── sanfmt.py                # 源码格式化器
+├── sanyancc.py              # 交叉编译器
+├── skin.py                  # 皮肤管理器
+├── ternary_core.py          # 平衡三进制核心
+├── values.py                # 值类型与语言异常
+├── vm.py                    # 字节码虚拟机
+├── sugar/                   # 糖语法转换器
+│   ├── __init__.py
+│   ├── errors.py
+│   ├── lexer.py
+│   └── parser.py
+├── ops/                     # 内置操作实现（28 模块）
+│   ├── __init__.py
+│   ├── _util.py
+│   ├── arithmetic_ops.py    # 算术运算
+│   ├── comparison_ops.py    # 比较运算
+│   ├── concurrent_ops.py    # 并发与锁
+│   ├── container_ops.py     # 列表/数组/字典/高阶函数
+│   ├── control_ops.py       # 控制流
+│   ├── crypto_ops.py        # 哈希与编解码
+│   ├── device_registry.py   # IoT 设备注册表
+│   ├── dispatcher.py        # 操作分派器
+│   ├── file_ops.py          # 文件读写
+│   ├── io_ops.py            # 输入输出/调试
+│   ├── iot_ops.py           # 传感器/执行器
+│   ├── json_ops.py          # JSON 序列化
+│   ├── logic_ops.py         # 三态逻辑
+│   ├── math_extra_ops.py    # 统计函数
+│   ├── math_funcs_ops.py    # 数学函数
+│   ├── net_ops.py           # HTTP 请求
+│   ├── package_ops.py       # 包管理器
+│   ├── random_ops.py        # 随机操作
+│   ├── regex_ops.py         # 正则表达式
+│   ├── registry.py          # 操作注册表
+│   ├── sandbox_ops.py       # 沙箱操作
+│   ├── string_ops.py        # 字符串操作
+│   ├── system_ops.py        # 系统命令
+│   ├── time_ops.py          # 时间戳/计时
+│   ├── type_ops.py          # 类型判断
+│   └── unicode_ops.py       # URL/Unicode 编码
+├── sanyan-vscode/           # VS Code 扩展
 │   ├── package.json
 │   ├── extension.js
 │   ├── language-configuration.json
 │   └── syntaxes/
 │       └── sanyan.tmLanguage.json
-├── language/              # 皮肤文件（chinese.json / english.json）
-├── examples/              # 示例（糖语法 + S 表达式双版本）
-│   ├── greenhouse.san / greenhouse_se.san
-│   ├── voting.san / voting_se.san
-│   ├── data_clean.san / data_clean_se.san
-│   ├── sensor_pipeline_simple.san / sensor_pipeline_simple_se.san
-│   └── stm32-blinky/      # STM32 点灯示例
-│       ├── blinky.san     # 三言源码
-│       ├── firmware_data.h# 编译后字节码
-│       ├── runtime_stm32.c# STM32F103 字节码解释器
-│       ├── stm32_flash.ld # 链接脚本
-│       ├── Makefile       # 一键编译烧录
-│       └── gen_header.py  # 字节码 → C 头文件
-├── stdlib/                # 标准库
-│   ├── eval.san           # 纯 Sanyan 元循环求值器
-│   ├── math.san / string.san / list.san
-│   ├── iot.san / logic.san / io.san
-│   └── test.san           # 测试框架
-├── tests/                 # 自动测试（双版本）
-│   ├── run_all.py         # 测试运行器
-│   ├── test_core.py       # Python 单测 52 项
-│   ├── test_ops.py        # ops 模块单测 78 项
-│   ├── test_lsp.py        # LSP 协议测试 6 项
-│   ├── test_package.py    # 包管理器测试 6 项
-│   ├── test_eval.san      # 元循环求值器测试
-│   ├── test_parser.py     # 解析器 AST 校验 28 项
-│   ├── test_*.san         # 糖语法测试
-│   └── test_*_se.san      # S 表达式对照测试
-├── docs/                  # 语言手册
-├── benchmark/             # 性能基准测试套件
-│   ├── run_benchmark.py
-│   ├── fibonacci.san
-│   ├── primes.san
-│   └── fizzbuzz.san
-└── .vscode/               # VS Code 工作区配置
-    └── settings.json
+├── language/                # 皮肤文件
+│   ├── chinese.json
+│   └── english.json
+├── examples/                # 示例
+├── stdlib/                  # 标准库
+├── tests/                   # 自动测试
+├── docs/                    # 语言手册
+├── benchmark/               # 性能基准测试
+└── packages/                # 包管理器缓存
 ```
 
 ## 三态词表

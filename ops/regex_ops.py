@@ -6,14 +6,6 @@ from values import SanyanSyntaxError
 from ops.registry import register, register_alias
 
 
-def _to_str(evaluator, val):
-    if isinstance(val, TritValue):
-        return str(val)
-    if isinstance(val, str) and val and val[0] in ('"', "'", '\u201c', '\u2018'):
-        return evaluator.eval(val)
-    return str(val)
-
-
 def op_re_match(evaluator, args):
     """正则匹配(模式, 字符串) — 若完全匹配返回真，否则返回假"""
     if len(args) < 2:

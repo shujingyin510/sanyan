@@ -47,7 +47,7 @@ class LspClient:
                 self.proc.stdout.readline()  # empty line
                 body = self.proc.stdout.read(length).decode()
                 self._msg_queue.put(json.loads(body))
-            except Exception:
+            except (IOError, OSError, json.JSONDecodeError):
                 break
 
     def send_request(self, method, params=None):

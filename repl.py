@@ -364,5 +364,5 @@ def repl() -> None:
     if readline:
         try:
             readline.write_history_file(_history_file)
-        except Exception:
+        except (IOError, OSError):
             pass
