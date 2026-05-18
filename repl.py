@@ -1,6 +1,7 @@
 """REPL 交互环境与演示程序"""
 
 import os
+from typing import Any
 from lexer import tokenize
 from parser import parse
 from VERSION import VERSION
@@ -63,18 +64,20 @@ def _color_value(value) -> str:
 
 # REPL 历史记录
 _history_file = os.path.expanduser(os.path.join(os.path.expanduser('~'), '.sanyan_history'))
+readline: Any = None
 try:
-    import readline
+    import readline as _rl
+    readline = _rl
 except ImportError:
     try:
         import pyreadline3 as readline  # type: ignore[no-redef]
     except ImportError:
-        readline = None  # type: ignore[assignment]
+        pass
 
 if readline is not None:
-    readline.set_history_length(1000)  # type: ignore
+    readline.set_history_length(1000)
     if os.path.exists(_history_file):
-        readline.read_history_file(_history_file)  # type: ignore
+        readline.read_history_file(_history_file)
 
 
 def demo(skin_mgr: SkinManager) -> None:
@@ -188,8 +191,8 @@ def repl() -> None:
 
     # 设置自动补全
     if readline:
-        readline.set_completer(_make_completer(env))  # type: ignore
-        readline.parse_and_bind('tab: complete')  # type: ignore
+        readline.set_completer(_make_completer(env))
+        readline.parse_and_bind('tab: complete')
 
     print(f'三言 v{VERSION} REPL (母语可定制)')
     print('输入 :lang english 切换英文，:lang chinese 切换中文')
@@ -359,6 +362,6 @@ def repl() -> None:
     # 保存历史记录
     if readline:
         try:
-            readline.write_history_file(_history_file)  # type: ignore
+            readline.write_history_file(_history_file)
         except Exception:
             pass
