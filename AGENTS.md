@@ -2,35 +2,67 @@
 
 ## 环境
 
-- **Python**: `python`（≥3.8，`pyproject.toml` 要求）
-- **Git**: `"D:\Program Files\Git\cmd\git.exe"`（必须用完整路径，cmd.exe PATH 不含 Git）
+- **Python**: `python`（≥3.12，`pyproject.toml` 要求）
+- **Git**: 直接在项目目录下使用 `git`（PowerShell 终端可用，cmd.exe 需完整路径）
 - **UTF-8**: 运行 `.san` 文件时始终用 `python -X utf8 main.py ...`
 
 ## Git 操作
 
-提交和推送统一使用完整路径（bash 工具中是 cmd.exe，PATH 不含 Git）：
+在项目目录下直接使用 `git`（bash 工具自动使用项目 workdir）：
 
 ```bash
-"D:\Program Files\Git\cmd\git.exe" -C D:\Test\sanyan add -A
-"D:\Program Files\Git\cmd\git.exe" -C D:\Test\sanyan commit -m "..."
-"D:\Program Files\Git\cmd\git.exe" -C D:\Test\sanyan push origin main
+git add -A
+git commit -m "..."
+git push
 ```
 
-或在 cd 到项目目录后使用 `git`（仅限 PowerShell 终端）。
+- **提交信息使用中文**：`git commit -m "..."` 中的提交说明必须用中文书写，清晰描述改动的目的和内容
+
+### 推送前 MD 文件检查
+
+每次 `git push` 前，必须对仓库中所有 `*.md` 文件做内容差异检查，确认增删改内容：
+
+```bash
+# 查看自上次提交以来所有 .md 文件的变更
+git diff --stat HEAD -- '*.md'
+# 查看具体内容变动
+git diff HEAD -- '*.md'
+```
+
+- **新增**的文件应在 `git diff` 中可见，确认内容正确
+- **删除**的文件应确认是预期的删除
+- **修改**的内容应检查无意外改动
+- 推送至远程前先 Review 一遍 `.md` 差异，确保文档变更与代码变更一致
+
+### 推送前 CI 检查
+
+每次 `git push` 前，必须确认 GitHub CI（Actions）状态正常：
+
+```bash
+# 查看当前分支最近一次 CI 运行状态
+gh run list --branch $(git branch --show-current) --limit 1
+# 如需等待正在运行的 CI 完成
+gh run watch
+```
+
+- 推送前确保本地测试全部通过（见下文#测试）
+- 如有 CI 正在运行，等待其完成后再推送新提交
+- 若 CI 失败，先修复再推送
 
 ## 测试
 
-每次代码修改后必须运行全部测试（9 套）：
+每次代码修改后必须运行全部测试（10 套）：
 
 ```bash
 python -X utf8 tests/test_core.py -v      # 运行时核心单测 52 项
 python -X utf8 tests/test_commands.py -v  # 命令模块单测
 python -X utf8 tests/test_parser.py       # 解析器 AST 校验 28 项
 python -X utf8 tests/test_ops.py -v       # ops 模块单测 78 项
+python -X utf8 tests/test_ops_ext.py -v   # 扩展 ops 单测 26 项
 python -X utf8 tests/test_lsp.py -v       # LSP 测试 6 项
 python -X utf8 tests/test_package.py -v   # 包管理器测试 6 项
 python -X utf8 tests/test_iot.py -v       # IoT 测试 25 项
-python -X utf8 tests/test_sugar_san.py -v # sugar.san 测试 37 项
+python -X utf8 tests/test_sugar_san.py -v # sugar.san 测试
 python -X utf8 tests/run_all.py           # 集成测试
 ```
 
@@ -39,11 +71,12 @@ python -X utf8 tests/run_all.py           # 集成测试
 - test_commands.py 全部通过
 - test_parser.py 28/28
 - test_ops.py 78/78
+- test_ops_ext.py 全部通过
 - test_lsp.py 6/6
 - test_package.py 6/6
 - test_iot.py 全部通过
 - test_sugar_san.py 全部通过
-- run_all.py 全部通过
+- run_all.py 38/38
 
 Python 文档同步：首次或每次代码修改后建议运行：
 ```bash
@@ -85,6 +118,7 @@ python doc_sync.py
 - `SanyanNameError` — 未定义符号
 - `SanyanKeyError` — 字典键访问错误
 - `SanyanAttributeError` — 属性/方法不存在错误
+- `SanyanIOError` — 文件/IO 错误
 
 仅 `parser.py` 和 `sugar.py` 的解析阶段可用 Python 原生 `SyntaxError`。
 
