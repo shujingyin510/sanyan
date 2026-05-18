@@ -67,6 +67,7 @@ _history_file = os.path.expanduser(os.path.join(os.path.expanduser('~'), '.sanya
 readline: Any = None
 try:
     import readline as _rl
+
     readline = _rl
 except ImportError:
     try:
