@@ -295,12 +295,21 @@ class CodegenContext:
             self.builder.ret(_NULL)
 
     def _box_int(self, int_val: ir.Value) -> ir.Value:
-        """i32 → i8* 装箱。"""
-        return self.builder.inttoptr(int_val, _PTR, name='box')
+        """i32 → tagged i8* 装箱。值左移1位, bit0=1 标记为整数。"""
+        shifted = self.builder.shl(int_val, _ONE, name='box_shl')
+        tagged = self.builder.or_(shifted, _ONE, name='box_tag')
+        return self.builder.inttoptr(tagged, _PTR, name='box')
 
     def _unbox_int(self, ptr_val: ir.Value) -> ir.Value:
-        """i8* → i32 拆箱。"""
-        return self.builder.ptrtoint(ptr_val, _INT, name='unbox')
+        """tagged i8* → i32 拆箱。ptrtoint 后右移1位去除 tag。"""
+        raw = self.builder.ptrtoint(ptr_val, _INT, name='unbox_raw')
+        return self.builder.lshr(raw, _ONE, name='unbox')
+
+    def _is_tagged_int(self, ptr_val: ir.Value) -> ir.Value:
+        """检查 tagged 指针是否为整数（bit0 == 1）。返回 i1。"""
+        raw = self.builder.ptrtoint(ptr_val, _INT, name='tag_raw')
+        tagged = self.builder.and_(raw, _ONE, name='tag_bit')
+        return self.builder.icmp_signed('!=', tagged, _ZERO, name='is_int')
 
     def _to_i32(self, val: ir.Value) -> ir.Value:
         """将值转为 i32：若已是 i32 直接返回，若是 i8* 则拆箱。"""
@@ -981,18 +990,28 @@ def compile_node(node, cg: CodegenContext) -> ir.Value | None:
     if op in ('输出', 'print'):
         if args:
             raw = args[0]
-            # 字符串字面量直接打印
             if isinstance(raw, str) and _is_string_literal(raw):
                 cg.emit_print_str(cg._make_global_string(_unquote(raw)))
                 return _NULL
             val = compile_node(raw, cg)
             if val is None:
                 return _NULL
-            # 判断：若值是指向全局字符串常量的 GEP，按字符串打印
-            if _from_global_string(val):
-                cg.emit_print_str(val)
-            else:
-                cg.emit_print_int(val)
+            # 使用 tag 区分 int/str：bit0=1 → 整数, bit0=0 → 字符串指针
+            is_int = cg._is_tagged_int(val)
+            int_block = cg._add_block(name='pr_int')
+            str_block = cg._add_block(name='pr_str')
+            pr_done = cg._add_block(name='pr_done')
+            cg.builder.cbranch(is_int, int_block, str_block)
+
+            cg.builder.position_at_start(int_block)
+            cg.emit_print_int(val)
+            cg.builder.branch(pr_done)
+
+            cg.builder.position_at_start(str_block)
+            cg.emit_print_str(val)
+            cg.builder.branch(pr_done)
+
+            cg.builder.position_at_start(pr_done)
         return _NULL
 
     # ── 若条件 ──

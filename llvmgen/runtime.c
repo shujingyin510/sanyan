@@ -83,8 +83,8 @@ int32_t rt_str_find(const char *hs, const char *ndl) {
     return p ? (int32_t)(p - hs) : -1;
 }
 
-void *rt_int_to_str(uintptr_t boxed) {
-    int32_t val = (int32_t)(intptr_t)boxed;
+void *rt_int_to_str(uintptr_t tagged) {
+    int32_t val = (int32_t)((intptr_t)tagged >> 1);  /* untag */
     char buf[32];
     snprintf(buf, sizeof(buf), "%d", val);
     return _rt_make(buf);
@@ -289,8 +289,18 @@ void rt_iot_with(void *dp, void *bp) { (void)dp; (void)bp; }
 
 /* ── 类型判断 ── */
 int32_t rt_is_number(int32_t v) { (void)v; return 1; }
-int32_t rt_is_string(void *p)   { return p ? 1 : 0; }
-int32_t rt_is_list(void *p)     { return p ? 1 : 0; }
+
+int32_t rt_is_string(void *p) {
+    if (!p) return 0;
+    if ((uintptr_t)p & 1) return 0;  /* tagged int */
+    return 1;
+}
+
+int32_t rt_is_list(void *p) {
+    if (!p) return 0;
+    if ((uintptr_t)p & 1) return 0;  /* tagged int */
+    return 1;
+}
 
 /* ── 异常处理 ── */
 static rt_str_t *_rt_error = NULL;

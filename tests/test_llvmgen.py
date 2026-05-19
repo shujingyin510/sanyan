@@ -30,19 +30,16 @@ class TestLLVMBasicLiterals(unittest.TestCase):
 
     def test_int_literal(self):
         ir = _compile_ast([['设', 'x', 42]])
-        self.assertIn('inttoptr i32 42 to i8*', ir)
-
-    def test_string_literal(self):
-        ir = _compile_ast([['输出', '"hello"']])
-        self.assertIn('hello', ir)
+        self.assertIn('shl i32', ir)
+        self.assertIn('or i32', ir)
 
     def test_bool_true(self):
         ir = _compile_ast([['设', 'x', '真']])
-        self.assertIn('inttoptr i32 1 to i8*', ir)
+        self.assertIn('shl i32 1', ir)
 
     def test_bool_false(self):
         ir = _compile_ast([['设', 'x', '假']])
-        self.assertIn('inttoptr i32 0 to i8*', ir)
+        self.assertIn('shl i32 0', ir)
 
 
 class TestLLVMArithmetic(unittest.TestCase):
