@@ -24,9 +24,11 @@ def _guess_syntax(op: str) -> str:
     """为缺失的内置操作猜测合理的语法列内容。"""
     return f'`{op}(…)`'
 
+
 def _guess_description(op: str) -> str:
     """为缺失的内置操作猜测合理的说明列内容。"""
     return f'内置操作（{op}）'
+
 
 def sync_builtin_ops_table():
     """从 runtime.py:BUILTIN_OPS 同步命令速查表到 manual 第 17 节。"""
@@ -59,7 +61,11 @@ def sync_builtin_ops_table():
     table_cmds = set()
     for line in table_lines:
         line_stripped = line.strip()
-        if line_stripped.startswith('|') and not line_stripped.startswith('| ---') and not line_stripped.startswith('| 命令'):
+        if (
+            line_stripped.startswith('|')
+            and not line_stripped.startswith('| ---')
+            and not line_stripped.startswith('| 命令')
+        ):
             parts = line_stripped.split('|')
             if len(parts) >= 2:
                 cell = parts[1].strip()

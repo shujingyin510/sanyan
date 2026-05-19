@@ -164,6 +164,7 @@ class SanyanEvaluator(SanyanRuntime):
                 resolved = self.skin_manager.get_internal_keyword(node) or self.skin_manager.get_internal_op(node)
                 if resolved:
                     from ops.registry import has_op
+
                     if has_op(resolved):
                         return self._apply(node, [])
             return self._resolve_identifier(node)

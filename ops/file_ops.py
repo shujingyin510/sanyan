@@ -98,7 +98,7 @@ def _load_sugar_parser(evaluator):
     if cmd_def is None:
         return _fallback_convert(sugar_code, skin_mgr)
 
-    params, body = cmd_def[0], cmd_def[1]
+    body = cmd_def[1]
     sugar_ast = None
     try:
         bootstrap_env.push_scope()
@@ -131,10 +131,12 @@ def _load_sugar_parser(evaluator):
 def _fallback_convert(sugar_code, skin_mgr):
     """回退：使用 Python SugarConverter 转换 sugar.san（当 bootstrap 不可用/失败时）。"""
     from sugar import SugarConverter
+
     ast = SugarConverter.convert(sugar_code, skin_mgr)
     if ast is None:
         return None
     from evaluator import SanyanEvaluator
+
     module_env = SanyanEvaluator(skin_manager=skin_mgr)
     module_env.eval(ast)
     exports = _collect_exports(ast) or {'词法分析', '解析'}
