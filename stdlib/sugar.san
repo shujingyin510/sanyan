@@ -552,7 +552,7 @@
         返回(列表(列表("循环", cond, body), rest))
     }
 
-    // 遍历 var 从 start 到 end { body }
+    // 遍历 var 从 start 到 end { body }  或  遍历 var 在 container { body }
     若 (str_equals(ttype, "标识符") 且 str_equals(tval, "遍历")) {
         设 rest = 切片(tokens, 1)
         设 name_tok = 取当前(rest)
@@ -560,6 +560,19 @@
         设 var_name = 取(name_tok, 1)
         rest = 切片(rest, 1)
 
+        // 遍历 var 在 container { body }
+        若 (匹配(rest, "标识符", "在")) {
+            rest = 消耗(rest, "标识符", "在")
+            设 container_r = 解析表达式(rest, 0)
+            设 container = 取(container_r, 0)
+            rest = 取(container_r, 1)
+            设 body_r = 解析主表达式(rest)
+            设 body = 取(body_r, 0)
+            rest = 取(body_r, 1)
+            返回(列表(列表("遍历", var_name, container, body), rest))
+        }
+
+        // 遍历 var 从 start 到 end { body }
         // 可选的 从
         若 (匹配(rest, "标识符", "从")) { rest = 消耗(rest, "标识符", "从") }
 
@@ -595,7 +608,53 @@
 
         设 val_r = 解析表达式(rest, 0)
         设 val = 取(val_r, 0)
-        返回(列表(列表("设", name, val), 取(val_r, 1)))
+            返回(列表(列表("设", name, val), 取(val_r, 1)))
+    }
+
+    // 置 设备 = 状态
+    若 (str_equals(ttype, "标识符") 且 str_equals(tval, "置")) {
+        设 rest = 切片(tokens, 1)
+        设 name_tok = 取当前(rest)
+        若 (非(是列表(name_tok))) { 1 / 0 }
+        设 name = 连接("\"", 取(name_tok, 1), "\"")
+        rest = 切片(rest, 1)
+        若 (匹配(rest, "运算符", "=")) { rest = 消耗(rest, "运算符", "=") }
+        设 val_r = 解析表达式(rest, 0)
+        设 val = 取(val_r, 0)
+        返回(列表(列表("置", name, val), 取(val_r, 1)))
+    }
+
+    // 读 传感器
+    若 (str_equals(ttype, "标识符") 且 str_equals(tval, "读")) {
+        设 rest = 切片(tokens, 1)
+        设 name_tok = 取当前(rest)
+        若 (非(是列表(name_tok))) { 1 / 0 }
+        设 name = 连接("\"", 取(name_tok, 1), "\"")
+        rest = 切片(rest, 1)
+        返回(列表(列表("读", name), rest))
+    }
+
+    // 查 设备
+    若 (str_equals(ttype, "标识符") 且 str_equals(tval, "查")) {
+        设 rest = 切片(tokens, 1)
+        设 name_tok = 取当前(rest)
+        若 (非(是列表(name_tok))) { 1 / 0 }
+        设 name = 连接("\"", 取(name_tok, 1), "\"")
+        rest = 切片(rest, 1)
+        返回(列表(列表("查", name), rest))
+    }
+
+    // 对 对象 { body }
+    若 (str_equals(ttype, "标识符") 且 str_equals(tval, "对")) {
+        设 rest = 切片(tokens, 1)
+        设 name_tok = 取当前(rest)
+        若 (非(是列表(name_tok))) { 1 / 0 }
+        设 name = 连接("\"", 取(name_tok, 1), "\"")
+        rest = 切片(rest, 1)
+        设 body_r = 解析主表达式(rest)
+        设 body = 取(body_r, 0)
+        rest = 取(body_r, 1)
+        返回(列表(列表("对", name, body), rest))
     }
 
     // 定义 fn (params) { body }

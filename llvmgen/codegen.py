@@ -69,34 +69,6 @@ _LOGIC_OPS = {
     '或': 'or',
     'or': 'or',
 }
-
-# IoT 关键字（糖解析器不支持 置/读/查 语法时以 bare string 出现，此类节点跳过）
-_IOT_KEYWORDS = {
-    '置',
-    '读',
-    '查',
-    '对',
-    '读文件',
-    '写文件',
-    'write',
-    'read',
-    'query',
-    'with',
-    '灯',
-    '窗帘',
-    '风扇',
-    '加热',
-    '人体',
-    '光线',
-    '温度',
-    '人体传感器',
-    '光线传感器',
-    '温度传感器',
-    '从',
-    '到',
-    '在',
-}
-
 # ── 运行时函数声明规范 ──
 # (函数名, 返回类型, [参数类型]) — 使用真实 C 类型（i32 或 i8*）
 _RUNTIME_FUNCS: dict[str, tuple] = {
@@ -447,16 +419,25 @@ def _compile_if(args: list, cg: CodegenContext) -> ir.Value | None:
 def _compile_for(args: list, cg: CodegenContext) -> ir.Value | None:
     """编译 遍历/for 循环。
 
-    AST 格式: ['遍历', var_name, start_expr, end_expr, body]
+    AST 格式:
+      ['遍历', var, start, end, body]  — 范围遍历
+      ['遍历', var, container, body]    — 容器遍历（阶段 3 桩）
     """
-    if len(args) < 4:
-        raise SyntaxError('遍历 需要 (变量名 起始 结束 体)')
+    if len(args) < 3:
+        raise SyntaxError('遍历 需要 (变量名 起始 结束 体) 或 (变量名 容器 体)')
 
     var_name = args[0]
-    start_val = compile_node(args[1], cg)
-    end_val = compile_node(args[2], cg)
-    body = args[3]
+    body = args[-1]
     body_exprs = _unwrap_block(body)
+    is_range = len(args) >= 4
+
+    if is_range:
+        start_val = compile_node(args[1], cg)
+        end_val = compile_node(args[2], cg)
+    else:
+        # 容器遍历：桩 — 编译容器表达式但不迭代
+        compile_node(args[1], cg)
+        return _NULL
 
     # 分配循环变量
     loop_var = cg.builder.alloca(_PTR, name=var_name)
@@ -517,6 +498,13 @@ def _compile_fold(op: str, args: list, func: ir.Function, cg: CodegenContext) ->
     return result
 
 
+def _quote_if_ident(arg: object) -> object:
+    """如果参数是裸标识符（非数字、非字符串字面量），加双引号变成字符串字面量。"""
+    if isinstance(arg, str) and not _is_string_literal(arg) and _to_int(arg) is None:
+        return f'"{arg}"'
+    return arg
+
+
 def _dispatch_runtime(op: str, args: list, func: ir.Function, cg: CodegenContext) -> ir.Value | None:
     """将内置操作分发到运行时函数调用，处理装箱/拆箱。"""
     compiled = [compile_node(a, cg) for a in args]
@@ -569,9 +557,6 @@ def compile_node(node, cg: CodegenContext) -> ir.Value | None:
         n = _to_int(node)
         if n is not None:
             return cg._box_int(ir.Constant(_INT, n))
-        # IoT 关键字（糖解析器不支持的语法，忽略）
-        if node in _IOT_KEYWORDS:
-            return _NULL
         return cg.get_var(node)
 
     if not isinstance(node, list) or len(node) < 1:
@@ -622,6 +607,9 @@ def compile_node(node, cg: CodegenContext) -> ir.Value | None:
     # ── 运行时函数调用 ──
     rt_func = cg._get_runtime_func(op)
     if rt_func is not None:
+        # IoT 操作：自动为裸标识符参数加引号
+        if op in ('读', '查', '置', '对', 'read', 'query', 'write', 'with'):
+            args = [_quote_if_ident(a) for a in args]
         # 连接/列表合 支持变参：两两折叠调用
         if op in ('连接', 'concat', '列表合', 'list_concat') and len(args) > 2:
             return _compile_fold(op, args, rt_func, cg)
@@ -642,8 +630,6 @@ def compile_node(node, cg: CodegenContext) -> ir.Value | None:
     if op in ('做', 'do'):
         result = None
         for stmt in args:
-            if isinstance(stmt, str) and stmt in _IOT_KEYWORDS:
-                continue
             result = compile_node(stmt, cg)
         return result
 
@@ -795,7 +781,7 @@ def _deep_merge(node):
         first = node[0]
         if first in ('做', 'do'):
             # 过滤 IoT 关键字，然后合并
-            inner = [c for c in node[1:] if not (isinstance(c, str) and c in _IOT_KEYWORDS)]
+            inner = node[1:]
             inner = _merge_if_chain(inner)
             return [first] + inner
         # 其他节点递归处理子节点
@@ -812,7 +798,6 @@ def compile_top_level(ast_nodes: list, module_name: str = 'main') -> CodegenCont
         ast_nodes = ast_nodes[1:]
 
     # 过滤裸露的 IoT 关键字（糖解析器不支持 置/读/查 语法时产生）
-    ast_nodes = [n for n in ast_nodes if not (isinstance(n, str) and n in _IOT_KEYWORDS)]
 
     # 规范化：合并 再若/否则 到前一个 若 节点
     ast_nodes = _merge_if_chain(ast_nodes)
