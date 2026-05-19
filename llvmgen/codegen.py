@@ -94,6 +94,16 @@ class CodegenContext:
             raise RuntimeError('builder 未初始化，先调用 begin_function()')
         return self._builder
 
+    @property
+    def _func(self) -> ir.Function:
+        """当前正在编译的函数（断言非 None）。"""
+        assert self._current_func is not None, '当前无活跃函数'
+        return self._current_func
+
+    def _add_block(self, name: str = '') -> ir.Block:
+        """在当前函数追加基本块。"""
+        return self._func.append_basic_block(name=name)
+
     def begin_function(self, name: str, param_names: list[str]) -> ir.Function:
         """创建函数并进入其 entry 块。"""
         fnty = ir.FunctionType(_TYPE, [_TYPE] * len(param_names))
@@ -115,8 +125,8 @@ class CodegenContext:
 
     def end_function(self):
         """结束当前函数（如果未显式返回则补 ret 0）。"""
-        if not self._builder.block.is_terminated:
-            self._builder.ret(_ZERO)
+        if not self.builder.block.is_terminated:
+            self.builder.ret(_ZERO)
 
     def emit_print_int(self, value: ir.Value):
         """生成 printf(\"%d\\n\", value) 调用。"""
@@ -218,13 +228,13 @@ def _compile_if(args: list, cg: CodegenContext) -> ir.Value | None:
         else:
             i += 1
 
-    merge_block = cg._current_func.append_basic_block(name='if_merge')
+    merge_block = cg._add_block(name='if_merge')
     phi_incoming: list[tuple[ir.Value, ir.Block]] = []
 
     for cond_node, body_node in branches:
-        test_block = cg._current_func.append_basic_block(name='if_test')
-        body_block = cg._current_func.append_basic_block(name='if_body')
-        next_test = cg._current_func.append_basic_block(name='if_next')
+        test_block = cg._add_block(name='if_test')
+        body_block = cg._add_block(name='if_body')
+        next_test = cg._add_block(name='if_next')
 
         cg.builder.branch(test_block)
         cg.builder.position_at_start(test_block)
@@ -241,7 +251,7 @@ def _compile_if(args: list, cg: CodegenContext) -> ir.Value | None:
         cg.builder.position_at_start(next_test)
 
     if final_else is not None:
-        else_block = cg._current_func.append_basic_block(name='if_else')
+        else_block = cg._add_block(name='if_else')
         cg.builder.branch(else_block)
         cg.builder.position_at_start(else_block)
         for e in final_else:
@@ -284,9 +294,9 @@ def _compile_for(args: list, cg: CodegenContext) -> ir.Value | None:
     saved = cg._scope.get(var_name)
     cg._scope[var_name] = loop_var
 
-    loop_h = cg._current_func.append_basic_block(name='for_h')
-    loop_b = cg._current_func.append_basic_block(name='for_b')
-    loop_e = cg._current_func.append_basic_block(name='for_e')
+    loop_h = cg._add_block(name='for_h')
+    loop_b = cg._add_block(name='for_b')
+    loop_e = cg._add_block(name='for_e')
 
     cg.builder.branch(loop_h)
 
@@ -385,6 +395,8 @@ def compile_node(node, cg: CodegenContext) -> ir.Value | None:
                 cg.emit_print_str(str_ptr)
                 return _ZERO
             val = compile_node(raw, cg)
+            if val is None:
+                return _ZERO
             # 判断是否为字符串指针 (i8*)
             if isinstance(val.type, ir.PointerType) and isinstance(val.type.pointee, ir.IntType):
                 cg.emit_print_str(val)
@@ -407,9 +419,9 @@ def compile_node(node, cg: CodegenContext) -> ir.Value | None:
         if len(args) < 2:
             raise SyntaxError(f'{op} 需要 (条件 体)')
 
-        loop_h = cg._current_func.append_basic_block(name='loop_h')
-        loop_b = cg._current_func.append_basic_block(name='loop_b')
-        loop_e = cg._current_func.append_basic_block(name='loop_e')
+        loop_h = cg._add_block(name='loop_h')
+        loop_b = cg._add_block(name='loop_b')
+        loop_e = cg._add_block(name='loop_e')
 
         cg.builder.branch(loop_h)
 

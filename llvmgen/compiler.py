@@ -1,8 +1,15 @@
 """三言 → LLVM 编译器入口"""
 
+from __future__ import annotations
+
 import os
 import sys
+from typing import TYPE_CHECKING
+
 from llvmgen.codegen import compile_top_level
+
+if TYPE_CHECKING:
+    from llvmgen.codegen import CodegenContext
 
 
 def _parse_source(source: str) -> list:
@@ -16,28 +23,28 @@ def _parse_source(source: str) -> list:
     skin = evaluator.skin_manager
 
     # 优先用糖解析器
-    ast = _parse_with_sugar_san(source, evaluator)
-    if ast is not None:
-        return ast
+    parsed = _parse_with_sugar_san(source, evaluator)
+    if parsed is not None and isinstance(parsed, list):
+        return parsed  # type: ignore[no-any-return]
 
     # 回退到 SugarConverter
-    ast = SugarConverter.convert(source, skin)
-    if ast is not None:
-        return ast
+    parsed = SugarConverter.convert(source, skin)
+    if parsed is not None and isinstance(parsed, list):
+        return parsed
 
     # 最后回退到 S 表达式解析
     from lexer import tokenize
     from parser import parse
 
     tokens = tokenize(source)
-    ast = parse(tokens)
-    if ast is not None:
-        return ast
+    parsed = parse(tokens)
+    if parsed is not None and isinstance(parsed, list):
+        return parsed
 
     raise SyntaxError('所有解析器均失败')
 
 
-def compile_source(source: str, module_name: str = 'main'):
+def compile_source(source: str, module_name: str = 'main') -> tuple[str, 'CodegenContext']:
     """编译三言源码，返回 (ir_text, codegen_context)。"""
     ast = _parse_source(source)
     if not isinstance(ast, list):
