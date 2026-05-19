@@ -190,3 +190,4 @@ examples/stm32-blinky/firmware.elf
 examples/stm32-blinky/bytecode.bin
 examples/stm32-blinky/test_led.bin
 examples/stm32-blinky/test_led.elf
+sanyan_parse.dll
