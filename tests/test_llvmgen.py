@@ -123,10 +123,12 @@ class TestLLVMControlFlow(unittest.TestCase):
         self.assertIn('br i1', ir)
 
     def test_loop(self):
-        ir = _compile_ast([
-            ['设', 'i', 0],
-            ['循环', ['小于', 'i', 5], ['做', ['设', 'i', ['加', 'i', 1]]]],
-        ])
+        ir = _compile_ast(
+            [
+                ['设', 'i', 0],
+                ['循环', ['小于', 'i', 5], ['做', ['设', 'i', ['加', 'i', 1]]]],
+            ]
+        )
         self.assertIn('loop_h', ir)
         self.assertIn('loop_b', ir)
 
@@ -135,9 +137,11 @@ class TestLLVMControlFlow(unittest.TestCase):
         self.assertIn('store', ir)
 
     def test_return(self):
-        ir = _compile_ast([
-            ['定义', 'f', [], ['返回', 42]],
-        ])
+        ir = _compile_ast(
+            [
+                ['定义', 'f', [], ['返回', 42]],
+            ]
+        )
         self.assertIn('ret i8*', ir)
 
     def test_judge(self):
@@ -153,25 +157,34 @@ class TestLLVMFunctions(unittest.TestCase):
         self.assertIn('define i8* @"add1"', ir)
 
     def test_function_call(self):
-        ir = _compile_ast([
-            ['定义', 'double', ['n'], ['返回', ['乘', 'n', 2]]],
-            ['设', 'r', ['double', 5]],
-        ])
+        ir = _compile_ast(
+            [
+                ['定义', 'double', ['n'], ['返回', ['乘', 'n', 2]]],
+                ['设', 'r', ['double', 5]],
+            ]
+        )
         self.assertIn('call i8* @"double"', ir)
 
     def test_recursion(self):
-        ir = _compile_ast([
-            ['定义', 'fact', ['n'],
-                ['若', ['小于', 'n', 2], ['返回', 1],
-                       ['返回', ['乘', 'n', ['fact', ['减', 'n', 1]]]]]],
-        ])
+        ir = _compile_ast(
+            [
+                [
+                    '定义',
+                    'fact',
+                    ['n'],
+                    ['若', ['小于', 'n', 2], ['返回', 1], ['返回', ['乘', 'n', ['fact', ['减', 'n', 1]]]]],
+                ],
+            ]
+        )
         self.assertIn('@"fact"', ir)
         self.assertIn('ret i8*', ir)
 
     def test_multiple_params(self):
-        ir = _compile_ast([
-            ['定义', 'add3', ['a', 'b', 'c'], ['返回', ['加', ['加', 'a', 'b'], 'c']]],
-        ])
+        ir = _compile_ast(
+            [
+                ['定义', 'add3', ['a', 'b', 'c'], ['返回', ['加', ['加', 'a', 'b'], 'c']]],
+            ]
+        )
         self.assertIn('define i8* @"add3"(i8* %"a", i8* %"b", i8* %"c")', ir)
 
 
@@ -179,18 +192,22 @@ class TestLLVMForLoop(unittest.TestCase):
     """遍历循环"""
 
     def test_range_for(self):
-        ir = _compile_ast([
-            ['设', 's', 0],
-            ['遍历', 'i', 1, 10, ['做', ['设', 's', ['加', 's', 'i']]]],
-        ])
+        ir = _compile_ast(
+            [
+                ['设', 's', 0],
+                ['遍历', 'i', 1, 10, ['做', ['设', 's', ['加', 's', 'i']]]],
+            ]
+        )
         self.assertIn('for_h', ir)
         self.assertIn('for_b', ir)
 
     def test_container_for(self):
-        ir = _compile_ast([
-            ['设', 'lst', ['列表', 1, 2, 3]],
-            ['遍历', 'v', 'lst', ['做', ['输出', 'v']]],
-        ])
+        ir = _compile_ast(
+            [
+                ['设', 'lst', ['列表', 1, 2, 3]],
+                ['遍历', 'v', 'lst', ['做', ['输出', 'v']]],
+            ]
+        )
         self.assertIn('call', ir)  # 应包含 rt_list_len / rt_list_get 调用
 
 
