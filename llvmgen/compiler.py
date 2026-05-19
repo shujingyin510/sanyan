@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import os
 import sys
-from typing import TYPE_CHECKING, cast
+from typing import TYPE_CHECKING
 
 from llvmgen.codegen import compile_top_level
 
@@ -13,35 +13,64 @@ if TYPE_CHECKING:
 
 
 def _parse_source(source: str) -> list:
-    """解析三言源码为 AST 列表。"""
+    """解析三言源码为 AST 列表。
+
+    顺序: 糖解析器 → C S表达式 → Python SugarConverter
+    """
     from ops.file_ops import _parse_with_sugar_san, clear_cache
     from evaluator import SanyanEvaluator
-    from sugar import SugarConverter
 
     clear_cache()
     evaluator = SanyanEvaluator()
-    skin = evaluator.skin_manager
 
-    # 优先用糖解析器
-    parsed = cast('list | None', _parse_with_sugar_san(source, evaluator))
+    # 1. 糖解析器
+    try:
+        parsed = _parse_with_sugar_san(source, evaluator)
+        if parsed is not None and isinstance(parsed, list):
+            return parsed  # type: ignore[no-any-return]
+    except Exception:
+        pass
+
+    # 2. C S 表达式解析器
+    parsed = _parse_c_s_expr(source)
     if parsed is not None:
         return parsed
 
-    # 回退到 SugarConverter
-    parsed = cast('list | None', SugarConverter.convert(source, skin))
-    if parsed is not None:
-        return parsed
+    # 3. Python SugarConverter
+    try:
+        from sugar import SugarConverter
 
-    # 最后回退到 S 表达式解析
-    from lexer import tokenize
-    from parser import parse
-
-    tokens = tokenize(source)
-    parsed = cast('list | None', parse(tokens))
-    if parsed is not None:
-        return parsed
+        parsed = SugarConverter.convert(source, evaluator.skin_manager)
+        if parsed is not None and isinstance(parsed, list):
+            return parsed
+    except Exception:
+        pass
 
     raise SyntaxError('所有解析器均失败')
+
+
+def _parse_c_s_expr(source: str) -> list | None:
+    """使用 C 共享库解析 S 表达式。"""
+    import ctypes
+    import json
+    import os
+
+    dll_path = os.path.join(os.path.dirname(__file__), '..', 'sanyan_parse.dll')
+    if not os.path.exists(dll_path):
+        return None
+    try:
+        lib = ctypes.CDLL(dll_path)
+        lib.sanyan_parse.argtypes = [ctypes.c_char_p]
+        lib.sanyan_parse.restype = ctypes.c_char_p
+        result = lib.sanyan_parse(source.encode('utf-8'))
+        if result:
+            ast = json.loads(result.decode('utf-8'))
+            if isinstance(ast, list) and len(ast) == 1:
+                ast = ast[0]  # 展开外层列表包装
+            return ast  # type: ignore[no-any-return]
+    except Exception:
+        pass
+    return None
 
 
 def compile_source(source: str, module_name: str = 'main') -> tuple[str, 'CodegenContext']:
