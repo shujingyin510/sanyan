@@ -177,7 +177,12 @@ class CodegenContext:
 
     def __init__(self, module_name: str = 'main'):
         self.module = ir.Module(name=module_name)
-        self.module.triple = 'x86_64-pc-linux-gnu'
+        try:
+            from llvmlite import binding as _llvm_bind
+
+            self.module.triple = _llvm_bind.get_default_triple()
+        except Exception:
+            self.module.triple = 'x86_64-pc-linux-gnu'
         self._printf = None
         self._builder: ir.IRBuilder | None = None
         self._entry_block: ir.Block | None = None
