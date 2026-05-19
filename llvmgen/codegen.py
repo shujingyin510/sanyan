@@ -1170,11 +1170,11 @@ def compile_top_level(ast_nodes: list, module_name: str = 'main') -> CodegenCont
         class _DeferredFn:
             def __init__(self, node):
                 self.node = node
+
         deferred: list[_DeferredFn] = []
         for node in defs:
             deferred.append(_DeferredFn(node))
-            name = node[1] if isinstance(node[1], str) else (
-                node[1][0] if isinstance(node[1], list) else str(node[1]))
+            name = node[1] if isinstance(node[1], str) else (node[1][0] if isinstance(node[1], list) else str(node[1]))
             params = node[2] if len(node) > 2 and isinstance(node[2], list) else []
             cg.begin_function(name, params)
             cg.end_function()  # 空体占位
