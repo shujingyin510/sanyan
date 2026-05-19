@@ -593,6 +593,10 @@ def _compile_try_catch(args: list, cg: CodegenContext) -> ir.Value | None:
     for stmt in try_stmts:
         compile_node(stmt, cg)
 
+    # 若 try 体已终止（如 return），跳过 catch
+    if cg.builder.block.is_terminated:
+        return _NULL
+
     # 检查异常
     fnty = ir.FunctionType(_INT, [])
     rt_check = ir.Function(cg.module, fnty, name='rt_try_check')
@@ -745,6 +749,26 @@ def _compile_list_create(args: list, cg: CodegenContext) -> ir.Value:
     for a in args:
         elem = compile_node(a, cg)
         cg.builder.call(push_fn, [result, elem], name='push')
+    return result
+
+
+def _compile_dict_create(args: list, cg: CodegenContext) -> ir.Value:
+    """编译 字典(k1,v1,k2,v2...) → rt_dict_new + rt_dict_set × N/2。"""
+    new_fn = cg._get_runtime_func('dict')
+    assert new_fn is not None
+    result = cg.builder.call(new_fn, [], name='dict_new')
+    set_name = 'rt_dict_set'
+    if set_name not in cg._rt_funcs:
+        ft = ir.FunctionType(ir.VoidType(), [_PTR, _PTR, _PTR])
+        set_fn = ir.Function(cg.module, ft, name=set_name)
+        cg._rt_funcs[set_name] = set_fn
+    else:
+        set_fn = cg._rt_funcs[set_name]
+    for i in range(0, len(args), 2):
+        if i + 1 < len(args):
+            key = compile_node(args[i], cg)
+            val = compile_node(args[i + 1], cg)
+            cg.builder.call(set_fn, [result, key, val], name='dict_set')
     return result
 
 
@@ -927,6 +951,9 @@ def compile_node(node, cg: CodegenContext) -> ir.Value | None:
         # list/列表 需要逐个 push 元素
         if op in ('列表', 'list') and len(args) > 0:
             return _compile_list_create(args, cg)
+        # dict/字典 需要逐对 set
+        if op in ('字典', 'dict') and len(args) > 0:
+            return _compile_dict_create(args, cg)
         # 连接/列表合 支持变参：两两折叠调用
         if op in ('连接', 'concat', '列表合', 'list_concat') and len(args) > 2:
             return _compile_fold(op, args, rt_func, cg)
