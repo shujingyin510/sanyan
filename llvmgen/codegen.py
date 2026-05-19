@@ -283,7 +283,8 @@ class CodegenContext:
 
     def _make_global_string(self, s: str) -> ir.Value:
         n = len(self.module.globals)
-        c = ir.Constant(ir.ArrayType(ir.IntType(8), len(s) + 1), bytearray(s + '\0', 'utf-8'))
+        data = bytearray(s + '\0', 'utf-8')
+        c = ir.Constant(ir.ArrayType(ir.IntType(8), len(data)), data)
         gv = ir.GlobalVariable(self.module, c.type, name=f'.str.{n}')
         gv.linkage = 'private'
         gv.global_constant = True
@@ -376,6 +377,10 @@ def _compile_if(args: list, cg: CodegenContext) -> ir.Value | None:
                 # 合并后的否则体列表
                 final_else = item[1:]
                 i += 1
+            elif len(args) == 3 and i == 2:
+                # 简单 if-else：第三参数是 else 分支
+                final_else = [item]
+                i += 1
             else:
                 i += 1
         elif isinstance(item, str) and item == '否则':
@@ -387,7 +392,9 @@ def _compile_if(args: list, cg: CodegenContext) -> ir.Value | None:
             i += 1
 
     merge_block = cg._add_block(name='if_merge')
-    phi_incoming: list[tuple[ir.Value, ir.Block]] = []
+    # 使用 alloca + store 而非 phi（避免 predecessor 不完整问题）
+    result_alloca = cg.builder.alloca(_PTR, name='if_res')
+    cg.builder.store(_NULL, result_alloca)
 
     for cond_node, body_node in branches:
         test_block = cg._add_block(name='if_test')
@@ -403,8 +410,9 @@ def _compile_if(args: list, cg: CodegenContext) -> ir.Value | None:
         cg.builder.position_at_start(body_block)
         body_val = compile_node(body_node, cg)
         if not cg.builder.block.is_terminated:
+            if body_val is not None:
+                cg.builder.store(body_val, result_alloca)
             cg.builder.branch(merge_block)
-            phi_incoming.append((body_val if body_val is not None else _ZERO, body_block))
 
         cg.builder.position_at_start(next_test)
 
@@ -415,18 +423,14 @@ def _compile_if(args: list, cg: CodegenContext) -> ir.Value | None:
         for e in final_else:
             else_val = compile_node(e, cg)
         if not cg.builder.block.is_terminated:
+            if else_val is not None:
+                cg.builder.store(else_val, result_alloca)
             cg.builder.branch(merge_block)
-            phi_incoming.append((else_val if else_val is not None else _ZERO, else_block))
     else:
         cg.builder.branch(merge_block)
 
     cg.builder.position_at_start(merge_block)
-    if phi_incoming:
-        phi = cg.builder.phi(_PTR, name='if_result')
-        for val, blk in phi_incoming:
-            phi.add_incoming(val, blk)
-        return phi
-    return _NULL
+    return cg.builder.load(result_alloca, name='if_result')
 
 
 def _compile_judge(args: list, cg: CodegenContext) -> ir.Value | None:
