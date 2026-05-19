@@ -80,6 +80,11 @@ _RUNTIME_FUNCS: dict[str, tuple] = {
     # 类型判断 → i32
     '是数字': ('rt_is_number', _INT, [_INT]),
     'is_number': ('rt_is_number', _INT, [_INT]),
+    '是字符串': ('rt_is_string', _INT, [_PTR]),
+    'is_string': ('rt_is_string', _INT, [_PTR]),
+    '是列表': ('rt_is_list', _INT, [_PTR]),
+    # 函数应用（桩）
+    '应用': ('rt_apply_stub', _PTR, [_PTR, _PTR]),
     # 等待
     '等待': ('rt_sleep', ir.VoidType(), [_INT]),
     'wait': ('rt_sleep', ir.VoidType(), [_INT]),
@@ -417,6 +422,49 @@ def _compile_if(args: list, cg: CodegenContext) -> ir.Value | None:
     return _NULL
 
 
+def _compile_judge(args: list, cg: CodegenContext) -> ir.Value | None:
+    """编译 判/三态分支。AST: ['判', val, true_body, maybe_body, false_body]"""
+    val = cg._unbox_int(compile_node(args[0], cg))
+
+    true_block = cg._add_block(name='judge_true')
+    maybe_block = cg._add_block(name='judge_maybe')
+    false_block = cg._add_block(name='judge_false')
+    merge_block = cg._add_block(name='judge_end')
+
+    # switch on value: 1→真, 0→可能, -1→假
+    sw = cg.builder.switch(val, false_block)
+    sw.add_case(_ONE, true_block)
+    sw.add_case(_ZERO, maybe_block)
+
+    phi_incoming: list[tuple[ir.Value, ir.Block]] = []
+
+    cg.builder.position_at_start(true_block)
+    tv = compile_node(args[1], cg) if len(args) > 1 else _NULL
+    if not cg.builder.block.is_terminated:
+        cg.builder.branch(merge_block)
+        phi_incoming.append((tv if tv is not None else _NULL, true_block))
+
+    cg.builder.position_at_start(maybe_block)
+    mv = compile_node(args[2], cg) if len(args) > 2 else _NULL
+    if not cg.builder.block.is_terminated:
+        cg.builder.branch(merge_block)
+        phi_incoming.append((mv if mv is not None else _NULL, maybe_block))
+
+    cg.builder.position_at_start(false_block)
+    fv = compile_node(args[3], cg) if len(args) > 3 else _NULL
+    if not cg.builder.block.is_terminated:
+        cg.builder.branch(merge_block)
+        phi_incoming.append((fv if fv is not None else _NULL, false_block))
+
+    cg.builder.position_at_start(merge_block)
+    if phi_incoming:
+        phi = cg.builder.phi(_PTR, name='judge_result')
+        for v, blk in phi_incoming:
+            phi.add_incoming(v, blk)
+        return phi
+    return _NULL
+
+
 def _compile_for(args: list, cg: CodegenContext) -> ir.Value | None:
     """编译 遍历/for 循环。
 
@@ -642,6 +690,16 @@ def compile_node(node, cg: CodegenContext) -> ir.Value | None:
         b = cg.builder.icmp_signed('!=', val, _ZERO, name='not_val')
         return cg._box_int(cg.builder.zext(cg.builder.not_(b), _INT, name='not_bool'))
 
+    # ── 判 三态分支 (判 expr { 真: .. 可能: .. 假: .. }) ──
+    if op in ('判', 'judge'):
+        if len(args) < 2:
+            raise SyntaxError(f'{op} 需要 (值 真分支 [可能分支] [假分支])')
+        return _compile_judge(args, cg)
+
+    # ── 函数 匿名 lambda（桩：返回 null）──
+    if op in ('函数', 'lambda'):
+        return _NULL
+
     # ── 运行时函数调用 ──
     rt_func = cg._get_runtime_func(op)
     if rt_func is not None:
@@ -754,16 +812,21 @@ def compile_node(node, cg: CodegenContext) -> ir.Value | None:
         assert cg._get_runtime_func('取') is not None
         return _dispatch_runtime('取', [op, args[0]], cg._get_runtime_func('取'), cg)
 
-    # ── 函数调用 ──
-    if op in cg._funcs:
-        callee = cg._funcs[op]
+    # ── 函数调用（含点号访问 test.函数名）──
+    resolved_op = op
+    if '.' in op and op not in cg._funcs:
+        # 点号访问：取最后一段作为函数名查找
+        resolved_op = op.split('.')[-1]
+    if resolved_op in cg._funcs:
+        callee = cg._funcs[resolved_op]
         arg_vals = [compile_node(a, cg) for a in args]
         return cg.builder.call(callee, arg_vals, name=f'call_{op}')
 
     # ── 未知操作 → 当作前向引用函数调用 ──
-    arg_vals = [compile_node(a, cg) for a in args]
-    if op in cg._funcs:
-        return cg.builder.call(cg._funcs[op], arg_vals, name=f'call_{op}')
+    resolved_op = op.split('.')[-1] if '.' in op else op
+    if resolved_op in cg._funcs:
+        arg_vals = [compile_node(a, cg) for a in args]
+        return cg.builder.call(cg._funcs[resolved_op], arg_vals, name=f'call_{op}')
     raise NameError(f'编译错误: 未定义的操作或函数 {op}')
 
 
@@ -827,6 +890,75 @@ def _deep_merge(node):
     return node
 
 
+def _resolve_imports(nodes: list, cg: CodegenContext) -> tuple[list, list]:
+    """解析 设 var = 导入(\"path\")，编译被导入文件的 定义 到当前模块。
+    返回 (处理后的节点列表, 导入的顶层设节点列表)。
+    """
+    import os
+
+    result = []
+    imported_setups = []  # 导入文件中的 设 节点
+    for node in nodes:
+        if (
+            isinstance(node, list)
+            and len(node) >= 3
+            and node[0] in ('设', 'set')
+            and isinstance(node[2], list)
+            and node[2][0] in ('导入', 'import')
+            and len(node[2]) >= 2
+        ):
+            path_node = node[2][1]
+            if isinstance(path_node, str) and _is_string_literal(path_node):
+                path_node = _unquote(path_node)
+            path_str = str(path_node)
+            search = [path_str, f'stdlib/{path_str}', f'stdlib/{path_str}.san']
+            found = None
+            for sp in search:
+                if os.path.exists(sp):
+                    found = sp
+                    break
+                if not sp.endswith('.san') and os.path.exists(sp + '.san'):
+                    found = sp + '.san'
+                    break
+            if found:
+                try:
+                    with open(found, 'r', encoding='utf-8') as f:
+                        imported_code = f.read()
+                    from ops.file_ops import _parse_with_sugar_san
+                    from evaluator import SanyanEvaluator
+
+                    tmp_eval = SanyanEvaluator()
+                    imported_ast = _parse_with_sugar_san(imported_code, tmp_eval)
+                    if imported_ast is None:
+                        from sugar import SugarConverter
+                        from skin import SkinManager
+
+                        imported_ast = SugarConverter.convert(imported_code, SkinManager('chinese'))
+                    if isinstance(imported_ast, list) and len(imported_ast) > 0 and imported_ast[0] in ('做', 'do'):
+                        imported_ast = imported_ast[1:]
+                    if isinstance(imported_ast, list):
+                        # 先处理 设，再处理 定义（确保 定义 内可用全局变量）
+                        for inode in imported_ast:
+                            if isinstance(inode, list) and len(inode) > 0 and inode[0] in ('设', 'set'):
+                                imported_setups.append(inode)
+                        for inode in imported_ast:
+                            if isinstance(inode, list) and len(inode) > 0 and inode[0] in ('定义', 'define', 'fn'):
+                                try:
+                                    compile_node(inode, cg)
+                                except Exception as _exc:
+                                    import sys as _sys2
+
+                                    _name = inode[1] if len(inode) > 1 else '?'
+                                    print(f'[import] skip {_name}: {_exc}', file=_sys2.stderr)
+                except Exception as _exc2:
+                    import sys as _sys3
+
+                    print(f'[import] failed: {_exc2}', file=_sys3.stderr)
+            continue
+        result.append(node)
+    return result, imported_setups
+
+
 def compile_top_level(ast_nodes: list, module_name: str = 'main') -> CodegenContext:
     """编译顶层 AST 节点列表。返回 CodegenContext 用于验证/导出。"""
     cg = CodegenContext(module_name)
@@ -841,7 +973,9 @@ def compile_top_level(ast_nodes: list, module_name: str = 'main') -> CodegenCont
     ast_nodes = _merge_if_chain(ast_nodes)
 
     def collect_and_compile(nodes):
-        """两遍：先收集 定义，再编译 设/表达式/调用。"""
+        """两遍：先 定义，再 main(导入设 + 顶层代码)。"""
+        nodes, imported_setups = _resolve_imports(nodes, cg)
+
         defs = []
         others = []
         for node in nodes:
@@ -855,13 +989,13 @@ def compile_top_level(ast_nodes: list, module_name: str = 'main') -> CodegenCont
             compile_node(node, cg)
 
         # 第二遍：编译顶层代码（放入 main 函数）
-        if others:
+        all_others = imported_setups + others
+        if all_others:
             cg.begin_function('main', [])
-            for node in others:
+            for node in all_others:
                 compile_node(node, cg)
             cg.end_function()
         else:
-            # 没有顶层代码则生成空 main
             cg.begin_function('main', [])
             cg.end_function()
 

@@ -250,3 +250,7 @@ void      rt_iot_with(rt_str_t *d, rt_str_t *b)   { (void)d; (void)b; }
 
 /* ── 导入桩 ── */
 rt_str_t *rt_import(rt_str_t *path)               { (void)path; return rt_str_new(""); }
+
+/* ── 其他桩 ── */
+int32_t  rt_is_list(void *p)        { return p != NULL ? 1 : 0; }
+rt_str_t *rt_apply_stub(void *fn, void *args) { (void)fn; (void)args; return rt_str_new(""); }
