@@ -398,10 +398,17 @@ class CodegenContext:
             self._global_inits.append((name, init_value))
 
     def compile_fn_body(self, name: str, param_names: list[str], body: list):
-        """编译函数体（处理 定义 AST）。"""
+        """编译函数体（处理 定义 AST）。最后表达式若非返回则隐式返回。"""
         self.begin_function(name, param_names)
-        for stmt in body:
-            compile_node(stmt, self)
+        result = None
+        for i, stmt in enumerate(body):
+            result = compile_node(stmt, self)
+            # 隐式返回：最后一条语句非返回时，将其值作为返回值
+            if i == len(body) - 1 and not self.builder.block.is_terminated:
+                if isinstance(stmt, list) and stmt[0] in ('返回', 'return'):
+                    pass  # 已有显式返回
+                elif result is not None:
+                    self.builder.ret(result)
         self.end_function()
 
     def verify(self) -> str:
