@@ -89,6 +89,7 @@ _RUNTIME_FUNCS: dict[str, tuple] = {
     # 字符串操作
     '连接': ('rt_str_concat', _PTR, [_PTR, _PTR]),
     'concat': ('rt_str_concat', _PTR, [_PTR, _PTR]),
+    '整数转字符串': ('rt_int_to_str', _PTR, [_PTR]),
     '取长': ('rt_str_len', _INT, [_PTR]),
     'length': ('rt_str_len', _INT, [_PTR]),
     '字符串相等': ('rt_str_equals', _INT, [_PTR, _PTR]),
@@ -477,11 +478,20 @@ def _compile_for(args: list, cg: CodegenContext) -> ir.Value | None:
 def _compile_fold(op: str, args: list, func: ir.Function, cg: CodegenContext) -> ir.Value:
     """变参操作的折叠编译：两两调用运行时函数。
 
-    例如: 连接(a, b, c, d) → rt_str_concat(rt_str_concat(rt_str_concat(a, b), c), d)
+    连接 自动对非字符串参数调用 rt_int_to_str 转换。
     """
     spec = _RUNTIME_FUNCS[op]
     param_types = spec[2]
     ret_type = spec[1]
+    is_str_op = op in ('连接', 'concat')
+
+    def _to_str(val: ir.Value) -> ir.Value:
+        """如果值不是全局字符串常量，调用 rt_int_to_str 转换。"""
+        if is_str_op and not _from_global_string(val):
+            to_str_func = cg._get_runtime_func('整数转字符串')
+            assert to_str_func is not None
+            return cg.builder.call(to_str_func, [val], name='to_str')
+        return val
 
     def _call(a, b):
         a_u = cg._unbox_int(a) if isinstance(param_types[0], ir.IntType) else a
@@ -492,6 +502,9 @@ def _compile_fold(op: str, args: list, func: ir.Function, cg: CodegenContext) ->
         return r
 
     compiled = [compile_node(a, cg) for a in args]
+    # 自动 int→str 转换
+    if is_str_op:
+        compiled = [_to_str(v) for v in compiled]
     result = compiled[0]
     for i in range(1, len(compiled)):
         result = _call(result, compiled[i])

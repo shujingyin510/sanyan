@@ -81,7 +81,8 @@ int32_t rt_str_find(rt_str_t *hs, rt_str_t *ndl) {
     return p ? (int32_t)(p - hs->data) : -1;
 }
 
-rt_str_t *rt_int_to_str(int32_t val) {
+rt_str_t *rt_int_to_str(uintptr_t boxed) {
+    int32_t val = (int32_t)(intptr_t)boxed;
     char buf[32];
     snprintf(buf, sizeof(buf), "%d", val);
     return rt_str_new(buf);
