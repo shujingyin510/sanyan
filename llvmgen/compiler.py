@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import os
 import sys
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, cast
 
 from llvmgen.codegen import compile_top_level
 
@@ -23,13 +23,13 @@ def _parse_source(source: str) -> list:
     skin = evaluator.skin_manager
 
     # 优先用糖解析器
-    parsed = _parse_with_sugar_san(source, evaluator)
-    if parsed is not None and isinstance(parsed, list):
-        return parsed  # type: ignore
+    parsed = cast('list | None', _parse_with_sugar_san(source, evaluator))
+    if parsed is not None:
+        return parsed
 
     # 回退到 SugarConverter
-    parsed = SugarConverter.convert(source, skin)
-    if parsed is not None and isinstance(parsed, list):
+    parsed = cast('list | None', SugarConverter.convert(source, skin))
+    if parsed is not None:
         return parsed
 
     # 最后回退到 S 表达式解析
@@ -37,8 +37,8 @@ def _parse_source(source: str) -> list:
     from parser import parse
 
     tokens = tokenize(source)
-    parsed = parse(tokens)
-    if parsed is not None and isinstance(parsed, list):
+    parsed = cast('list | None', parse(tokens))
+    if parsed is not None:
         return parsed
 
     raise SyntaxError('所有解析器均失败')
