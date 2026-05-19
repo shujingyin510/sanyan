@@ -325,11 +325,13 @@ class CodegenContext:
 
 
 def _unwrap_block(node):
-    """展开 做/do 块，返回内部表达式列表。"""
-    if isinstance(node, list) and len(node) > 0 and node[0] in ('做', 'do'):
+    """展开 做/do 块，返回内部表达式列表。空节点返回空列表。"""
+    if not isinstance(node, list):
+        return [node]
+    if len(node) == 0:
+        return []
+    if node[0] in ('做', 'do'):
         return node[1:]
-    if isinstance(node, list):
-        return node
     return [node]
 
 
