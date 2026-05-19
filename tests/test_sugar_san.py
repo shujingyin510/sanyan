@@ -30,10 +30,17 @@ def _normalize_block(node):
     return node
 
 
+def setUpModule():
+    """模块级初始化：清缓存并预加载 sugar 解析器，复用给全部测试"""
+    clear_cache()
+    _load_sugar_parser(_get_evaluator())
+
+
 class TestSugarSanLoading(unittest.TestCase):
     """sugar.san 模块能否正常加载"""
 
     def setUp(self):
+        # 此测试需要独立验证完整加载流程，重置缓存
         clear_cache()
 
     def test_load_parser(self):
@@ -46,9 +53,6 @@ class TestSugarSanLoading(unittest.TestCase):
 
 class TestSugarSanBasicParsing(unittest.TestCase):
     """基本表达式解析——验证解析成功且结构正确"""
-
-    def setUp(self):
-        clear_cache()
 
     def assertParses(self, code):
         ast = _sugar_parse(code)
@@ -79,9 +83,6 @@ class TestSugarSanBasicParsing(unittest.TestCase):
 class TestSugarSanControlFlow(unittest.TestCase):
     """控制流语句"""
 
-    def setUp(self):
-        clear_cache()
-
     def assertParses(self, code):
         ast = _sugar_parse(code)
         self.assertIsNotNone(ast, f'sugar.san failed to parse: {code}')
@@ -111,9 +112,6 @@ class TestSugarSanControlFlow(unittest.TestCase):
 class TestSugarSanListAndDict(unittest.TestCase):
     """列表、字典字面量"""
 
-    def setUp(self):
-        clear_cache()
-
     def assertParses(self, code):
         ast = _sugar_parse(code)
         self.assertIsNotNone(ast, f'sugar.san failed to parse: {code}')
@@ -132,9 +130,6 @@ class TestSugarSanListAndDict(unittest.TestCase):
 class TestSugarSanTryCatch(unittest.TestCase):
     """异常处理"""
 
-    def setUp(self):
-        clear_cache()
-
     def assertParses(self, code):
         ast = _sugar_parse(code)
         self.assertIsNotNone(ast, f'sugar.san failed to parse: {code}')
@@ -148,9 +143,6 @@ class TestSugarSanTryCatch(unittest.TestCase):
 
 class TestSugarSanOpPrecedence(unittest.TestCase):
     """运算符优先级"""
-
-    def setUp(self):
-        clear_cache()
 
     def assertParses(self, code):
         ast = _sugar_parse(code)
@@ -179,9 +171,6 @@ class TestSugarSanOpPrecedence(unittest.TestCase):
 
 class TestSugarSanEdgeCases(unittest.TestCase):
     """边界情况"""
-
-    def setUp(self):
-        clear_cache()
 
     def assertParses(self, code):
         ast = _sugar_parse(code)
@@ -216,9 +205,6 @@ class TestSugarSanEdgeCases(unittest.TestCase):
 class TestSugarSanStructural(unittest.TestCase):
     """特定 AST 结构验证"""
 
-    def setUp(self):
-        clear_cache()
-
     def test_if_structure(self):
         ast = _sugar_parse('若 (1) { 输出(1) }')
         self.assertIsNotNone(ast)
@@ -251,9 +237,6 @@ class TestSugarSanStructural(unittest.TestCase):
 class TestSugarSanDotAccess(unittest.TestCase):
     """点号属性访问"""
 
-    def setUp(self):
-        clear_cache()
-
     def test_dot_access(self):
         ast = _sugar_parse('模.加')
         self.assertIsNotNone(ast)
@@ -263,9 +246,6 @@ class TestSugarSanDotAccess(unittest.TestCase):
 
 class TestSugarSanPythonCompat(unittest.TestCase):
     """与 Python SugarConverter 的 AST 兼容性（结构级）"""
-
-    def setUp(self):
-        clear_cache()
 
     def _compare_ast_loose(self, code):
         """宽松比较：归一化后校验结构兼容。
