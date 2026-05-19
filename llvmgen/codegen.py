@@ -193,6 +193,9 @@ class CodegenContext:
         self._scope: dict[str, ir.Value] = {}  # 当前函数作用域
         self._funcs: dict[str, ir.Function] = {}  # 已定义的函数
         self._current_func: ir.Function | None = None
+        self._globals: dict[str, ir.GlobalVariable] = {}  # 模块级全局变量
+        self._global_inits: list[tuple[str, ir.Value | int | str]] = []  # 全局变量初始化
+        self._loop_stack: list[tuple[ir.Block, ir.Block]] = []  # (header, exit) 循环上下文
         self._rt_funcs: dict[str, ir.Function] = {}  # 已声明的运行时函数
         # 声明外部运行时函数
         self._declare_runtime()
@@ -233,7 +236,20 @@ class CodegenContext:
         return self._func.append_basic_block(name=name)
 
     def begin_function(self, name: str, param_names: list[str]) -> ir.Function:
-        """创建函数并进入其 entry 块。所有变量存储为 i8*。"""
+        """创建函数并进入其 entry 块。若已存在则复用。"""
+        if name in self._funcs:
+            func = self._funcs[name]
+            self._current_func = func
+            self._scope = {}
+            entry = func.append_basic_block(name='entry')
+            self._builder = ir.IRBuilder(entry)
+            self._entry_block = entry
+            for i, pname in enumerate(param_names):
+                alloca = self._builder.alloca(_PTR, name=pname)
+                self._builder.store(func.args[i], alloca)
+                self._scope[pname] = alloca
+            return func
+
         fnty = ir.FunctionType(_PTR, [_PTR] * len(param_names))
         func = ir.Function(self.module, fnty, name=name)
         for i, pname in enumerate(param_names):
@@ -244,7 +260,6 @@ class CodegenContext:
         entry = func.append_basic_block(name='entry')
         self._builder = ir.IRBuilder(entry)
         self._entry_block = entry
-        # 参数分配局部变量 (i8*)
         for i, pname in enumerate(param_names):
             alloca = self._builder.alloca(_PTR, name=pname)
             self._builder.store(func.args[i], alloca)
@@ -296,9 +311,11 @@ class CodegenContext:
         return self.builder.gep(gv, [_ZERO, _ZERO], inbounds=True)
 
     def get_var(self, name: str) -> ir.Value:
-        """加载变量值，返回 i8*（需调用方按需拆箱为 i32）。"""
+        """加载变量值，返回 i8*（需调用方按需拆箱为 i32）。先查局部变量，再查全局变量。"""
         if name in self._scope:
             return self.builder.load(self._scope[name], name=name)
+        if name in self._globals:
+            return self.builder.load(self._globals[name], name=name)
         if name in self._funcs:
             raise NameError(f'{name} 是函数，不能当作变量')
         raise NameError(f'编译错误: 未定义变量 {name}')
@@ -306,15 +323,28 @@ class CodegenContext:
     def set_var(self, name: str, value: ir.Value):
         """存储变量值。i32 自动装箱为 i8*，i8* 直接存储。"""
         if isinstance(value.type, ir.PointerType):
-            pass  # 已是指针，直接存储
+            pass
         else:
             value = self._box_int(value)
         if name in self._scope:
             self.builder.store(value, self._scope[name])
+        elif name in self._globals:
+            self.builder.store(value, self._globals[name])
         else:
             alloca = self.builder.alloca(_PTR, name=name)
             self.builder.store(value, alloca)
             self._scope[name] = alloca
+
+    def create_global(self, name: str, init_value: ir.Value | None = None):
+        """创建模块级全局变量（编译时可见）。"""
+        if name in self._globals:
+            return
+        gv = ir.GlobalVariable(self.module, _PTR, name=name)
+        gv.linkage = 'internal'
+        gv.initializer = _NULL
+        self._globals[name] = gv
+        if init_value is not None:
+            self._global_inits.append((name, init_value))
 
     def compile_fn_body(self, name: str, param_names: list[str], body: list):
         """编译函数体（处理 定义 AST）。"""
@@ -617,6 +647,7 @@ def _compile_for(args: list, cg: CodegenContext) -> ir.Value | None:
     loop_b = cg._add_block(name='for_b')
     loop_e = cg._add_block(name='for_e')
 
+    cg._loop_stack.append((loop_h, loop_e))
     cg.builder.branch(loop_h)
 
     cg.builder.position_at_start(loop_h)
@@ -642,6 +673,7 @@ def _compile_for(args: list, cg: CodegenContext) -> ir.Value | None:
         cg._scope[var_name] = saved
     else:
         cg._scope.pop(var_name, None)
+    cg._loop_stack.pop()
     return _NULL
 
 
@@ -827,6 +859,17 @@ def compile_node(node, cg: CodegenContext) -> ir.Value | None:
     if op in ('尝试', 'try'):
         return _compile_try_catch(args, cg)
 
+    # ── 跳出/继续 (循环控制) ──
+    if op in ('跳出', 'break', '继续', 'continue'):
+        if not cg._loop_stack:
+            raise SyntaxError(f'{op} 必须在循环内使用')
+        _loop_h, _loop_e = cg._loop_stack[-1]
+        if op in ('跳出', 'break'):
+            cg.builder.branch(_loop_e)
+        else:
+            cg.builder.branch(_loop_h)
+        return _NULL
+
     # ── 运行时函数调用 ──
     rt_func = cg._get_runtime_func(op)
     if rt_func is not None:
@@ -887,22 +930,20 @@ def compile_node(node, cg: CodegenContext) -> ir.Value | None:
         if len(args) < 2:
             raise SyntaxError(f'{op} 需要 (条件 体)')
 
-        # 展开 做/do 包裹的体
         body_exprs = _unwrap_block(args[1])
 
         loop_h = cg._add_block(name='loop_h')
         loop_b = cg._add_block(name='loop_b')
         loop_e = cg._add_block(name='loop_e')
 
+        cg._loop_stack.append((loop_h, loop_e))  # push 循环上下文
         cg.builder.branch(loop_h)
 
-        # 条件块
         cg.builder.position_at_start(loop_h)
         cond_val = compile_node(args[0], cg)
         cond = cg.builder.icmp_signed('!=', cg._unbox_int(cond_val), _ZERO, name='loop_cond')
         cg.builder.cbranch(cond, loop_b, loop_e)
 
-        # 体块
         cg.builder.position_at_start(loop_b)
         for stmt in body_exprs:
             compile_node(stmt, cg)
@@ -910,6 +951,7 @@ def compile_node(node, cg: CodegenContext) -> ir.Value | None:
             cg.builder.branch(loop_h)
 
         cg.builder.position_at_start(loop_e)
+        cg._loop_stack.pop()  # pop
         return _NULL
 
     # ── 返回 (返回 expr) ──
@@ -931,9 +973,13 @@ def compile_node(node, cg: CodegenContext) -> ir.Value | None:
         return _NULL
 
     # ── 变量作为容器索引：列表名(索引) → 取(列表名, 索引) ──
-    if op in cg._scope and len(args) == 1:
+    if (op in cg._scope or op in cg._globals) and len(args) == 1:
         assert cg._get_runtime_func('取') is not None
         return _dispatch_runtime('取', [op, args[0]], cg._get_runtime_func('取'), cg)
+
+    # ── 导出 (忽略) ──
+    if op in ('导出', 'export'):
+        return _NULL
 
     # ── 函数调用（含点号访问 test.函数名）──
     resolved_op = op
@@ -1096,7 +1142,7 @@ def compile_top_level(ast_nodes: list, module_name: str = 'main') -> CodegenCont
     ast_nodes = _merge_if_chain(ast_nodes)
 
     def collect_and_compile(nodes):
-        """两遍：先 定义，再 main(导入设 + 顶层代码)。"""
+        """三遍：全局变量 → 函数定义 → main(顶层代码)。"""
         nodes, imported_setups = _resolve_imports(nodes, cg)
 
         defs = []
@@ -1107,14 +1153,49 @@ def compile_top_level(ast_nodes: list, module_name: str = 'main') -> CodegenCont
             else:
                 others.append(node)
 
-        # 第一遍：收集所有函数定义
-        for node in defs:
-            compile_node(node, cg)
+        # 第 0 遍：预创建顶层 设 为全局变量
+        for node in others + imported_setups:
+            if isinstance(node, list) and len(node) >= 3 and node[0] in ('设', 'set'):
+                name = node[1]
+                if isinstance(name, str) and not name.startswith('_'):
+                    val = node[2]
+                    if isinstance(val, (int, float)):
+                        cg.create_global(name, val)
+                    elif isinstance(val, str) and _is_string_literal(val):
+                        cg.create_global(name, _unquote(val))
+                    else:
+                        cg.create_global(name)
 
-        # 第二遍：编译顶层代码（放入 main 函数）
+        # 第一遍：先注册所有函数名（预创建空函数），解决前向引用
+        class _DeferredFn:
+            def __init__(self, node):
+                self.node = node
+        deferred: list[_DeferredFn] = []
+        for node in defs:
+            deferred.append(_DeferredFn(node))
+            name = node[1] if isinstance(node[1], str) else (
+                node[1][0] if isinstance(node[1], list) else str(node[1]))
+            params = node[2] if len(node) > 2 and isinstance(node[2], list) else []
+            cg.begin_function(name, params)
+            cg.end_function()  # 空体占位
+
+        # 第二遍：重新编译每个函数体
+        for d in deferred:
+            compile_node(d.node, cg)
+
+        # 第二遍：编译顶层代码（放入 main 函数），含全局变量初始化
         all_others = imported_setups + others
-        if all_others:
+        if all_others or cg._global_inits:
             cg.begin_function('main', [])
+            # 全局变量初始化
+            for gname, gval in cg._global_inits:
+                if isinstance(gval, (int, float)):
+                    init_val = cg._box_int(ir.Constant(_INT, int(gval)))
+                elif isinstance(gval, str):
+                    init_val = cg._make_global_string(gval)
+                else:
+                    init_val = _NULL
+                cg.builder.store(init_val, cg._globals[gname])
             for node in all_others:
                 compile_node(node, cg)
             cg.end_function()
