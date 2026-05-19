@@ -436,9 +436,31 @@ def _compile_for(args: list, cg: CodegenContext) -> ir.Value | None:
         start_val = compile_node(args[1], cg)
         end_val = compile_node(args[2], cg)
     else:
-        # 容器遍历：桩 — 编译容器表达式但不迭代
-        compile_node(args[1], cg)
-        return _NULL
+        # 容器遍历：生成 i = 0..len-1 的范围循环
+        container = compile_node(args[1], cg)
+        len_func = cg._get_runtime_func('表长')
+        assert len_func is not None
+        len_val = cg.builder.call(len_func, [container], name='list_len')
+        len_i32 = cg._unbox_int(len_val) if isinstance(len_val.type, ir.PointerType) else len_val
+        end_i32 = cg.builder.sub(len_i32, _ONE, name='end_idx')
+        start_val = cg._box_int(_ZERO)
+        end_val = cg._box_int(end_i32)
+        is_range = True
+        # 包装原体：在每轮循环中加入 取元素 → 设变量
+        get_func = cg._get_runtime_func('取')
+        assert get_func is not None
+        _orig_body = body_exprs
+
+        def _make_container_body():
+            # 在循环体内取元素
+            idx_ptr = cg.builder.load(loop_var, name='idx_ptr')
+            idx_i32 = cg._unbox_int(idx_ptr)
+            elem = cg.builder.call(get_func, [container, idx_i32], name='elem')
+            cg.set_var(var_name, elem)
+            for e in _orig_body:
+                compile_node(e, cg)
+
+        body_exprs = [('__container_body__', _make_container_body)]
 
     # 分配循环变量
     loop_var = cg.builder.alloca(_PTR, name=var_name)
@@ -460,7 +482,10 @@ def _compile_for(args: list, cg: CodegenContext) -> ir.Value | None:
 
     cg.builder.position_at_start(loop_b)
     for expr in body_exprs:
-        compile_node(expr, cg)
+        if isinstance(expr, tuple) and expr[0] == '__container_body__':
+            expr[1]()  # 调用回调生成容器遍历体
+        else:
+            compile_node(expr, cg)
     cur_val = cg._unbox_int(cg.builder.load(loop_var, name=f'{var_name}_next'))
     next_val = cg._box_int(cg.builder.add(cur_val, _ONE))
     cg.builder.store(next_val, loop_var)
