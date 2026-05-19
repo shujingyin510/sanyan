@@ -236,26 +236,37 @@ class CodegenContext:
         return self._func.append_basic_block(name=name)
 
     def begin_function(self, name: str, param_names: list[str]) -> ir.Function:
-        """创建函数并进入其 entry 块。若已存在则复用。"""
+        """创建函数并进入其 entry 块。若已存在则复用（清空旧指令）。"""
         if name in self._funcs:
             func = self._funcs[name]
             self._current_func = func
             self._scope = {}
+            # 清空旧 entry 块指令，重新填充
             entry = func.blocks[0]
+            entry.instructions.clear()
             self._builder = ir.IRBuilder(entry)
             self._entry_block = entry
-            # 参数已在第一遍分配，直接映射
             for i, pname in enumerate(param_names):
-                # 找到已有的 alloca（遍历 entry 块指令）
-                for instr in entry.instructions:
-                    if hasattr(instr, 'name') and instr.name == pname:
-                        self._scope[pname] = instr
-                        break
-                else:
-                    alloca = self._builder.alloca(_PTR, name=pname)
-                    self._builder.store(func.args[i], alloca)
-                    self._scope[pname] = alloca
+                alloca = self._builder.alloca(_PTR, name=pname)
+                self._builder.store(func.args[i], alloca)
+                self._scope[pname] = alloca
             return func
+
+        fnty = ir.FunctionType(_PTR, [_PTR] * len(param_names))
+        func = ir.Function(self.module, fnty, name=name)
+        for i, pname in enumerate(param_names):
+            func.args[i].name = pname
+        self._funcs[name] = func
+        self._current_func = func
+        self._scope = {}
+        entry = func.append_basic_block(name='entry')
+        self._builder = ir.IRBuilder(entry)
+        self._entry_block = entry
+        for i, pname in enumerate(param_names):
+            alloca = self._builder.alloca(_PTR, name=pname)
+            self._builder.store(func.args[i], alloca)
+            self._scope[pname] = alloca
+        return func
 
         fnty = ir.FunctionType(_PTR, [_PTR] * len(param_names))
         func = ir.Function(self.module, fnty, name=name)
