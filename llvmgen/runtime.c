@@ -288,3 +288,29 @@ void *rt_import(void *path)              { (void)path; return _rt_make(""); }
 
 /* ── 内存管理 ── */
 void rt_free_str(rt_str_t *s) { if (s) free(s); }
+
+/* ── 列表切片 ── */
+void *rt_list_slice(void *lstp, int32_t start, int32_t end) {
+    rt_list_t *lst = (rt_list_t *)lstp;
+    rt_list_t *r = rt_list_new();
+    if (!lst || !r) return r;
+    if (start < 0) start = 0;
+    if (end > lst->len) end = lst->len;
+    for (int32_t i = start; i < end; i++) {
+        if (r->len >= r->cap) { r->cap *= 2; r->items = realloc(r->items, (size_t)r->cap * sizeof(void *)); }
+        r->items[r->len++] = lst->items[i];
+    }
+    return r;
+}
+
+/* ── 字符串转字符列表 ── */
+void *rt_str_to_list(const char *s) {
+    rt_list_t *r = rt_list_new();
+    if (!s || !r) return r;
+    for (int32_t i = 0; s[i]; i++) {
+        char buf[2] = {s[i], 0};
+        if (r->len >= r->cap) { r->cap *= 2; r->items = realloc(r->items, (size_t)r->cap * sizeof(void *)); }
+        r->items[r->len++] = _rt_make(buf);
+    }
+    return r;
+}

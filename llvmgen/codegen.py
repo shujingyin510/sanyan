@@ -83,6 +83,7 @@ _RUNTIME_FUNCS: dict[str, tuple] = {
     '是字符串': ('rt_is_string', _INT, [_PTR]),
     'is_string': ('rt_is_string', _INT, [_PTR]),
     '是列表': ('rt_is_list', _INT, [_PTR]),
+    'is_list': ('rt_is_list', _INT, [_PTR]),
     # 函数应用（桩）
     '应用': ('rt_apply_stub', _PTR, [_PTR, _PTR]),
     # 等待
@@ -124,6 +125,9 @@ _RUNTIME_FUNCS: dict[str, tuple] = {
     'list_concat': ('rt_list_concat', _PTR, [_PTR, _PTR]),
     '取': ('rt_list_get', _PTR, [_PTR, _INT]),
     'get': ('rt_list_get', _PTR, [_PTR, _INT]),
+    'slice': ('rt_list_slice', _PTR, [_PTR, _INT, _INT]),
+    '切片': ('rt_list_slice', _PTR, [_PTR, _INT, _INT]),
+    'str_to_list': ('rt_str_to_list', _PTR, [_PTR]),
     # 输入
     '输入': ('rt_read_input', _PTR, []),
     'input': ('rt_read_input', _PTR, []),
@@ -719,7 +723,7 @@ def _dispatch_runtime(op: str, args: list, func: ir.Function, cg: CodegenContext
     call_args = []
     for i, ptype in enumerate(param_types):
         if i >= len(compiled):
-            call_args.append(_NULL)
+            call_args.append(_ZERO if isinstance(ptype, ir.IntType) else _NULL)
         elif isinstance(ptype, ir.IntType):
             call_args.append(cg._unbox_int(compiled[i]))
         else:
