@@ -1163,6 +1163,21 @@ def _merge_if_chain(nodes: list) -> list:
     return result
 
 
+def _normalize_fn_format(nodes: list) -> list:
+    """将 SugarConverter 的 ['fn', 'name', ['p'], body] 转为标准 ['fn', ['name', 'p'], body]。"""
+    result = []
+    for node in nodes:
+        if isinstance(node, list) and len(node) >= 3 and node[0] == 'fn':
+            if isinstance(node[1], str) and isinstance(node[2], list):
+                name = node[1]
+                params = node[2]
+                body = node[3] if len(node) > 3 else []
+                result.append(['fn', [name] + params, body])
+                continue
+        result.append(node)
+    return result
+
+
 def _deep_merge(node):
     """递归对 AST 节点及其所有子节点进行 if-elif-else 合并，并过滤 IoT 关键字。"""
     if isinstance(node, list) and len(node) > 0:
@@ -1282,7 +1297,8 @@ def compile_top_level(ast_nodes: list, module_name: str = 'main') -> CodegenCont
     if isinstance(ast_nodes, list) and len(ast_nodes) > 0 and ast_nodes[0] in ('做', 'do'):
         ast_nodes = ast_nodes[1:]
 
-    # 过滤裸露的 IoT 关键字（糖解析器不支持 置/读/查 语法时产生）
+    # 规范化 fn 格式: ['fn', 'name', ['p'], body] → ['fn', ['name', 'p'], body]
+    ast_nodes = _normalize_fn_format(ast_nodes)
 
     # 规范化：合并 再若/否则 到前一个 若 节点
     ast_nodes = _merge_if_chain(ast_nodes)
