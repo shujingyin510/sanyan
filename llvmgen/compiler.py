@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import os
 import sys
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any, cast
 
 from llvmgen.codegen import compile_top_level
 
@@ -27,7 +27,7 @@ def _parse_source(source: str) -> list:
     try:
         parsed = _parse_with_sugar_san(source, evaluator)
         if parsed is not None and isinstance(parsed, list):
-            return parsed  # type: ignore[no-any-return]
+            return cast(list[Any], parsed)
     except Exception:
         pass
 
@@ -67,7 +67,7 @@ def _parse_c_s_expr(source: str) -> list | None:
             ast = json.loads(result.decode('utf-8'))
             if isinstance(ast, list) and len(ast) == 1:
                 ast = ast[0]  # 展开外层列表包装
-            return ast  # type: ignore[no-any-return]
+            return cast(list[Any] | None, ast)
     except Exception:
         pass
     return None
