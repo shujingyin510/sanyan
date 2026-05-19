@@ -472,6 +472,21 @@ def _compile_judge(args: list, cg: CodegenContext) -> ir.Value | None:
     return _NULL
 
 
+def _compile_lambda(args: list, cg: CodegenContext) -> ir.Value:
+    """编译匿名函数 函数(params) { body } 为命名函数，返回函数指针。"""
+    params = args[0] if args and isinstance(args[0], list) else []
+    body = args[1] if len(args) > 1 else []
+    body_stmts = _unwrap_block(body)
+    n = len([k for k in cg._funcs if k.startswith('__lambda_')])
+    name = f'__lambda_{n}'
+    cg.begin_function(name, params)
+    for stmt in body_stmts:
+        compile_node(stmt, cg)
+    cg.end_function()
+    func = cg._funcs[name]
+    return cg.builder.bitcast(func, _PTR, name=f'{name}_ptr')
+
+
 def _compile_try_catch(args: list, cg: CodegenContext) -> ir.Value | None:
     """编译 尝试/捕获 异常处理。
 
@@ -796,9 +811,9 @@ def compile_node(node, cg: CodegenContext) -> ir.Value | None:
             raise SyntaxError(f'{op} 需要 (值 真分支 [可能分支] [假分支])')
         return _compile_judge(args, cg)
 
-    # ── 函数 匿名 lambda（桩：返回 null）──
+    # ── 函数 匿名 lambda ──
     if op in ('函数', 'lambda'):
-        return _NULL
+        return _compile_lambda(args, cg)
 
     # ── 尝试 (尝试 body 捕获 (err) handler) — 必须在运行时调度之前 ──
     if op in ('尝试', 'try'):
