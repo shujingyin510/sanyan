@@ -25,7 +25,7 @@ def _parse_source(source: str) -> list:
     # 优先用糖解析器
     parsed = _parse_with_sugar_san(source, evaluator)
     if parsed is not None and isinstance(parsed, list):
-        return parsed  # type: ignore[no-any-return]
+        return parsed  # type: ignore
 
     # 回退到 SugarConverter
     parsed = SugarConverter.convert(source, skin)
