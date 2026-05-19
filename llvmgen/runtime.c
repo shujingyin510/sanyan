@@ -301,7 +301,9 @@ void    rt_throw(void *msg)         { _rt_error = (rt_str_t *)msg; }
 void    rt_try_end(void)            { _rt_error = NULL; }
 
 /* ── 桩 ── */
-void *rt_apply_stub(void *fn, void *args) { (void)fn; (void)args; return NULL; }
+void rt_dbg_int(int32_t v) {
+    fprintf(stderr, \"[DBG] %d\\n\", v);
+}
 void *rt_import(void *path)              { (void)path; return _rt_make(""); }
 
 /* ── 内存管理 ── */
