@@ -1,0 +1,19 @@
+设 e = 导入("stdlib/eval.san")
+设 env = e.新建环境()
+
+定义 repl () {
+    输出("三言 eval.san REPL（输入 退出 或 exit 退出）")
+    循环 (真) {
+        输出("> ")
+        设 line = 输入()
+        若 (字符串相等(line, "退出") 或 字符串相等(line, "exit")) {
+            输出("再见")
+            跳出
+        }
+        设 ast = 解析(line)
+        设 result = e.求值(ast, env)
+        输出(" => " + result)
+    }
+}
+
+导出 repl
