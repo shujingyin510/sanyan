@@ -29,6 +29,7 @@ def _parse_source(source: str) -> list:
     # 最后回退到 S 表达式解析
     from lexer import tokenize
     from parser import parse
+
     tokens = tokenize(source)
     ast = parse(tokens)
     if ast is not None:

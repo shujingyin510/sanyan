@@ -6,20 +6,31 @@ from llvmlite import ir
 
 # ── 内置操作名 → LLVM 指令映射 ──
 _ARITH_OPS = {
-    '加': 'add', 'add': 'add',
-    '减': 'sub', 'sub': 'sub',
-    '乘': 'mul', 'mul': 'mul',
-    '除': 'sdiv', 'div': 'sdiv',
-    '余': 'srem', 'mod': 'srem',
+    '加': 'add',
+    'add': 'add',
+    '减': 'sub',
+    'sub': 'sub',
+    '乘': 'mul',
+    'mul': 'mul',
+    '除': 'sdiv',
+    'div': 'sdiv',
+    '余': 'srem',
+    'mod': 'srem',
 }
 
 _COMPARE_OPS = {
-    '等于': '==', 'eq': '==',
-    '大于': '>', 'gt': '>',
-    '小于': '<', 'lt': '<',
-    '大于等于': '>=', 'gte': '>=',
-    '小于等于': '<=', 'lte': '<=',
-    '不等于': '!=', 'ne': '!=',
+    '等于': '==',
+    'eq': '==',
+    '大于': '>',
+    'gt': '>',
+    '小于': '<',
+    'lt': '<',
+    '大于等于': '>=',
+    'gte': '>=',
+    '小于等于': '<=',
+    'lte': '<=',
+    '不等于': '!=',
+    'ne': '!=',
 }
 
 _TYPE = ir.IntType(32)
@@ -164,6 +175,7 @@ class CodegenContext:
 
 # ── 辅助编译函数 ──
 
+
 def _compile_if(args: list, cg: CodegenContext) -> ir.Value | None:
     """编译 若/if 结构，支持 再若/else-if 和 否则/else。
 
@@ -302,6 +314,7 @@ def _compile_for(args: list, cg: CodegenContext) -> ir.Value | None:
 
 # ── 主编译函数 ──
 
+
 def compile_node(node, cg: CodegenContext) -> ir.Value | None:
     """递归编译 AST 节点，返回 LLVM Value（可能为 None 表示无返回值）。"""
 
@@ -409,7 +422,7 @@ def compile_node(node, cg: CodegenContext) -> ir.Value | None:
 
         # 体块
         cg.builder.position_at_start(loop_b)
-        for stmt in (args[1] if isinstance(args[1], list) else [args[1]]):
+        for stmt in args[1] if isinstance(args[1], list) else [args[1]]:
             compile_node(stmt, cg)
         if not cg.builder.block.is_terminated:
             cg.builder.branch(loop_h)
@@ -517,8 +530,7 @@ def compile_top_level(ast_nodes: list, module_name: str = 'main') -> CodegenCont
     cg = CodegenContext(module_name)
 
     # 若顶层是单个 做/do 块，展开其内部语句
-    if (isinstance(ast_nodes, list) and len(ast_nodes) > 0
-            and ast_nodes[0] in ('做', 'do')):
+    if isinstance(ast_nodes, list) and len(ast_nodes) > 0 and ast_nodes[0] in ('做', 'do'):
         ast_nodes = ast_nodes[1:]
 
     # 规范化：合并 再若/否则 到前一个 若 节点
