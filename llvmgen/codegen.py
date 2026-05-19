@@ -1015,11 +1015,16 @@ def compile_node(node, cg: CodegenContext) -> ir.Value | None:
     if op in ('定义', 'define', 'fn'):
         if len(args) < 2:
             raise SyntaxError(f'{op} 需要 (名称 参数列表 [体])')
-        # fn 格式: ['fn', ['name', 'p1', 'p2'], body]
+        # fn 格式: ['fn', 'name', ['p1', 'p2'], body_expr...]
         if isinstance(args[0], list):
             name = args[0][0]
             params = args[0][1:]
             body = _unwrap_block(args[1]) if len(args) > 1 else []
+        elif op == 'fn' and len(args) >= 3:
+            # _bootstrap.san 格式: ['fn', 'name', ['params'], e1, e2, ...]
+            name = args[0]
+            params = args[1] if isinstance(args[1], list) else []
+            body = args[2:]
         else:
             # 定义 格式: ['定义', 'name', ['p1', 'p2'], body]
             name = args[0]
@@ -1261,9 +1266,14 @@ def compile_top_level(ast_nodes: list, module_name: str = 'main') -> CodegenCont
         deferred: list[_DeferredFn] = []
         for node in defs:
             deferred.append(_DeferredFn(node))
+            # fn 格式: ['fn', 'name', ['p1', ...], body...]
             if isinstance(node[1], list):
                 name = node[1][0]
                 params = node[1][1:]
+            elif node[0] == 'fn' and len(node) >= 3:
+                # _bootstrap.san 格式: ['fn', 'name', ['p'], e1, ...]
+                name = node[1]
+                params = node[2] if isinstance(node[2], list) else []
             else:
                 name = node[1] if isinstance(node[1], str) else str(node[1])
                 params = node[2] if len(node) > 2 and isinstance(node[2], list) else []
