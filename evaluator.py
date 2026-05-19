@@ -159,6 +159,13 @@ class SanyanEvaluator(SanyanRuntime):
         if numeric is not None:
             return numeric
         if self._is_valid_identifier(node):
+            # 如果标识符经皮肤映射为已注册的内部操作，则作为零参数操作分派（如 跳出→break, 继续→continue）
+            if self.skin_manager:
+                resolved = self.skin_manager.get_internal_keyword(node) or self.skin_manager.get_internal_op(node)
+                if resolved:
+                    from ops.registry import has_op
+                    if has_op(resolved):
+                        return self._apply(node, [])
             return self._resolve_identifier(node)
         return node
 

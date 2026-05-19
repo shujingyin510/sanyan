@@ -8,7 +8,7 @@ cd sanyan
 pip install -e ".[dev]"
 ```
 
-要求 Python >= 3.8。
+要求 Python >= 3.12。
 
 ## 运行测试
 
@@ -34,7 +34,7 @@ python tests/test_package.py -v
 # IoT 测试（25 项）
 python tests/test_iot.py -v
 
-# sugar.san 测试（37 项）
+# sugar.san 测试（45 项）
 python tests/test_sugar_san.py -v
 
 # 三言集成测试（动态发现）
@@ -84,7 +84,7 @@ evaluator.all_scoped_vars()   # 调试/补全用
 ## 架构
 
 ```
-源码 (.san) → [preprocess.py] → [sugar.py | lexer.py → parser.py] → [evaluator.py] → [ops/*.py] → [ternary_core.py]
+源码 (.san) → [preprocess.py] → [sugar/ | lexer.py → parser.py] → [evaluator.py] → [ops/*.py] → [ternary_core.py]
 ```
 
 ## 文档维护

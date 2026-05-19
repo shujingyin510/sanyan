@@ -26,20 +26,8 @@ dev = [
 sanyan = "main:main"
 
 [tool.setuptools]
-packages = ["ops", "sugar"]
-py-modules = [
-    "commands",
-    "evaluator",
-    "lexer",
-    "main",
-    "parser",
-    "preprocess",
-    "repl",
-    "runtime",
-    "skin",
-    "ternary_core",
-    "values"
-]
+packages = ["ops", "sugar", "lsp"]
+py-modules = []  # 由 setup.py 动态发现
 
 [tool.ruff]
 line-length = 120

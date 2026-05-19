@@ -355,6 +355,7 @@ sanyan/
 ├── preprocess.py            # #include 预处理器
 ├── pyproject.toml           # 项目配置
 ├── repl.py                  # REPL 交互环境
+├── runtime.c                # C 语言字节码解释器（主机端）
 ├── runtime.py               # 运行环境
 ├── runtime_components.py    # 运行组件（作用域/IoT/调试/性能）
 ├── sandbox.py               # 沙箱安全机制
@@ -369,7 +370,7 @@ sanyan/
 │   ├── errors.py
 │   ├── lexer.py
 │   └── parser.py
-├── ops/                     # 内置操作实现（28 模块）
+├── ops/                     # 内置操作实现（26 模块）
 │   ├── __init__.py
 │   ├── _util.py
 │   ├── arithmetic_ops.py    # 算术运算
@@ -407,7 +408,20 @@ sanyan/
 ├── language/                # 皮肤文件
 │   ├── chinese.json
 │   └── english.json
+├── lsp/                     # LSP 语言服务器组件
+│   ├── __init__.py
+│   ├── analysis.py
+│   ├── handler.py
+│   ├── keywords.py
+│   └── protocol.py
 ├── examples/                # 示例
+│   └── stm32-blinky/        # STM32 固件示例
+│       ├── blinky.san
+│       ├── firmware_data.h
+│       ├── gen_header.py
+│       ├── Makefile
+│       ├── runtime_stm32.c
+│       └── stm32_flash.ld
 ├── stdlib/                  # 标准库
 ├── tests/                   # 自动测试
 ├── docs/                    # 语言手册
@@ -489,7 +503,7 @@ sanyan/
 
 - **性能**：基于 Python 的树遍历解释器，高频循环场景性能有限。可使用 PyPy 运行获得 5-10 倍加速。
 - **无标准输入流**：`输入()` 仅支持交互式输入，不支持管道重定向。
-- **模块路径**：`导入("test")` 会自动查找 `stdlib/test.san`，但不支持嵌套包或包管理器。
+- **模块路径**：`导入("a.b.c")` 自动查找 `stdlib/a/b/c.san` → `stdlib/a/b/c/package.san`，支持嵌套包导入。
 
 ## For English Readers (TL;DR)
 

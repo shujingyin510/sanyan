@@ -15,9 +15,9 @@
 (set 字符串结束 (dict "\"" "\"" "'" "'"))
 (set 前缀运算符 (list "-" "!"))
 (set 运算符映射 (dict
-"+" "加" "-" "减" "*" "乘" "/" "除" "%" "余" "^" "幂"
-">" "大于" "<" "小于" ">=" "大于等于" "<=" "小于等于"
-"=" "等于" "!=" "不等于" "!" "非"
+  "+" "加" "-" "减" "*" "乘" "/" "除" "%" "余" "^" "幂"
+  ">" "大于" "<" "小于" ">=" "大于等于" "<=" "小于等于"
+  "=" "等于" "!=" "不等于" "==" "等于" "!" "非"
 ))
 (fn 取当前 (tokens)
 (if (eq (list_len tokens) 0) (return 假))
@@ -48,7 +48,7 @@
 (if (or (str_equals op "*") (str_equals op "/") (str_equals op "%")) (return 60))
 (if (or (str_equals op "+") (str_equals op "-")) (return 50))
 (if (or (str_equals op ">") (str_equals op "<") (str_equals op ">=") (str_equals op "<=")) (return 40))
-(if (or (str_equals op "=") (str_equals op "!=")) (return 30))
+(if (or (str_equals op "=") (str_equals op "!=") (str_equals op "==")) (return 30))
 (if (str_equals op "且") (return 20))
 (if (str_equals op "或") (return 10))
 (return 0))
@@ -72,17 +72,22 @@
 (set nxt (get chars (add i 1)))
 (if (or (str_equals nxt "/") (str_equals nxt "／"))
 (set is_comment 真))))
-(if is_comment
-(do
-(loop (and (lt i len) (not (str_equals (get chars i) 换行符))) (set i (add i 1)))
-(continue)))))
+    (if is_comment
+      (do
+        (loop 真
+          (if (not (lt i len)) (break))
+          (if (str_equals (get chars i) 换行符) (break))
+          (set i (add i 1)))
+        (continue)))))
 (if (gt (find 字符串开始 c) -1)
 (do
 (set quote c)
 (set end_quote (if (dict_contains 字符串结束 c) (get_key 字符串结束 c) c))
 (set start i)
 (set i (add i 1))
-(loop (and (lt i len) (not (str_equals (get chars i) end_quote)))
+(loop 真
+(if (not (lt i len)) (break))
+(if (str_equals (get chars i) end_quote) (break))
 (if (str_equals (get chars i) "\\") (set i (add i 1)))
 (set i (add i 1)))
 (if (lt i len) (set i (add i 1)))
@@ -114,7 +119,9 @@
 (if (and (str_equals mapped "<") (str_equals next_mapped "="))
 (do (set tokens (list_concat tokens (list (list "运算符" "<=")))) (set i (add i 2)) (continue)))
 (if (and (str_equals mapped "!") (str_equals next_mapped "="))
-(do (set tokens (list_concat tokens (list (list "运算符" "!=")))) (set i (add i 2)) (continue)))))
+(do (set tokens (list_concat tokens (list (list "运算符" "!=")))) (set i (add i 2)) (continue)))
+(if (and (str_equals mapped "=") (str_equals next_mapped "="))
+(do (set tokens (list_concat tokens (list (list "运算符" "==")))) (set i (add i 2)) (continue)))))
 (set tokens (list_concat tokens (list (list "运算符" mapped))))
 (set i (add i 1))
 (continue)))
@@ -230,6 +237,8 @@
 (set rest (get r 1)))
 (set node (if (eq (list_len stmts) 1) (get stmts 0) (list_concat (list "do") stmts)))
 (return (list node rest))))
+(if (str_equals ttype "运算符")
+(return (list tval (slice tokens 1))))
 (div 1 0)))
 (fn 解析表达式 (tokens 最小优先级)
 (do
@@ -237,7 +246,7 @@
 (if (not (is_list tok)) (div 1 0))
 (set ttype (get tok 0))
 (set tval (get tok 1))
-(if (and (str_equals ttype "运算符") (gt (find "!" tval) -1))
+(if (and (str_equals ttype "运算符") (or (gt (find "!" tval) -1) (str_equals tval "-")))
 (do
 (set rest (slice tokens 1))
 (set r (解析表达式 rest 70))
@@ -308,11 +317,17 @@
 (set rest (get el_r 1))
 (set else_body (list_concat else_body (list el_body))))))
 (if (匹配 rest "标识符" "否则")
-(do
-(set rest (消耗 rest "标识符" "否则"))
-(set else_r (解析主表达式 rest))
-(set else_body (get else_r 0))
-(set rest (get else_r 1)))))
+ (do
+  (set rest (消耗 rest "标识符" "否则"))
+  (if (匹配 rest "标识符" "若")
+   (do
+    (set r (解析语句 rest))
+    (set else_body (get r 0))
+    (set rest (get r 1)))
+   (do
+    (set else_r (解析主表达式 rest))
+    (set else_body (get else_r 0))
+    (set rest (get else_r 1)))))))
 (set node (list "if" cond then_body))
 (if (is_list else_body) (set node (list_concat node (list else_body))))
 (return (list node rest))))

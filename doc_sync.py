@@ -20,6 +20,14 @@ def _write(path: str, content: str) -> None:
         f.write(content)
 
 
+def _guess_syntax(op: str) -> str:
+    """为缺失的内置操作猜测合理的语法列内容。"""
+    return f'`{op}(…)`'
+
+def _guess_description(op: str) -> str:
+    """为缺失的内置操作猜测合理的说明列内容。"""
+    return f'内置操作（{op}）'
+
 def sync_builtin_ops_table():
     """从 runtime.py:BUILTIN_OPS 同步命令速查表到 manual 第 17 节。"""
     runtime = _read('runtime.py')
@@ -39,21 +47,57 @@ def sync_builtin_ops_table():
     table_start = manual.find('| `', section_start)
     if table_start < 0:
         return
-    # 找到表格结束
-    next_section = manual.find('## 1', table_start + 1)
-    if next_section < 0:
-        next_section = len(manual)
+    # 找到表格结束位置（--- 分隔线或下一节）
+    section_end = manual.find('\n---\n\n## 1', table_start)
+    if section_end < 0:
+        section_end = manual.find('## 1', table_start + 1)
+    if section_end < 0:
+        section_end = len(manual)
+
+    # 提取表格中的所有命令
+    table_lines = manual[table_start:section_end].split('\n')
+    table_cmds = set()
+    for line in table_lines:
+        line_stripped = line.strip()
+        if line_stripped.startswith('|') and not line_stripped.startswith('| ---') and not line_stripped.startswith('| 命令'):
+            parts = line_stripped.split('|')
+            if len(parts) >= 2:
+                cell = parts[1].strip()
+                m = re.match(r'`([^`]+)`', cell)
+                if m:
+                    table_cmds.add(m.group(1))
 
     # 检查每个操作是否出现在表格中
     missing = []
     for op in sorted(ops):
-        if op not in manual[section_start:next_section]:
+        if op not in table_cmds:
             missing.append(op)
+
+    # 检查表格中是否有 BUILTIN_OPS 之外的条目
+    extra = [c for c in sorted(table_cmds) if c not in ops]
 
     if missing:
         print(f'警告: BUILTIN_OPS 中有 {len(missing)} 个操作未出现在手册第 17 节:')
         for m in missing:
             print(f'  - {m}')
+        # 自动插入缺失行到表格末尾
+        new_rows = []
+        for op in missing:
+            syntax = _guess_syntax(op)
+            desc = _guess_description(op)
+            new_rows.append(f'| {syntax} | {syntax:<46} | {desc:<30} |')
+        # 在表格最后一行和 --- 分隔线之间插入
+        insert_before = manual.find('\n---\n\n## 1', table_start)
+        if insert_before < 0:
+            insert_before = len(manual)
+        insertion = '\n' + '\n'.join(new_rows)
+        manual = manual[:insert_before] + insertion + manual[insert_before:]
+        _write(MANUAL_PATH, manual)
+        print(f'已自动插入 {len(missing)} 行到第 17 节（请手动审核语法和说明）')
+    elif extra:
+        print(f'注意: 手册第 17 节有 {len(extra)} 个条目不在 BUILTIN_OPS 中:')
+        for e in extra:
+            print(f'  - {e}')
     else:
         print('BUILTIN_OPS 与第 17 节一致')
 

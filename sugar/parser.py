@@ -29,7 +29,7 @@ def _build_keyword_map() -> dict[str, str]:
                         maps[kw] = internal
                 else:
                     maps[keyword] = internal
-        except (FileNotFoundError, json.JSONDecodeError):
+        except (OSError, json.JSONDecodeError):
             pass
     # 关键字自映射（支持直接使用英文内部名）
     for internal in [
@@ -80,7 +80,7 @@ def _build_op_map() -> dict[str, str]:
                         maps[o] = internal
                 else:
                     maps[op] = internal
-        except (FileNotFoundError, json.JSONDecodeError):
+        except (OSError, json.JSONDecodeError):
             pass
     return maps
 

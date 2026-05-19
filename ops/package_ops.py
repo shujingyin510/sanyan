@@ -86,7 +86,7 @@ class PackageOps:
             try:
                 url = PackageOps._lookup_index(name)
             except (IOError, OSError, KeyError):
-                raise SanyanValueError(
+                raise SanyanIOError(
                     f"包 '{name}' 未安装，且无法从索引获取。"
                     f'请先手动下载到 packages/{name}/ 目录，'
                     f'或提供 URL: 安装("{name}", "下载地址")'
@@ -174,7 +174,7 @@ class PackageOps:
             with urllib.request.urlopen(url, timeout=30) as resp:
                 data = resp.read()
         except (urllib.error.URLError, IOError, OSError) as e:
-            raise SanyanValueError(f'下载包失败: {e}')
+            raise SanyanIOError(f'下载包失败: {e}')
 
         # 解压（带 zip-slip 防护）
         try:
@@ -194,7 +194,7 @@ class PackageOps:
             if not os.path.exists(os.path.join(pkg_dir, 'package.san')):
                 with open(os.path.join(pkg_dir, f'{name}.san'), 'wb') as f:
                     f.write(data)
-            raise SanyanValueError(f'解压包失败: {e}')
+            raise SanyanIOError(f'解压包失败: {e}')
 
     @staticmethod
     def _lookup_index(name: str) -> str | None:

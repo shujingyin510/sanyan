@@ -325,7 +325,7 @@
                 rest = 消耗(rest, "符号", ";")
                 继续
             }
-            设 r = 解析表达式(rest, 0)
+            设 r = 解析语句(rest)
             stmts = 列表合(stmts, 列表(取(r, 0)))
             rest = 取(r, 1)
         }
@@ -342,7 +342,7 @@
 设 运算符映射 = 字典(
     "+", "加", "-", "减", "*", "乘", "/", "除", "%", "余", "^", "幂",
     ">", "大于", "<", "小于", ">=", "大于等于", "<=", "小于等于",
-    "=", "等于", "!=", "不等于", "!", "非",
+    "=", "等于", "!=", "不等于", "==", "等于", "!", "非",
 )
 
 定义 映射运算符 (op) {
@@ -463,9 +463,15 @@
             }
         } 否则 若 (匹配(rest, "标识符", "否则")) {
             rest = 消耗(rest, "标识符", "否则")
-            设 else_r = 解析主表达式(rest)
-            else_body = 取(else_r, 0)
-            rest = 取(else_r, 1)
+            若 (匹配(rest, "标识符", "若")) {
+                设 r = 解析语句(rest)
+                else_body = 取(r, 0)
+                rest = 取(r, 1)
+            } 否则 {
+                设 else_r = 解析主表达式(rest)
+                else_body = 取(else_r, 0)
+                rest = 取(else_r, 1)
+            }
         }
 
         设 node = 列表("若", cond, then_body)
@@ -589,6 +595,27 @@
             node = 列表合(node, 列表(列表("捕获", catch_var, catch_body)))
         }
         返回(列表(node, rest))
+    }
+
+    // 返回 expr
+    若 (str_equals(ttype, "标识符") 且 str_equals(tval, "返回")) {
+        设 rest = 切片(tokens, 1)
+        设 val_r = 解析表达式(rest, 0)
+        返回(列表(列表("返回", 取(val_r, 0)), 取(val_r, 1)))
+    }
+
+    // 导出 name1 name2 …
+    若 (str_equals(ttype, "标识符") 且 str_equals(tval, "导出")) {
+        设 rest = 切片(tokens, 1)
+        设 names = 列表()
+        循环 (真) {
+            设 tok = 取当前(rest)
+            若 (非(是列表(tok))) { 跳出 }
+            若 (非(str_equals(取(tok, 0), "标识符"))) { 跳出 }
+            names = 列表合(names, 列表(取(tok, 1)))
+            rest = 切片(rest, 1)
+        }
+        返回(列表(列表合(列表("export"), names), rest))
     }
 
     // 通用表达式

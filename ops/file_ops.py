@@ -87,7 +87,7 @@ def _load_sugar_parser(evaluator):
     except SyntaxError:
         return _fallback_convert(sugar_code, skin_mgr)
 
-    bootstrap_env = SanyanEvaluator(skin_manager=skin_mgr, max_loop_steps=5000)
+    bootstrap_env = SanyanEvaluator(skin_manager=skin_mgr, max_loop_steps=50000)
     try:
         bootstrap_env.eval(bootstrap_ast)
     except Exception:
@@ -149,7 +149,7 @@ def _parse_with_sugar_san(code, evaluator):
     try:
         from evaluator import SanyanEvaluator
 
-        temp_env = SanyanEvaluator(skin_manager=evaluator.skin_manager)
+        temp_env = SanyanEvaluator(skin_manager=evaluator.skin_manager, max_loop_steps=50000)
         result = parser.call(temp_env, ['解析', code])
         if isinstance(result, TritValue):
             iv = result.to_int()

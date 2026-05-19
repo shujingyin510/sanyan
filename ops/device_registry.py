@@ -4,7 +4,7 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 from typing import Optional
 from ternary_core import BT, TritValue
-from values import SanyanNameError, SanyanValueError
+from values import SanyanNameError, SanyanValueError, SanyanIOError
 
 
 class Device(ABC):
@@ -57,7 +57,7 @@ class FileDevice(Device):
             with open(self.path, 'w', encoding='utf-8') as f:
                 f.write(value.symbol)
         except (IOError, OSError) as e:
-            raise SanyanValueError(f'设备写入失败: {e}')
+            raise SanyanIOError(f'设备写入失败: {e}')
 
 
 class DeviceRegistry:
