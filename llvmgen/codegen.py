@@ -3,6 +3,23 @@
 from __future__ import annotations
 from llvmlite import ir
 
+# ── 类型定义 ──
+_TYPE = ir.IntType(32)
+_PTR_TYPE = ir.PointerType(ir.IntType(8))  # i8* 通用指针
+_ZERO = ir.Constant(_TYPE, 0)
+_ONE = ir.Constant(_TYPE, 1)
+_NULL_PTR = ir.Constant(_PTR_TYPE, None)
+
+# 内置常量
+_BUILTIN_CONSTS = {
+    '真': 1,
+    'true': 1,
+    'True': 1,
+    '假': 0,
+    'false': 0,
+    'False': 0,
+}
+
 # ── 内置操作名 → LLVM 指令映射 ──
 _ARITH_OPS = {
     '加': 'add',
@@ -15,6 +32,7 @@ _ARITH_OPS = {
     'div': 'sdiv',
     '余': 'srem',
     'mod': 'srem',
+    '取余': 'srem',
 }
 
 _COMPARE_OPS = {
@@ -30,11 +48,29 @@ _COMPARE_OPS = {
     'lte': '<=',
     '不等于': '!=',
     'ne': '!=',
+    '不大于': '<=',
+    '不小于': '>=',
 }
 
-_TYPE = ir.IntType(32)
-_ZERO = ir.Constant(_TYPE, 0)
-_ONE = ir.Constant(_TYPE, 1)
+# 逻辑运算
+_LOGIC_OPS = {
+    '且': 'and',
+    'and': 'and',
+    '与': 'and',
+    '或': 'or',
+    'or': 'or',
+}
+
+# ── 运行时函数声明规范 ──
+# (函数名, 返回类型, [参数类型]) — 参数和返回值统一用 i32
+_RUNTIME_FUNCS: dict[str, tuple] = {
+    '随机数': ('rt_random_int', _TYPE, [_TYPE, _TYPE]),
+    'randint': ('rt_random_int', _TYPE, [_TYPE, _TYPE]),
+    '是数字': ('rt_is_number', _TYPE, [_TYPE]),
+    'is_number': ('rt_is_number', _TYPE, [_TYPE]),
+    '是字符串': ('rt_is_string', _TYPE, [_TYPE]),
+    'is_string': ('rt_is_string', _TYPE, [_TYPE]),
+}  # yapf: disable
 
 
 def _to_int(s: str) -> int | None:
@@ -79,14 +115,28 @@ class CodegenContext:
         self._scope: dict[str, ir.Value] = {}  # 当前函数作用域
         self._funcs: dict[str, ir.Function] = {}  # 已定义的函数
         self._current_func: ir.Function | None = None
+        self._rt_funcs: dict[str, ir.Function] = {}  # 已声明的运行时函数
         # 声明外部运行时函数
         self._declare_runtime()
 
     def _declare_runtime(self):
         """声明外部运行时函数（printf 等）。"""
         if self._printf is None:
-            fnty = ir.FunctionType(_TYPE, [ir.PointerType(ir.IntType(8))], var_arg=True)
+            fnty = ir.FunctionType(_TYPE, [_PTR_TYPE], var_arg=True)
             self._printf = ir.Function(self.module, fnty, name='printf')
+
+    def _get_runtime_func(self, op: str) -> ir.Function | None:
+        """获取或声明运行时函数。"""
+        spec = _RUNTIME_FUNCS.get(op)
+        if spec is None:
+            return None
+        name, ret_type, param_types = spec
+        if name in self._rt_funcs:
+            return self._rt_funcs[name]
+        fn_type = ir.FunctionType(ret_type, param_types)
+        func = ir.Function(self.module, fn_type, name=name)
+        self._rt_funcs[name] = func
+        return func
 
     @property
     def builder(self) -> ir.IRBuilder:
@@ -180,6 +230,18 @@ class CodegenContext:
             return str(self.module)
         except Exception as e:
             raise RuntimeError(f'LLVM IR 生成失败: {e}') from e
+
+
+# ── 辅助函数 ──
+
+
+def _unwrap_block(node):
+    """展开 做/do 块，返回内部表达式列表。"""
+    if isinstance(node, list) and len(node) > 0 and node[0] in ('做', 'do'):
+        return node[1:]
+    if isinstance(node, list):
+        return node
+    return [node]
 
 
 # ── 辅助编译函数 ──
@@ -283,10 +345,7 @@ def _compile_for(args: list, cg: CodegenContext) -> ir.Value | None:
     start_val = compile_node(args[1], cg)
     end_val = compile_node(args[2], cg)
     body = args[3]
-    if isinstance(body, list) and len(body) > 0 and body[0] in ('做', 'do'):
-        body_exprs = body[1:]
-    else:
-        body_exprs = [body]
+    body_exprs = _unwrap_block(body)
 
     # 分配循环变量
     loop_var = cg.builder.alloca(_TYPE, name=var_name)
@@ -324,6 +383,15 @@ def _compile_for(args: list, cg: CodegenContext) -> ir.Value | None:
 # ── 主编译函数 ──
 
 
+def _dispatch_runtime(op: str, args: list, func: ir.Function, cg: CodegenContext) -> ir.Value | None:
+    """将内置操作分发到运行时函数调用。"""
+    compiled_args = [compile_node(a, cg) for a in args]
+    # 字符串/列表操作：第一个参数通常是字符串指针
+    # 把编译好的 i32 当作通用值传递
+    ret = cg.builder.call(func, compiled_args, name=f'rt_{op}')
+    return ret if not isinstance(func.return_value.type, ir.VoidType) else _ZERO
+
+
 def compile_node(node, cg: CodegenContext) -> ir.Value | None:
     """递归编译 AST 节点，返回 LLVM Value（可能为 None 表示无返回值）。"""
 
@@ -332,6 +400,9 @@ def compile_node(node, cg: CodegenContext) -> ir.Value | None:
         return ir.Constant(_TYPE, int(node))
 
     if isinstance(node, str):
+        # 内置常量
+        if node in _BUILTIN_CONSTS:
+            return ir.Constant(_TYPE, _BUILTIN_CONSTS[node])
         # 字符串字面量 → 全局常量指针
         if _is_string_literal(node):
             s = _unquote(node)
@@ -365,6 +436,36 @@ def compile_node(node, cg: CodegenContext) -> ir.Value | None:
         rhs = compile_node(args[1], cg)
         cond = cg.builder.icmp_signed(cmp_op, lhs, rhs, name=f'{op}_tmp')
         return cg.builder.zext(cond, _TYPE, name=f'{op}_bool')
+
+    # ── 逻辑运算（且/或/非）──
+    logic_op = _LOGIC_OPS.get(op)
+    if logic_op is not None:
+        if len(args) < 2:
+            raise SyntaxError(f'{op} 需要两个参数')
+        lhs = compile_node(args[0], cg)
+        rhs = compile_node(args[1], cg)
+        # 转换为 i1 再运算再转回 i32
+        lhs_bool = cg.builder.icmp_signed('!=', lhs, _ZERO, name=f'{op}_lhs')
+        rhs_bool = cg.builder.icmp_signed('!=', rhs, _ZERO, name=f'{op}_rhs')
+        if logic_op == 'and':
+            res = cg.builder.and_(lhs_bool, rhs_bool, name=f'{op}_tmp')
+        else:
+            res = cg.builder.or_(lhs_bool, rhs_bool, name=f'{op}_tmp')
+        return cg.builder.zext(res, _TYPE, name=f'{op}_bool')
+
+    # ── 非（一元逻辑）──
+    if op in ('非', 'not'):
+        if len(args) < 1:
+            raise SyntaxError(f'{op} 需要至少一个参数')
+        val = compile_node(args[0], cg)
+        val_bool = cg.builder.icmp_signed('!=', val, _ZERO, name='not_val')
+        res = cg.builder.not_(val_bool, name='not_tmp')
+        return cg.builder.zext(res, _TYPE, name='not_bool')
+
+    # ── 运行时函数调用 ──
+    rt_func = cg._get_runtime_func(op)
+    if rt_func is not None:
+        return _dispatch_runtime(op, args, rt_func, cg)
 
     # ── 定义变量 (设 name value) ──
     if op in ('设', 'set'):
@@ -419,6 +520,9 @@ def compile_node(node, cg: CodegenContext) -> ir.Value | None:
         if len(args) < 2:
             raise SyntaxError(f'{op} 需要 (条件 体)')
 
+        # 展开 做/do 包裹的体
+        body_exprs = _unwrap_block(args[1])
+
         loop_h = cg._add_block(name='loop_h')
         loop_b = cg._add_block(name='loop_b')
         loop_e = cg._add_block(name='loop_e')
@@ -433,7 +537,7 @@ def compile_node(node, cg: CodegenContext) -> ir.Value | None:
 
         # 体块
         cg.builder.position_at_start(loop_b)
-        for stmt in args[1] if isinstance(args[1], list) else [args[1]]:
+        for stmt in body_exprs:
             compile_node(stmt, cg)
         if not cg.builder.block.is_terminated:
             cg.builder.branch(loop_h)
@@ -455,12 +559,7 @@ def compile_node(node, cg: CodegenContext) -> ir.Value | None:
         if not isinstance(name, str):
             name = args[0][0] if isinstance(args[0], list) else str(args[0])
         params = args[1] if isinstance(args[1], list) else []
-        body = args[2] if len(args) > 2 else []
-        # 函数体展开（若包在 做 中）
-        if isinstance(body, list) and len(body) > 0 and body[0] in ('做', 'do'):
-            body = body[1:]
-        elif not isinstance(body, list):
-            body = [body]
+        body = _unwrap_block(args[2]) if len(args) > 2 else []
         cg.compile_fn_body(name, params, body)
         return _ZERO
 
