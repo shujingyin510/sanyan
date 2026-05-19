@@ -1128,6 +1128,34 @@ def _resolve_imports(nodes: list, cg: CodegenContext) -> tuple[list, list]:
     return result, imported_setups
 
 
+def _make_bootstrap_harness(cg: CodegenContext):
+    """为 bootstrap 模块添加 parse_sanyan() ASCII 入口。"""
+    cg.begin_function('parse_sanyan', ['source'])
+    # 全局变量初始化
+    for gname, gval in cg._global_inits:
+        if isinstance(gval, (int, float)):
+            init_val = cg._box_int(ir.Constant(_INT, int(gval)))
+        elif isinstance(gval, str):
+            init_val = cg._make_global_string(gval)
+        else:
+            # 复杂初始化表达式 → 编译
+            if isinstance(gval, list):
+                init_val = compile_node(gval, cg)
+            else:
+                init_val = _NULL
+        if init_val is not None:
+            cg.builder.store(init_val, cg._globals[gname])
+    # 调用 解析(source)
+    func = cg._funcs.get('解析')
+    if func:
+        src = cg.get_var('source')
+        result = cg.builder.call(func, [src], name='ast')
+        cg.builder.ret(result)
+    else:
+        cg.builder.ret(_NULL)
+    cg.end_function()
+
+
 def compile_top_level(ast_nodes: list, module_name: str = 'main') -> CodegenContext:
     """编译顶层 AST 节点列表。返回 CodegenContext 用于验证/导出。"""
     cg = CodegenContext(module_name)
@@ -1164,7 +1192,10 @@ def compile_top_level(ast_nodes: list, module_name: str = 'main') -> CodegenCont
                     elif isinstance(val, str) and _is_string_literal(val):
                         cg.create_global(name, _unquote(val))
                     else:
-                        cg.create_global(name)
+                        # 复杂表达式（dict, list 等）→ 存 AST 节点
+                        cg.create_global(name, val)
+                        # Mark that this needs runtime init
+                        cg._global_inits.append((name, val))
 
         # 第一遍：先注册所有函数名（预创建空函数），解决前向引用
         class _DeferredFn:
@@ -1183,9 +1214,14 @@ def compile_top_level(ast_nodes: list, module_name: str = 'main') -> CodegenCont
         for d in deferred:
             compile_node(d.node, cg)
 
-        # 第二遍：编译顶层代码（放入 main 函数），含全局变量初始化
+        # 若编译 bootstrap，添加 ASCII 入口包装
+        if module_name == 'bootstrap' and '解析' in cg._funcs:
+            _make_bootstrap_harness(cg)
+
+        # 第三遍：编译顶层代码（放入 main 函数），含全局变量初始化
+        # bootstrap 模块由 harness 提供 main，跳过
         all_others = imported_setups + others
-        if all_others or cg._global_inits:
+        if module_name != 'bootstrap' and (all_others or cg._global_inits):
             cg.begin_function('main', [])
             # 全局变量初始化
             for gname, gval in cg._global_inits:
@@ -1199,7 +1235,7 @@ def compile_top_level(ast_nodes: list, module_name: str = 'main') -> CodegenCont
             for node in all_others:
                 compile_node(node, cg)
             cg.end_function()
-        else:
+        elif module_name != 'bootstrap':
             cg.begin_function('main', [])
             cg.end_function()
 
