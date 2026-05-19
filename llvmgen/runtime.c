@@ -72,7 +72,22 @@ int32_t rt_str_find(rt_str_t *haystack, rt_str_t *needle) {
     return (int32_t)(p - haystack->data);
 }
 
-/* ── 列表类型 ── */
+/* ── 字典类型（简化：list of key-value pairs）── */
+rt_list_t *rt_dict_new(void) {
+    return rt_list_new();  /* dummy: returns empty list */
+}
+
+int32_t rt_dict_contains(rt_list_t *d, rt_str_t *key) {
+    return 0;  /* dummy */
+}
+
+rt_str_t *rt_dict_get(rt_list_t *d, rt_str_t *key) {
+    return rt_str_new("");  /* dummy */
+}
+
+void rt_dict_set(rt_list_t *d, rt_str_t *key, rt_str_t *val) {
+    /* dummy */
+}
 typedef struct {
     int32_t len;
     int32_t cap;
@@ -232,4 +247,7 @@ void rt_iot_set(rt_str_t *dev, rt_str_t *state) { /* no-op */ }
 rt_str_t *rt_iot_read(rt_str_t *dev) { return rt_str_new("0"); }
 void rt_iot_query(rt_str_t *dev) { printf("[IoT] query %s\n", dev ? dev->data : "?"); }
 void rt_iot_with(rt_str_t *dev, rt_str_t *body_name) { /* no-op */ }
+
+/* ── 导入桩 ── */
+rt_str_t *rt_import(rt_str_t *path) { return rt_str_new(\"\"); }
 

@@ -18,6 +18,9 @@ _BUILTIN_CONSTS = {
     '假': 0,
     'false': 0,
     'False': 0,
+    '可能': 0,
+    'maybe': 0,
+    'Maybe': 0,
     # IoT 设备状态
     '开': 1,
     '亮': 1,
@@ -89,6 +92,9 @@ _IOT_KEYWORDS = {
     '人体传感器',
     '光线传感器',
     '温度传感器',
+    '从',
+    '到',
+    '在',
 }
 
 # ── 运行时函数声明规范 ──
@@ -126,6 +132,14 @@ _RUNTIME_FUNCS: dict[str, tuple] = {
     # 列表操作
     '列表': ('rt_list_new', _PTR, []),
     'list': ('rt_list_new', _PTR, []),
+    '字典': ('rt_dict_new', _PTR, []),
+    'dict': ('rt_dict_new', _PTR, []),
+    'dict_contains': ('rt_dict_contains', _INT, [_PTR, _PTR]),
+    '含键': ('rt_dict_contains', _INT, [_PTR, _PTR]),
+    'get_key': ('rt_dict_get', _PTR, [_PTR, _PTR]),
+    'set_key': ('rt_dict_set', ir.VoidType(), [_PTR, _PTR, _PTR]),
+    '取键': ('rt_dict_get', _PTR, [_PTR, _PTR]),
+    '置键': ('rt_dict_set', ir.VoidType(), [_PTR, _PTR, _PTR]),
     '表长': ('rt_list_len', _INT, [_PTR]),
     'list_len': ('rt_list_len', _INT, [_PTR]),
     '列表合': ('rt_list_concat', _PTR, [_PTR, _PTR]),
@@ -135,6 +149,9 @@ _RUNTIME_FUNCS: dict[str, tuple] = {
     # 输入
     '输入': ('rt_read_input', _PTR, []),
     'input': ('rt_read_input', _PTR, []),
+    # 导入（桩）
+    '导入': ('rt_import', _PTR, []),
+    'import': ('rt_import', _PTR, []),
     # IoT 操作（桩）
     '置': ('rt_iot_set', ir.VoidType(), [_PTR, _PTR]),
     '读': ('rt_iot_read', _PTR, [_PTR]),
@@ -442,7 +459,7 @@ def _compile_for(args: list, cg: CodegenContext) -> ir.Value | None:
     body_exprs = _unwrap_block(body)
 
     # 分配循环变量
-    loop_var = cg.builder.alloca(_INT, name=var_name)
+    loop_var = cg.builder.alloca(_PTR, name=var_name)
     cg.builder.store(start_val, loop_var)
     saved = cg._scope.get(var_name)
     cg._scope[var_name] = loop_var
@@ -503,16 +520,20 @@ def _compile_fold(op: str, args: list, func: ir.Function, cg: CodegenContext) ->
 def _dispatch_runtime(op: str, args: list, func: ir.Function, cg: CodegenContext) -> ir.Value | None:
     """将内置操作分发到运行时函数调用，处理装箱/拆箱。"""
     compiled = [compile_node(a, cg) for a in args]
-    spec = _RUNTIME_FUNCS[op]
+    spec = _RUNTIME_FUNCS.get(op)
+    if spec is None:
+        raise NameError(f'编译错误: 未定义的运行时函数 {op}')
     param_types = spec[2]
     ret_type = spec[1]
     # 根据运行时函数的真实参数类型拆箱
     call_args = []
-    for val, ptype in zip(compiled, param_types):
-        if isinstance(ptype, ir.IntType):
-            call_args.append(cg._unbox_int(val))
+    for i, ptype in enumerate(param_types):
+        if i >= len(compiled):
+            call_args.append(_NULL)
+        elif isinstance(ptype, ir.IntType):
+            call_args.append(cg._unbox_int(compiled[i]))
         else:
-            call_args.append(val)
+            call_args.append(compiled[i])
     ret = cg.builder.call(func, call_args, name=f'rt_{op}')
     # 返回值若为 i32 则装箱
     if isinstance(ret_type, ir.IntType):
@@ -703,6 +724,11 @@ def compile_node(node, cg: CodegenContext) -> ir.Value | None:
         body = _unwrap_block(args[2]) if len(args) > 2 else []
         cg.compile_fn_body(name, params, body)
         return _NULL
+
+    # ── 变量作为容器索引：列表名(索引) → 取(列表名, 索引) ──
+    if op in cg._scope and len(args) == 1:
+        assert cg._get_runtime_func('取') is not None
+        return _dispatch_runtime('取', [op, args[0]], cg._get_runtime_func('取'), cg)
 
     # ── 函数调用 ──
     if op in cg._funcs:
