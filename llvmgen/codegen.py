@@ -333,6 +333,14 @@ class CodegenContext:
         gv.initializer = c
         return self.builder.gep(gv, [_ZERO, _ZERO], inbounds=True)
 
+    def _entry_alloca(self, name: str) -> ir.Value:
+        """在函数 entry 块创建 alloca（确保支配所有使用）。"""
+        saved_pos = self.builder.block
+        self.builder.position_at_start(self._entry_block)
+        alloca = self.builder.alloca(_PTR, name=name)
+        self.builder.position_at_end(saved_pos)
+        return alloca
+
     def get_var(self, name: str) -> ir.Value:
         """加载变量值，返回 i8*（需调用方按需拆箱为 i32）。先查局部变量，再查全局变量。"""
         if name in self._scope:
@@ -354,7 +362,7 @@ class CodegenContext:
         elif name in self._globals:
             self.builder.store(value, self._globals[name])
         else:
-            alloca = self.builder.alloca(_PTR, name=name)
+            alloca = self._entry_alloca(name)
             self.builder.store(value, alloca)
             self._scope[name] = alloca
 
@@ -449,8 +457,7 @@ def _compile_if(args: list, cg: CodegenContext) -> ir.Value | None:
             i += 1
 
     merge_block = cg._add_block(name='if_merge')
-    # 使用 alloca + store 而非 phi（避免 predecessor 不完整问题）
-    result_alloca = cg.builder.alloca(_PTR, name='if_res')
+    result_alloca = cg._entry_alloca('if_res')
     cg.builder.store(_NULL, result_alloca)
 
     for cond_node, body_node in branches:
@@ -661,7 +668,7 @@ def _compile_for(args: list, cg: CodegenContext) -> ir.Value | None:
         body_exprs = [('__container_body__', _make_container_body)]
 
     # 分配循环变量
-    loop_var = cg.builder.alloca(_PTR, name=var_name)
+    loop_var = cg._entry_alloca(var_name)
     cg.builder.store(start_val, loop_var)
     saved = cg._scope.get(var_name)
     cg._scope[var_name] = loop_var
