@@ -241,14 +241,37 @@ class CodegenContext:
             func = self._funcs[name]
             self._current_func = func
             self._scope = {}
-            entry = func.append_basic_block(name='entry')
+            entry = func.blocks[0]
             self._builder = ir.IRBuilder(entry)
             self._entry_block = entry
+            # 参数已在第一遍分配，直接映射
             for i, pname in enumerate(param_names):
-                alloca = self._builder.alloca(_PTR, name=pname)
-                self._builder.store(func.args[i], alloca)
-                self._scope[pname] = alloca
+                # 找到已有的 alloca（遍历 entry 块指令）
+                for instr in entry.instructions:
+                    if hasattr(instr, 'name') and instr.name == pname:
+                        self._scope[pname] = instr
+                        break
+                else:
+                    alloca = self._builder.alloca(_PTR, name=pname)
+                    self._builder.store(func.args[i], alloca)
+                    self._scope[pname] = alloca
             return func
+
+        fnty = ir.FunctionType(_PTR, [_PTR] * len(param_names))
+        func = ir.Function(self.module, fnty, name=name)
+        for i, pname in enumerate(param_names):
+            func.args[i].name = pname
+        self._funcs[name] = func
+        self._current_func = func
+        self._scope = {}
+        entry = func.append_basic_block(name='entry')
+        self._builder = ir.IRBuilder(entry)
+        self._entry_block = entry
+        for i, pname in enumerate(param_names):
+            alloca = self._builder.alloca(_PTR, name=pname)
+            self._builder.store(func.args[i], alloca)
+            self._scope[pname] = alloca
+        return func
 
         fnty = ir.FunctionType(_PTR, [_PTR] * len(param_names))
         func = ir.Function(self.module, fnty, name=name)
@@ -964,11 +987,16 @@ def compile_node(node, cg: CodegenContext) -> ir.Value | None:
     if op in ('定义', 'define', 'fn'):
         if len(args) < 2:
             raise SyntaxError(f'{op} 需要 (名称 参数列表 [体])')
-        name = args[0]
-        if not isinstance(name, str):
-            name = args[0][0] if isinstance(args[0], list) else str(args[0])
-        params = args[1] if isinstance(args[1], list) else []
-        body = _unwrap_block(args[2]) if len(args) > 2 else []
+        # fn 格式: ['fn', ['name', 'p1', 'p2'], body]
+        if isinstance(args[0], list):
+            name = args[0][0]
+            params = args[0][1:]
+            body = _unwrap_block(args[1]) if len(args) > 1 else []
+        else:
+            # 定义 格式: ['定义', 'name', ['p1', 'p2'], body]
+            name = args[0]
+            params = args[1] if isinstance(args[1], list) else []
+            body = _unwrap_block(args[2]) if len(args) > 2 else []
         cg.compile_fn_body(name, params, body)
         return _NULL
 
@@ -1205,10 +1233,14 @@ def compile_top_level(ast_nodes: list, module_name: str = 'main') -> CodegenCont
         deferred: list[_DeferredFn] = []
         for node in defs:
             deferred.append(_DeferredFn(node))
-            name = node[1] if isinstance(node[1], str) else (node[1][0] if isinstance(node[1], list) else str(node[1]))
-            params = node[2] if len(node) > 2 and isinstance(node[2], list) else []
+            if isinstance(node[1], list):
+                name = node[1][0]
+                params = node[1][1:]
+            else:
+                name = node[1] if isinstance(node[1], str) else str(node[1])
+                params = node[2] if len(node) > 2 and isinstance(node[2], list) else []
             cg.begin_function(name, params)
-            cg.end_function()  # 空体占位
+            # 不调用 end_function：留空体让第二遍填充
 
         # 第二遍：重新编译每个函数体
         for d in deferred:

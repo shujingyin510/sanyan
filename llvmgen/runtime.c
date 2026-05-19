@@ -164,6 +164,17 @@ void rt_dict_set(void *dp, void *kp, void *vp) {
     d->count++;
 }
 
+/* rt_dict_from_pairs: 从键值对列表填充字典 */
+void *rt_dict_from_pairs(void *dictp, void *pairs_list) {
+    rt_dict_t *d = (rt_dict_t *)dictp;
+    rt_list_t *pairs = (rt_list_t *)pairs_list;
+    if (!d || !pairs) return dictp;
+    for (int32_t i = 0; i + 1 < pairs->len; i += 2) {
+        rt_dict_set(d, pairs->items[i], pairs->items[i + 1]);
+    }
+    return dictp;
+}
+
 /* ── 随机数 ── */
 static int _rand_ok = 0;
 int32_t rt_random_int(int32_t lo, int32_t hi) {
