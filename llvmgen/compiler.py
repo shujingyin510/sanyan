@@ -7,10 +7,9 @@ from llvmgen.codegen import compile_top_level
 
 def _parse_source(source: str) -> list:
     """解析三言源码为 AST 列表。"""
-    from ops.file_ops import _parse_with_sugar_san, _load_sugar_parser, clear_cache
+    from ops.file_ops import _parse_with_sugar_san, clear_cache
     from evaluator import SanyanEvaluator
     from sugar import SugarConverter
-    from skin import SkinManager
 
     clear_cache()
     evaluator = SanyanEvaluator()

@@ -1,7 +1,6 @@
 """三言 AST → LLVM IR 代码生成器"""
 
 from __future__ import annotations
-from typing import Any
 from llvmlite import ir
 
 # ── 内置操作名 → LLVM 指令映射 ──
@@ -268,7 +267,7 @@ def _compile_for(args: list, cg: CodegenContext) -> ir.Value | None:
     AST 格式: ['遍历', var_name, start_expr, end_expr, body]
     """
     if len(args) < 4:
-        raise SyntaxError(f'遍历 需要 (变量名 起始 结束 体)')
+        raise SyntaxError('遍历 需要 (变量名 起始 结束 体)')
 
     var_name = args[0]
     start_val = compile_node(args[1], cg)
