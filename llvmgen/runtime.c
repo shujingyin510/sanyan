@@ -8,6 +8,8 @@
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
+#include <time.h>
+#include <unistd.h>
 
 /* ── 字符串类型 ── */
 typedef struct {
@@ -165,8 +167,69 @@ rt_list_t *rt_str_split(rt_str_t *s, rt_str_t *sep) {
 
 /* ── 随机数 ── */
 static int _rt_rand_seeded = 0;
+
 int32_t rt_random_int(int32_t lo, int32_t hi) {
     if (!_rt_rand_seeded) { srand((unsigned)time(NULL)); _rt_rand_seeded = 1; }
     if (lo > hi) { int32_t t = lo; lo = hi; hi = t; }
     return lo + rand() % (hi - lo + 1);
 }
+
+int32_t rt_random_trit(void) {
+    if (!_rt_rand_seeded) { srand((unsigned)time(NULL)); _rt_rand_seeded = 1; }
+    int r = rand() % 3;
+    return r == 0 ? -1 : (r == 1 ? 0 : 1);
+}
+
+/* ── 等待 ── */
+void rt_sleep(int32_t ms) {
+    #ifdef _WIN32
+    Sleep(ms);
+    #else
+    usleep(ms * 1000);
+    #endif
+}
+
+/* ── 文件操作 ── */
+rt_str_t *rt_read_file(rt_str_t *path) {
+    if (!path) return rt_str_new("");
+    FILE *f = fopen(path->data, "rb");
+    if (!f) return rt_str_new("");
+    fseek(f, 0, SEEK_END);
+    long sz = ftell(f);
+    fseek(f, 0, SEEK_SET);
+    char *buf = (char *)malloc(sz + 1);
+    if (buf) {
+        fread(buf, 1, sz, f);
+        buf[sz] = '\0';
+    }
+    fclose(f);
+    rt_str_t *result = rt_str_new(buf ? buf : "");
+    free(buf);
+    return result;
+}
+
+void rt_write_file(rt_str_t *path, rt_str_t *content) {
+    if (!path || !content) return;
+    FILE *f = fopen(path->data, "w");
+    if (!f) return;
+    fwrite(content->data, 1, content->len, f);
+    fclose(f);
+}
+
+/* ── 输入 ── */
+rt_str_t *rt_read_input(void) {
+    char buf[4096];
+    if (fgets(buf, sizeof(buf), stdin)) {
+        size_t len = strlen(buf);
+        if (len > 0 && buf[len - 1] == '\n') buf[len - 1] = '\0';
+        return rt_str_new(buf);
+    }
+    return rt_str_new("");
+}
+
+/* ── IoT 设备桩 ── */
+void rt_iot_set(rt_str_t *dev, rt_str_t *state) { /* no-op */ }
+rt_str_t *rt_iot_read(rt_str_t *dev) { return rt_str_new("0"); }
+void rt_iot_query(rt_str_t *dev) { printf("[IoT] query %s\n", dev ? dev->data : "?"); }
+void rt_iot_with(rt_str_t *dev, rt_str_t *body_name) { /* no-op */ }
+

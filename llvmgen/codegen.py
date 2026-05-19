@@ -4,11 +4,11 @@ from __future__ import annotations
 from llvmlite import ir
 
 # ── 类型定义 ──
-_TYPE = ir.IntType(32)
-_PTR_TYPE = ir.PointerType(ir.IntType(8))  # i8* 通用指针
-_ZERO = ir.Constant(_TYPE, 0)
-_ONE = ir.Constant(_TYPE, 1)
-_NULL_PTR = ir.Constant(_PTR_TYPE, None)
+_INT = ir.IntType(32)
+_PTR = ir.PointerType(ir.IntType(8))  # i8* — 变量统一存储类型
+_ZERO = ir.Constant(_INT, 0)
+_ONE = ir.Constant(_INT, 1)
+_NULL = ir.Constant(_PTR, None)
 
 # 内置常量
 _BUILTIN_CONSTS = {
@@ -18,6 +18,12 @@ _BUILTIN_CONSTS = {
     '假': 0,
     'false': 0,
     'False': 0,
+    # IoT 设备状态
+    '开': 1,
+    '亮': 1,
+    '关': -1,
+    '灭': -1,
+    '守': 0,
 }
 
 # ── 内置操作名 → LLVM 指令映射 ──
@@ -61,15 +67,83 @@ _LOGIC_OPS = {
     'or': 'or',
 }
 
+# IoT 关键字（糖解析器不支持 置/读/查 语法时以 bare string 出现，此类节点跳过）
+_IOT_KEYWORDS = {
+    '置',
+    '读',
+    '查',
+    '对',
+    '读文件',
+    '写文件',
+    'write',
+    'read',
+    'query',
+    'with',
+    '灯',
+    '窗帘',
+    '风扇',
+    '加热',
+    '人体',
+    '光线',
+    '温度',
+    '人体传感器',
+    '光线传感器',
+    '温度传感器',
+}
+
 # ── 运行时函数声明规范 ──
-# (函数名, 返回类型, [参数类型]) — 参数和返回值统一用 i32
+# (函数名, 返回类型, [参数类型]) — 使用真实 C 类型（i32 或 i8*）
 _RUNTIME_FUNCS: dict[str, tuple] = {
-    '随机数': ('rt_random_int', _TYPE, [_TYPE, _TYPE]),
-    'randint': ('rt_random_int', _TYPE, [_TYPE, _TYPE]),
-    '是数字': ('rt_is_number', _TYPE, [_TYPE]),
-    'is_number': ('rt_is_number', _TYPE, [_TYPE]),
-    '是字符串': ('rt_is_string', _TYPE, [_TYPE]),
-    'is_string': ('rt_is_string', _TYPE, [_TYPE]),
+    # 随机数 → i32
+    '随机数': ('rt_random_int', _INT, [_INT, _INT]),
+    'randint': ('rt_random_int', _INT, [_INT, _INT]),
+    # 随机态 → i32（三值：-1/0/1）
+    '随机态': ('rt_random_trit', _INT, []),
+    # 类型判断 → i32
+    '是数字': ('rt_is_number', _INT, [_INT]),
+    'is_number': ('rt_is_number', _INT, [_INT]),
+    # 等待
+    '等待': ('rt_sleep', ir.VoidType(), [_INT]),
+    'wait': ('rt_sleep', ir.VoidType(), [_INT]),
+    # 文件操作
+    '读文件': ('rt_read_file', _PTR, [_PTR]),
+    '写文件': ('rt_write_file', ir.VoidType(), [_PTR, _PTR]),
+    # 字符串操作
+    '连接': ('rt_str_concat', _PTR, [_PTR, _PTR]),
+    'concat': ('rt_str_concat', _PTR, [_PTR, _PTR]),
+    '取长': ('rt_str_len', _INT, [_PTR]),
+    'length': ('rt_str_len', _INT, [_PTR]),
+    '字符串相等': ('rt_str_equals', _INT, [_PTR, _PTR]),
+    'str_equals': ('rt_str_equals', _INT, [_PTR, _PTR]),
+    '分割': ('rt_str_split', _PTR, [_PTR, _PTR]),
+    'split': ('rt_str_split', _PTR, [_PTR, _PTR]),
+    '子串': ('rt_str_substr', _PTR, [_PTR, _INT, _INT]),
+    'substring': ('rt_str_substr', _PTR, [_PTR, _INT, _INT]),
+    '包含': ('rt_str_contains', _INT, [_PTR, _PTR]),
+    'contains': ('rt_str_contains', _INT, [_PTR, _PTR]),
+    '查找': ('rt_str_find', _INT, [_PTR, _PTR]),
+    'find': ('rt_str_find', _INT, [_PTR, _PTR]),
+    # 列表操作
+    '列表': ('rt_list_new', _PTR, []),
+    'list': ('rt_list_new', _PTR, []),
+    '表长': ('rt_list_len', _INT, [_PTR]),
+    'list_len': ('rt_list_len', _INT, [_PTR]),
+    '列表合': ('rt_list_concat', _PTR, [_PTR, _PTR]),
+    'list_concat': ('rt_list_concat', _PTR, [_PTR, _PTR]),
+    '取': ('rt_list_get', _PTR, [_PTR, _INT]),
+    'get': ('rt_list_get', _PTR, [_PTR, _INT]),
+    # 输入
+    '输入': ('rt_read_input', _PTR, []),
+    'input': ('rt_read_input', _PTR, []),
+    # IoT 操作（桩）
+    '置': ('rt_iot_set', ir.VoidType(), [_PTR, _PTR]),
+    '读': ('rt_iot_read', _PTR, [_PTR]),
+    '查': ('rt_iot_query', ir.VoidType(), [_PTR]),
+    '对': ('rt_iot_with', ir.VoidType(), [_PTR, _PTR]),
+    'write': ('rt_iot_set', ir.VoidType(), [_PTR, _PTR]),
+    'read': ('rt_iot_read', _PTR, [_PTR]),
+    'query': ('rt_iot_query', ir.VoidType(), [_PTR]),
+    'with': ('rt_iot_with', ir.VoidType(), [_PTR, _PTR]),
 }  # yapf: disable
 
 
@@ -122,7 +196,7 @@ class CodegenContext:
     def _declare_runtime(self):
         """声明外部运行时函数（printf 等）。"""
         if self._printf is None:
-            fnty = ir.FunctionType(_TYPE, [_PTR_TYPE], var_arg=True)
+            fnty = ir.FunctionType(_INT, [_PTR], var_arg=True)
             self._printf = ir.Function(self.module, fnty, name='printf')
 
     def _get_runtime_func(self, op: str) -> ir.Function | None:
@@ -155,8 +229,8 @@ class CodegenContext:
         return self._func.append_basic_block(name=name)
 
     def begin_function(self, name: str, param_names: list[str]) -> ir.Function:
-        """创建函数并进入其 entry 块。"""
-        fnty = ir.FunctionType(_TYPE, [_TYPE] * len(param_names))
+        """创建函数并进入其 entry 块。所有变量存储为 i8*。"""
+        fnty = ir.FunctionType(_PTR, [_PTR] * len(param_names))
         func = ir.Function(self.module, fnty, name=name)
         for i, pname in enumerate(param_names):
             func.args[i].name = pname
@@ -166,22 +240,36 @@ class CodegenContext:
         entry = func.append_basic_block(name='entry')
         self._builder = ir.IRBuilder(entry)
         self._entry_block = entry
-        # 参数分配局部变量
+        # 参数分配局部变量 (i8*)
         for i, pname in enumerate(param_names):
-            alloca = self._builder.alloca(_TYPE, name=pname)
+            alloca = self._builder.alloca(_PTR, name=pname)
             self._builder.store(func.args[i], alloca)
             self._scope[pname] = alloca
         return func
 
     def end_function(self):
-        """结束当前函数（如果未显式返回则补 ret 0）。"""
+        """结束当前函数（如果未显式返回则补 ret null）。"""
         if not self.builder.block.is_terminated:
-            self.builder.ret(_ZERO)
+            self.builder.ret(_NULL)
+
+    def _box_int(self, int_val: ir.Value) -> ir.Value:
+        """i32 → i8* 装箱。"""
+        return self.builder.inttoptr(int_val, _PTR, name='box')
+
+    def _unbox_int(self, ptr_val: ir.Value) -> ir.Value:
+        """i8* → i32 拆箱。"""
+        return self.builder.ptrtoint(ptr_val, _INT, name='unbox')
+
+    def _to_i32(self, val: ir.Value) -> ir.Value:
+        """将值转为 i32：若已是 i32 直接返回，若是 i8* 则拆箱。"""
+        if isinstance(val.type, ir.IntType):
+            return val
+        return self._unbox_int(val)
 
     def emit_print_int(self, value: ir.Value):
-        """生成 printf(\"%d\\n\", value) 调用。"""
+        """生成 printf(\"%d\\n\", i32) 调用。自动拆箱 i8*。"""
         fmt = self._make_global_string('%d\n')
-        self.builder.call(self._printf, [fmt, value])
+        self.builder.call(self._printf, [fmt, self._to_i32(value)])
 
     def emit_print_str(self, value: ir.Value):
         """生成 printf(\"%s\\n\", value) 调用。"""
@@ -203,6 +291,7 @@ class CodegenContext:
         return self.builder.gep(gv, [_ZERO, _ZERO], inbounds=True)
 
     def get_var(self, name: str) -> ir.Value:
+        """加载变量值，返回 i8*（需调用方按需拆箱为 i32）。"""
         if name in self._scope:
             return self.builder.load(self._scope[name], name=name)
         if name in self._funcs:
@@ -210,10 +299,15 @@ class CodegenContext:
         raise NameError(f'编译错误: 未定义变量 {name}')
 
     def set_var(self, name: str, value: ir.Value):
+        """存储变量值。i32 自动装箱为 i8*，i8* 直接存储。"""
+        if isinstance(value.type, ir.PointerType):
+            pass  # 已是指针，直接存储
+        else:
+            value = self._box_int(value)
         if name in self._scope:
             self.builder.store(value, self._scope[name])
         else:
-            alloca = self.builder.alloca(_TYPE, name=name)
+            alloca = self.builder.alloca(_PTR, name=name)
             self.builder.store(value, alloca)
             self._scope[name] = alloca
 
@@ -301,7 +395,7 @@ def _compile_if(args: list, cg: CodegenContext) -> ir.Value | None:
         cg.builder.branch(test_block)
         cg.builder.position_at_start(test_block)
         cond_val = compile_node(cond_node, cg)
-        cond = cg.builder.icmp_signed('!=', cond_val, _ZERO, name='if_cond')
+        cond = cg.builder.icmp_signed('!=', cg._unbox_int(cond_val), _ZERO, name='if_cond')
         cg.builder.cbranch(cond, body_block, next_test)
 
         cg.builder.position_at_start(body_block)
@@ -326,11 +420,11 @@ def _compile_if(args: list, cg: CodegenContext) -> ir.Value | None:
 
     cg.builder.position_at_start(merge_block)
     if phi_incoming:
-        phi = cg.builder.phi(_TYPE, name='if_result')
+        phi = cg.builder.phi(_PTR, name='if_result')
         for val, blk in phi_incoming:
             phi.add_incoming(val, blk)
         return phi
-    return _ZERO
+    return _NULL
 
 
 def _compile_for(args: list, cg: CodegenContext) -> ir.Value | None:
@@ -348,7 +442,7 @@ def _compile_for(args: list, cg: CodegenContext) -> ir.Value | None:
     body_exprs = _unwrap_block(body)
 
     # 分配循环变量
-    loop_var = cg.builder.alloca(_TYPE, name=var_name)
+    loop_var = cg.builder.alloca(_INT, name=var_name)
     cg.builder.store(start_val, loop_var)
     saved = cg._scope.get(var_name)
     cg._scope[var_name] = loop_var
@@ -360,14 +454,16 @@ def _compile_for(args: list, cg: CodegenContext) -> ir.Value | None:
     cg.builder.branch(loop_h)
 
     cg.builder.position_at_start(loop_h)
-    cur = cg.builder.load(loop_var, name=f'{var_name}_val')
-    cond = cg.builder.icmp_signed('<=', cur, end_val, name='for_cond')
+    cur = cg._unbox_int(cg.builder.load(loop_var, name=f'{var_name}_val'))
+    end_i32 = cg._unbox_int(end_val)
+    cond = cg.builder.icmp_signed('<=', cur, end_i32, name='for_cond')
     cg.builder.cbranch(cond, loop_b, loop_e)
 
     cg.builder.position_at_start(loop_b)
     for expr in body_exprs:
         compile_node(expr, cg)
-    next_val = cg.builder.add(cg.builder.load(loop_var, name=f'{var_name}_next'), _ONE)
+    cur_val = cg._unbox_int(cg.builder.load(loop_var, name=f'{var_name}_next'))
+    next_val = cg._box_int(cg.builder.add(cur_val, _ONE))
     cg.builder.store(next_val, loop_var)
     if not cg.builder.block.is_terminated:
         cg.builder.branch(loop_h)
@@ -377,39 +473,84 @@ def _compile_for(args: list, cg: CodegenContext) -> ir.Value | None:
         cg._scope[var_name] = saved
     else:
         cg._scope.pop(var_name, None)
-    return _ZERO
+    return _NULL
 
 
-# ── 主编译函数 ──
+def _compile_fold(op: str, args: list, func: ir.Function, cg: CodegenContext) -> ir.Value:
+    """变参操作的折叠编译：两两调用运行时函数。
+
+    例如: 连接(a, b, c, d) → rt_str_concat(rt_str_concat(rt_str_concat(a, b), c), d)
+    """
+    spec = _RUNTIME_FUNCS[op]
+    param_types = spec[2]
+    ret_type = spec[1]
+
+    def _call(a, b):
+        a_u = cg._unbox_int(a) if isinstance(param_types[0], ir.IntType) else a
+        b_u = cg._unbox_int(b) if isinstance(param_types[1], ir.IntType) else b
+        r = cg.builder.call(func, [a_u, b_u], name=f'rt_{op}')
+        if isinstance(ret_type, ir.IntType):
+            return cg._box_int(r)
+        return r
+
+    compiled = [compile_node(a, cg) for a in args]
+    result = compiled[0]
+    for i in range(1, len(compiled)):
+        result = _call(result, compiled[i])
+    return result
 
 
 def _dispatch_runtime(op: str, args: list, func: ir.Function, cg: CodegenContext) -> ir.Value | None:
-    """将内置操作分发到运行时函数调用。"""
-    compiled_args = [compile_node(a, cg) for a in args]
-    # 字符串/列表操作：第一个参数通常是字符串指针
-    # 把编译好的 i32 当作通用值传递
-    ret = cg.builder.call(func, compiled_args, name=f'rt_{op}')
-    return ret if not isinstance(func.return_value.type, ir.VoidType) else _ZERO
+    """将内置操作分发到运行时函数调用，处理装箱/拆箱。"""
+    compiled = [compile_node(a, cg) for a in args]
+    spec = _RUNTIME_FUNCS[op]
+    param_types = spec[2]
+    ret_type = spec[1]
+    # 根据运行时函数的真实参数类型拆箱
+    call_args = []
+    for val, ptype in zip(compiled, param_types):
+        if isinstance(ptype, ir.IntType):
+            call_args.append(cg._unbox_int(val))
+        else:
+            call_args.append(val)
+    ret = cg.builder.call(func, call_args, name=f'rt_{op}')
+    # 返回值若为 i32 则装箱
+    if isinstance(ret_type, ir.IntType):
+        return cg._box_int(ret)
+    if isinstance(ret_type, ir.VoidType):
+        return _NULL
+    return ret
+
+
+def _from_global_string(val: ir.Value) -> bool:
+    """判断值是否来自全局字符串常量（GEP 指令或常量）。"""
+    if isinstance(val, ir.Constant) and isinstance(val.constant, ir.GEPConstant):
+        return True
+    if hasattr(val, 'opname') and val.opname == 'getelementptr':
+        return True
+    return False
 
 
 def compile_node(node, cg: CodegenContext) -> ir.Value | None:
-    """递归编译 AST 节点，返回 LLVM Value（可能为 None 表示无返回值）。"""
+    """递归编译 AST 节点，返回 i8* 值。"""
 
-    # 字面量
+    # 字面量 → i8*
     if isinstance(node, (int, float)):
-        return ir.Constant(_TYPE, int(node))
+        return cg._box_int(ir.Constant(_INT, int(node)))
 
     if isinstance(node, str):
         # 内置常量
         if node in _BUILTIN_CONSTS:
-            return ir.Constant(_TYPE, _BUILTIN_CONSTS[node])
-        # 字符串字面量 → 全局常量指针
+            return cg._box_int(ir.Constant(_INT, _BUILTIN_CONSTS[node]))
+        # 字符串字面量 → i8*
         if _is_string_literal(node):
-            s = _unquote(node)
-            return cg._make_global_string(s)
+            return cg._make_global_string(_unquote(node))
         n = _to_int(node)
         if n is not None:
-            return ir.Constant(_TYPE, n)
+            return cg._box_int(ir.Constant(_INT, n))
+        # IoT 关键字（糖解析器不支持的语法，忽略）
+        if node in _IOT_KEYWORDS:
+            return _NULL
         return cg.get_var(node)
 
     if not isinstance(node, list) or len(node) < 1:
@@ -418,53 +559,51 @@ def compile_node(node, cg: CodegenContext) -> ir.Value | None:
     op = node[0]
     args = node[1:]
 
-    # ── 内置二元算术 ──
+    # ── 内置二元算术（i8* → unbox → op → rebox → i8*）──
     arith = _ARITH_OPS.get(op)
     if arith is not None:
         if len(args) < 2:
             raise SyntaxError(f'{op} 需要两个参数')
-        lhs = compile_node(args[0], cg)
-        rhs = compile_node(args[1], cg)
-        return getattr(cg.builder, arith)(lhs, rhs, name=f'{op}_tmp')
+        lhs = cg._unbox_int(compile_node(args[0], cg))
+        rhs = cg._unbox_int(compile_node(args[1], cg))
+        return cg._box_int(getattr(cg.builder, arith)(lhs, rhs, name=f'{op}_tmp'))
 
-    # ── 内置比较 ──
+    # ── 内置比较（i8* → unbox → icmp → zext → rebox）──
     cmp_op = _COMPARE_OPS.get(op)
     if cmp_op is not None:
         if len(args) < 2:
             raise SyntaxError(f'{op} 需要两个参数')
-        lhs = compile_node(args[0], cg)
-        rhs = compile_node(args[1], cg)
+        lhs = cg._unbox_int(compile_node(args[0], cg))
+        rhs = cg._unbox_int(compile_node(args[1], cg))
         cond = cg.builder.icmp_signed(cmp_op, lhs, rhs, name=f'{op}_tmp')
-        return cg.builder.zext(cond, _TYPE, name=f'{op}_bool')
+        return cg._box_int(cg.builder.zext(cond, _INT, name=f'{op}_bool'))
 
-    # ── 逻辑运算（且/或/非）──
+    # ── 逻辑运算 ──
     logic_op = _LOGIC_OPS.get(op)
     if logic_op is not None:
         if len(args) < 2:
             raise SyntaxError(f'{op} 需要两个参数')
-        lhs = compile_node(args[0], cg)
-        rhs = compile_node(args[1], cg)
-        # 转换为 i1 再运算再转回 i32
-        lhs_bool = cg.builder.icmp_signed('!=', lhs, _ZERO, name=f'{op}_lhs')
-        rhs_bool = cg.builder.icmp_signed('!=', rhs, _ZERO, name=f'{op}_rhs')
-        if logic_op == 'and':
-            res = cg.builder.and_(lhs_bool, rhs_bool, name=f'{op}_tmp')
-        else:
-            res = cg.builder.or_(lhs_bool, rhs_bool, name=f'{op}_tmp')
-        return cg.builder.zext(res, _TYPE, name=f'{op}_bool')
+        lhs = cg._unbox_int(compile_node(args[0], cg))
+        rhs = cg._unbox_int(compile_node(args[1], cg))
+        lb = cg.builder.icmp_signed('!=', lhs, _ZERO, name=f'{op}_lb')
+        rb = cg.builder.icmp_signed('!=', rhs, _ZERO, name=f'{op}_rb')
+        res = cg.builder.and_(lb, rb) if logic_op == 'and' else cg.builder.or_(lb, rb)
+        return cg._box_int(cg.builder.zext(res, _INT, name=f'{op}_bool'))
 
-    # ── 非（一元逻辑）──
+    # ── 非 ──
     if op in ('非', 'not'):
         if len(args) < 1:
             raise SyntaxError(f'{op} 需要至少一个参数')
-        val = compile_node(args[0], cg)
-        val_bool = cg.builder.icmp_signed('!=', val, _ZERO, name='not_val')
-        res = cg.builder.not_(val_bool, name='not_tmp')
-        return cg.builder.zext(res, _TYPE, name='not_bool')
+        val = cg._unbox_int(compile_node(args[0], cg))
+        b = cg.builder.icmp_signed('!=', val, _ZERO, name='not_val')
+        return cg._box_int(cg.builder.zext(cg.builder.not_(b), _INT, name='not_bool'))
 
     # ── 运行时函数调用 ──
     rt_func = cg._get_runtime_func(op)
     if rt_func is not None:
+        # 连接/列表合 支持变参：两两折叠调用
+        if op in ('连接', 'concat', '列表合', 'list_concat') and len(args) > 2:
+            return _compile_fold(op, args, rt_func, cg)
         return _dispatch_runtime(op, args, rt_func, cg)
 
     # ── 定义变量 (设 name value) ──
@@ -482,6 +621,8 @@ def compile_node(node, cg: CodegenContext) -> ir.Value | None:
     if op in ('做', 'do'):
         result = None
         for stmt in args:
+            if isinstance(stmt, str) and stmt in _IOT_KEYWORDS:
+                continue
             result = compile_node(stmt, cg)
         return result
 
@@ -491,21 +632,17 @@ def compile_node(node, cg: CodegenContext) -> ir.Value | None:
             raw = args[0]
             # 字符串字面量直接打印
             if isinstance(raw, str) and _is_string_literal(raw):
-                s = _unquote(raw)
-                str_ptr = cg._make_global_string(s)
-                cg.emit_print_str(str_ptr)
-                return _ZERO
+                cg.emit_print_str(cg._make_global_string(_unquote(raw)))
+                return _NULL
             val = compile_node(raw, cg)
             if val is None:
-                return _ZERO
-            # 判断是否为字符串指针 (i8*)
-            if isinstance(val.type, ir.PointerType) and isinstance(val.type.pointee, ir.IntType):
+                return _NULL
+            # 判断：若值是指向全局字符串常量的 GEP，按字符串打印
+            if _from_global_string(val):
                 cg.emit_print_str(val)
             else:
                 cg.emit_print_int(val)
-        else:
-            cg.emit_print_int(_ZERO)
-        return _ZERO
+        return _NULL
 
     # ── 若条件 ──
     if op in ('若', 'if'):
@@ -514,6 +651,10 @@ def compile_node(node, cg: CodegenContext) -> ir.Value | None:
     # ── 遍历 (遍历 var 从 start 到 end body) ──
     if op in ('遍历', 'for'):
         return _compile_for(args, cg)
+
+    # ── 尝试 (尝试 body 捕获 (err) handler) — 阶段 3 简化为只执行 try 体 ──
+    if op in ('尝试', 'try'):
+        return compile_node(args[0], cg)
 
     # ── 循环 (循环 条件 体) ──
     if op in ('循环', 'loop'):
@@ -532,7 +673,7 @@ def compile_node(node, cg: CodegenContext) -> ir.Value | None:
         # 条件块
         cg.builder.position_at_start(loop_h)
         cond_val = compile_node(args[0], cg)
-        cond = cg.builder.icmp_signed('!=', cond_val, _ZERO, name='loop_cond')
+        cond = cg.builder.icmp_signed('!=', cg._unbox_int(cond_val), _ZERO, name='loop_cond')
         cg.builder.cbranch(cond, loop_b, loop_e)
 
         # 体块
@@ -543,11 +684,11 @@ def compile_node(node, cg: CodegenContext) -> ir.Value | None:
             cg.builder.branch(loop_h)
 
         cg.builder.position_at_start(loop_e)
-        return _ZERO
+        return _NULL
 
     # ── 返回 (返回 expr) ──
     if op in ('返回', 'return'):
-        val = compile_node(args[0], cg) if args else _ZERO
+        val = compile_node(args[0], cg) if args else _NULL
         cg.builder.ret(val)
         return val
 
@@ -561,7 +702,7 @@ def compile_node(node, cg: CodegenContext) -> ir.Value | None:
         params = args[1] if isinstance(args[1], list) else []
         body = _unwrap_block(args[2]) if len(args) > 2 else []
         cg.compile_fn_body(name, params, body)
-        return _ZERO
+        return _NULL
 
     # ── 函数调用 ──
     if op in cg._funcs:
@@ -623,12 +764,13 @@ def _merge_if_chain(nodes: list) -> list:
 
 
 def _deep_merge(node):
-    """递归对 AST 节点及其所有子节点进行 if-elif-else 合并。"""
+    """递归对 AST 节点及其所有子节点进行 if-elif-else 合并，并过滤 IoT 关键字。"""
     if isinstance(node, list) and len(node) > 0:
         first = node[0]
         if first in ('做', 'do'):
-            # 做块内部需要合并再若/否则
-            inner = _merge_if_chain(list(node[1:]))
+            # 过滤 IoT 关键字，然后合并
+            inner = [c for c in node[1:] if not (isinstance(c, str) and c in _IOT_KEYWORDS)]
+            inner = _merge_if_chain(inner)
             return [first] + inner
         # 其他节点递归处理子节点
         return [node[0]] + [_deep_merge(c) for c in node[1:]]
@@ -642,6 +784,9 @@ def compile_top_level(ast_nodes: list, module_name: str = 'main') -> CodegenCont
     # 若顶层是单个 做/do 块，展开其内部语句
     if isinstance(ast_nodes, list) and len(ast_nodes) > 0 and ast_nodes[0] in ('做', 'do'):
         ast_nodes = ast_nodes[1:]
+
+    # 过滤裸露的 IoT 关键字（糖解析器不支持 置/读/查 语法时产生）
+    ast_nodes = [n for n in ast_nodes if not (isinstance(n, str) and n in _IOT_KEYWORDS)]
 
     # 规范化：合并 再若/否则 到前一个 若 节点
     ast_nodes = _merge_if_chain(ast_nodes)
