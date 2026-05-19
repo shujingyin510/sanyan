@@ -52,8 +52,8 @@
         // 空白
         若 (查找(空白, c) >= 0) { i = i + 1; 继续 }
 
-        // 行注释 // 或 #
-        若 (str_equals(c, "/") 或 str_equals(c, "#")) {
+        // 行注释 //, ／／ 或 #
+        若 (str_equals(c, "/") 或 str_equals(c, "／") 或 str_equals(c, "#")) {
             设 is_comment = 假
             若 (str_equals(c, "#")) { is_comment = 真 }
             若 (非(is_comment) 且 i + 1 < len) {
@@ -116,6 +116,10 @@
                 }
                 若 (str_equals(mapped, "!") 且 str_equals(next_mapped, "=")) {
                     tokens = 列表合(tokens, 列表(生成token("运算符", "!=")))
+                    i = i + 2; 继续
+                }
+                若 (str_equals(mapped, "=") 且 str_equals(next_mapped, "=")) {
+                    tokens = 列表合(tokens, 列表(生成token("运算符", "==")))
                     i = i + 2; 继续
                 }
             }
@@ -276,6 +280,31 @@
     // 标识符
     若 (str_equals(ttype, "标识符")) {
         设 rest = 切片(tokens, 1)
+
+        // 匿名函数: 函数(params) { body }
+        若 (str_equals(tval, "函数") 且 匹配(rest, "符号", "(")) {
+            rest = 消耗(rest, "符号", "(")
+            设 params = 列表()
+            循环 (真) {
+                若 (匹配(rest, "符号", ")")) {
+                    rest = 消耗(rest, "符号", ")")
+                    跳出
+                }
+                若 (匹配(rest, "符号", ",")) {
+                    rest = 消耗(rest, "符号", ",")
+                    继续
+                }
+                设 p_tok = 取当前(rest)
+                若 (非(是列表(p_tok))) { 1 / 0 }
+                params = 列表合(params, 列表(取(p_tok, 1)))
+                rest = 切片(rest, 1)
+            }
+            设 body_r = 解析主表达式(rest)
+            设 body = 取(body_r, 0)
+            rest = 取(body_r, 1)
+            返回(列表(列表("函数", params, body), rest))
+        }
+
         // 检查是否是函数调用 fn(...)
         若 (匹配(rest, "符号", "(")) {
             // 消耗 '('
@@ -297,7 +326,7 @@
             设 node = 列表合(列表(tval), args)
             返回(列表(node, rest))
         }
-        // 点号访问 a.b
+        // 点号访问 a.b 或 a.b(...)
         若 (匹配(rest, "符号", ".")) {
             rest = 消耗(rest, "符号", ".")
             设 r = 解析主表达式(rest)
@@ -305,6 +334,13 @@
             rest = 取(r, 1)
             若 (是字符串(rhs)) {
                 设 node = 连接(tval, ".", rhs)
+                返回(列表(node, rest))
+            }
+            // a.b(...) — lhs 是列表 ["方法", args...]
+            若 (是列表(rhs)) {
+                设 method_name = 连接(tval, ".", 取(rhs, 0))
+                设 method_args = 切片(rhs, 1)
+                设 node = 列表合(列表(method_name), method_args)
                 返回(列表(node, rest))
             }
             1 / 0
@@ -352,11 +388,17 @@
 定义 获取优先级 (op) {
     若 (str_equals(op, ".")) { 返回(80) }
     若 (str_equals(op, "!") 或 str_equals(op, "非")) { 返回(70) }
-    若 (str_equals(op, "*") 或 str_equals(op, "/") 或 str_equals(op, "%")) { 返回(60) }
-    若 (str_equals(op, "+") 或 str_equals(op, "-")) { 返回(50) }
+    若 (str_equals(op, "^") 或 str_equals(op, "幂")) { 返回(70) }
+    若 (str_equals(op, "*") 或 str_equals(op, "/") 或 str_equals(op, "%") 或
+        str_equals(op, "乘") 或 str_equals(op, "除") 或 str_equals(op, "余")) { 返回(60) }
+    若 (str_equals(op, "+") 或 str_equals(op, "-") 或
+        str_equals(op, "加") 或 str_equals(op, "减")) { 返回(50) }
     若 (str_equals(op, ">") 或 str_equals(op, "<") 或
-        str_equals(op, ">=") 或 str_equals(op, "<=")) { 返回(40) }
-    若 (str_equals(op, "=") 或 str_equals(op, "!=")) { 返回(30) }
+        str_equals(op, ">=") 或 str_equals(op, "<=") 或
+        str_equals(op, "大于") 或 str_equals(op, "小于") 或
+        str_equals(op, "大于等于") 或 str_equals(op, "小于等于")) { 返回(40) }
+    若 (str_equals(op, "=") 或 str_equals(op, "!=") 或 str_equals(op, "==") 或
+        str_equals(op, "等于") 或 str_equals(op, "不等于")) { 返回(30) }
     若 (str_equals(op, "且")) { 返回(20) }
     若 (str_equals(op, "或")) { 返回(10) }
     返回(0)
@@ -393,13 +435,32 @@
         设 is_op = 假
 
         若 (str_equals(ttype2, "运算符") 或
-            (str_equals(ttype2, "标识符") 且
-             (str_equals(tval2, "且") 或 str_equals(tval2, "或") 或
-              str_equals(tval2, "非")))) {
-            is_op = 真
+             (str_equals(ttype2, "标识符") 且
+              (str_equals(tval2, "且") 或 str_equals(tval2, "或") 或
+               str_equals(tval2, "非") 或 str_equals(tval2, "等于") 或
+               str_equals(tval2, "不等于") 或 str_equals(tval2, "大于") 或
+               str_equals(tval2, "小于") 或 str_equals(tval2, "大于等于") 或
+               str_equals(tval2, "小于等于") 或 str_equals(tval2, "不大于") 或
+               str_equals(tval2, "不小于") 或 str_equals(tval2, "同") 或
+               str_equals(tval2, "加") 或 str_equals(tval2, "减") 或
+               str_equals(tval2, "乘") 或 str_equals(tval2, "除") 或
+               str_equals(tval2, "余") 或 str_equals(tval2, "幂")))) {
+             is_op = 真
         }
 
-        若 (非(is_op)) { 跳出 }
+        若 (非(is_op)) {
+            // 索引访问 a[i]
+            若 (str_equals(ttype2, "符号") 且 str_equals(tval2, "[")) {
+                rest = 切片(rest, 1)
+                设 idx_r = 解析表达式(rest, 0)
+                设 idx = 取(idx_r, 0)
+                rest = 取(idx_r, 1)
+                rest = 消耗(rest, "符号", "]")
+                left = 列表("取", left, idx)
+                继续
+            }
+            跳出
+        }
 
         设 prec = 获取优先级(tval2)
         若 (prec < 最小优先级) { 跳出 }
@@ -489,6 +550,34 @@
         设 body = 取(body_r, 0)
         rest = 取(body_r, 1)
         返回(列表(列表("循环", cond, body), rest))
+    }
+
+    // 遍历 var 从 start 到 end { body }
+    若 (str_equals(ttype, "标识符") 且 str_equals(tval, "遍历")) {
+        设 rest = 切片(tokens, 1)
+        设 name_tok = 取当前(rest)
+        若 (非(是列表(name_tok))) { 1 / 0 }
+        设 var_name = 取(name_tok, 1)
+        rest = 切片(rest, 1)
+
+        // 可选的 从
+        若 (匹配(rest, "标识符", "从")) { rest = 消耗(rest, "标识符", "从") }
+
+        设 start_r = 解析表达式(rest, 0)
+        设 start_ast = 取(start_r, 0)
+        rest = 取(start_r, 1)
+
+        // 可选的 到
+        若 (匹配(rest, "标识符", "到")) { rest = 消耗(rest, "标识符", "到") }
+
+        设 end_r = 解析表达式(rest, 0)
+        设 end_ast = 取(end_r, 0)
+        rest = 取(end_r, 1)
+
+        设 body_r = 解析主表达式(rest)
+        设 body = 取(body_r, 0)
+        rest = 取(body_r, 1)
+        返回(列表(列表("遍历", var_name, start_ast, end_ast, body), rest))
     }
 
     // 设 x = val
@@ -602,6 +691,20 @@
         设 rest = 切片(tokens, 1)
         设 val_r = 解析表达式(rest, 0)
         返回(列表(列表("返回", 取(val_r, 0)), 取(val_r, 1)))
+    }
+
+    // 跳出
+    若 (str_equals(ttype, "标识符") 且 str_equals(tval, "跳出")) {
+        设 rest = 切片(tokens, 1)
+        若 (匹配(rest, "符号", ";")) { rest = 消耗(rest, "符号", ";") }
+        返回(列表(列表("跳出"), rest))
+    }
+
+    // 继续
+    若 (str_equals(ttype, "标识符") 且 str_equals(tval, "继续")) {
+        设 rest = 切片(tokens, 1)
+        若 (匹配(rest, "符号", ";")) { rest = 消耗(rest, "符号", ";") }
+        返回(列表(列表("继续"), rest))
     }
 
     // 导出 name1 name2 …

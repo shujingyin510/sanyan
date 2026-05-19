@@ -44,6 +44,9 @@ _init_ops()
 
 class SanyanEvaluator(SanyanRuntime):
     def __init__(self, max_loop_steps=None, skin_manager=None):
+        import sys as _sys
+
+        _sys.setrecursionlimit(max(_sys.getrecursionlimit(), 2000))
         if skin_manager is None:
             from skin import SkinManager
 
