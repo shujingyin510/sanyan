@@ -472,6 +472,73 @@ def _compile_judge(args: list, cg: CodegenContext) -> ir.Value | None:
     return _NULL
 
 
+def _compile_try_catch(args: list, cg: CodegenContext) -> ir.Value | None:
+    """编译 尝试/捕获 异常处理。
+
+    AST 格式: ['尝试', try_body, ['捕获', error_var, catch_body...]]
+    """
+    if len(args) < 2:
+        raise SyntaxError('尝试 需要 (try_body 捕获 (err) catch_body)')
+
+    try_body = args[0]
+    catch_spec = args[1]
+
+    if not isinstance(catch_spec, list) or len(catch_spec) < 2 or catch_spec[0] not in ('捕获', 'catch'):
+        raise SyntaxError('尝试 需要 捕获 (变量) { 体 }')
+
+    error_var = catch_spec[1]
+    if isinstance(error_var, list):
+        error_var = error_var[0] if len(error_var) > 0 else '错误'
+    catch_body_stmts = _unwrap_block(catch_spec[2]) if len(catch_spec) > 2 else []
+
+    # 展开 try 体
+    if isinstance(try_body, list) and len(try_body) > 0 and try_body[0] in ('做', 'do'):
+        try_stmts = try_body[1:]
+    else:
+        try_stmts = [try_body]
+
+    # 调用 rt_try_begin
+    if 'rt_try_begin' not in cg._rt_funcs:
+        ft = ir.FunctionType(ir.VoidType(), [])
+        try_func = ir.Function(cg.module, ft, name='rt_try_begin')
+        cg._rt_funcs['rt_try_begin'] = try_func
+    else:
+        try_func = cg._rt_funcs['rt_try_begin']
+    cg.builder.call(try_func, [], name='try_begin')
+
+    # 执行 try 体
+    for stmt in try_stmts:
+        compile_node(stmt, cg)
+
+    # 检查异常
+    fnty = ir.FunctionType(_INT, [])
+    rt_check = ir.Function(cg.module, fnty, name='rt_try_check')
+    has_err = cg.builder.call(rt_check, [], name='has_err')
+    cond = cg.builder.icmp_signed('!=', has_err, _ZERO, name='catch_cond')
+
+    catch_block = cg._add_block(name='catch_body')
+    after_block = cg._add_block(name='try_after')
+    cg.builder.cbranch(cond, catch_block, after_block)
+
+    # catch 体
+    cg.builder.position_at_start(catch_block)
+    e_fnty = ir.FunctionType(_PTR, [])
+    rt_get_err = ir.Function(cg.module, e_fnty, name='rt_try_get_error')
+    err_val = cg.builder.call(rt_get_err, [], name='err_msg')
+    cg.set_var(error_var, err_val)
+    for stmt in catch_body_stmts:
+        compile_node(stmt, cg)
+    # 清除错误
+    end_fnty = ir.FunctionType(ir.VoidType(), [])
+    rt_end = ir.Function(cg.module, end_fnty, name='rt_try_end')
+    cg.builder.call(rt_end, [], name='try_clear')
+    if not cg.builder.block.is_terminated:
+        cg.builder.branch(after_block)
+
+    cg.builder.position_at_start(after_block)
+    return _NULL
+
+
 def _compile_for(args: list, cg: CodegenContext) -> ir.Value | None:
     """编译 遍历/for 循环。
 
@@ -553,6 +620,29 @@ def _compile_for(args: list, cg: CodegenContext) -> ir.Value | None:
     else:
         cg._scope.pop(var_name, None)
     return _NULL
+
+
+def _check_div_zero(lhs: ir.Value, rhs: ir.Value, cg: CodegenContext):
+    """插入零除运行时检查。若 rhs == 0，调用 rt_throw。"""
+    is_zero = cg.builder.icmp_signed('==', rhs, _ZERO, name='div_zero')
+    if isinstance(is_zero.type, ir.IntType) and is_zero.type.width == 1:
+        ok_block = cg._add_block(name='div_ok')
+        err_block = cg._add_block(name='div_err')
+        cg.builder.cbranch(is_zero, err_block, ok_block)
+
+        cg.builder.position_at_start(err_block)
+        # 声明或复用 rt_throw
+        if 'rt_throw' not in cg._rt_funcs:
+            ft = ir.FunctionType(ir.VoidType(), [_PTR])
+            throw_fn = ir.Function(cg.module, ft, name='rt_throw')
+            cg._rt_funcs['rt_throw'] = throw_fn
+        else:
+            throw_fn = cg._rt_funcs['rt_throw']
+        msg = cg._make_global_string('除零错误')
+        cg.builder.call(throw_fn, [msg], name='throw_div0')
+        cg.builder.branch(ok_block)
+
+        cg.builder.position_at_start(ok_block)
 
 
 def _compile_fold(op: str, args: list, func: ir.Function, cg: CodegenContext) -> ir.Value:
@@ -665,6 +755,9 @@ def compile_node(node, cg: CodegenContext) -> ir.Value | None:
             raise SyntaxError(f'{op} 需要两个参数')
         lhs = cg._unbox_int(compile_node(args[0], cg))
         rhs = cg._unbox_int(compile_node(args[1], cg))
+        # 除/余：零除检查
+        if op in ('除', 'div', '余', 'mod'):
+            _check_div_zero(lhs, rhs, cg)
         return cg._box_int(getattr(cg.builder, arith)(lhs, rhs, name=f'{op}_tmp'))
 
     # ── 内置比较（i8* → unbox → icmp → zext → rebox）──
@@ -706,6 +799,10 @@ def compile_node(node, cg: CodegenContext) -> ir.Value | None:
     # ── 函数 匿名 lambda（桩：返回 null）──
     if op in ('函数', 'lambda'):
         return _NULL
+
+    # ── 尝试 (尝试 body 捕获 (err) handler) — 必须在运行时调度之前 ──
+    if op in ('尝试', 'try'):
+        return _compile_try_catch(args, cg)
 
     # ── 运行时函数调用 ──
     rt_func = cg._get_runtime_func(op)
@@ -761,10 +858,6 @@ def compile_node(node, cg: CodegenContext) -> ir.Value | None:
     # ── 遍历 (遍历 var 从 start 到 end body) ──
     if op in ('遍历', 'for'):
         return _compile_for(args, cg)
-
-    # ── 尝试 (尝试 body 捕获 (err) handler) — 阶段 3 简化为只执行 try 体 ──
-    if op in ('尝试', 'try'):
-        return compile_node(args[0], cg)
 
     # ── 循环 (循环 条件 体) ──
     if op in ('循环', 'loop'):

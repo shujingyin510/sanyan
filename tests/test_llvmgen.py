@@ -309,6 +309,23 @@ class TestLLVMEdgeCases(unittest.TestCase):
         self.assertIn('ptrtoint', ir)
 
 
+class TestLLVMTryCatch(unittest.TestCase):
+    """异常处理"""
+
+    def test_try_catch_basic(self):
+        ir = _compile_ast(
+            [
+                [
+                    '尝试',
+                    ['做', ['输出', '"try"']],
+                    ['捕获', '错误', ['做', ['输出', '"catch"']]],
+                ]
+            ]
+        )
+        self.assertIn('rt_try_begin', ir)
+        self.assertIn('rt_try_check', ir)
+
+
 class TestLLVMNoRegression(unittest.TestCase):
     """回归防护：已知通过的示例不应引入新错误"""
 

@@ -253,4 +253,27 @@ rt_str_t *rt_import(rt_str_t *path)               { (void)path; return rt_str_ne
 
 /* ── 其他桩 ── */
 int32_t  rt_is_list(void *p)        { return p != NULL ? 1 : 0; }
-rt_str_t *rt_apply_stub(void *fn, void *args) { (void)fn; (void)args; return rt_str_new(""); }
+rt_str_t *rt_apply_stub(void *fn, void *args) { (void)fn; (void)args; return rt_str_new(\"\"); }
+
+/* ── 异常处理：全局错误状态 + 尝试/捕获 ── */
+static rt_str_t *_rt_error = NULL;
+
+void rt_try_begin(void) {
+    _rt_error = NULL;
+}
+
+int32_t rt_try_check(void) {
+    return _rt_error != NULL;
+}
+
+rt_str_t *rt_try_get_error(void) {
+    return _rt_error ? _rt_error : rt_str_new(\"\");
+}
+
+void rt_throw(rt_str_t *msg) {
+    _rt_error = msg;
+}
+
+void rt_try_end(void) {
+    _rt_error = NULL;
+}
