@@ -107,6 +107,13 @@ rt_list_t *rt_list_new(void) {
     return lst;
 }
 
+void rt_list_push_item(void *lstp, void *item) {
+    rt_list_t *lst = (rt_list_t *)lstp;
+    if (!lst) return;
+    if (lst->len >= lst->cap) { lst->cap *= 2; lst->items = realloc(lst->items, (size_t)lst->cap * sizeof(void *)); }
+    lst->items[lst->len++] = item;
+}
+
 int32_t rt_list_len(rt_list_t *lst) { return lst ? lst->len : 0; }
 
 void *rt_list_get(rt_list_t *lst, int32_t idx) {

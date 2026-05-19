@@ -730,6 +730,24 @@ def _check_div_zero(lhs: ir.Value, rhs: ir.Value, cg: CodegenContext):
         cg.builder.position_at_start(ok_block)
 
 
+def _compile_list_create(args: list, cg: CodegenContext) -> ir.Value:
+    """编译 列表(元素...) → rt_list_new + rt_list_push_item × N。"""
+    new_fn = cg._get_runtime_func('list')
+    assert new_fn is not None
+    result = cg.builder.call(new_fn, [], name='list_new')
+    push_name = 'rt_list_push_item'
+    if push_name not in cg._rt_funcs:
+        ft = ir.FunctionType(ir.VoidType(), [_PTR, _PTR])
+        push_fn = ir.Function(cg.module, ft, name=push_name)
+        cg._rt_funcs[push_name] = push_fn
+    else:
+        push_fn = cg._rt_funcs[push_name]
+    for a in args:
+        elem = compile_node(a, cg)
+        cg.builder.call(push_fn, [result, elem], name='push')
+    return result
+
+
 def _compile_fold(op: str, args: list, func: ir.Function, cg: CodegenContext) -> ir.Value:
     """变参操作的折叠编译：两两调用运行时函数。
 
@@ -906,6 +924,9 @@ def compile_node(node, cg: CodegenContext) -> ir.Value | None:
         # IoT 操作：自动为裸标识符参数加引号
         if op in ('读', '查', '置', '对', 'read', 'query', 'write', 'with'):
             args = [_quote_if_ident(a) for a in args]
+        # list/列表 需要逐个 push 元素
+        if op in ('列表', 'list') and len(args) > 0:
+            return _compile_list_create(args, cg)
         # 连接/列表合 支持变参：两两折叠调用
         if op in ('连接', 'concat', '列表合', 'list_concat') and len(args) > 2:
             return _compile_fold(op, args, rt_func, cg)
