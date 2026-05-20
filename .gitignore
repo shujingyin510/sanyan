@@ -191,3 +191,12 @@ examples/stm32-blinky/bytecode.bin
 examples/stm32-blinky/test_led.bin
 examples/stm32-blinky/test_led.elf
 sanyan_parse.dll
+
+# PyInstaller build output
+dist/
+
+# C build artifacts
+*.exe
+*.o
+*.ll
+NUL

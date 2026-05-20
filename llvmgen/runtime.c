@@ -1,7 +1,7 @@
 /* 三言 LLVM 编译运行时库 (libsanyan_rt)
  *
- * 所有字符串函数接受 const char*（LLVM 直接传入的全局字符串指针）。
- * 内部包装为 rt_str_t 处理。
+ * 所有字符串函数接受 void*（LLVM 直接传入的全局字符串指针 或 rt_str_t*）。
+ * 内部通过 _cstr() 统一提取 C 字符串。
  *
  * 编译:  gcc -c runtime.c -o runtime.o -std=c99
  * 链接:  gcc main.o runtime.o -o a.out
@@ -36,51 +36,71 @@ static rt_str_t *_rt_make(const char *s) {
     return st;
 }
 
-/* ── 字符串 API（全部接受 const char*）── */
+/* ── 统一字符串访问 ──
+ *
+ * 所有运行时字符串以 rt_str_t（i32 len + data[]）格式传递。
+ * 全局字符串常量通过 _make_rt_string() 生成，也是 rt_str_t 格式。
+ * _cstr() 直接返回 data 字段，无需启发式检测。
+ */
+static const char *_cstr(const void *p) {
+    if (!p) return NULL;
+    return ((rt_str_t *)p)->data;
+}
 
-void *rt_str_concat(const char *a, const char *b) {
+static int32_t _cstr_len(const void *p) {
+    if (!p) return 0;
+    return ((rt_str_t *)p)->len;
+}
+
+/* ── 字符串 API（全部接受 void*）── */
+
+void *rt_str_concat(const void *a, const void *b) {
     if (!a && !b) return NULL;
-    if (!a) return _rt_make(b);
-    if (!b) return _rt_make(a);
-    int32_t la = (int32_t)strlen(a), lb = (int32_t)strlen(b);
+    if (!a) return _rt_make(_cstr(b));
+    if (!b) return _rt_make(_cstr(a));
+    const char *ca = _cstr(a), *cb = _cstr(b);
+    int32_t la = (int32_t)strlen(ca), lb = (int32_t)strlen(cb);
     rt_str_t *st = (rt_str_t *)malloc(sizeof(rt_str_t) + la + lb + 1);
     if (!st) return NULL;
     st->len = la + lb;
-    memcpy(st->data, a, la);
-    memcpy(st->data + la, b, lb + 1);
+    memcpy(st->data, ca, la);
+    memcpy(st->data + la, cb, lb + 1);
     return st;
 }
 
-int32_t rt_str_len(const char *s)   { return s ? (int32_t)strlen(s) : 0; }
+int32_t rt_str_len(const void *s)   { return _cstr_len(s); }
 
-void *rt_str_substr(const char *s, int32_t start, int32_t len) {
-    if (!s || start < 0 || len <= 0) return _rt_make("");
-    int32_t slen = (int32_t)strlen(s);
+void *rt_str_substr(const void *s, int32_t start, int32_t len) {
+    if (!s) return _rt_make("");
+    const char *cs = _cstr(s);
+    if (start < 0 || len <= 0) return _rt_make("");
+    int32_t slen = _cstr_len(s);
     if (start >= slen) return _rt_make("");
     if (start + len > slen) len = slen - start;
     char *buf = (char *)malloc((size_t)len + 1);
-    memcpy(buf, s + start, (size_t)len);
+    memcpy(buf, cs + start, (size_t)len);
     buf[len] = '\0';
     rt_str_t *r = _rt_make(buf);
     free(buf);
     return r;
 }
 
-int32_t rt_str_equals(const char *a, const char *b) {
+int32_t rt_str_equals(const void *a, const void *b) {
     if (!a && !b) return 1;
     if (!a || !b) return 0;
-    return strcmp(a, b) == 0 ? 1 : 0;
+    return strcmp(_cstr(a), _cstr(b)) == 0 ? 1 : 0;
 }
 
-int32_t rt_str_contains(const char *hs, const char *ndl) {
+int32_t rt_str_contains(const void *hs, const void *ndl) {
     if (!hs || !ndl) return 0;
-    return strstr(hs, ndl) ? 1 : 0;
+    return strstr(_cstr(hs), _cstr(ndl)) ? 1 : 0;
 }
 
-int32_t rt_str_find(const char *hs, const char *ndl) {
+int32_t rt_str_find(const void *hs, const void *ndl) {
     if (!hs || !ndl) return -1;
-    char *p = strstr(hs, ndl);
-    return p ? (int32_t)(p - hs) : -1;
+    const char *chs = _cstr(hs), *cndl = _cstr(ndl);
+    char *p = strstr(chs, cndl);
+    return p ? (int32_t)(p - chs) : -1;
 }
 
 void *rt_int_to_str(uintptr_t tagged) {
@@ -90,7 +110,26 @@ void *rt_int_to_str(uintptr_t tagged) {
     return _rt_make(buf);
 }
 
-void *rt_str_split(const char *s, const char *sep);
+void *rt_str_split(const char *s, const char *sep) {
+    rt_list_t *r = rt_list_new();
+    if (!s || !sep || !r) return r;
+    const char *cs = _cstr(s), *csep = _cstr(sep);
+    if (!cs || !csep || !*cs) return r;
+    int32_t slen = (int32_t)strlen(cs), seplen = (int32_t)strlen(csep);
+    if (seplen <= 0) { rt_list_push_item(r, _rt_make(cs)); return r; }
+    const char *p = cs;
+    while (p && *p) {
+        const char *next = strstr(p, csep);
+        if (!next) { rt_list_push_item(r, _rt_make(p)); break; }
+        int32_t part_len = (int32_t)(next - p);
+        char *buf = (char *)malloc((size_t)part_len + 1);
+        if (buf) { memcpy(buf, p, (size_t)part_len); buf[part_len] = '\0'; }
+        rt_list_push_item(r, _rt_make(buf ? buf : ""));
+        free(buf);
+        p = next + seplen;
+    }
+    return r;
+}
 
 /* ── 列表类型 ── */
 typedef struct {
@@ -142,31 +181,44 @@ typedef struct { int32_t count; rt_entry_t entries[RT_DICT_MAX]; } rt_dict_t;
 
 void *rt_dict_new(void) { return calloc(1, sizeof(rt_dict_t)); }
 
+/* 字典 key 统一复制（兼容 rt_str_t* 和裸 const char*） */
+static char *_strdup_key(const void *kp) {
+    const char *s = _cstr(kp);
+    if (!s) return NULL;
+    size_t len = strlen(s);
+    char *d = (char *)malloc(len + 1);
+    if (d) memcpy(d, s, len + 1);
+    return d;
+}
+
 int32_t rt_dict_contains(void *dp, void *kp) {
     rt_dict_t *d = (rt_dict_t *)dp;
     if (!d || !kp) return 0;
+    const char *key = _cstr(kp);
     for (int32_t i = 0; i < d->count; i++)
-        if (d->entries[i].key && strcmp(d->entries[i].key, (const char *)kp) == 0) return 1;
+        if (d->entries[i].key && strcmp(d->entries[i].key, key) == 0) return 1;
     return 0;
 }
 
 void *rt_dict_get(void *dp, void *kp) {
     rt_dict_t *d = (rt_dict_t *)dp;
     if (!d || !kp) return NULL;
+    const char *key = _cstr(kp);
     for (int32_t i = 0; i < d->count; i++)
-        if (d->entries[i].key && strcmp(d->entries[i].key, (const char *)kp) == 0) return d->entries[i].value;
+        if (d->entries[i].key && strcmp(d->entries[i].key, key) == 0) return d->entries[i].value;
     return NULL;
 }
 
 void rt_dict_set(void *dp, void *kp, void *vp) {
     rt_dict_t *d = (rt_dict_t *)dp;
     if (!d || !kp || d->count >= RT_DICT_MAX) return;
+    const char *key = _cstr(kp);
     for (int32_t i = 0; i < d->count; i++) {
-        if (d->entries[i].key && strcmp(d->entries[i].key, (const char *)kp) == 0) {
+        if (d->entries[i].key && strcmp(d->entries[i].key, key) == 0) {
             d->entries[i].value = vp; return;
         }
     }
-    d->entries[d->count].key = _strdup((const char *)kp);
+    d->entries[d->count].key = _strdup_key(kp);
     d->entries[d->count].value = vp;
     d->count++;
 }
@@ -195,6 +247,12 @@ int32_t rt_random_trit(void) {
     return r == 0 ? -1 : (r == 1 ? 0 : 1);
 }
 
+/* ── 输出 ── */
+void rt_print_str(const void *p) {
+    if (!p) return;
+    printf("%s\n", _cstr(p));
+}
+
 /* ── 等待（参数为秒）── */
 void rt_sleep(int32_t sec) {
     int32_t ms = sec * 1000;
@@ -208,7 +266,9 @@ void rt_sleep(int32_t sec) {
 /* ── 文件操作 ── */
 void *rt_read_file(const char *path) {
     if (!path) return _rt_make("");
-    FILE *f = fopen(path, "rb");
+    const char *rp = _cstr(path);
+    if (!rp) return _rt_make("");
+    FILE *f = fopen(rp, "rb");
     if (!f) return _rt_make("");
     fseek(f, 0, SEEK_END);
     long sz = ftell(f);
@@ -223,9 +283,10 @@ void *rt_read_file(const char *path) {
 
 void rt_write_file(const char *path, const char *content) {
     if (!path || !content) return;
-    FILE *f = fopen(path, "w");
+    const char *rp = _cstr(path), *rc = _cstr(content);
+    FILE *f = fopen(rp, "w");
     if (!f) return;
-    fwrite(content, 1, strlen(content), f);
+    fwrite(rc, 1, strlen(rc), f);
     fclose(f);
 }
 
@@ -247,19 +308,21 @@ static rt_iot_dev_t _iot_devs[RT_IOT_MAX];
 static int32_t _iot_count = 0;
 
 static rt_iot_dev_t *_iot_find(const char *name) {
+    const char *rn = _cstr(name);
+    if (!rn) return NULL;
     for (int32_t i = 0; i < _iot_count; i++)
-        if (strcmp(_iot_devs[i].name, name) == 0) return &_iot_devs[i];
+        if (strcmp(_iot_devs[i].name, rn) == 0) return &_iot_devs[i];
     if (_iot_count < RT_IOT_MAX) {
         rt_iot_dev_t *d = &_iot_devs[_iot_count++];
-        strncpy(d->name, name, 31); d->name[31] = '\0'; d->state = 0;
+        strncpy(d->name, rn, 31); d->name[31] = '\0'; d->state = 0;
         return d;
     }
     return NULL;
 }
 
 void rt_iot_set(void *dp, void *sp) {
-    const char *name = (const char *)dp;
-    const char *state = (const char *)sp;
+    const char *name = _cstr(dp);
+    const char *state = _cstr(sp);
     if (!name) return;
     rt_iot_dev_t *d = _iot_find(name);
     if (!d || !state) return;
@@ -269,7 +332,7 @@ void rt_iot_set(void *dp, void *sp) {
 }
 
 void *rt_iot_read(void *dp) {
-    const char *name = (const char *)dp;
+    const char *name = _cstr(dp);
     if (!name) return _rt_make("0");
     rt_iot_dev_t *d = _iot_find(name);
     if (!d) return _rt_make("0");
@@ -279,7 +342,7 @@ void *rt_iot_read(void *dp) {
 }
 
 void rt_iot_query(void *dp) {
-    const char *name = (const char *)dp;
+    const char *name = _cstr(dp);
     if (!name) return;
     rt_iot_dev_t *d = _iot_find(name);
     if (d) printf("[IoT] %s = %s\n", d->name, d->state == 1 ? "开" : (d->state == -1 ? "关" : "守"));
@@ -306,7 +369,7 @@ int32_t rt_is_list(void *p) {
 static rt_str_t *_rt_error = NULL;
 void    rt_try_begin(void)          { _rt_error = NULL; }
 int32_t rt_try_check(void)          { return _rt_error != NULL; }
-void   *rt_try_get_error(void)      { return _rt_error ? _rt_error->data : NULL; }
+void   *rt_try_get_error(void)      { return _rt_error; }
 void    rt_throw(void *msg)         { _rt_error = (rt_str_t *)msg; }
 void    rt_try_end(void)            { _rt_error = NULL; }
 
@@ -333,9 +396,10 @@ void *rt_list_slice(void *lstp, int32_t start, int32_t end) {
 /* ── 字符串转字符列表 ── */
 void *rt_str_to_list(const char *s) {
     rt_list_t *r = rt_list_new();
-    if (!s || !r) return r;
-    for (int32_t i = 0; s[i]; i++) {
-        char buf[2] = {s[i], 0};
+    const char *cs = _cstr(s);
+    if (!cs || !r) return r;
+    for (int32_t i = 0; cs[i]; i++) {
+        char buf[2] = {cs[i], 0};
         if (r->len >= r->cap) { r->cap *= 2; r->items = realloc(r->items, (size_t)r->cap * sizeof(void *)); }
         r->items[r->len++] = _rt_make(buf);
     }

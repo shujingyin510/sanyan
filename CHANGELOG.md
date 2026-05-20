@@ -2,6 +2,35 @@
 
 ---
 
+## [v3.12.0] — 2026-05-20
+
+### 新增
+- **LLVM 代码生成器文档** (`docs/llvm.md`): 完整 LLVM 编译管线文档，涵盖 `runtime.c` 运行时库、`codegen.py` 代码生成器、Tagged Value 机制、编译链接、dp.c 测试套件、已知限制
+- **`_parse_source()` 第 4 回退** (`llvmgen/compiler.py`): 新增 Python `lexer.py` → `parser.py`（S 表达式解析器）作为编译管线最后回退，修复 `_bootstrap.san` 编译失败（"所有解析器均失败"）
+
+### 修复
+- **`runtime.c` 字符串格式不兼容** (`llvmgen/runtime.c`): 全局字符串常量（裸 `const char*`）与 `rt_str_t*`（`len` 字段在前）之间类型不匹配——`rt_str_equals`/`rt_str_find`/`rt_str_contains` 直接用 `strcmp`/`strstr` 导致所有字符串比较均失败，词法分析 token 列表恒为空。新增 `_cstr()`/`_cstr_len()` 统一访问辅助函数，修复全部 12 个运行时字符串操作和 4 个字典函数
+- **字典 key 复制** (`llvmgen/runtime.c`): `_strdup` 替换为 `_strdup_key()`，兼容 `rt_str_t*` 与裸 `const char*` 两种格式
+
+### 文档
+- **docs/llvm.md**: 新增完整 LLVM 功能文档
+- **CHANGELOG.md**: 新增 v3.12.0 条目
+- **README.md**: 版本号更新至 v3.12.0，项目结构树补充 `llvmgen/`、`docs/llvm.md`
+- **CONTRIBUTING.md**: 测试数量同步更新
+- **docs/manual.md**: 版本号同步，新增 LLVM 参考章节
+- **docs/syntax.md/commands.md/errors.md**: 原 manual.md 拆分为三份子文档，manual.md 改为导航页
+- **doc_sync.py**: 同步更新文档检查路径
+
+### 工具
+- **gui.py**: 可视化编译器 (Dev-C++ 风格 IDE)，支持语法高亮、查找替换 (Ctrl+F)、行号、项目文件树、断点调试 (F6/F10/F8)
+- **build_exe.py**: PyInstaller 一键打包脚本，输出 `dist/三言.exe`
+- **installer.iss**: Inno Setup 安装包脚本，配合 `BUILD.cmd` 一键构建安装程序
+
+### 修复
+- **异常体系一致性** (`ternary_core.py`): 将全部 `ZeroDivisionError`/`ValueError`/`IndexError` 替换为 `SanyanValueError`/`SanyanKeyError`（lazy import 避免循环依赖）
+
+---
+
 ## [v3.11.0] — 2026-05-17
 
 ### 新增

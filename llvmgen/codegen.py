@@ -334,14 +334,23 @@ class CodegenContext:
         self.builder.call(self._printf, [fmt, self._to_i32(value)])
 
     def emit_print_str(self, value: ir.Value):
-        """生成 printf(\"%s\\n\", value) 调用。"""
-        fmt = self._make_global_string('%s\n')
-        self.builder.call(self._printf, [fmt, value])
+        """通过 rt_print_str 打印 rt_str_t 字符串。"""
+        fn = self._get_or_declare('rt_print_str', ir.VoidType(), [_PTR])
+        self.builder.call(fn, [value])
 
     def emit_print(self, fmt: str, value: ir.Value):
         """生成 printf 调用。"""
         fmt_ptr = self._make_global_string(fmt)
         self.builder.call(self._printf, [fmt_ptr, value])
+
+    def _get_or_declare(self, name: str, ret_type, param_types: list) -> ir.Function:
+        """获取或声明一个外部函数。"""
+        if name in self._rt_funcs:
+            return self._rt_funcs[name]
+        fn_type = ir.FunctionType(ret_type, param_types)
+        func = ir.Function(self.module, fn_type, name=name)
+        self._rt_funcs[name] = func
+        return func
 
     def _make_global_string(self, s: str) -> ir.Value:
         n = len(self.module.globals)
@@ -352,6 +361,28 @@ class CodegenContext:
         gv.global_constant = True
         gv.initializer = c
         return self.builder.gep(gv, [_ZERO, _ZERO], inbounds=True)
+
+    def _make_rt_string(self, s: str) -> ir.Value:
+        """创建运行时字符串常量（rt_str_t 格式：{i32 len, [N x i8] data}）。
+
+        生成的全局变量带 4 字节长度前缀，可直接作为 rt_str_t* 传给运行时函数。
+        _cstr() 无需启发式检测。返回 i8* 以兼容统一变量类型。
+        """
+        n = len(self.module.globals)
+        encoded = s.encode('utf-8')
+        slen = len(encoded)
+        data_bytes = bytearray(encoded) + b'\x00'
+        # 构建 {i32, [N x i8]} 结构体常量
+        st_ty = ir.LiteralStructType([_INT, ir.ArrayType(ir.IntType(8), slen + 1)])
+        len_f = ir.Constant(_INT, slen)
+        data_f = ir.Constant(ir.ArrayType(ir.IntType(8), slen + 1), data_bytes)
+        c = ir.Constant(st_ty, [len_f, data_f])
+        gv = ir.GlobalVariable(self.module, st_ty, name=f'.rt_str.{n}')
+        gv.linkage = 'private'
+        gv.global_constant = True
+        gv.initializer = c
+        raw = self.builder.gep(gv, [_ZERO, _ZERO], inbounds=True)
+        return self.builder.bitcast(raw, _PTR, name=f'.rt_str_p{n}')
 
     def _entry_alloca(self, name: str) -> ir.Value:
         """在函数 entry 块创建 alloca（确保支配所有使用）。"""
@@ -754,7 +785,7 @@ def _check_div_zero(lhs: ir.Value, rhs: ir.Value, cg: CodegenContext):
             cg._rt_funcs['rt_throw'] = throw_fn
         else:
             throw_fn = cg._rt_funcs['rt_throw']
-        msg = cg._make_global_string('除零错误')
+        msg = cg._make_rt_string('除零错误')
         cg.builder.call(throw_fn, [msg], name='throw_div0')
         cg.builder.branch(ok_block)
 
@@ -888,9 +919,9 @@ def compile_node(node, cg: CodegenContext) -> ir.Value | None:
         # 内置常量
         if node in _BUILTIN_CONSTS:
             return cg._box_int(ir.Constant(_INT, _BUILTIN_CONSTS[node]))
-        # 字符串字面量 → i8*
+        # 字符串字面量 → i8* (rt_str_t 格式)
         if _is_string_literal(node):
-            return cg._make_global_string(_unquote(node))
+            return cg._make_rt_string(_unquote(node))
         n = _to_int(node)
         if n is not None:
             return cg._box_int(ir.Constant(_INT, n))
@@ -1008,9 +1039,6 @@ def compile_node(node, cg: CodegenContext) -> ir.Value | None:
     if op in ('输出', 'print'):
         if args:
             raw = args[0]
-            if isinstance(raw, str) and _is_string_literal(raw):
-                cg.emit_print_str(cg._make_global_string(_unquote(raw)))
-                return _NULL
             val = compile_node(raw, cg)
             if val is None:
                 return _NULL
@@ -1276,7 +1304,7 @@ def _make_bootstrap_harness(cg: CodegenContext):
         if isinstance(gval, (int, float)):
             init_val = cg._box_int(ir.Constant(_INT, int(gval)))
         elif isinstance(gval, str):
-            init_val = cg._make_global_string(gval)
+            init_val = cg._make_rt_string(gval)
         else:
             # 复杂初始化表达式 → 编译
             if isinstance(gval, list):
@@ -1378,7 +1406,7 @@ def compile_top_level(ast_nodes: list, module_name: str = 'main') -> CodegenCont
                 if isinstance(gval, (int, float)):
                     init_val = cg._box_int(ir.Constant(_INT, int(gval)))
                 elif isinstance(gval, str):
-                    init_val = cg._make_global_string(gval)
+                    init_val = cg._make_rt_string(gval)
                 else:
                     init_val = _NULL
                 cg.builder.store(init_val, cg._globals[gname])

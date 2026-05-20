@@ -36,7 +36,19 @@ def _parse_source(source: str) -> list:
     if parsed is not None:
         return parsed
 
-    # 3. Python SugarConverter
+    # 3. Python S 表达式解析器（lexer.py + parser.py）
+    try:
+        from lexer import tokenize
+        from parser import parse
+
+        tokens = tokenize(source)
+        parsed = parse(tokens)
+        if parsed is not None and isinstance(parsed, list):
+            return cast(list[Any], parsed)
+    except Exception:
+        pass
+
+    # 4. Python SugarConverter
     try:
         from sugar import SugarConverter
 

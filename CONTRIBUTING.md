@@ -25,6 +25,9 @@ python tests/test_parser.py
 # ops 模块单测（78 项）
 python tests/test_ops.py -v
 
+# 扩展 ops 单测（26 项）
+python tests/test_ops_ext.py -v
+
 # LSP 测试（6 项）
 python tests/test_lsp.py -v
 
@@ -37,7 +40,16 @@ python tests/test_iot.py -v
 # sugar.san 测试（45 项）
 python tests/test_sugar_san.py -v
 
-# 三言集成测试（动态发现）
+# LLVM 代码生成测试（53 项）
+python tests/test_llvmgen.py -v
+
+# S 表达式解析测试（10 项）
+python tests/test_dp_python.py -v
+
+# LLVM 原生编译测试（需 C 编译器）
+python tests/test_llvm_native.py -v
+
+# 三言集成测试（38 项）
 python tests/run_all.py
 ```
 
@@ -85,6 +97,8 @@ evaluator.all_scoped_vars()   # 调试/补全用
 
 ```
 源码 (.san) → [preprocess.py] → [sugar/ | lexer.py → parser.py] → [evaluator.py] → [ops/*.py] → [ternary_core.py]
+                                     ↓
+                              [llvmgen/compiler.py → codegen.py → LLVM IR → runtime.c → 可执行文件]
 ```
 
 ## 文档维护

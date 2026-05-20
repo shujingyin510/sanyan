@@ -73,15 +73,20 @@ static void _list_add(ast_node_t *lst, ast_node_t *item) {
 
 /* ── 词法分析 ── */
 
-#define TOKEN_MAX 4096
+#define TOKEN_MAX 65536
 
-static char *_tokens[TOKEN_MAX];
+static char **_tokens = NULL;
 static int _token_count = 0;
-static char _token_buf[8192];
+static char *_token_buf = NULL;
 static int _buf_pos = 0;
+static int _buf_cap = 0;
 
 static void _add_token(const char *s, int len) {
     if (_token_count >= TOKEN_MAX) return;
+    if (_buf_pos + len + 1 > _buf_cap) {
+        _buf_cap = _buf_cap ? _buf_cap * 2 : 65536;
+        _token_buf = (char *)realloc(_token_buf, (size_t)_buf_cap);
+    }
     char *t = _token_buf + _buf_pos;
     memcpy(t, s, (size_t)len);
     t[len] = '\0';
@@ -103,12 +108,21 @@ static int _try_parse_int(const char *s, int32_t *out) {
 static void tokenize(const char *code) {
     _token_count = 0;
     _buf_pos = 0;
-    memset(_token_buf, 0, sizeof(_token_buf));
-    memset(_tokens, 0, sizeof(_tokens));
+    if (!_tokens) {
+        _tokens = (char **)calloc(TOKEN_MAX, sizeof(char *));
+    } else {
+        memset(_tokens, 0, (size_t)TOKEN_MAX * sizeof(char *));
+    }
+    if (!_token_buf) {
+        _buf_cap = 65536;
+        _token_buf = (char *)malloc((size_t)_buf_cap);
+    }
+    _token_buf[0] = '\0';
 
     int i = 0;
     int len = (int)strlen(code);
-    char current[1024];
+    int current_cap = 4096;
+    char *current = (char *)malloc((size_t)current_cap);
     int ci = 0;
 
     while (i < len) {
@@ -153,7 +167,8 @@ static void tokenize(const char *code) {
                 i++; continue;
             }
             /* 普通字符 */
-            if (ci < 1023) current[ci++] = (char)c;
+            if (ci >= current_cap - 4) { current_cap *= 2; current = (char *)realloc(current, (size_t)current_cap); }
+            current[ci++] = (char)c;
             i++;
         } else {
             /* UTF-8 多字节字符：原样保留 */
@@ -162,12 +177,14 @@ static void tokenize(const char *code) {
             else if ((c & 0xF0) == 0xE0) clen = 3;
             else if ((c & 0xF8) == 0xF0) clen = 4;
             for (int k = 0; k < clen && i + k < len; k++) {
-                if (ci < 1023) current[ci++] = code[i + k];
+                if (ci >= current_cap - 4) { current_cap *= 2; current = (char *)realloc(current, (size_t)current_cap); }
+                current[ci++] = code[i + k];
             }
             i += clen;
         }
     }
     if (ci > 0) { current[ci] = '\0'; _add_token_str(current); }
+    free(current);
 }
 
 /* ── 语法分析 ── */
@@ -281,6 +298,8 @@ static void _cleanup(void) {
         free(_pool); _pool = NULL; _pool_cap = _pool_len = 0;
     }
     if (_json_buf) { free(_json_buf); _json_buf = NULL; _json_buf_cap = 0; _json_len = 0; }
+    if (_token_buf) { free(_token_buf); _token_buf = NULL; _buf_cap = 0; _buf_pos = 0; }
+    if (_tokens) { free(_tokens); _tokens = NULL; } _token_count = 0;
 }
 
 /* ── 公共 API ── */

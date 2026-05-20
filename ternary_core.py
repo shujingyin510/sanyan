@@ -158,7 +158,8 @@ class TernaryALU:
     def div(a: list, b: list, precision: int = 0) -> list:
         """定点除法：a / b，精度 precision 位。"""
         if TernaryALU.is_zero(b):
-            raise ZeroDivisionError('ternary division by zero')
+            from values import SanyanValueError
+            raise SanyanValueError('ternary division by zero')
         a_int = BT.to_int(a)
         b_int = BT.to_int(b)
         return BT.from_int(int(round(a_int * (3**precision) / b_int)))
@@ -261,7 +262,8 @@ class TritValue:
     def from_string(word: str) -> 'TritValue':
         if word in TritValue.STATE_MAP:
             return TritValue(TritValue.STATE_MAP[word])
-        raise ValueError(f'未知的三态词: {word}')
+        from values import SanyanValueError
+        raise SanyanValueError(f'未知的三态词: {word}')
 
     def to_int(self) -> int:
         if self.float_val is not None:
@@ -297,12 +299,14 @@ class ArrayValue:
 
     def get(self, index: int) -> object:
         if index < 0 or index >= self.length:
-            raise IndexError(f'数组索引越界: {index} (长度 {self.length})')
+            from values import SanyanKeyError
+            raise SanyanKeyError(f'数组索引越界: {index} (长度 {self.length})')
         return self.data[index]
 
     def set(self, index: int, value: object) -> 'ArrayValue':
         if index < 0 or index >= self.length:
-            raise IndexError(f'数组索引越界: {index} (长度 {self.length})')
+            from values import SanyanKeyError
+            raise SanyanKeyError(f'数组索引越界: {index} (长度 {self.length})')
         self.data[index] = value
         return self
 
@@ -408,7 +412,8 @@ def ternary_tan(x_trits: list, precision: Optional[int] = None) -> list:
     s = ternary_sin(x_trits, precision)
     c = ternary_cos(x_trits, precision)
     if TernaryALU.is_zero(c):
-        raise ValueError('tan(x): cos(x) is zero')
+        from values import SanyanValueError
+        raise SanyanValueError('tan(x): cos(x) is zero')
     return TernaryALU.fixed_div(s, c, precision)
 
 
@@ -421,7 +426,8 @@ def ternary_sqrt(x_trits: list, precision: Optional[int] = None) -> list:
         return BT.from_int(0)
     x_int = BT.to_int(x_trits)
     if x_int < 0:
-        raise ValueError('sqrt: negative argument')
+        from values import SanyanValueError
+        raise SanyanValueError('sqrt: negative argument')
     # 初始猜测：x/2 或 1（取决于 x 是否大于 1），全部在定点域计算
     if x_int > scale:
         guess = BT.from_int(int(round(x_int / 2)))
@@ -457,7 +463,8 @@ def ternary_log(x_trits: list, precision: Optional[int] = None) -> list:
     scale = 3**precision
     x_int = BT.to_int(x_trits)
     if x_int <= 0:
-        raise ValueError('log: argument must be positive')
+        from values import SanyanValueError
+        raise SanyanValueError('log: argument must be positive')
     one = _int_at_precision(1, precision)
     # 初始猜测：x/3 或 0.5（取决于 x 是否大于 2），全部在定点域
     if x_int > 2 * scale:

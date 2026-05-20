@@ -1,4 +1,4 @@
-# 三言 Sanyan v3.11.0
+# 三言 Sanyan v3.12.0
 
 [![VS Code Marketplace](https://img.shields.io/badge/VS%20Code-Marketplace-%23007ACC?logo=visualstudiocode)](https://marketplace.visualstudio.com/items?itemName=sanyan-lang.sanyan-language)
 [![CI](https://github.com/shujingyin510/sanyan/actions/workflows/ci.yml/badge.svg)](https://github.com/shujingyin510/sanyan/actions)
@@ -275,6 +275,15 @@ tests/
 | `定义 f (x) { 返回(x+1) }` | `（定义 f （x） （返回 （+ x 1）））` |
 | `若 (x > 0) { … } 否则 { … }` | `（若 （大于 x 0） … …）` |
 
+## 新增特性速览（v3.12.0）
+
+| 特性 | 说明 |
+|---|---|
+| 🧠 **LLVM 代码生成器** | AST → LLVM IR 编译（~1393 行 codegen），链接 C 运行时生成原生可执行文件 |
+| 🔧 **运行时库完善** | `runtime.c` 新增统一字符串访问层 (`_cstr()`)，修复 `rt_str_t*` / `const char*` 格式不兼容 |
+| 📡 **自举解析管线** | `_parse_source()` 新增 Python S 表达式解析器回退，支持 `_bootstrap.san` 完整编译 |
+| 📝 **LLVM 功能文档** | `docs/llvm.md` — 编译管线、运行时库 API、Tagged Value 机制、dp.c 测试套件 |
+
 ## 新增特性速览（v3.11.0）
 
 | 特性 | 说明 |
@@ -355,7 +364,6 @@ sanyan/
 ├── preprocess.py            # #include 预处理器
 ├── pyproject.toml           # 项目配置
 ├── repl.py                  # REPL 交互环境
-├── runtime.c                # C 语言字节码解释器（主机端）
 ├── runtime.py               # 运行环境
 ├── runtime_components.py    # 运行组件（作用域/IoT/调试/性能）
 ├── sandbox.py               # 沙箱安全机制
@@ -365,12 +373,21 @@ sanyan/
 ├── ternary_core.py          # 平衡三进制核心
 ├── values.py                # 值类型与语言异常
 ├── vm.py                    # 字节码虚拟机
+├── runtime.c                # C 语言字节码解释器（主机端）
+├── dp.c                     # S 表达式解析回归测试（C）
+├── sanyan_parse.dll         # S 表达式 C 共享库解析器
 ├── sugar/                   # 糖语法转换器
 │   ├── __init__.py
 │   ├── errors.py
 │   ├── lexer.py
 │   └── parser.py
-├── ops/                     # 内置操作实现（26 模块）
+├── llvmgen/                 # LLVM 代码生成器
+│   ├── __init__.py
+│   ├── build.py             # 完整编译管线
+│   ├── codegen.py           # AST → LLVM IR
+│   ├── compiler.py          # 编译入口
+│   └── runtime.c            # C 运行时库
+├── ops/                     # 内置操作实现（28 模块）
 │   ├── __init__.py
 │   ├── _util.py
 │   ├── arithmetic_ops.py    # 算术运算
@@ -424,7 +441,7 @@ sanyan/
 │       └── stm32_flash.ld
 ├── stdlib/                  # 标准库
 ├── tests/                   # 自动测试
-├── docs/                    # 语言手册
+├── docs/                    # 语言手册 + LLVM 文档
 ├── benchmark/               # 性能基准测试
 └── packages/                # 包管理器缓存
 ```
@@ -472,6 +489,7 @@ sanyan/
 - [x] 性能剖析 --profile（v3.10.0）
 - [x] AST JSON 导出（v3.10.0）
 - [x] DAP 调试适配器（v3.10.0）
+- [x] LLVM 代码生成器 + C 运行时库（v3.12.0）
 - [ ] GPIO 真实硬件控制
 - [ ] Web IDE
 - [ ] 标准库扩展（更多自举模块）

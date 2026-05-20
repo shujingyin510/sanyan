@@ -55,27 +55,33 @@ gh run watch
 
 ```bash
 python -X utf8 tests/test_core.py -v      # 运行时核心单测 52 项
-python -X utf8 tests/test_commands.py -v  # 命令模块单测
+python -X utf8 tests/test_commands.py -v  # 命令模块单测 19 项
 python -X utf8 tests/test_parser.py       # 解析器 AST 校验 28 项
 python -X utf8 tests/test_ops.py -v       # ops 模块单测 78 项
 python -X utf8 tests/test_ops_ext.py -v   # 扩展 ops 单测 26 项
 python -X utf8 tests/test_lsp.py -v       # LSP 测试 6 项
 python -X utf8 tests/test_package.py -v   # 包管理器测试 6 项
 python -X utf8 tests/test_iot.py -v       # IoT 测试 25 项
-python -X utf8 tests/test_sugar_san.py -v # sugar.san 测试
-python -X utf8 tests/run_all.py           # 集成测试
+python -X utf8 tests/test_sugar_san.py -v # sugar.san 测试 45 项
+python -X utf8 tests/test_llvmgen.py -v   # LLVM 代码生成测试 53 项
+python -X utf8 tests/test_dp_python.py -v # S 表达式解析测试 10 项
+python -X utf8 tests/test_llvm_native.py -v # LLVM 原生编译测试（需 C 编译器）
+python -X utf8 tests/run_all.py           # 集成测试 38 项
 ```
 
 全部通过才算成功：
 - test_core.py 52/52
-- test_commands.py 全部通过
+- test_commands.py 19/19
 - test_parser.py 28/28
 - test_ops.py 78/78
-- test_ops_ext.py 全部通过
+- test_ops_ext.py 26/26（含 1 项 skip）
 - test_lsp.py 6/6
 - test_package.py 6/6
-- test_iot.py 全部通过
-- test_sugar_san.py 全部通过
+- test_iot.py 25/25
+- test_sugar_san.py 45/45
+- test_llvmgen.py 53/53
+- test_dp_python.py 10/10
+- test_llvm_native.py（需 C 编译器，否则 skip）
 - run_all.py 38/38
 
 Python 文档同步：首次或每次代码修改后建议运行：

@@ -35,7 +35,9 @@
     返回(键取值(全角映射, ch, ch))
 }
 
-定义 生成token (类型, 值) { 列表(类型, 值) }
+定义 生成token (类型, 值) {
+    返回(列表(类型, 值))
+}
 
 定义 词法分析 (source) {
     设 len = 取长(source)
@@ -166,7 +168,9 @@
                 converted = 连接(converted, m)
                 j = j + 1
             }
-            tokens = 列表合(tokens, 列表(生成token("数字", converted)))
+            设 new_token = 生成token("数字", converted)
+            设 token_list = 列表(new_token)
+            tokens = 列表合(tokens, token_list)
             继续
         }
 

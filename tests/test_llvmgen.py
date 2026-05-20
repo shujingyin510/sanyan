@@ -218,8 +218,7 @@ class TestLLVMPrint(unittest.TestCase):
 
     def test_print_string(self):
         ir = _compile_ast([['输出', '"hello world"']])
-        self.assertIn('printf', ir)
-        self.assertIn('%s', ir)
+        self.assertIn('rt_print_str', ir)
 
     def test_print_variable(self):
         ir = _compile_ast([['设', 'x', 99], ['输出', 'x']])
