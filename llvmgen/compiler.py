@@ -67,7 +67,7 @@ def _parse_c_s_expr(source: str) -> list | None:
     import json
     import os
 
-    dll_path = os.path.join(os.path.dirname(__file__), '..', 'sanyan_parse.dll')
+    dll_path = os.path.join(os.path.dirname(__file__), '..', 'csrc', 'sanyan_parse.dll')
     if not os.path.exists(dll_path):
         return None
     try:
