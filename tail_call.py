@@ -33,7 +33,7 @@ def detect_tail_call(body: list, op: str, params: list, args: list) -> Tuple[lis
     return tail_body, last_expr, is_tco
 
 
-def run_tail_call(evaluator, params: list, tail_body: list, last_expr: list, op: str, args: list) -> TritValue:
+def run_tail_call(evaluator, params: list, tail_body: list, last_expr: Optional[list], op: str, args: list) -> TritValue:
     """执行尾递归优化的函数调用"""
     max_iterations = evaluator.max_loop_steps * _TCO_LOOP_MULTIPLIER
     iteration = 0
@@ -51,7 +51,10 @@ def run_tail_call(evaluator, params: list, tail_body: list, last_expr: list, op:
             tail_expr = last_expr
             if isinstance(tail_expr, list) and tail_expr[0] == 'return':
                 tail_expr = tail_expr[1]
-            args = [evaluator.eval(arg) for arg in tail_expr[1:]]
+            if tail_expr is not None:
+                args = [evaluator.eval(arg) for arg in tail_expr[1:]]
+            else:
+                args = []
         except ReturnException as ret:
             return ret.value if ret.value is not None else TritValue(0)
         finally:

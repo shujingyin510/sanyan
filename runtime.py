@@ -245,11 +245,11 @@ class SanyanRuntime:
         self._iot_mgr.actuators = value
 
     @property
-    def device_registry(self) -> Dict[str, Any]:
+    def device_registry(self) -> Any:
         return self._iot_mgr.device_registry
 
     @device_registry.setter
-    def device_registry(self, value: Dict[str, Any]) -> None:
+    def device_registry(self, value: Any) -> None:
         self._iot_mgr.device_registry = value
 
     @property

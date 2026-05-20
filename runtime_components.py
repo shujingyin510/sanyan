@@ -13,11 +13,11 @@ class ScopeManager:
         self._scopes: List[Dict[str, Any]] = scopes_list if scopes_list is not None else [{}]
 
     @property
-    def scope_vars(self):
+    def scope_vars(self) -> Dict[str, Any]:
         return self._scopes[-1]
 
     @scope_vars.setter
-    def scope_vars(self, value):
+    def scope_vars(self, value: Dict[str, Any]) -> None:
         self._scopes[-1] = value
 
     def get_var(self, name: str) -> Any:
@@ -42,8 +42,8 @@ class ScopeManager:
         if len(self._scopes) > 1:
             self._scopes.pop()
 
-    def all_scoped_vars(self):
-        result = {}
+    def all_scoped_vars(self) -> Dict[str, Any]:
+        result: Dict[str, Any] = {}
         for scope in self._scopes:
             result.update(scope)
         return result
