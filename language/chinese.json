@@ -34,6 +34,7 @@
     "is_string": "是字符串",
     "is_list": "是列表",
     "str_equals": "字符串相等",
+    "to_string": "字符串",
     "apply": "应用",
     "time": "当前时间",
     "random_state": "随机态",

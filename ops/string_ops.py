@@ -37,11 +37,13 @@ class StringOps:
     @staticmethod
     def str_to_list(evaluator, args):
         if len(args) != 1:
-            raise SanyanSyntaxError('字列 需要一个字符串参数')
+            raise SanyanSyntaxError('字列 需要一个参数')
         val = evaluator.eval(args[0])
         if isinstance(val, str):
             return list(val)
-        raise SanyanTypeError('字列 需要字符串')
+        if isinstance(val, dict):
+            return list(val.keys())
+        raise SanyanTypeError('字列 需要字符串或字典')
 
     @staticmethod
     def string_substring(evaluator, args):

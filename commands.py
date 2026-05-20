@@ -50,6 +50,7 @@ class Commands:
         if evaluator.call_depth > evaluator.max_call_depth:
             evaluator.call_depth -= 1
             from values import SanyanRuntimeError
+
             raise SanyanRuntimeError('命令调用超过了最大递归深度')
         evaluator.call_stack.append((op, args))
         try:

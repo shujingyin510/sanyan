@@ -59,6 +59,21 @@ class TypeOps:
             return TritValue(1 if a == b else -1)
         return TritValue(-1)
 
+    @staticmethod
+    def to_string(evaluator, args):
+        if len(args) != 1:
+            raise SanyanSyntaxError('字符串 需要一个参数')
+        val = evaluator.eval(args[0])
+        if isinstance(val, str):
+            return val
+        if isinstance(val, TritValue):
+            return str(val.to_int())
+        if isinstance(val, list):
+            return '[' + ', '.join(str(v) for v in val) + ']'
+        if isinstance(val, dict):
+            return '{' + ', '.join(f'{k}: {v}' for k, v in val.items()) + '}'
+        return str(val)
+
 
 # 注册类型操作
 register('time', TypeOps.time_now)
@@ -67,3 +82,4 @@ register('is_number', TypeOps.is_number)
 register('is_string', TypeOps.is_string)
 register('is_list', TypeOps.is_list)
 register('str_equals', TypeOps.str_equals)
+register('to_string', TypeOps.to_string)

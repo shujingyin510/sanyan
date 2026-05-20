@@ -50,6 +50,7 @@ def resolve_command(evaluator, op: str):
         available = list(evaluator.commands.keys())[:10]
         hint = f'，可用命令: {available}' if available else ''
         from values import SanyanNameError
+
         raise SanyanNameError(f"未定义的操作: '{op}'{hint}")
     cmd_def = evaluator.commands[op]
     param_types = cmd_def[2] if len(cmd_def) > 2 else {}

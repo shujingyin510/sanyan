@@ -49,8 +49,12 @@ def parse_string_literal(s: str) -> str:
 
 def parse_numeric_literal(node: str) -> Optional[TritValue]:
     """解析数值字面量字符串"""
-    if node.replace('.', '', 1).replace('-', '', 1).isdigit():
-        return TritValue(float(node)) if '.' in node else TritValue(int(node))
+    stripped = node.replace('.', '', 1).replace('-', '', 1)
+    if stripped.isdigit():
+        try:
+            return TritValue(float(node)) if '.' in node else TritValue(int(node))
+        except ValueError:
+            return None
     return None
 
 

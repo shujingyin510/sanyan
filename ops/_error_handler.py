@@ -20,17 +20,13 @@ def check_args_count(args: list, expected: int, op_name: str) -> None:
 def check_args_range(args: list, min_count: int, max_count: int, op_name: str) -> None:
     """检查参数数量范围"""
     if len(args) < min_count or len(args) > max_count:
-        raise SanyanSyntaxError(
-            f"'{op_name}' 需要 {min_count}-{max_count} 个参数，但提供了 {len(args)} 个"
-        )
+        raise SanyanSyntaxError(f"'{op_name}' 需要 {min_count}-{max_count} 个参数，但提供了 {len(args)} 个")
 
 
 def check_min_args(args: list, min_count: int, op_name: str) -> None:
     """检查最小参数数量"""
     if len(args) < min_count:
-        raise SanyanSyntaxError(
-            f"'{op_name}' 至少需要 {min_count} 个参数，但提供了 {len(args)} 个"
-        )
+        raise SanyanSyntaxError(f"'{op_name}' 至少需要 {min_count} 个参数，但提供了 {len(args)} 个")
 
 
 def type_check(value: Any, expected_type: type, param_name: str, op_name: str) -> None:
@@ -48,6 +44,7 @@ def handle_op_errors(op_name: str) -> Callable:
         def add(evaluator, args):
             ...
     """
+
     def decorator(func: Callable) -> Callable:
         @wraps(func)
         def wrapper(evaluator, args: list) -> Any:
@@ -57,13 +54,16 @@ def handle_op_errors(op_name: str) -> Callable:
                 raise
             except Exception as e:
                 raise SanyanRuntimeError(f"'{op_name}' 执行错误: {e}") from e
+
         return wrapper
+
     return decorator
 
 
 def validate_numeric(value: Any, param_name: str, op_name: str) -> None:
     """验证值是否为数值类型"""
     from ternary_core import TritValue
+
     if not isinstance(value, (int, float, TritValue)):
         raise SanyanTypeError(f"'{op_name}' 的参数 '{param_name}' 期望数值类型，但得到 {type(value).__name__}")
 

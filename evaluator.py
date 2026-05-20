@@ -129,11 +129,13 @@ class SanyanEvaluator(SanyanRuntime):
     def _eval_dot_symbol(self, symbol: str) -> Any:
         """解析 对象.属性 形式的 IoT 设备访问（委派给 eval_helpers）"""
         from eval_helpers import _eval_dot_symbol
+
         return _eval_dot_symbol(self, symbol)
 
     def _eval_context_symbol(self, symbol: str) -> Any:
         """在 对 作用域内解析符号为 IoT 设备操作（委派给 eval_helpers）"""
         from eval_helpers import _eval_context_symbol
+
         return _eval_context_symbol(self, symbol)
 
     def _pos(self, node: Any) -> str:
