@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 import sys
-from typing import Any
 
 
 def debug_before(evaluator, internal: str, op: str, args: list) -> None:

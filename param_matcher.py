@@ -1,7 +1,6 @@
 """参数匹配模块：从 commands.py 提取的参数解析和类型检查逻辑"""
 
-from typing import Any, List, Dict
-from values import SanyanSyntaxError, SanyanTypeError, check_type
+from values import SanyanSyntaxError, check_type
 from ternary_core import TritValue
 
 

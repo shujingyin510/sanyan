@@ -1,6 +1,6 @@
 """尾递归优化模块：从 commands.py 提取的尾调用检测和执行逻辑"""
 
-from typing import Any, Tuple, Optional
+from typing import Tuple, Optional
 from values import ReturnException, SanyanRuntimeError
 from ternary_core import TritValue
 

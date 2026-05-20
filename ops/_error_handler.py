@@ -6,7 +6,6 @@ from values import (
     SanyanError,
     SanyanTypeError,
     SanyanSyntaxError,
-    SanyanValueError,
     SanyanRuntimeError,
 )
 

@@ -2,12 +2,11 @@
 
 from __future__ import annotations
 import time
-import sys
-from typing import Any, Dict, List, Optional, Union, cast
+from typing import Any, Dict, Optional, cast
 from ternary_core import TritValue, ArrayValue
 from runtime import SanyanRuntime
 from commands import Commands
-from values import FunctionValue, ModuleValue, SrcNode, SanyanNameError, SanyanError
+from values import FunctionValue, ModuleValue, SrcNode, SanyanError
 from values import SanyanRuntimeError
 from eval_helpers import (
     parse_string_literal,
