@@ -2,6 +2,26 @@
 
 ---
 
+## [v3.13.0] — 2026-05-20
+
+### 新增
+- **求值器模块拆分** (`eval_helpers.py`、`debug_eval.py`): `evaluator.py` 从 315 行降至 176 行（-44%），符号解析、字面量处理、IoT 设备访问提取到 `eval_helpers.py`，调试断点/监视/调用栈提取到 `debug_eval.py`
+- **命令模块重构** (`tail_call.py`、`param_matcher.py`): `commands.py` 从 200 行降至 105 行（-48%），尾递归检测与执行提取到 `tail_call.py`，参数匹配/求值/类型检查提取到 `param_matcher.py`
+- **统一错误处理** (`ops/_error_handler.py`): `handle_op_errors` 装饰器，`check_args_count`/`check_args_range`/`validate_numeric`/`validate_string` 等参数验证工具函数
+- **标准库扩充**: 新增 `stdlib/algorithm.san`（二分查找、冒泡排序、选择排序、最大公约数、最小公倍数、质数判断、斐波那契、阶乘、快速幂）、`stdlib/collection.san`（栈、队列、集合）、`stdlib/validate.san`（邮箱/IP/身份证/URL 验证）
+- **实用示例**: 新增 `examples/student_grade.san`（学生成绩管理系统）、`examples/sales_analysis.san`（销售数据分析报表）、`examples/file_batch_process.san`（文件批量处理脚本）
+
+### 变更
+- **类型标注增强**: `evaluator.py`/`runtime.py`/`values.py` 核心模块补充完整 TypeHint（`Dict`/`Tuple`/`Optional`/`Set` 等）
+- **版本号**: 更新至 v3.13.0
+- **build_exe.py**: 添加 `eval_helpers`/`debug_eval`/`tail_call`/`param_matcher` hidden-import
+
+### 文档
+- **README.md**: 版本号更新至 v3.13.0，新增 v3.13.0 特性表，项目结构树补充 `eval_helpers.py`/`debug_eval.py`/`tail_call.py`/`param_matcher.py`/`ops/_error_handler.py`
+- **CHANGELOG.md**: 新增 v3.13.0 条目
+
+---
+
 ## [v3.12.0] — 2026-05-20
 
 ### 新增

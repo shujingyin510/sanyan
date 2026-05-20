@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 import os
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Set, Tuple
 from values import SanyanSyntaxError
 from runtime_components import (
     ScopeManager,
@@ -12,7 +12,7 @@ from runtime_components import (
 )
 
 # 模块级常量，供 lexer.py 等模块导入
-BUILTIN_OPS = {
+BUILTIN_OPS: Set[str] = {
     '且',
     '或',
     '非',
@@ -180,13 +180,13 @@ BUILTIN_OPS = {
 
 
 class SanyanRuntime:
-    BUILTIN_OPS = BUILTIN_OPS
+    BUILTIN_OPS: Set[str] = BUILTIN_OPS
 
-    def __init__(self, max_loop_steps: Optional[int] = None, skin_manager: Any = None):
+    def __init__(self, max_loop_steps: Optional[int] = None, skin_manager: Any = None) -> None:
         if max_loop_steps is None:
             max_loop_steps = int(os.environ.get('MAX_LOOP_STEPS', '500'))
         self.max_loop_steps: int = max_loop_steps
-        self.commands: dict = {}
+        self.commands: Dict[str, Tuple[list, list, dict]] = {}
         self.call_depth: int = 0
         self.max_call_depth: int = 200
         self.skin_manager: Any = skin_manager
@@ -201,11 +201,11 @@ class SanyanRuntime:
 
     # ── 作用域委派 ──
     @property
-    def scope_vars(self):
+    def scope_vars(self) -> Dict[str, Any]:
         return self._scope_mgr.scope_vars
 
     @scope_vars.setter
-    def scope_vars(self, value):
+    def scope_vars(self, value: Dict[str, Any]) -> None:
         self._scope_mgr.scope_vars = value
 
     def get_var(self, name: str) -> Any:
@@ -217,92 +217,92 @@ class SanyanRuntime:
     def set_var(self, name: str, value: Any) -> None:
         self._scope_mgr.set_var(name, value)
 
-    def push_scope(self):
+    def push_scope(self) -> None:
         self._scope_mgr.push_scope()
 
-    def pop_scope(self):
+    def pop_scope(self) -> None:
         self._scope_mgr.pop_scope()
 
-    def all_scoped_vars(self):
+    def all_scoped_vars(self) -> Dict[str, Any]:
         return self._scope_mgr.all_scoped_vars()
 
     # ── IoT 委派 ──
     @property
-    def sensors(self):
+    def sensors(self) -> Dict[str, Any]:
         return self._iot_mgr.sensors
 
     @sensors.setter
-    def sensors(self, value):
+    def sensors(self, value: Dict[str, Any]) -> None:
         self._iot_mgr.sensors = value
 
     @property
-    def actuators(self):
+    def actuators(self) -> Dict[str, Any]:
         return self._iot_mgr.actuators
 
     @actuators.setter
-    def actuators(self, value):
+    def actuators(self, value: Dict[str, Any]) -> None:
         self._iot_mgr.actuators = value
 
     @property
-    def device_registry(self):
+    def device_registry(self) -> Dict[str, Any]:
         return self._iot_mgr.device_registry
 
     @device_registry.setter
-    def device_registry(self, value):
+    def device_registry(self, value: Dict[str, Any]) -> None:
         self._iot_mgr.device_registry = value
 
     @property
-    def context_object(self):
+    def context_object(self) -> Optional[str]:
         return self._iot_mgr.context_object
 
     @context_object.setter
-    def context_object(self, value):
+    def context_object(self, value: Optional[str]) -> None:
         self._iot_mgr.context_object = value
 
     # ── 调试委派 ──
     @property
-    def debug_mode(self):
+    def debug_mode(self) -> bool:
         return self._debug_mgr.debug_mode
 
     @debug_mode.setter
-    def debug_mode(self, value):
+    def debug_mode(self, value: bool) -> None:
         self._debug_mgr.debug_mode = value
 
     @property
-    def call_stack(self):
+    def call_stack(self) -> List[Tuple[str, list]]:
         return self._debug_mgr.call_stack
 
     @call_stack.setter
-    def call_stack(self, value):
+    def call_stack(self, value: List[Tuple[str, list]]) -> None:
         self._debug_mgr.call_stack = value
 
     # ── 向后兼容属性（evaluator.py / repl.py 直接访问私有属性）──
     @property
-    def _break_ops(self):
+    def _break_ops(self) -> Set[str]:
         return self._debug_mgr._break_ops
 
     @property
-    def _break_all(self):
+    def _break_all(self) -> bool:
         return self._debug_mgr._break_all
 
     @_break_all.setter
-    def _break_all(self, value):
+    def _break_all(self, value: bool) -> None:
         self._debug_mgr._break_all = value
 
     @property
-    def _watched_vars(self):
+    def _watched_vars(self) -> Set[str]:
         return self._debug_mgr._watched_vars
 
     @property
-    def _profiling(self):
+    def _profiling(self) -> bool:
         return self._profile_mgr._profiling
 
     @_profiling.setter
-    def _profiling(self, value):
+    def _profiling(self, value: bool) -> None:
         self._profile_mgr._profiling = value
 
     @property
-    def _profile(self):
+    def _profile(self) -> Dict[str, Dict[str, Any]]:
         return self._profile_mgr._profile
 
     def break_add(self, name: str) -> None:
@@ -321,15 +321,15 @@ class SanyanRuntime:
     def profile_start(self) -> None:
         self._profile_mgr.start()
 
-    def profile_stop(self) -> dict:
+    def profile_stop(self) -> Dict[str, Dict[str, Any]]:
         return self._profile_mgr.stop()
 
     def profile_report(self) -> str:
         return self._profile_mgr.report()
 
     # ── 工具方法 ──
-    def _parse_pairs(self, items):
-        pairs = []
+    def _parse_pairs(self, items: List[str]) -> List[Tuple[str, str]]:
+        pairs: List[Tuple[str, str]] = []
         if all(isinstance(x, str) and '.' in x for x in items):
             for item in items:
                 obj, val = item.split('.')

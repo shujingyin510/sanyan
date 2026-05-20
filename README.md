@@ -1,4 +1,4 @@
-# 三言 Sanyan v3.12.0
+# 三言 Sanyan v3.13.0
 
 [![VS Code Marketplace](https://img.shields.io/badge/VS%20Code-Marketplace-%23007ACC?logo=visualstudiocode)](https://marketplace.visualstudio.com/items?itemName=sanyan-lang.sanyan-language)
 [![CI](https://github.com/shujingyin510/sanyan/actions/workflows/ci.yml/badge.svg)](https://github.com/shujingyin510/sanyan/actions)
@@ -275,6 +275,17 @@ tests/
 | `定义 f (x) { 返回(x+1) }` | `（定义 f （x） （返回 （+ x 1）））` |
 | `若 (x > 0) { … } 否则 { … }` | `（若 （大于 x 0） … …）` |
 
+## 新增特性速览（v3.13.0）
+
+| 特性 | 说明 |
+|---|---|
+| 🧩 **求值器模块拆分** | `evaluator.py` 从 315 行降至 176 行，拆出 `eval_helpers.py`、`debug_eval.py` |
+| 🧩 **命令模块重构** | `commands.py` 从 200 行降至 105 行，拆出 `tail_call.py`、`param_matcher.py` |
+| 🧩 **统一错误处理** | `ops/_error_handler.py` — `handle_op_errors` 装饰器，参数验证工具函数 |
+| 📝 **类型标注增强** | `evaluator.py`/`runtime.py`/`values.py` 核心模块补充完整 TypeHint |
+| 📚 **标准库扩充** | 新增 `stdlib/algorithm.san`（排序/质数/算法）、`stdlib/collection.san`（栈/队列/集合）、`stdlib/validate.san`（邮箱/IP/身份证验证） |
+| 📝 **实用示例** | 新增 `examples/student_grade.san`（成绩管理）、`examples/sales_analysis.san`（销售分析）、`examples/file_batch_process.san`（批量文件处理） |
+
 ## 新增特性速览（v3.12.0）
 
 | 特性 | 说明 |
@@ -355,12 +366,15 @@ sanyan/
 ├── ast_json.py              # AST JSON 导出
 ├── commands.py              # 自定义命令调用
 ├── dap_server.py            # DAP 调试适配器
+├── debug_eval.py            # 调试辅助模块
 ├── doc_sync.py              # 文档同步检查
+├── eval_helpers.py          # 求值辅助模块
 ├── evaluator.py             # 求值器
 ├── lexer.py                 # S 表达式词法
 ├── lsp_server.py            # LSP 服务器
 ├── main.py                  # 入口
 ├── parser.py                # S 表达式语法
+├── param_matcher.py         # 参数匹配与类型检查
 ├── preprocess.py            # #include 预处理器
 ├── pyproject.toml           # 项目配置
 ├── repl.py                  # REPL 交互环境
@@ -370,6 +384,7 @@ sanyan/
 ├── sanfmt.py                # 源码格式化器
 ├── sanyancc.py              # 交叉编译器
 ├── skin.py                  # 皮肤管理器
+├── tail_call.py             # 尾递归优化
 ├── ternary_core.py          # 平衡三进制核心
 ├── values.py                # 值类型与语言异常
 ├── vm.py                    # 字节码虚拟机
@@ -389,6 +404,7 @@ sanyan/
 │   └── runtime.c            # C 运行时库
 ├── ops/                     # 内置操作实现（28 模块）
 │   ├── __init__.py
+│   ├── _error_handler.py    # 统一错误处理装饰器
 │   ├── _util.py
 │   ├── arithmetic_ops.py    # 算术运算
 │   ├── comparison_ops.py    # 比较运算

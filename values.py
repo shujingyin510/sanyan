@@ -1,10 +1,11 @@
 """三言中的值类型和异常"""
 
-from typing import Any, Optional
+from __future__ import annotations
+from typing import Any, Callable, Dict, List, Optional, Set, Union
 from ternary_core import TritValue, ArrayValue
 
 
-def to_num(v):
+def to_num(v: Any) -> Union[int, float, Any]:
     """将 TritValue 或可数值化的值转为 int/float。
     若无法数值化则原样返回（兼容非数值相等比较）。
     """
@@ -75,16 +76,16 @@ class SrcNode(list):
 
     __slots__ = ('line', 'col')
 
-    def __new__(cls, items=(), line=0, col=0):
+    def __new__(cls, items: tuple = (), line: int = 0, col: int = 0) -> SrcNode:
         obj = super().__new__(cls)
         obj.line = line  # type: ignore[attr-defined]
         obj.col = col  # type: ignore[attr-defined]
         return obj
 
 
-def check_type(value, expected_type: str, param_name: str = '') -> None:
+def check_type(value: Any, expected_type: str, param_name: str = '') -> None:
     """检查值是否符合预期类型，不符则抛出 SanyanTypeError。"""
-    type_checks = {
+    type_checks: Dict[str, Callable[[Any], bool]] = {
         '数字': lambda v: isinstance(v, TritValue),
         '字符串': lambda v: isinstance(v, str),
         '列表': lambda v: isinstance(v, list),
@@ -112,11 +113,11 @@ class FunctionValue:
 
     def __init__(
         self,
-        params: list,
-        body: list,
-        evaluator=None,
-        closure_vars: Optional[dict] = None,
-        param_types: Optional[dict] = None,
+        params: List[str],
+        body: List[Any],
+        evaluator: Optional[Any] = None,
+        closure_vars: Optional[Dict[str, Any]] = None,
+        param_types: Optional[Dict[str, str]] = None,
     ) -> None:
         self.params = params
         self.body = body
@@ -124,7 +125,7 @@ class FunctionValue:
         self.closure_vars = closure_vars
         self.param_types = param_types or {}
 
-    def call(self, evaluator, args: list) -> TritValue:
+    def call(self, evaluator: Any, args: List[Any]) -> TritValue:
         if len(args) != len(self.params):
             raise SanyanSyntaxError(
                 f'函数 λ{self.params} 需要 {len(self.params)} 个参数，但提供了 {len(args)} 个: {args}'
@@ -160,11 +161,11 @@ class FunctionValue:
                         self.closure_vars[k] = evaluator.scope_vars[k]
             evaluator.pop_scope()
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return f'<函数 λ {self.params}>'
 
 
-def call_function(evaluator, func, args: list) -> Any:
+def call_function(evaluator: Any, func: Union[str, FunctionValue], args: List[Any]) -> Any:
     if isinstance(func, str):
         # 如果是字符串，直接尝试通过 evaluator 的 _apply 方法调用（避免直接在此处引用 SanyanEvaluator 造成循环依赖）
         if hasattr(evaluator, '_apply'):
@@ -180,7 +181,12 @@ def call_function(evaluator, func, args: list) -> Any:
 class ModuleValue:
     __slots__ = ('vars', 'commands', 'exports')
 
-    def __init__(self, vars: dict, commands: dict, exports: Optional[set] = None) -> None:
+    def __init__(
+        self,
+        vars: Dict[str, Any],
+        commands: Dict[str, Any],
+        exports: Optional[Set[str]] = None,
+    ) -> None:
         self.vars = dict(vars)
         self.commands = dict(commands)
         self.exports = exports  # None = 全部导出
@@ -190,7 +196,7 @@ class ModuleValue:
             return True
         return name in self.exports
 
-    def call(self, evaluator, args: list) -> TritValue:
+    def call(self, evaluator: Any, args: List[Any]) -> TritValue:
         if len(args) < 1:
             raise SanyanSyntaxError('模块调用需要至少一个参数（函数名），但未提供')
         func_name = args[0]

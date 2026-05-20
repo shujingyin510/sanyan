@@ -3,15 +3,24 @@
 from __future__ import annotations
 import time
 import sys
-from typing import Any
+from typing import Any, Dict, List, Optional, Union, cast
 from ternary_core import TritValue, ArrayValue
 from runtime import SanyanRuntime
 from commands import Commands
 from values import FunctionValue, ModuleValue, SrcNode, SanyanNameError, SanyanError
 from values import SanyanRuntimeError
+from eval_helpers import (
+    parse_string_literal,
+    parse_numeric_literal,
+    is_valid_identifier,
+    resolve_identifier,
+    eval_str,
+    eval_symbol,
+)
+from debug_eval import debug_before, debug_after, debug_prompt
 
 
-def _init_ops():
+def _init_ops() -> None:
     """初始化所有操作模块的注册（仅在首次导入时执行一次）"""
     import ops.control_ops
     import ops.logic_ops
@@ -43,7 +52,11 @@ _init_ops()
 
 
 class SanyanEvaluator(SanyanRuntime):
-    def __init__(self, max_loop_steps=None, skin_manager=None):
+    def __init__(
+        self,
+        max_loop_steps: Optional[int] = None,
+        skin_manager: Optional[Any] = None,
+    ) -> None:
         import sys as _sys
 
         _sys.setrecursionlimit(max(_sys.getrecursionlimit(), 2000))
@@ -52,9 +65,9 @@ class SanyanEvaluator(SanyanRuntime):
 
             skin_manager = SkinManager('chinese')
         super().__init__(max_loop_steps=max_loop_steps, skin_manager=skin_manager)
-        self._op_cache = {}
-        self._name_cache = {}
-        self._name_cache_max = 5000
+        self._op_cache: Dict[str, tuple] = {}
+        self._name_cache: Dict[str, str] = {}
+        self._name_cache_max: int = 5000
 
     def eval(self, node: Any) -> Any:
         if isinstance(node, (TritValue, ArrayValue, FunctionValue, ModuleValue)):
@@ -94,146 +107,42 @@ class SanyanEvaluator(SanyanRuntime):
             raise
 
     def _parse_string_literal(self, s: str) -> str:
-        """解析字符串字面量的转义序列"""
-        result = []
-        i = 0
-        while i < len(s):
-            if s[i] == '\\' and i + 1 < len(s):
-                esc = s[i + 1]
-                if esc == 'n':
-                    result.append('\n')
-                    i += 2
-                elif esc == 't':
-                    result.append('\t')
-                    i += 2
-                elif esc == 'r':
-                    result.append('\r')
-                    i += 2
-                elif esc == '\\':
-                    result.append('\\')
-                    i += 2
-                elif esc == '"':
-                    result.append('"')
-                    i += 2
-                elif esc == "'":
-                    result.append("'")
-                    i += 2
-                elif esc == 'u' and i + 5 < len(s):
-                    try:
-                        result.append(chr(int(s[i + 2 : i + 6], 16)))
-                        i += 6
-                    except ValueError:
-                        result.append(s[i])
-                        i += 1
-                else:
-                    result.append(s[i])
-                    i += 1
-            else:
-                result.append(s[i])
-                i += 1
-        return ''.join(result)
+        """解析字符串字面量的转义序列（委派给 eval_helpers）"""
+        return parse_string_literal(s)
 
-    def _parse_numeric_literal(self, node: str):
-        """解析数值字面量字符串"""
-        if node.replace('.', '', 1).replace('-', '', 1).isdigit():
-            return TritValue(float(node)) if '.' in node else TritValue(int(node))
-        return None
+    def _parse_numeric_literal(self, node: str) -> Optional[TritValue]:
+        """解析数值字面量字符串（委派给 eval_helpers）"""
+        return parse_numeric_literal(node)
 
-    def _resolve_identifier(self, node: str):
-        """解析标识符：字典点号访问 → 符号求值 → 中文字符串降级"""
-        if '.' in node:
-            parts = node.split('.', 1)
-            var_name, key = parts[0], parts[1]
-            if self.has_var(var_name):
-                var = self.get_var(var_name)
-                if isinstance(var, dict) and key in var:
-                    return var[key]
-        try:
-            return self._eval_symbol(node)
-        except SanyanNameError:
-            if any('\u4e00' <= c <= '\u9fff' for c in node):
-                return node
-            raise
+    def _resolve_identifier(self, node: str) -> Any:
+        """解析标识符：字典点号访问 → 符号求值 → 中文字符串降级（委派给 eval_helpers）"""
+        return resolve_identifier(self, node)
 
     def _eval_str(self, node: str) -> Any:
-        if len(node) >= 2 and node[0] in ('"', '\u201c', '\u2018', "'"):
-            return self._parse_string_literal(node[1:-1])
-        numeric = self._parse_numeric_literal(node)
-        if numeric is not None:
-            return numeric
-        if self._is_valid_identifier(node):
-            # 如果标识符经皮肤映射为已注册的内部操作，则作为零参数操作分派（如 跳出→break, 继续→continue）
-            if self.skin_manager:
-                resolved = self.skin_manager.get_internal_keyword(node) or self.skin_manager.get_internal_op(node)
-                if resolved:
-                    from ops.registry import has_op
+        """求值字符串节点（委派给 eval_helpers）"""
+        return eval_str(self, node)
 
-                    if has_op(resolved):
-                        return self._apply(node, [])
-            return self._resolve_identifier(node)
-        return node
+    def _eval_symbol(self, symbol: str) -> Any:
+        """求值符号：变量 → 字面量 → 三态词 → IoT 设备 → 上下文对象（委派给 eval_helpers）"""
+        return eval_symbol(self, symbol)
 
-    def _eval_symbol(self, symbol: str):
-        """求值符号：变量 → 字面量 → 三态词 → IoT 设备 → 上下文对象"""
-        if self.has_var(symbol):
-            return self.get_var(symbol)
-        if symbol.isdigit() or (symbol.startswith('-') and symbol[1:].isdigit()):
-            return TritValue(int(symbol))
-        if self.skin_manager:
-            state = self.skin_manager.is_ternary_word(symbol)
-            if state is not None:
-                return TritValue(state)
-        if symbol in TritValue.STATE_MAP:
-            return TritValue(TritValue.STATE_MAP[symbol])
-        if '.' in symbol:
-            return self._eval_dot_symbol(symbol)
-        if '：' in symbol:
-            obj, attr = symbol.split('：')
-            return self._eval_symbol(obj + '.' + attr)
-        if self.context_object is not None:
-            return self._eval_context_symbol(symbol)
-        raise SanyanNameError(f'未定义的符号: {symbol}')
+    def _eval_dot_symbol(self, symbol: str) -> Any:
+        """解析 对象.属性 形式的 IoT 设备访问（委派给 eval_helpers）"""
+        from eval_helpers import _eval_dot_symbol
+        return _eval_dot_symbol(self, symbol)
 
-    def _eval_dot_symbol(self, symbol: str):
-        """解析 对象.属性 形式的 IoT 设备访问"""
-        obj, attr = symbol.split('.')
-        if obj in self.actuators:
-            val = TritValue.from_string(attr)
-            self.actuators[obj] = val
-            return val
-        if obj in self.sensors:
-            sensor_val = self.sensors[obj]
-            attr_val = TritValue.from_string(attr)
-            return TritValue(1 if sensor_val.symbol == attr_val.symbol else -1)
-        raise SanyanNameError(f'未定义的设备: {obj}')
+    def _eval_context_symbol(self, symbol: str) -> Any:
+        """在 对 作用域内解析符号为 IoT 设备操作（委派给 eval_helpers）"""
+        from eval_helpers import _eval_context_symbol
+        return _eval_context_symbol(self, symbol)
 
-    def _eval_context_symbol(self, symbol: str):
-        """在 对 作用域内解析符号为 IoT 设备操作"""
-        obj = self.context_object
-        if obj in self.actuators:
-            val = TritValue.from_string(symbol)
-            self.actuators[obj] = val
-            return val
-        if obj in self.sensors:
-            sensor_val = self.sensors[obj]
-            attr_val = TritValue.from_string(symbol)
-            return TritValue(1 if sensor_val.symbol == attr_val.symbol else -1)
-        if hasattr(self, 'device_registry'):
-            dev = self.device_registry.get(obj)
-            if dev:
-                val = TritValue.from_string(symbol)
-                dev.write(val)
-                return val
-        raise SanyanNameError(f'未定义的设备: {obj}')
-
-    def _pos(self, node) -> str:
+    def _pos(self, node: Any) -> str:
         """如果节点有源码位置，返回位置前缀。"""
         if isinstance(node, SrcNode) and (node.line or node.col):  # type: ignore[attr-defined]
             return f'第 {node.line} 行，第 {node.col} 列: '  # type: ignore[attr-defined]
         return ''
 
     def _apply(self, op: str, args: list) -> TritValue:
-        from typing import cast
         from ops.dispatcher import resolve_op_name, apply
 
         internal = resolve_op_name(self, op)
@@ -253,63 +162,18 @@ class SanyanEvaluator(SanyanRuntime):
             self._debug_after(internal, op, args)
 
     def _debug_before(self, internal: str, op: str, args: list) -> None:
-        if not self.debug_mode:
-            return
-        if not self._break_all and op not in self._break_ops and internal not in self._break_ops:
-            return
-        self._debug_prompt(internal or op, args)
+        """操作执行前的调试检查（委派给 debug_eval）"""
+        debug_before(self, internal, op, args)
 
     def _debug_after(self, internal: str, op: str, args: list) -> None:
-        if not self._watched_vars:
-            return
-        name = internal or op
-        if name not in self._watched_vars:
-            return
-        for v in self._watched_vars:
-            if self.has_var(v):
-                print(f'  [监视] {v} = {self.get_var(v)}')
+        """操作执行后的监视变量检查（委派给 debug_eval）"""
+        debug_after(self, internal, op, args)
 
     def _debug_prompt(self, cur_op: str, args: list) -> None:
-        from ops.io_ops import IOOps
-
-        fargs = ', '.join(IOOps.format_value(a) if not isinstance(a, str) else a for a in args)
-        print(f'\n⏸ [断点] {cur_op}({fargs})')
-        while True:
-            try:
-                cmd = input('调试> ').strip()
-            except (KeyboardInterrupt, EOFError):
-                print()
-                self.debug_mode = False
-                return
-            if cmd in ('', 'n', 'next'):
-                return
-            if cmd in ('c', 'continue'):
-                self.debug_mode = False
-                return
-            if cmd.startswith('p ') or cmd.startswith('print '):
-                var = cmd.split(maxsplit=1)[1].strip()
-                if self.has_var(var):
-                    val = self.get_var(var)
-                    print(f'  {var} = {IOOps.format_value(val) if not isinstance(val, str) else val}')
-                else:
-                    print(f'  {var}: 未定义')
-            elif cmd == 'bt':
-                print('\n  === 调用栈 ===')
-                for oname, oargs in self.call_stack:
-                    fa = ', '.join(str(a) for a in oargs)
-                    print(f'    at {oname}({fa})')
-                print('  =============')
-            elif cmd == 'q':
-                sys.exit(0)
-            else:
-                print('  命令: [Enter]/n=下一步  c=继续  p 变量  bt=调用栈  q=退出')
+        """调试断点交互提示（委派给 debug_eval）"""
+        debug_prompt(self, cur_op, args)
 
     @staticmethod
     def _is_valid_identifier(s: str) -> bool:
-        if not s:
-            return False
-        for c in s:
-            if c.isalnum() or c == '_' or c == '.' or '\u4e00' <= c <= '\u9fff' or '\u3400' <= c <= '\u4dbf':
-                continue
-            return False
-        return True
+        """检查是否为有效标识符（委派给 eval_helpers）"""
+        return is_valid_identifier(s)

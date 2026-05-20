@@ -55,7 +55,7 @@ gh run watch
 
 ```bash
 python -X utf8 tests/test_core.py -v      # 运行时核心单测 52 项
-python -X utf8 tests/test_commands.py -v  # 命令模块单测 19 项
+python -X utf8 tests/test_commands.py -v  # 命令模块单测 18 项
 python -X utf8 tests/test_parser.py       # 解析器 AST 校验 28 项
 python -X utf8 tests/test_ops.py -v       # ops 模块单测 78 项
 python -X utf8 tests/test_ops_ext.py -v   # 扩展 ops 单测 26 项
@@ -71,7 +71,7 @@ python -X utf8 tests/run_all.py           # 集成测试 38 项
 
 全部通过才算成功：
 - test_core.py 52/52
-- test_commands.py 19/19
+- test_commands.py 18/18
 - test_parser.py 28/28
 - test_ops.py 78/78
 - test_ops_ext.py 26/26（含 1 项 skip）
