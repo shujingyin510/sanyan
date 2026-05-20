@@ -46,7 +46,9 @@ def sync_builtin_ops_table():
     if table_start < 0:
         return
     section_end = manual.find('\n\n', table_start)
-    while section_end > 0 and (manual[section_end:section_end+3] in ('\n| ', '\n|`') or manual[section_end+1:section_end+2] == '|'):
+    while section_end > 0 and (
+        manual[section_end : section_end + 3] in ('\n| ', '\n|`') or manual[section_end + 1 : section_end + 2] == '|'
+    ):
         section_end = manual.find('\n\n', section_end + 1)
     if section_end < 0:
         section_end = len(manual)

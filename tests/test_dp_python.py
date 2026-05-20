@@ -29,7 +29,7 @@ class TestParseSanyan(unittest.TestCase):
     """镜像 dp.c 的 7 项测试"""
 
     def test_int(self):
-        ast = parse_sanyan("42")
+        ast = parse_sanyan('42')
         # S 表达式解析器将所有 token 保持为字符串
         self.assertEqual(ast, '42')
 
@@ -39,40 +39,40 @@ class TestParseSanyan(unittest.TestCase):
         self.assertEqual(ast, '"hello"')
 
     def test_identifier(self):
-        ast = parse_sanyan("x")
-        self.assertEqual(ast, "x")
+        ast = parse_sanyan('x')
+        self.assertEqual(ast, 'x')
 
     def test_list_add(self):
-        ast = parse_sanyan("(add 1 2)")
+        ast = parse_sanyan('(add 1 2)')
         self.assertIsInstance(ast, list)
-        self.assertEqual(ast[0], "add")
+        self.assertEqual(ast[0], 'add')
         # S 表达式保持所有 token 为字符串
         self.assertEqual(ast[1], '1')
         self.assertEqual(ast[2], '2')
 
     def test_list_if(self):
-        ast = parse_sanyan("(if 1 2 3)")
+        ast = parse_sanyan('(if 1 2 3)')
         self.assertIsInstance(ast, list)
-        self.assertEqual(ast[0], "if")
+        self.assertEqual(ast[0], 'if')
 
     def test_list_set(self):
-        ast = parse_sanyan("(set x 42)")
+        ast = parse_sanyan('(set x 42)')
         self.assertIsInstance(ast, list)
-        self.assertEqual(ast[0], "set")
-        self.assertEqual(ast[1], "x")
+        self.assertEqual(ast[0], 'set')
+        self.assertEqual(ast[1], 'x')
 
     def test_lambda(self):
-        ast = parse_sanyan("(fn (f x) (return x))")
+        ast = parse_sanyan('(fn (f x) (return x))')
         self.assertIsInstance(ast, list)
-        self.assertEqual(ast[0], "fn")
-        self.assertEqual(ast[1][0], "f")
-        self.assertEqual(ast[1][1], "x")
+        self.assertEqual(ast[0], 'fn')
+        self.assertEqual(ast[1][0], 'f')
+        self.assertEqual(ast[1][1], 'x')
 
     def test_nested_sexpr(self):
-        ast = parse_sanyan("(add (mul 2 3) 4)")
+        ast = parse_sanyan('(add (mul 2 3) 4)')
         self.assertIsInstance(ast, list)
-        self.assertEqual(ast[0], "add")
-        self.assertEqual(ast[1][0], "mul")
+        self.assertEqual(ast[0], 'add')
+        self.assertEqual(ast[1][0], 'mul')
 
     def test_multi_expr(self):
         """多表达式顶层返回第一个表达式（非 do 包裹）"""
@@ -82,14 +82,14 @@ class TestParseSanyan(unittest.TestCase):
         """
         ast = parse_sanyan(code)
         self.assertIsInstance(ast, list)
-        self.assertEqual(ast[0], "fn")
+        self.assertEqual(ast[0], 'fn')
 
     def test_utf8_identifiers(self):
-        ast = parse_sanyan("(词法分析 source)")
+        ast = parse_sanyan('(词法分析 source)')
         self.assertIsInstance(ast, list)
-        self.assertEqual(ast[0], "词法分析")
-        self.assertEqual(ast[1], "source")
+        self.assertEqual(ast[0], '词法分析')
+        self.assertEqual(ast[1], 'source')
 
 
-if __name__ == "__main__":
+if __name__ == '__main__':
     unittest.main()

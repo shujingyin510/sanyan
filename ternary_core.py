@@ -159,6 +159,7 @@ class TernaryALU:
         """定点除法：a / b，精度 precision 位。"""
         if TernaryALU.is_zero(b):
             from values import SanyanValueError
+
             raise SanyanValueError('ternary division by zero')
         a_int = BT.to_int(a)
         b_int = BT.to_int(b)
@@ -263,6 +264,7 @@ class TritValue:
         if word in TritValue.STATE_MAP:
             return TritValue(TritValue.STATE_MAP[word])
         from values import SanyanValueError
+
         raise SanyanValueError(f'未知的三态词: {word}')
 
     def to_int(self) -> int:
@@ -300,12 +302,14 @@ class ArrayValue:
     def get(self, index: int) -> object:
         if index < 0 or index >= self.length:
             from values import SanyanKeyError
+
             raise SanyanKeyError(f'数组索引越界: {index} (长度 {self.length})')
         return self.data[index]
 
     def set(self, index: int, value: object) -> 'ArrayValue':
         if index < 0 or index >= self.length:
             from values import SanyanKeyError
+
             raise SanyanKeyError(f'数组索引越界: {index} (长度 {self.length})')
         self.data[index] = value
         return self
@@ -413,6 +417,7 @@ def ternary_tan(x_trits: list, precision: Optional[int] = None) -> list:
     c = ternary_cos(x_trits, precision)
     if TernaryALU.is_zero(c):
         from values import SanyanValueError
+
         raise SanyanValueError('tan(x): cos(x) is zero')
     return TernaryALU.fixed_div(s, c, precision)
 
@@ -427,6 +432,7 @@ def ternary_sqrt(x_trits: list, precision: Optional[int] = None) -> list:
     x_int = BT.to_int(x_trits)
     if x_int < 0:
         from values import SanyanValueError
+
         raise SanyanValueError('sqrt: negative argument')
     # 初始猜测：x/2 或 1（取决于 x 是否大于 1），全部在定点域计算
     if x_int > scale:
@@ -464,6 +470,7 @@ def ternary_log(x_trits: list, precision: Optional[int] = None) -> list:
     x_int = BT.to_int(x_trits)
     if x_int <= 0:
         from values import SanyanValueError
+
         raise SanyanValueError('log: argument must be positive')
     one = _int_at_precision(1, precision)
     # 初始猜测：x/3 或 0.5（取决于 x 是否大于 2），全部在定点域
