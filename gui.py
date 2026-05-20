@@ -6,6 +6,7 @@ import re
 import sys
 import tkinter as tk
 from tkinter import filedialog, messagebox, ttk, scrolledtext
+from typing import Any, cast
 
 from VERSION import VERSION
 from skin import SkinManager
@@ -351,21 +352,21 @@ class SanyanIDE:
 
     def _make_toolbar(self, parent):
         tb = tk.Frame(parent, relief='raised', bd=1, bg='#e8e8e8')
-        s = {'relief': 'raised', 'bd': 1, 'bg': '#e8e8e8', 'font': ('微软雅黑', 8), 'padx': 6, 'pady': 1}
-        tk.Button(tb, text='新建', command=self._new_file, **s).pack(side='left', padx=2, pady=2)
-        tk.Button(tb, text='打开', command=self._open_file, **s).pack(side='left', padx=2, pady=2)
-        tk.Button(tb, text='保存', command=self._save_file, **s).pack(side='left', padx=2, pady=2)
+        btn = lambda parent, **kw: tk.Button(parent, relief='raised', bd=1, bg='#e8e8e8', font=('微软雅黑', 8), padx=6, pady=1, **kw)
+        btn(tb, text='新建', command=self._new_file).pack(side='left', padx=2, pady=2)
+        btn(tb, text='打开', command=self._open_file).pack(side='left', padx=2, pady=2)
+        btn(tb, text='保存', command=self._save_file).pack(side='left', padx=2, pady=2)
         tk.Frame(tb, width=4, relief='sunken', bd=1, bg='#c0c0c0').pack(side='left', fill='y', padx=4, pady=2)
-        self._run_btn = tk.Button(tb, text='▶ 运行', command=self._run_code, **s)
+        self._run_btn = btn(tb, text='▶ 运行', command=self._run_code)
         self._run_btn.pack(side='left', padx=2, pady=2)
-        self._debug_btn = tk.Button(tb, text='⚫ 调试', command=self._debug_run, **s)
+        self._debug_btn = btn(tb, text='⚫ 调试', command=self._debug_run)
         self._debug_btn.pack(side='left', padx=2, pady=2)
-        self._step_btn = tk.Button(tb, text='↘ 单步', command=self._debug_step, state='disabled', **s)
+        self._step_btn = btn(tb, text='↘ 单步', command=self._debug_step, state='disabled')
         self._step_btn.pack(side='left', padx=2, pady=2)
-        self._cont_btn = tk.Button(tb, text='▶ 继续', command=self._debug_continue, state='disabled', **s)
+        self._cont_btn = btn(tb, text='▶ 继续', command=self._debug_continue, state='disabled')
         self._cont_btn.pack(side='left', padx=2, pady=2)
         tk.Frame(tb, width=4, relief='sunken', bd=1, bg='#c0c0c0').pack(side='left', fill='y', padx=4, pady=2)
-        tk.Button(tb, text='清空输出', command=self._clear_output, **s).pack(side='left', padx=2, pady=2)
+        btn(tb, text='清空输出', command=self._clear_output).pack(side='left', padx=2, pady=2)
         return tb
 
     def _build_ui(self):
@@ -686,6 +687,7 @@ class SanyanIDE:
     def _debug_continue_execution(self):
         self._set_status('调试运行中...')
         self.root.update()
+        assert self._debug_env is not None
         try:
             result = self._debug_env.eval(self._debug_ast)
             if result is not None:
@@ -705,7 +707,7 @@ class SanyanIDE:
         buf = io.StringIO()
         sys.stdout = buf
         try:
-            ast = None
+            ast: Any = None
             sugar_error = None
             try:
                 ast = SugarConverter.convert(code, skin_mgr)
@@ -756,7 +758,7 @@ class SanyanIDE:
         buf = io.StringIO()
         sys.stdout = buf
         try:
-            ast = None
+            ast: Any = None
             try:
                 ast = SugarConverter.convert(code, skin_mgr)
             except SyntaxError:
