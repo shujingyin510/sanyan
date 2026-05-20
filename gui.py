@@ -6,7 +6,7 @@ import re
 import sys
 import tkinter as tk
 from tkinter import filedialog, messagebox, ttk, scrolledtext
-from typing import Any, cast
+from typing import Any
 
 from VERSION import VERSION
 from skin import SkinManager
@@ -352,9 +352,10 @@ class SanyanIDE:
 
     def _make_toolbar(self, parent):
         tb = tk.Frame(parent, relief='raised', bd=1, bg='#e8e8e8')
-        btn = lambda parent, **kw: tk.Button(
-            parent, relief='raised', bd=1, bg='#e8e8e8', font=('微软雅黑', 8), padx=6, pady=1, **kw
-        )
+
+        def btn(parent, **kw):
+            return tk.Button(parent, relief='raised', bd=1, bg='#e8e8e8', font=('微软雅黑', 8), padx=6, pady=1, **kw)
+
         btn(tb, text='新建', command=self._new_file).pack(side='left', padx=2, pady=2)
         btn(tb, text='打开', command=self._open_file).pack(side='left', padx=2, pady=2)
         btn(tb, text='保存', command=self._save_file).pack(side='left', padx=2, pady=2)

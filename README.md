@@ -561,4 +561,4 @@ Philosophy: uncertainty is not a bug — it's a legitimate computational state.
 
 ## License
 
-MIT (c) 2025
+GNU General Public License v3.0 (GPL-3.0)
