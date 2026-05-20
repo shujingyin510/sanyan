@@ -383,8 +383,7 @@ class SanyanIDE:
         )
         self.file_tree = ttk.Treeview(left_frame, columns=(), show='tree', height=8)
         self.file_tree.pack(fill='both', expand=True)
-        self.file_tree.insert('', 'end', text='examples', open=True)
-        self.file_tree.insert('', 'end', text='stdlib', open=True)
+        self._populate_tree()
         self.file_tree.bind('<Double-1>', self._on_tree_double)
         main_pw.add(left_frame, weight=0)
         right_frame = ttk.Frame(main_pw)
@@ -486,17 +485,49 @@ class SanyanIDE:
     def _show_about(self):
         messagebox.showinfo('关于三言', f'三言 v{VERSION}\n\n中文三进制编程语言\n母语可定制 · 三态逻辑 · 万物互联')
 
+    def _populate_tree(self):
+        self.file_tree.delete(*self.file_tree.get_children())
+        for root_dir in ('examples', 'stdlib'):
+            if os.path.isdir(root_dir):
+                parent = self.file_tree.insert('', 'end', text=root_dir, open=True, values=[root_dir])
+                self._populate_subtree(parent, root_dir)
+
+    def _populate_subtree(self, parent, path):
+        try:
+            entries = sorted(os.listdir(path))
+        except OSError:
+            return
+        for entry in entries:
+            full = os.path.join(path, entry)
+            if os.path.isdir(full):
+                node = self.file_tree.insert(parent, 'end', text=entry, values=[full])
+                self.file_tree.insert(node, 'end', text='')  # dummy child for expand arrow
+            elif entry.endswith('.san'):
+                self.file_tree.insert(parent, 'end', text=entry, values=[full])
+
+    def _expand_dir(self, parent, path):
+        existing = self.file_tree.get_children(parent)
+        if existing:
+            first = existing[0]
+            first_text = self.file_tree.item(first, 'text')
+            if not first_text:
+                # dummy child present — delete and populate
+                self.file_tree.delete(*existing)
+                self._populate_subtree(parent, path)
+
     def _on_tree_double(self, event):
         sel = self.file_tree.selection()
         if not sel:
             return
         item = sel[0]
-        text = self.file_tree.item(item, 'text')
-        for root_dir in ('examples', 'stdlib'):
-            path = os.path.join(root_dir, text)
-            if os.path.isfile(path):
-                self._open_file(path)
-                return
+        vals = self.file_tree.item(item, 'values')
+        if not vals:
+            return
+        full = vals[0]
+        if os.path.isdir(full):
+            self._expand_dir(item, full)
+        elif os.path.isfile(full) and full.endswith('.san'):
+            self._open_file(full)
 
     def _show_find(self):
         self.find_bar.show()
