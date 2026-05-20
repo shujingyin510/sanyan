@@ -7,57 +7,42 @@ on:
     branches: [main, master]
 
 jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: python -m pip install --upgrade pip
+      - run: pip install .[dev]
+      - run: ruff format --check .
+      - run: ruff check .
+      - run: mypy .
+
   test:
     runs-on: ubuntu-latest
     strategy:
       matrix:
         python-version: ["3.12", "3.13"]
-
     steps:
       - uses: actions/checkout@v4
-
       - name: Set up Python ${{ matrix.python-version }}
         uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.python-version }}
-
-      - name: Install dependencies
-        run: |
-          python -m pip install --upgrade pip
-          pip install llvmlite
-
-      - name: Core unit tests
-        run: python -X utf8 tests/test_core.py -v
-
-      - name: Commands tests
-        run: python -X utf8 tests/test_commands.py -v
-
-      - name: Parser AST tests
-        run: python -X utf8 tests/test_parser.py
-
-      - name: Ops module tests
-        run: python -X utf8 tests/test_ops.py -v
-
-      - name: Extended ops tests
-        run: python -X utf8 tests/test_ops_ext.py -v
-
-      - name: LSP tests
-        run: python -X utf8 tests/test_lsp.py -v
-
-      - name: Package manager tests
-        run: python -X utf8 tests/test_package.py -v
-
-      - name: IoT tests
-        run: python -X utf8 tests/test_iot.py -v
-
-      - name: sugar.san tests
-        run: python -X utf8 tests/test_sugar_san.py -v
-
-      - name: LLVM codegen tests
-        run: python -X utf8 tests/test_llvmgen.py -v
-
-      - name: Integration tests
-        run: python -X utf8 tests/run_all.py
-
-      - name: Documentation sync check
-        run: python -X utf8 doc_sync.py
+      - run: python -m pip install --upgrade pip
+      - run: pip install llvmlite
+      - run: python -X utf8 tests/test_core.py -v
+      - run: python -X utf8 tests/test_commands.py -v
+      - run: python -X utf8 tests/test_parser.py
+      - run: python -X utf8 tests/test_ops.py -v
+      - run: python -X utf8 tests/test_ops_ext.py -v
+      - run: python -X utf8 tests/test_lsp.py -v
+      - run: python -X utf8 tests/test_package.py -v
+      - run: python -X utf8 tests/test_iot.py -v
+      - run: python -X utf8 tests/test_sugar_san.py -v
+      - run: python -X utf8 tests/test_llvmgen.py -v
+      - run: python -X utf8 tests/test_dp_python.py -v
+      - run: python -X utf8 tests/run_all.py
+      - run: python -X utf8 doc_sync.py
