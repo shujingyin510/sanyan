@@ -148,14 +148,22 @@ def _parse_with_sugar_san(code, evaluator):
 
 
 def _parse_code(code, evaluator):
-    """解析代码：sugar.san 自举解析 → S-表达式降级。"""
+    """解析代码：sugar.san 自举解析 → SugarConverter → S-表达式降级。"""
     ast = _parse_with_sugar_san(code, evaluator)
     if ast is not None:
         return ast
+    try:
+        from sugar import SugarConverter
+        ast = SugarConverter.convert(code, evaluator.skin_manager)
+        if ast is not None:
+            return ast
+    except SyntaxError:
+        pass
     from lexer import tokenize
     from parser import parse
 
-    tokens = tokenize(code)
+    wrapped = '(do\n' + code + '\n)'
+    tokens = tokenize(wrapped)
     return parse(tokens)
 
 
@@ -280,7 +288,33 @@ class FileOps:
 
 
 # 注册文件操作
+    @staticmethod
+    def write_binary_op(evaluator, args):
+        """写二进制文件：路径和整数列表 → 原始字节写入。"""
+        if len(args) != 2:
+            raise SanyanSyntaxError('写二进制 需要路径和字节列表')
+        path = evaluator.eval(args[0])
+        data = evaluator.eval(args[1])
+        if hasattr(path, 'to_int'):
+            path = str(path.to_int())
+        path = _resolve_path(path, auto_stdlib=False)
+        if not isinstance(data, list):
+            raise SanyanTypeError('第二个参数必须是整数列表')
+        raw_bytes = bytearray()
+        for b in data:
+            if isinstance(b, TritValue):
+                b = b.to_int()
+            raw_bytes.append(b & 0xFF)
+        try:
+            with open(str(path), 'wb') as f:
+                f.write(bytes(raw_bytes))
+        except (IOError, OSError) as e:
+            raise SanyanIOError(f'写二进制失败: {e}')
+        return TritValue(0)
+
+
 register('read_file', FileOps.read_file_op)
 register('write_file', FileOps.write_file_op)
+register('write_binary', FileOps.write_binary_op)
 register('load', FileOps._load_file)
 register('import', FileOps.import_module)

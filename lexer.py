@@ -1,4 +1,14 @@
-"""词法分析器：将源代码字符串切割成 token 列表"""
+"""词法分析器：将源代码字符串切割成 token 列表
+
+支持两种注释语法：
+  // 行注释（半角）
+  ／／ 行注释（全角）
+从 // 或 ／／ 到行尾的内容被跳过，不产生 token。
+
+支持全角括号（ ）映射到半角 ( )。
+支持 . 点号访问语法（obj.attr）。
+"""
+
 
 from runtime import BUILTIN_OPS
 
@@ -11,6 +21,15 @@ def tokenize(code: str) -> list:
     i = 0
     while i < len(code):
         c = code[i]
+        # // 和 ／／ 行注释：跳过本行剩余内容
+        if c == '/' and i + 1 < len(code) and code[i + 1] == '/':
+            while i < len(code) and code[i] != '\n':
+                i += 1
+            continue
+        if c == '\uff0f' and i + 1 < len(code) and code[i + 1] == '\uff0f':
+            while i < len(code) and code[i] != '\n':
+                i += 1
+            continue
         if c == '（':
             if current:
                 tokens.append(current)

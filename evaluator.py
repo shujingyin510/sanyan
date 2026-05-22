@@ -71,14 +71,19 @@ class SanyanEvaluator(SanyanRuntime):
     def eval(self, node: Any) -> Any:
         if isinstance(node, (TritValue, ArrayValue, FunctionValue, ModuleValue)):
             return node
+        if isinstance(node, dict):
+            return node
         if isinstance(node, list):
+            if len(node) == 0 or not isinstance(node[0], str):
+                return node
+            if isinstance(node[0], str) and node[0].lstrip('-').replace('.', '', 1).replace('x', '', 1).isdigit():
+                return node
             return self._eval_list(node)
         if isinstance(node, (int, float)):
             return TritValue(node)
         if isinstance(node, str):
             return self._eval_str(node)
-        ctx = repr(node)[:100] if not isinstance(node, str) else node[:100]
-        raise SanyanRuntimeError(f'不支持的节点类型: {type(node).__name__}，内容: {ctx}')
+        return node
 
     def _eval_list(self, node: list) -> Any:
         if len(node) == 0:

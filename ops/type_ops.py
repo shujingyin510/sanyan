@@ -50,6 +50,15 @@ class TypeOps:
         return TritValue(-1)
 
     @staticmethod
+    def is_dict(evaluator, args):
+        if len(args) != 1:
+            raise SanyanSyntaxError('是字典 需要一个参数')
+        val = evaluator.eval(args[0])
+        if isinstance(val, dict):
+            return TritValue(1)
+        return TritValue(-1)
+
+    @staticmethod
     def str_equals(evaluator, args):
         if len(args) != 2:
             raise SanyanSyntaxError('字符串相等 需要两个参数')
@@ -58,6 +67,22 @@ class TypeOps:
         if isinstance(a, str) and isinstance(b, str):
             return TritValue(1 if a == b else -1)
         return TritValue(-1)
+
+    @staticmethod
+    def to_number(evaluator, args):
+        if len(args) != 1:
+            raise SanyanSyntaxError('to_number 需要一个参数')
+        val = evaluator.eval(args[0])
+        if isinstance(val, TritValue):
+            return val
+        if isinstance(val, (int, float)):
+            return TritValue(val)
+        if isinstance(val, str):
+            try:
+                return TritValue(int(val)) if val.isdigit() or (val.startswith('-') and val[1:].isdigit()) else TritValue(float(val))
+            except (ValueError, TypeError):
+                raise SanyanTypeError(f"无法将 '{val}' 转换为数字")
+        raise SanyanTypeError(f"无法将 {type(val).__name__} 转换为数字")
 
     @staticmethod
     def to_string(evaluator, args):
@@ -81,5 +106,7 @@ register('sleep', TypeOps.sleep_op)
 register('is_number', TypeOps.is_number)
 register('is_string', TypeOps.is_string)
 register('is_list', TypeOps.is_list)
+register('is_dict', TypeOps.is_dict)
 register('str_equals', TypeOps.str_equals)
 register('to_string', TypeOps.to_string)
+register('to_number', TypeOps.to_number)

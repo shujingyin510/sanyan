@@ -1,5 +1,22 @@
 # AGENTS.md — 三言项目维护约定
 
+## 自举状态（2026-05）
+
+**完全自举已达成。** VM 编译产出 `stdlib/bytecode_compiler.bin` 与求值器编译产出逐字节相同（5442 字节，5406 字节码）。
+
+VM 关键修复：
+- `DICT_SET` 不 push 返回值（消除主栈泄漏源）
+- `CALL` 记录 `stack_base = len(stack) - arg_count`，`RET` 执行 `del stack[base:]`（栈隔离）
+- `from_bin` 自动运行模块初始化代码
+- `_exec_frame` 正确隔离外层 vars
+- 新增 `DICT_KEYS`(0x32) 操作码
+
+编译器关键修复：
+- `(等于 (ord (子串 n 0 1)) 34)` 替代 `(str_equals ... "\"")`（tokenizer 不认 `\"` 转义）
+- `(set op "set")` 对非列表节点
+- `编译做体` 函数（DO 体循环编译）
+- OP映射 补全了中英文双语别名
+
 ## 环境
 
 - **Python**: `python`（≥3.12，`pyproject.toml` 要求）
@@ -66,7 +83,7 @@ python -X utf8 tests/test_sugar_san.py -v # sugar.san 测试 45 项
 python -X utf8 tests/test_llvmgen.py -v   # LLVM 代码生成测试 53 项
 python -X utf8 tests/test_dp_python.py -v # S 表达式解析测试 10 项
 python -X utf8 tests/test_llvm_native.py -v # LLVM 原生编译测试（需 C 编译器）
-python -X utf8 tests/run_all.py           # 集成测试 38 项
+python -X utf8 tests/run_all.py           # 集成测试 41 项
 ```
 
 全部通过才算成功：
@@ -82,7 +99,7 @@ python -X utf8 tests/run_all.py           # 集成测试 38 项
 - test_llvmgen.py 53/53
 - test_dp_python.py 10/10
 - test_llvm_native.py（需 C 编译器，否则 skip）
-- run_all.py 38/38
+- run_all.py 41/41
 
 Python 文档同步：首次或每次代码修改后建议运行：
 ```bash

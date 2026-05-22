@@ -1,7 +1,7 @@
 """容器操作：列表、数组、字典、通用索引、映射/过滤/归并"""
 
 from ternary_core import TritValue, ArrayValue
-from values import FunctionValue, call_function
+from values import FunctionValue, ModuleValue, call_function
 from values import SanyanSyntaxError, SanyanTypeError, SanyanValueError, SanyanKeyError, to_num
 from ops.registry import register
 
@@ -22,8 +22,12 @@ class ContainerOps:
 
     @staticmethod
     def list_concat(evaluator, args):
-        result = []
-        for arg in args:
+        if not args:
+            return []
+        result = evaluator.eval(args[0])
+        if not isinstance(result, list):
+            raise SanyanTypeError('所有参数必须是列表')
+        for arg in args[1:]:
             lst = evaluator.eval(arg)
             if not isinstance(lst, list):
                 raise SanyanTypeError('所有参数必须是列表')
@@ -163,7 +167,7 @@ class ContainerOps:
         if len(args) < 1:
             raise SanyanSyntaxError('应用 需要函数和参数')
         func = evaluator.eval(args[0])
-        func_args = args[1:]
+        func_args = [evaluator.eval(a) for a in args[1:]]
         return call_function(evaluator, func, func_args)
 
     @staticmethod
@@ -347,6 +351,20 @@ class ContainerOps:
         return delim.join(parts)
 
 
+
+    @staticmethod
+    def module_call(evaluator, args):
+        if len(args) < 2:
+            raise SanyanSyntaxError('模块调用 需要至少2个参数')
+        mod = evaluator.eval(args[0])
+        if not isinstance(mod, ModuleValue):
+            raise SanyanTypeError('第一个参数必须是模块')
+        func_name = evaluator.eval(args[1])
+        if not isinstance(func_name, str):
+            raise SanyanTypeError('第二个参数必须是字符串')
+        call_args = [evaluator.eval(a) for a in args[2:]]
+        return mod.call(evaluator, [func_name] + call_args)
+
 # 注册容器操作
 register('list', ContainerOps.list_new)
 register('list_concat', ContainerOps.list_concat)
@@ -373,3 +391,4 @@ register('unique', ContainerOps.list_unique)
 register('slice', ContainerOps.list_slice)
 register('sum', ContainerOps.list_sum)
 register('join', ContainerOps.list_join)
+register('module_call', ContainerOps.module_call)

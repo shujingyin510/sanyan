@@ -16,7 +16,7 @@ from ternary_core import _int_at_precision
 from values import SanyanSyntaxError, SanyanTypeError, SanyanValueError
 from ops.registry import register
 
-_DEFAULT_PRECISION = 16
+_DEFAULT_PRECISION = 32
 
 
 def _ensure_trits(val, precision=None):

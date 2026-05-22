@@ -33,6 +33,7 @@
     "is_number": "是数字",
     "is_string": "是字符串",
     "is_list": "是列表",
+    "is_dict": "是字典",
     "str_equals": "字符串相等",
     "to_string": "字符串",
     "apply": "应用",
@@ -96,7 +97,8 @@
     "ternary": "三进制",
     "to_json": "转JSON",
     "from_json": "解析JSON",
-    "register_device": "注册设备"
+    "register_device": "注册设备",
+    "write_binary": "写二进制"
   },
   "operators": {
     "add": "加",

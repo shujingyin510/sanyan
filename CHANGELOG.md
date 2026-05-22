@@ -2,6 +2,38 @@
 
 ---
 
+## [v3.14.0] — 2026-05-23
+
+### 新增
+- **字节码 VM 完整自举**: VM 编译 `stdlib/bytecode_compiler.bin` 与求值器编译产出逐字节相同（5442 字节，5406 字节码），实现完全自举
+- **行注释支持** (`lexer.py`): 新增 `//`（半角）和 `／／`（全角）行注释语法，tokenizer 自动跳过注释行
+- **DICT_KEYS 操作码** (`vm.py`): 新增 0x32 操作码，返回字典键列表（`字列` 映射修复）
+- **退出控制流注册** (`ops/control_ops.py`): 注册 `退出` 为 `return_op`，供后续 if-else 重构使用
+
+### 修复
+- **VM 栈隔离** (`vm.py`): CALL 指令记录 `stack_base = len(stack) - arg_count`，RET 指令执行 `del stack[base:]` 清理被调方泄漏值，消除 JMP 循环 + 递归 CALL 的栈污染
+- **VM STORE 扫描** (`vm.py`): CALL 时扫描被调函数序言的连续 STORE 指令自动推算参数个数，确保 `stack_base` 计算正确
+- **VM DICT_SET 去 push** (`vm.py`): DICT_SET 不再将修改后的 dict 推回栈（所有调用方为纯副作用），消除 fn handler 作用域复制循环的栈泄漏
+- **VM _exec_frame 变量隔离** (`vm.py`): 修正 `_exec_frame` 对外层 `vars` 引用的保存/恢复逻辑，避免内层变量污染外层
+- **VM from_bin 初始化** (`vm.py`): 加载 `.bin` 后自动执行模块初始化代码（PC=0 至代码末尾），填充全局变量
+- **SLICE 操作码** (`vm.py`): 修正 2 参数 / 3 参数形式的参数顺序，增加非整数索引保护
+- **发射i32 溢出** (`bytecode_compiler.san`): 移除 `(mod v 4294967296)`，2^32 在有符号 PUSH_I 中溢出为 0
+- **字符串引号检测** (`bytecode_compiler.san`): 改用 `(等于 (ord (子串 n 0 1)) 34)` 替代 `(str_equals ... "\"")`，因 tokenizer 不认 `\"` 转义
+- **OP映射全别名** (`bytecode_compiler.san`): 补全所有内置操作的中英文双语别名
+- **非列表节点 op** (`bytecode_compiler.san`): 对非列表节点设 `op = "set"`，确保数字/字符串处理器内部 SET 表达式被正确匹配
+
+### 变更
+- **编译节点重构** (`bytecode_compiler.san`): 新增 `编译做体` 函数（DO 体循环编译），`字列` 映射从 LIST_LEN 改为 DICT_KEYS
+- **三进制运行时** (`ternary_core.py`): TritValue 增加 `__mod__` 支持
+- **版本号**: 更新至 v3.14.0
+
+### 文档
+- **README.md**: 版本号更新至 v3.14.0
+- **AGENTS.md**: 新增自举状态章节，更新测试命令
+- **项目文件添加注释**: `vm.py`、`lexer.py`、`ops/control_ops.py`、`bytecode_compiler.san` 添加完整中文注释
+
+---
+
 ## [v3.13.0] — 2026-05-20
 
 ### 新增

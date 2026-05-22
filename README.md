@@ -1,4 +1,4 @@
-# 三言 Sanyan v3.13.0
+# 三言 Sanyan v3.14.0
 
 [![VS Code Marketplace](https://img.shields.io/badge/VS%20Code-Marketplace-%23007ACC?logo=visualstudiocode)](https://marketplace.visualstudio.com/items?itemName=sanyan-lang.sanyan-language)
 [![CI](https://github.com/shujingyin510/sanyan/actions/workflows/ci.yml/badge.svg)](https://github.com/shujingyin510/sanyan/actions)
@@ -274,6 +274,19 @@ tests/
 | `{ expr1; expr2 }` | `（做 expr1 expr2）` |
 | `定义 f (x) { 返回(x+1) }` | `（定义 f （x） （返回 （+ x 1）））` |
 | `若 (x > 0) { … } 否则 { … }` | `（若 （大于 x 0） … …）` |
+
+## 新增特性速览（v3.14.0）
+
+| 特性 | 说明 |
+|---|---|
+| 🔄 **字节码 VM 完全自举** | VM 编译 `stdlib/bytecode_compiler.bin` 与求值器产出逐字节相同（5442 字节，5406 字节码） |
+| 🛡️ **CALL/RET 栈隔离** | `stack_base` 记录 + `del stack[base:]` 清理，消除递归 CALL + JMP 循环的栈污染 |
+| 🔧 **DICT_SET 副作用优化** | 不再推回修改后的 dict，消除 fn handler 作用域复制循环的栈泄漏 |
+| 📝 **行注释支持** | `//`（半角）和 `／／`（全角）行注释，tokenizer 自动跳过 |
+| 🆕 **DICT_KEYS 操作码** | 新增 0x32 操作码，`字列` 正确返回字典键列表 |
+| 🐛 **字符串引号检测修复** | 用 `(ord (子串 n 0 1))` 替代转义不可靠的 `str_equals "\""` |
+| 🐛 **发射i32 溢出修复** | 直接拆 4 字节，不用 `(mod v 2^32)` 防止有符号溢出 |
+| 📝 **编译器注释化** | `bytecode_compiler.san` 73 行可读格式，`//` 注释覆盖全函数 |
 
 ## 新增特性速览（v3.13.0）
 

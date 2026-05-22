@@ -10,7 +10,9 @@
 from __future__ import annotations
 import struct
 
-# ── 指令集（与 sanyancc.py / runtime_stm32.c 一致） ──
+# ═══════════════════════════════════════════════════════════════
+# 指令集（与 sanyancc.py / runtime_stm32.c 一致）
+# ═══════════════════════════════════════════════════════════════
 NOP = 0x00
 PUSH_I = 0x01
 ADD = 0x02
@@ -36,6 +38,32 @@ GTE = 0x15
 LTE = 0x16
 NOT = 0x17
 WAIT = 0x18
+CONCAT = 0x19
+STRLEN = 0x1A
+STRSUB = 0x1B
+STREQ = 0x1C
+DICT = 0x1D
+DICT_GET = 0x1E
+DICT_SET = 0x1F
+DICT_HAS = 0x20
+IS_NUM = 0x21
+IS_STR = 0x22
+IS_LIST = 0x23
+SAME = 0x24
+GET = 0x25
+SET_ELEMENT = 0x26
+LIST_NEW = 0x27
+LIST_CONCAT = 0x28
+SLICE = 0x29
+LIST_LEN = 0x2A
+READ_FILE = 0x2B
+WRITE_FILE = 0x2C
+PUSH_STR = 0x2D
+IMPORT = 0x2E
+CALL_EXT = 0x2F
+WRITE_BINARY = 0x30
+ORD = 0x31
+DICT_KEYS = 0x32
 HALT = 0xFF
 
 OP_NAMES = {v: k for k, v in vars().items() if isinstance(v, int) and k.isupper()}
@@ -49,146 +77,518 @@ class VM:
     """栈式字节码虚拟机
 
     与 runtime_stm32.c 的 vm_run() 等效的 Python 实现。
+
+    关键状态:
+        code       — 当前执行的字节码数组（只读，不修改）
+        pc         — 程序计数器（指向下一条要执行的指令）
+        stack      — 数据栈（运算数、函数参数、返回值）
+        vars       — 变量数组（STORE 写入、LOAD 读取，长度固定）
+        call_stack — 调用栈：每帧为 (返回地址, vars快照)
+        halted     — 是否已停机
     """
 
-    def __init__(self, code: bytearray, vars_count: int = 256):
+    def __init__(self, code: bytearray, vars_count: int = 256, exports: dict = None):
         self.code = code
         self.pc = 0
-        self.stack: list[int] = []
-        self.vars: list[int] = [0] * max(vars_count, 1)
+        self.stack: list = []
+        self.vars: list = [0] * max(vars_count, 1)
         self.halted = False
-        self.call_stack: list[int] = []
+        self.call_stack: list[tuple[int, list]] = []
+        self.exports: dict[str, int] = exports or {}
+        self.modules: dict[str, 'VM'] = {}
+        self.modules_by_id: dict[int, 'VM'] = {}
 
-    @classmethod
-    def from_bin(cls, path: str) -> VM:
-        """从 sanyancc.py 生成的 .bin 文件加载字节码。"""
-        with open(path, 'rb') as f:
-            data = f.read()
-        magic, ver, vc, sz = struct.unpack_from('<4sBBH', data, 0)
-        if magic != b'SAN0':
-            raise VMError(f'无效的字节码文件: magic={magic!r}')
-        code = bytearray(data[8 : 8 + sz])
-        return cls(code, vc)
+    # ── 导出查找 ─────────────────────────────────────────────
+    def get_export(self, name: str) -> int | None:
+        return self.exports.get(name)
 
+    # ── 模块注册与导入 ───────────────────────────────────────
+    def register_module(self, name: str, vm: 'VM') -> None:
+        self.modules[name] = vm
+        self.modules_by_id[id(vm)] = vm
+
+    def import_module(self, path: str) -> int:
+        """导入另一个 .bin 模块，返回模块句柄。"""
+        vm = VM.from_bin(path)
+        name = path.split('/')[-1].replace('.bin', '')
+        self.modules[name] = vm
+        self.modules_by_id[id(vm)] = vm
+        return id(vm)
+
+    # ═══════════════════════════════════════════════════════════
+    # 帧执行：在独立的模块帧中执行字节码
+    #
+    # 保存当前 code/pc/vars/call_stack，切换到目标模块的帧，
+    # 执行完毕后恢复。CALL_EXT 指令依赖此方法实现跨模块调用。
+    # ═══════════════════════════════════════════════════════════
+    def _exec_frame(self, code, start_pc, args: list = None) -> None:
+        """在一个模块帧中执行字节码。
+        
+        保存当前的 code/pc/vars/call_stack，切换到目标帧执行，
+        执行完毕后完整恢复。注意：vars 用 copy 隔离，避免内部修改
+        污染外层变量（这是 JMP 循环 + 递归 CALL 能正常工作的关键）。
+        """
+        old_code = self.code
+        old_pc = self.pc
+        old_vars = self.vars                    # 保存外层 vars 引用
+        old_call_stack = list(self.call_stack)
+
+        self.call_stack.clear()
+        self.code = code
+        self.pc = start_pc
+        self.vars = list(old_vars)              # 使用独立副本执行
+        if args:
+            for val in args:
+                self.stack.append(val)
+
+        self._run_inner()
+
+        # 完整恢复外层状态（关键：vars 回原来的引用，不保留内部修改）
+        self.code = old_code
+        self.pc = old_pc
+        self.vars = old_vars
+        self.call_stack = old_call_stack
+
+    # ═══════════════════════════════════════════════════════════
+    # 指令读取辅助方法
+    # ═══════════════════════════════════════════════════════════
     def _read_i16(self) -> int:
+        """读取有符号 16 位整数，pc 前进 2 字节"""
         val: int = struct.unpack_from('<h', self.code, self.pc)[0]
         self.pc += 2
         return val
 
     def _read_i32(self) -> int:
+        """读取有符号 32 位整数，pc 前进 4 字节"""
         val: int = struct.unpack_from('<i', self.code, self.pc)[0]
         self.pc += 4
         return val
 
-    def run(self) -> None:
-        """执行字节码直到遇到 HALT 或运行完毕。"""
+    # ═══════════════════════════════════════════════════════════
+    # 主执行循环
+    #
+    # 设计原则:
+    #   1. 每条指令 self.pc 始终指向"下一条指令的首字节"
+    #   2. CALL 保存 (返回地址, vars快照) 到 call_stack，然后跳转
+    #   3. RET 从 call_stack 弹出帧，恢复 pc 和 vars
+    #   4. JMP/JZ/JNZ 使用有符号相对偏移（从指令末尾算起）
+    #   5. 循环内的 CALL/RET 不干扰 JMP 跳转目标（call_stack 独立管理）
+    # ═══════════════════════════════════════════════════════════
+    def _run_inner(self) -> None:
+        """内部执行循环。"""
         while not self.halted and self.pc < len(self.code):
             op = self.code[self.pc]
             self.pc += 1
 
-            if op == NOP:
-                pass
+            if op == HALT:
+                self.halted = True
+                return
+
+            # ── 控制流 ───────────────────────────────────────
+            elif op == RET:
+                if self.call_stack:
+                    pc, saved_vars, stack_base = self.call_stack.pop()
+                    # 安全检查：栈不应低于调用基线
+                    if len(self.stack) < stack_base:
+                        raise VMError(
+                            f"栈下溢: stack={len(self.stack)} < base={stack_base}, "
+                            f"func_return_pc={pc:#x}"
+                        )
+                    ret_val = self.stack.pop() if len(self.stack) > stack_base else None
+                    del self.stack[stack_base:]
+                    if ret_val is not None:
+                        self.stack.append(ret_val)
+                    self.pc = pc
+                    self.vars = saved_vars
+                else:
+                    break
+
+            elif op == JMP:
+                off = self._read_i16()
+                self.pc += off
+
+            elif op == JZ:
+                off = self._read_i16()
+                if self.stack.pop() == 0:
+                    self.pc += off
+
+            elif op == JNZ:
+                off = self._read_i16()
+                if self.stack.pop() != 0:
+                    self.pc += off
+
+            elif op == CALL:
+                addr = self._read_i16()
+                if addr == 0:
+                    pass
+                else:
+                    # 从函数入口开始数连续 STORE = 参数个数
+                    # 函数入口 = JMP skip 之后的第一条指令
+                    arg_count = 0
+                    p = addr
+                    while p + 1 < len(self.code) and self.code[p] == STORE:
+                        arg_count += 1
+                        p += 2
+                    # base = 调用方推参数前的栈深
+                    caller_base = len(self.stack) - arg_count
+                    self.call_stack.append((self.pc, list(self.vars), caller_base))
+                    self.pc = addr
+
+            # ── 栈操作 ───────────────────────────────────────
             elif op == PUSH_I:
                 self.stack.append(self._read_i32())
-            elif op == ADD:
-                b = self.stack.pop()
-                a = self.stack.pop()
-                self.stack.append(a + b)
-            elif op == SUB:
-                b = self.stack.pop()
-                a = self.stack.pop()
-                self.stack.append(a - b)
-            elif op == MUL:
-                b = self.stack.pop()
-                a = self.stack.pop()
-                self.stack.append(a * b)
-            elif op == DIV:
-                b = self.stack.pop()
-                a = self.stack.pop()
-                self.stack.append(a // b if b else 0)
-            elif op == MOD:
-                b = self.stack.pop()
-                a = self.stack.pop()
-                self.stack.append(a % b if b else 0)
+
+            elif op == PUSH_STR:
+                length = self.code[self.pc]
+                self.pc += 1
+                chars = []
+                for _ in range(length):
+                    lo = self.code[self.pc]
+                    hi = self.code[self.pc + 1]
+                    self.pc += 2
+                    chars.append(chr(lo | (hi << 8)))
+                self.stack.append(''.join(chars))
+
             elif op == LOAD:
                 idx = self.code[self.pc]
                 self.pc += 1
-                if idx < len(self.vars):
-                    self.stack.append(self.vars[idx])
+                self.stack.append(self.vars[idx] if idx < len(self.vars) else 0)
+
             elif op == STORE:
                 idx = self.code[self.pc]
                 self.pc += 1
                 if idx < len(self.vars):
                     self.vars[idx] = self.stack.pop()
-            elif op == JMP:
-                off = self._read_i16()
-                self.pc += off
-            elif op == JZ:
-                off = self._read_i16()
-                val = self.stack.pop()
-                if val == 0:
-                    self.pc += off
-            elif op == JNZ:
-                off = self._read_i16()
-                val = self.stack.pop()
-                if val != 0:
-                    self.pc += off
-            elif op == CALL:
-                addr = self._read_i16()
-                self.call_stack.append(self.pc)
-                self.pc = addr
-            elif op == RET:
-                if self.call_stack:
-                    self.pc = self.call_stack.pop()
-                else:
-                    self.halted = True
+
             elif op == PRINT:
-                val = self.stack.pop()
-                print(val)
-            elif op == IO_READ:
-                self.stack.pop()  # dev_id (discard)
-                self.stack.append(0)
-            elif op == IO_WRITE:
-                val = self.stack.pop()
-                self.stack.pop()  # dev_id (discard)
-            elif op == EQ:
+                print(self.stack.pop())
+
+            # ── 算术运算 ─────────────────────────────────────
+            elif op == ADD:
                 b = self.stack.pop()
                 a = self.stack.pop()
-                self.stack.append(1 if a == b else 0)
-            elif op == NE:
+                self.stack.append(a + b)
+
+            elif op == SUB:
                 b = self.stack.pop()
                 a = self.stack.pop()
-                self.stack.append(1 if a != b else 0)
+                self.stack.append(a - b)
+
+            elif op == MUL:
+                b = self.stack.pop()
+                a = self.stack.pop()
+                self.stack.append(a * b)
+
+            elif op == DIV:
+                b = self.stack.pop()
+                a = self.stack.pop()
+                self.stack.append(a // b if b else 0)
+
+            elif op == MOD:
+                b = self.stack.pop()
+                a = self.stack.pop()
+                self.stack.append(a % b if b else 0)
+
+            # ── 比较运算 ─────────────────────────────────────
             elif op == GT:
                 b = self.stack.pop()
                 a = self.stack.pop()
                 self.stack.append(1 if a > b else 0)
+
             elif op == LT:
                 b = self.stack.pop()
                 a = self.stack.pop()
                 self.stack.append(1 if a < b else 0)
+
             elif op == GTE:
                 b = self.stack.pop()
                 a = self.stack.pop()
                 self.stack.append(1 if a >= b else 0)
+
             elif op == LTE:
                 b = self.stack.pop()
                 a = self.stack.pop()
                 self.stack.append(1 if a <= b else 0)
+
+            elif op == EQ:
+                b = self.stack.pop()
+                a = self.stack.pop()
+                self.stack.append(1 if a == b else 0)
+
+            elif op == NE:
+                b = self.stack.pop()
+                a = self.stack.pop()
+                self.stack.append(1 if a != b else 0)
+
             elif op == NOT:
                 a = self.stack.pop()
                 self.stack.append(1 if a == 0 else 0)
+
+            # ── 类型检查 ─────────────────────────────────────
+            elif op == IS_NUM:
+                v = self.stack.pop()
+                self.stack.append(1 if isinstance(v, (int, float)) else 0)
+
+            elif op == IS_STR:
+                v = self.stack.pop()
+                self.stack.append(1 if isinstance(v, str) else 0)
+
+            elif op == IS_LIST:
+                v = self.stack.pop()
+                self.stack.append(1 if isinstance(v, (list, dict)) else 0)
+
+            elif op == SAME:
+                b = self.stack.pop()
+                a = self.stack.pop()
+                self.stack.append(1 if a == b else 0)
+
+            # ── 字符串操作 ───────────────────────────────────
+            elif op == STRLEN:
+                self.stack.append(len(str(self.stack.pop())))
+
+            elif op == STRSUB:
+                length = self.stack.pop()
+                start = self.stack.pop()
+                s = str(self.stack.pop())
+                self.stack.append(s[start:start + length])
+
+            elif op == STREQ:
+                b = str(self.stack.pop())
+                a = str(self.stack.pop())
+                self.stack.append(1 if a == b else 0)
+
+            elif op == CONCAT:
+                b = str(self.stack.pop())
+                a = str(self.stack.pop())
+                self.stack.append(a + b)
+
+            elif op == ORD:
+                ch = str(self.stack.pop())
+                self.stack.append(ord(ch[0]) if ch else 0)
+
+            # ── 容器操作 ─────────────────────────────────────
+            elif op == GET:
+                idx = self.stack.pop()
+                c = self.stack.pop()
+                if isinstance(c, (list, str)):
+                    self.stack.append(c[idx] if 0 <= idx < len(c) else 0)
+                elif isinstance(c, dict):
+                    self.stack.append(c.get(idx, 0))
+                else:
+                    self.stack.append(0)
+
+            elif op == SET_ELEMENT:
+                val = self.stack.pop()
+                idx = self.stack.pop()
+                c = self.stack.pop()
+                if isinstance(c, list) and 0 <= idx < len(c):
+                    c[idx] = val
+                self.stack.append(c)
+
+            elif op == LIST_NEW:
+                n = self.stack.pop()
+                if not isinstance(n, int):
+                    n = int(n) if str(n).lstrip('-').replace('.', '').isdigit() else 0
+                lst = []
+                for _ in range(n):
+                    lst.insert(0, self.stack.pop())
+                self.stack.append(lst)
+
+            elif op == LIST_CONCAT:
+                b = self.stack.pop()
+                a = self.stack.pop()
+                self.stack.append(
+                    (a if isinstance(a, list) else [a]) +
+                    (b if isinstance(b, list) else [b])
+                )
+
+            elif op == SLICE:
+                # 支持 2 参数 (container, start) 和 3 参数 (container, start, end)
+                a = self.stack.pop()
+                b = self.stack.pop()
+                if self.stack:
+                    # 3 参数：c start end
+                    end = a
+                    start = b
+                    c = self.stack.pop()
+                else:
+                    # 2 参数：c start
+                    start = a
+                    c = b
+                    end = len(c) if isinstance(c, (list, str)) else 0
+                # 确保索引为整数
+                if not isinstance(start, int):
+                    start = int(start) if str(start).lstrip('-').isdigit() else 0
+                if not isinstance(end, int):
+                    end = int(end) if str(end).lstrip('-').isdigit() else (
+                        len(c) if isinstance(c, (list, str)) else 0
+                    )
+                self.stack.append(c[start:end] if isinstance(c, (list, str)) else [])
+
+            elif op == LIST_LEN:
+                c = self.stack.pop()
+                self.stack.append(len(c) if isinstance(c, (list, str, dict)) else 0)
+
+            # ── 字典操作 ─────────────────────────────────────
+            elif op == DICT:
+                n = self.stack.pop()
+                if not isinstance(n, int):
+                    n = int(n) if str(n).lstrip('-').replace('.', '').isdigit() else 0
+                d = {}
+                for _ in range(n):
+                    v = self.stack.pop()
+                    k = self.stack.pop()
+                    d[k] = v
+                self.stack.append(d)
+
+            elif op == DICT_GET:
+                key = self.stack.pop()
+                d = self.stack.pop()
+                self.stack.append(d.get(key, 0))
+
+            elif op == DICT_SET:
+                val = self.stack.pop()
+                key = self.stack.pop()
+                d = self.stack.pop()
+                d[key] = val
+                # 不 push 返回值——所有调用方都是纯副作用，push 会造成栈泄漏
+
+            elif op == DICT_HAS:
+                key = self.stack.pop()
+                d = self.stack.pop()
+                self.stack.append(1 if key in d else 0)
+
+            elif op == DICT_KEYS:
+                d = self.stack.pop()
+                self.stack.append(list(d.keys()) if isinstance(d, dict) else [])
+
+            # ── I/O 操作 ─────────────────────────────────────
+            elif op == IO_READ:
+                self.stack.pop()
+                self.stack.append(0)
+
+            elif op == IO_WRITE:
+                self.stack.pop()
+                self.stack.pop()
+
             elif op == WAIT:
-                self.stack.pop()  # ms (discard)
-            elif op == HALT:
-                self.halted = True
-                return
+                self.stack.pop()
+
+            elif op == READ_FILE:
+                path = str(self.stack.pop())
+                try:
+                    with open(path, 'r', encoding='utf-8') as f:
+                        self.stack.append(f.read())
+                except Exception:
+                    self.stack.append('')
+
+            elif op == WRITE_FILE:
+                data = str(self.stack.pop())
+                path = str(self.stack.pop())
+                try:
+                    with open(path, 'w', encoding='utf-8') as f:
+                        f.write(data)
+                    self.stack.append(1)
+                except Exception:
+                    self.stack.append(0)
+
+            elif op == WRITE_BINARY:
+                data = self.stack.pop()
+                path = str(self.stack.pop())
+                try:
+                    if isinstance(data, list):
+                        raw = bytes(b & 0xFF if isinstance(b, int) else 0 for b in data)
+                        with open(path, 'wb') as f:
+                            f.write(raw)
+                    self.stack.append(1)
+                except Exception:
+                    self.stack.append(0)
+
+            # ── 模块操作 ─────────────────────────────────────
+            elif op == IMPORT:
+                path = str(self.stack.pop())
+                self.stack.append(self.import_module(path))
+
+            elif op == CALL_EXT:
+                # 栈顶到栈底: module_id, func_name, arg_count, args...
+                mod_id = self.stack.pop()
+                func_name = str(self.stack.pop())
+                arg_count = self.stack.pop()
+                target = self.modules_by_id.get(mod_id)
+                if target and func_name in target.exports:
+                    args = []
+                    for _ in range(arg_count):
+                        args.insert(0, self.stack.pop())
+                    self._exec_frame(target.code, target.exports[func_name], args)
+                else:
+                    self.stack.append(0)
+
             else:
+                # 未知操作码 → 跳过（保持向后兼容）
                 pass
+
+    # ═══════════════════════════════════════════════════════════
+    # from_bin: 从 .bin 文件加载并初始化
+    #
+    # .bin 文件结构:
+    #   [0..3]   magic  "SAN0"
+    #   [4]      ver    版本号
+    #   [5]      vc     变量数
+    #   [6..7]   sz     代码大小（小端 u16）
+    #   [8..]    code   字节码
+    #   [8+sz..]        导出表（count + entries）
+    #
+    # 加载后自动执行模块初始化代码（填充全局变量）。
+    # ═══════════════════════════════════════════════════════════
+    @classmethod
+    def from_bin(cls, path: str) -> 'VM':
+        with open(path, 'rb') as f:
+            data = f.read()
+        magic, ver, vc, sz = struct.unpack_from('<4sBBH', data, 0)
+        if magic != b'SAN0':
+            raise VMError(f'无效的字节码文件: magic={magic!r}')
+        pos = 8
+        code = bytearray(data[pos:pos + sz])
+        pos += sz
+
+        # 读取导出表
+        exports = {}
+        if len(data) > pos + 2:
+            export_count = struct.unpack_from('<H', data, pos)[0]
+            pos += 2
+            for _ in range(export_count):
+                name_len = struct.unpack_from('<H', data, pos)[0]
+                pos += 2
+                chars = []
+                for _ in range(name_len):
+                    lo = data[pos]
+                    hi = data[pos + 1]
+                    pos += 2
+                    chars.append(chr(lo | (hi << 8)))
+                name = ''.join(chars)
+                addr = struct.unpack_from('<H', data, pos)[0]
+                pos += 2
+                exports[name] = addr
+
+        vm = cls(code, max(vc, 256), exports)
+
+        # 执行模块初始化代码（设置全局变量：操作码值、OP映射等）
+        # 初始化代码从 PC=0 开始，执行到代码末尾自动退出
+        vm._run_inner()
+        vm.pc = 0
+        vm.halted = False
+        return vm
+
+    def run(self) -> None:
+        """执行字节码直到 HALT 或代码结束。"""
+        self._run_inner()
 
 
 def disassemble(code: bytearray) -> str:
-    """反汇编字节码（用于调试）。"""
+    """反汇编字节码（调试用）。
+
+    注意: CALL 使用绝对地址，反汇编中显示为相对偏移（仅供位置参考）。
+    """
     lines = []
     pc = 0
     while pc < len(code):
@@ -200,13 +600,29 @@ def disassemble(code: bytearray) -> str:
             val = struct.unpack_from('<i', code, pc)[0]
             line += f' {val}'
             pc += 4
-        elif op in (LOAD, STORE):
+        elif op in (LOAD, STORE, GET, SET_ELEMENT):
             line += f' #{code[pc]}'
+            pc += 1
+        elif op in (LIST_NEW,):
+            n = code[pc]
+            line += f' {n}'
             pc += 1
         elif op in (JMP, JZ, JNZ, CALL):
             off = struct.unpack_from('<h', code, pc)[0]
             target = pc + 2 + off
             line += f' -> {target:04x}'
             pc += 2
+        elif op == PUSH_STR:
+            length = code[pc]
+            pc += 1
+            chars = []
+            for _ in range(length):
+                lo = code[pc]
+                hi = code[pc + 1]
+                pc += 2
+                chars.append(chr(lo | (hi << 8)))
+            line += f' {repr("".join(chars))}'
+        elif op in (IMPORT, CALL_EXT):
+            pass
         lines.append(line)
     return '\n'.join(lines)

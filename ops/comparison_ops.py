@@ -54,7 +54,9 @@ class ComparisonOps:
     def equals_op(evaluator, args):
         a = evaluator.eval(args[0])
         b = evaluator.eval(args[1])
-        return TritValue(1 if a.symbol == b.symbol else -1)
+        if isinstance(a, TritValue) and isinstance(b, TritValue):
+            return TritValue(1 if a.symbol == b.symbol else -1)
+        return TritValue(1 if a == b else 0)
 
 
 register('eq', ComparisonOps.comparison, 'eq')

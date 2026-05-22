@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 from llvmlite import ir
+from ternary_core import TritValue
 
 # ── 类型定义 ──
 _INT = ir.IntType(32)
@@ -914,6 +915,10 @@ def compile_node(node, cg: CodegenContext) -> ir.Value | None:
     # 字面量 → i8*
     if isinstance(node, (int, float)):
         return cg._box_int(ir.Constant(_INT, int(node)))
+
+    # TritValue (sugar.san 解析结果)
+    if isinstance(node, TritValue):
+        return cg._box_int(ir.Constant(_INT, node.to_int()))
 
     if isinstance(node, str):
         # 内置常量
