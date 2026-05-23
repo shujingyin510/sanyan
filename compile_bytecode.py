@@ -17,7 +17,7 @@ from sugar.parser import parse_code as sugar_parse
 from ops.file_ops import clear_cache
 
 
-def compile_source(source: str, output_path: str, vars_table: dict = None) -> list:
+def compile_source(source: str, output_path: str, vars_table: dict | None = None) -> list:
     """编译源码字符串为 .bin 文件。返回 [成功, 代码大小, 变量数]。"""
     if vars_table is None:
         vars_table = {}
@@ -61,10 +61,10 @@ def compile_source(source: str, output_path: str, vars_table: dict = None) -> li
         raise RuntimeError('加载 bytecode_compiler.san 失败')
 
     result = compiler.call(e, ['编译字节码', ast, output_path, vars_table])
-    return result
+    return result  # type: ignore[no-any-return]
 
 
-def compile_san(source_path: str, output_path: str = None) -> bytes:
+def compile_san(source_path: str, output_path: str | None = None) -> bytes:
     """读取 .san 源码文件，编译为 .bin。返回 .bin 内容。"""
     if not output_path:
         output_path = source_path.replace('.san', '.bin')

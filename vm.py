@@ -87,13 +87,13 @@ class VM:
         halted     — 是否已停机
     """
 
-    def __init__(self, code: bytearray, vars_count: int = 256, exports: dict = None):
+    def __init__(self, code: bytearray, vars_count: int = 256, exports: dict | None = None):
         self.code = code
         self.pc = 0
         self.stack: list = []
         self.vars: list = [0] * max(vars_count, 1)
         self.halted = False
-        self.call_stack: list[tuple[int, list]] = []
+        self.call_stack: list[tuple[int, list, int]] = []
         self.exports: dict[str, int] = exports or {}
         self.modules: dict[str, 'VM'] = {}
         self.modules_by_id: dict[int, 'VM'] = {}
@@ -121,7 +121,7 @@ class VM:
     # 保存当前 code/pc/vars/call_stack，切换到目标模块的帧，
     # 执行完毕后恢复。CALL_EXT 指令依赖此方法实现跨模块调用。
     # ═══════════════════════════════════════════════════════════
-    def _exec_frame(self, code, start_pc, args: list = None) -> None:
+    def _exec_frame(self, code, start_pc, args: list | None = None) -> None:
         """在一个模块帧中执行字节码。
 
         保存当前的 code/pc/vars/call_stack，切换到目标帧执行，
@@ -386,7 +386,7 @@ class VM:
                 n = self.stack.pop()
                 if not isinstance(n, int):
                     n = int(n) if str(n).lstrip('-').replace('.', '').isdigit() else 0
-                lst = []
+                lst: list = []
                 for _ in range(n):
                     lst.insert(0, self.stack.pop())
                 self.stack.append(lst)
@@ -508,7 +508,7 @@ class VM:
                 arg_count = self.stack.pop()
                 target = self.modules_by_id.get(mod_id)
                 if target and func_name in target.exports:
-                    args = []
+                    args: list = []
                     for _ in range(arg_count):
                         args.insert(0, self.stack.pop())
                     self._exec_frame(target.code, target.exports[func_name], args)
