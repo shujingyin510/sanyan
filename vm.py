@@ -123,20 +123,20 @@ class VM:
     # ═══════════════════════════════════════════════════════════
     def _exec_frame(self, code, start_pc, args: list = None) -> None:
         """在一个模块帧中执行字节码。
-        
+
         保存当前的 code/pc/vars/call_stack，切换到目标帧执行，
         执行完毕后完整恢复。注意：vars 用 copy 隔离，避免内部修改
         污染外层变量（这是 JMP 循环 + 递归 CALL 能正常工作的关键）。
         """
         old_code = self.code
         old_pc = self.pc
-        old_vars = self.vars                    # 保存外层 vars 引用
+        old_vars = self.vars  # 保存外层 vars 引用
         old_call_stack = list(self.call_stack)
 
         self.call_stack.clear()
         self.code = code
         self.pc = start_pc
-        self.vars = list(old_vars)              # 使用独立副本执行
+        self.vars = list(old_vars)  # 使用独立副本执行
         if args:
             for val in args:
                 self.stack.append(val)
@@ -190,10 +190,7 @@ class VM:
                     pc, saved_vars, stack_base = self.call_stack.pop()
                     # 安全检查：栈不应低于调用基线
                     if len(self.stack) < stack_base:
-                        raise VMError(
-                            f"栈下溢: stack={len(self.stack)} < base={stack_base}, "
-                            f"func_return_pc={pc:#x}"
-                        )
+                        raise VMError(f'栈下溢: stack={len(self.stack)} < base={stack_base}, func_return_pc={pc:#x}')
                     ret_val = self.stack.pop() if len(self.stack) > stack_base else None
                     del self.stack[stack_base:]
                     if ret_val is not None:
@@ -350,7 +347,7 @@ class VM:
                 length = self.stack.pop()
                 start = self.stack.pop()
                 s = str(self.stack.pop())
-                self.stack.append(s[start:start + length])
+                self.stack.append(s[start : start + length])
 
             elif op == STREQ:
                 b = str(self.stack.pop())
@@ -397,10 +394,7 @@ class VM:
             elif op == LIST_CONCAT:
                 b = self.stack.pop()
                 a = self.stack.pop()
-                self.stack.append(
-                    (a if isinstance(a, list) else [a]) +
-                    (b if isinstance(b, list) else [b])
-                )
+                self.stack.append((a if isinstance(a, list) else [a]) + (b if isinstance(b, list) else [b]))
 
             elif op == SLICE:
                 # 支持 2 参数 (container, start) 和 3 参数 (container, start, end)
@@ -420,9 +414,7 @@ class VM:
                 if not isinstance(start, int):
                     start = int(start) if str(start).lstrip('-').isdigit() else 0
                 if not isinstance(end, int):
-                    end = int(end) if str(end).lstrip('-').isdigit() else (
-                        len(c) if isinstance(c, (list, str)) else 0
-                    )
+                    end = int(end) if str(end).lstrip('-').isdigit() else (len(c) if isinstance(c, (list, str)) else 0)
                 self.stack.append(c[start:end] if isinstance(c, (list, str)) else [])
 
             elif op == LIST_LEN:
@@ -548,7 +540,7 @@ class VM:
         if magic != b'SAN0':
             raise VMError(f'无效的字节码文件: magic={magic!r}')
         pos = 8
-        code = bytearray(data[pos:pos + sz])
+        code = bytearray(data[pos : pos + sz])
         pos += sz
 
         # 读取导出表

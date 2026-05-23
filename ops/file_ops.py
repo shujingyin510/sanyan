@@ -154,6 +154,7 @@ def _parse_code(code, evaluator):
         return ast
     try:
         from sugar import SugarConverter
+
         ast = SugarConverter.convert(code, evaluator.skin_manager)
         if ast is not None:
             return ast
@@ -286,8 +287,7 @@ class FileOps:
         _module_cache[abs_path] = module
         return module
 
-
-# 注册文件操作
+    # 注册文件操作
     @staticmethod
     def write_binary_op(evaluator, args):
         """写二进制文件：路径和整数列表 → 原始字节写入。"""

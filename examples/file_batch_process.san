@@ -128,7 +128,7 @@
 输出（"测试文件统计功能..."）
 设 测试文件 ＝ 列表（
     "examples/fizzbuzz.san"，
-    "examples/data_clean.san"，
+    "examples/data_cleaning.san"，
     "examples/voting.san"
 ）
 

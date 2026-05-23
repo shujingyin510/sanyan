@@ -9,7 +9,6 @@
 支持 . 点号访问语法（obj.attr）。
 """
 
-
 from runtime import BUILTIN_OPS
 
 KEYWORDS = BUILTIN_OPS

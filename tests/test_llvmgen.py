@@ -348,7 +348,7 @@ class TestLLVMNoRegression(unittest.TestCase):
         self._check_example('voting')
 
     def test_data_clean(self):
-        self._check_example('data_clean')
+        self._check_example('data_cleaning')
 
     def test_sensor_pipeline(self):
         self._check_example('sensor_pipeline_simple')

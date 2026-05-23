@@ -79,10 +79,14 @@ class TypeOps:
             return TritValue(val)
         if isinstance(val, str):
             try:
-                return TritValue(int(val)) if val.isdigit() or (val.startswith('-') and val[1:].isdigit()) else TritValue(float(val))
+                return (
+                    TritValue(int(val))
+                    if val.isdigit() or (val.startswith('-') and val[1:].isdigit())
+                    else TritValue(float(val))
+                )
             except (ValueError, TypeError):
                 raise SanyanTypeError(f"无法将 '{val}' 转换为数字")
-        raise SanyanTypeError(f"无法将 {type(val).__name__} 转换为数字")
+        raise SanyanTypeError(f'无法将 {type(val).__name__} 转换为数字')
 
     @staticmethod
     def to_string(evaluator, args):

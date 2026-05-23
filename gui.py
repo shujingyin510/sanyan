@@ -9,6 +9,7 @@ from tkinter import filedialog, messagebox, ttk, scrolledtext
 from typing import Any
 
 import tomllib
+
 with open('pyproject.toml', 'rb') as f:
     VERSION = tomllib.load(f)['project']['version']
 from skin import SkinManager

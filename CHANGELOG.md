@@ -359,7 +359,7 @@
 - **窄异常捕获**：`尝试`/`捕获` 只捕捉语言层 `SanyanError`，系统错误直接暴露
 - **新增示例**：
   - 三态投票统计 (`examples/voting.san`)
-  - 不确定数据清洗 (`examples/data_clean.san`)
+  - 不确定数据清洗 (`examples/data_cleaning.san`)
 - **回归测试**：解析器测试 24 项 + 运算符/容器/跳出/异常测试
 
 ### 变更

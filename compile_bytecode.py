@@ -4,6 +4,7 @@
 用法:
     python compile_bytecode.py input.san [-o output.bin] [--run]
 """
+
 import sys
 import os
 
@@ -82,6 +83,7 @@ def compile_san(source_path: str, output_path: str = None) -> bytes:
 def run_bin(bin_path: str) -> None:
     """执行编译后的 .bin 文件。"""
     from vm import VM
+
     vm = VM.from_bin(bin_path)
     print(f'▶ 运行 {bin_path}: {len(vm.code)} 字节代码, {len(vm.vars)} 变量')
     vm.run()
@@ -98,8 +100,11 @@ def main():
     args = [a for a in args if not a.startswith('--')]
 
     input_path = args[0]
-    output_path = args[2] if len(args) > 2 and args[1] == '-o' else \
-        os.path.join('build', os.path.basename(input_path.replace('.san', '.bin')))
+    output_path = (
+        args[2]
+        if len(args) > 2 and args[1] == '-o'
+        else os.path.join('build', os.path.basename(input_path.replace('.san', '.bin')))
+    )
 
     data = compile_san(input_path, output_path)
     magic = data[:4]

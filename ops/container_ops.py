@@ -350,8 +350,6 @@ class ContainerOps:
                 parts.append(str(item))
         return delim.join(parts)
 
-
-
     @staticmethod
     def module_call(evaluator, args):
         if len(args) < 2:
@@ -364,6 +362,7 @@ class ContainerOps:
             raise SanyanTypeError('第二个参数必须是字符串')
         call_args = [evaluator.eval(a) for a in args[2:]]
         return mod.call(evaluator, [func_name] + call_args)
+
 
 # 注册容器操作
 register('list', ContainerOps.list_new)
