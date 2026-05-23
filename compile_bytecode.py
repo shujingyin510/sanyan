@@ -107,7 +107,6 @@ def main():
     )
 
     data = compile_san(input_path, output_path)
-    magic = data[:4]
     ver = data[4]
     sz = data[6] | (data[7] << 8)
     print(f'  SAN0 v{ver}, {sz} 字节, 文件 {len(data)} 字节')

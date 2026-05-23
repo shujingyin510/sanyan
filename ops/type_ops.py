@@ -2,7 +2,7 @@
 
 import time
 from ternary_core import TritValue
-from values import SanyanSyntaxError, SanyanRuntimeError
+from values import SanyanSyntaxError, SanyanTypeError, SanyanRuntimeError
 from ops.registry import register
 
 

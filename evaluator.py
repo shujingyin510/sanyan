@@ -7,7 +7,7 @@ from ternary_core import TritValue, ArrayValue
 from runtime import SanyanRuntime
 from commands import Commands
 from values import FunctionValue, ModuleValue, SrcNode, SanyanError
-from values import SanyanRuntimeError
+
 from eval_helpers import (
     parse_string_literal,
     parse_numeric_literal,
