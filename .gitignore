@@ -203,3 +203,12 @@ dist/
 *.o
 *.ll
 NUL
+# Compiled bytecode files (except stdlib)
+*.bin
+!stdlib/bytecode_compiler.bin
+# Build outputs
+build/*.bin
+# Test build outputs
+tests/*.bin
+# Temp test outputs
+*.bin.tmp

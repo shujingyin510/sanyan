@@ -2,7 +2,9 @@
 
 import sys
 from repl import demo, repl
-from VERSION import VERSION
+import tomllib
+with open('pyproject.toml', 'rb') as f:
+    VERSION = tomllib.load(f)['project']['version']
 from evaluator import SanyanEvaluator
 from sugar import SugarConverter
 from ternary_core import TritValue

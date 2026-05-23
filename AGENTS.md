@@ -197,3 +197,29 @@ arm-none-eabi-gcc -mcpu=cortex-m3 -mthumb -Os -ffreestanding -nostartfiles \
 arm-none-eabi-objcopy -O binary firmware.elf firmware.bin
 # 用 CubeProgrammer 或 st-flash 烧写 firmware.bin 到 0x08000000
 ```
+
+## C VM (csrc/runtime.c)
+
+`csrc/runtime.c` 是 C 语言字节码解释器，支持全部 52 个操作码。编译运行：
+
+```bash
+export PATH="/d/msys64/mingw64/bin:$PATH"
+gcc -o csrc/runtime.exe csrc/runtime.c -std=c99 -Wall -Wextra
+./csrc/runtime.exe firmware.bin
+```
+
+### 值系统
+- 标记指针：LSB=1 为整数，LSB=0 为堆对象（带 `ObjType` 头部）
+- 堆类型：`rt_str_t`、`rt_list_t`、`rt_dict_t`
+- 字典键支持整数和字符串，通过 `key_eq()` 按类型比较
+
+### 递归打印
+`print_value()` 递归输出任意值：
+- int → `printf("%d")`
+- str → `printf("%s")`
+- list → `[item, …]`
+- dict → `{key: val, …}`
+
+### 已知限制
+- GCC 必须通过 MSYS2 的 `/d/msys64/mingw64/bin/gcc.exe` 全路径调用，且需将 mingw64 bin 加入 PATH（否则 as/ld 找不到）
+- 字典当前有最大条目限制（`DICT_MAX=256`）

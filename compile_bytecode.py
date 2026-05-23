@@ -99,7 +99,7 @@ def main():
 
     input_path = args[0]
     output_path = args[2] if len(args) > 2 and args[1] == '-o' else \
-        input_path.replace('.san', '.bin')
+        os.path.join('build', os.path.basename(input_path.replace('.san', '.bin')))
 
     data = compile_san(input_path, output_path)
     magic = data[:4]
