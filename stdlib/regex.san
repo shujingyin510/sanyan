@@ -1,0 +1,21 @@
+// 正则表达式库
+
+定义 match(pattern, text) {
+    返回(正则匹配(pattern, text))
+}
+
+定义 search(pattern, text) {
+    返回(正则搜索(pattern, text))
+}
+
+定义 findall(pattern, text) {
+    返回(正则查找(pattern, text))
+}
+
+定义 replace(pattern, replacement, text) {
+    返回(正则替换(pattern, replacement, text))
+}
+
+定义 split(pattern, text) {
+    返回(正则分割(pattern, text))
+}

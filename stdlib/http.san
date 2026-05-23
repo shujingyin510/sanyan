@@ -1,0 +1,20 @@
+// HTTP 客户端库
+
+定义 get(url) {
+    返回(http读(url))
+}
+
+定义 post(url, data) {
+    返回(http写(url, data))
+}
+
+定义 get_json(url) {
+    设 resp = http读(url)
+    返回(解析JSON(resp))
+}
+
+定义 post_json(url, data) {
+    设 json_data = 转JSON(data)
+    设 resp = http写(url, json_data)
+    返回(解析JSON(resp))
+}

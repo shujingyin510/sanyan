@@ -1,0 +1,12 @@
+// JSON 工具库
+
+定义 parse(text) {
+    返回(解析JSON(text))
+}
+
+定义 stringify(value, pretty) {
+    若 (pretty == 真) {
+        返回(转JSON(value, 真))
+    }
+    返回(转JSON(value))
+}

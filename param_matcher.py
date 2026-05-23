@@ -44,7 +44,7 @@ def evaluate_args(evaluator, params: list, args: list, param_types: dict) -> lis
 
 
 def resolve_command(evaluator, op: str):
-    """解析命令定义，返回 (params, body, param_types)"""
+    """解析命令定义，返回 (params, body, param_types, return_type)"""
     if op not in evaluator.commands:
         available = list(evaluator.commands.keys())[:10]
         hint = f'，可用命令: {available}' if available else ''
@@ -52,8 +52,10 @@ def resolve_command(evaluator, op: str):
 
         raise SanyanNameError(f"未定义的操作: '{op}'{hint}")
     cmd_def = evaluator.commands[op]
+    if len(cmd_def) >= 4:
+        return cmd_def[0], cmd_def[1], cmd_def[2], cmd_def[3]
     param_types = cmd_def[2] if len(cmd_def) > 2 else {}
-    return cmd_def[0], cmd_def[1], param_types
+    return cmd_def[0], cmd_def[1], param_types, None
 
 
 def format_args(args: list) -> str:

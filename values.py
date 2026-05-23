@@ -83,8 +83,19 @@ class SrcNode(list):
         return obj
 
 
+def _get_type_name(value: Any) -> str:
+    if isinstance(value, TritValue):
+        return '数字'
+    if isinstance(value, str):
+        return '字符串'
+    if isinstance(value, list):
+        return '列表'
+    if isinstance(value, dict):
+        return '字典'
+    return '未知'
+
+
 def check_type(value: Any, expected_type: str, param_name: str = '') -> None:
-    """检查值是否符合预期类型，不符则抛出 SanyanTypeError。"""
     type_checks: Dict[str, Callable[[Any], bool]] = {
         '数字': lambda v: isinstance(v, TritValue),
         '字符串': lambda v: isinstance(v, str),
@@ -93,23 +104,25 @@ def check_type(value: Any, expected_type: str, param_name: str = '') -> None:
         '布尔': lambda v: isinstance(v, TritValue) and v.to_int() in (1, -1),
         '三态': lambda v: isinstance(v, TritValue),
     }
-    if expected_type in type_checks:
-        if not type_checks[expected_type](value):
-            actual_type = '未知'
-            if isinstance(value, TritValue):
-                actual_type = '数字'
-            elif isinstance(value, str):
-                actual_type = '字符串'
-            elif isinstance(value, list):
-                actual_type = '列表'
-            elif isinstance(value, dict):
-                actual_type = '字典'
-            label = f"参数 '{param_name}' " if param_name else ''
-            raise SanyanTypeError(f"{label}期望类型 '{expected_type}'，但得到 '{actual_type}'")
+
+    is_optional = expected_type.startswith('?')
+    base_type = expected_type[1:] if is_optional else expected_type
+
+    if is_optional:
+        if isinstance(value, TritValue) and value.to_int() == 0:
+            return
+
+    if base_type not in type_checks:
+        return
+
+    if not type_checks[base_type](value):
+        actual = _get_type_name(value)
+        label = f"参数 '{param_name}' " if param_name else ''
+        raise SanyanTypeError(f"{label}期望类型 '{expected_type}'，但得到 '{actual}'")
 
 
 class FunctionValue:
-    __slots__ = ('params', 'body', 'evaluator', 'closure_vars', 'param_types')
+    __slots__ = ('params', 'body', 'evaluator', 'closure_vars', 'param_types', 'return_type')
 
     def __init__(
         self,
@@ -124,6 +137,7 @@ class FunctionValue:
         self.evaluator = evaluator
         self.closure_vars = closure_vars
         self.param_types = param_types or {}
+        self.return_type = self.param_types.pop('__return__', None) if self.param_types else None
 
     def call(self, evaluator: Any, args: List[Any]) -> TritValue:
         if len(args) != len(self.params):
@@ -153,7 +167,10 @@ class FunctionValue:
                 except ReturnException as ret:
                     result = ret.value
                     break
-            return result if result is not None else TritValue(0)
+            result = result if result is not None else TritValue(0)
+            if self.return_type:
+                check_type(result, self.return_type, '返回值')
+            return result
         finally:
             if self.closure_vars:
                 for k in self.closure_vars:

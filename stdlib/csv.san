@@ -1,0 +1,61 @@
+// 简单 CSV 解析库
+
+定义 parse_row(line) {
+    设 fields = 分割(line, ",")
+    设 result = 列表()
+    遍历 field 在 fields {
+        field = 去空白(field)
+        若 (前缀(field, "\"") 且 后缀(field, "\"")) {
+            field = 子串(field, 1, 取长(field) - 2)
+            field = 替换(field, "\"\"", "\"")
+        }
+        result = 列表合(result, 列表(field))
+    }
+    返回(result)
+}
+
+定义 parse(text) {
+    设 lines = 分割(text, "\n")
+    设 result = 列表()
+    设 headers = 列表()
+    设 first = 真
+    遍历 line 在 lines {
+        line = 去空白(line)
+        若 (取长(line) == 0) { 继续 }
+        若 (first) {
+            headers = parse_row(line)
+            first = 假
+        } 否则 {
+            设 row = 字典()
+            设 fields = parse_row(line)
+            设 i = 0
+            遍历 header 在 headers {
+                若 (i < 表长(fields)) {
+                    置键(row, header, 取(fields, i))
+                }
+                i = i + 1
+            }
+            result = 列表合(result, 列表(row))
+        }
+    }
+    返回(result)
+}
+
+定义 to_csv(headers, rows) {
+    若 (表长(headers) == 0) { 返回("") }
+    设 result = 合并(headers, ",") + "\n"
+    遍历 row 在 rows {
+        设 fields = 列表()
+        遍历 header 在 headers {
+            设 val = 取键(row, header)
+            val = 字符串(val)
+            若 (包含(val, ",") 或 包含(val, "\"") 或 包含(val, "\n")) {
+                val = 替换(val, "\"", "\"\"")
+                val = "\"" + val + "\""
+            }
+            fields = 列表合(fields, 列表(val))
+        }
+        result = result + 合并(fields, ",") + "\n"
+    }
+    返回(result)
+}

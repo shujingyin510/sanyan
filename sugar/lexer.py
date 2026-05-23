@@ -178,6 +178,11 @@ def tokenize(code: str) -> list[Token]:
             i += 2
             col += 2
             continue
+        if c == '-' and next_mapped == '>':
+            tokens.append(Token('OP', '->', line, col))
+            i += 2
+            col += 2
+            continue
 
         # Single-character symbols
         if c in SYMBOL_CHARS:

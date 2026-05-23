@@ -1,7 +1,7 @@
 """自定义命令：定义与调用"""
 
 from typing import Any
-from values import SanyanError, SanyanSyntaxError
+from values import SanyanError, SanyanSyntaxError, check_type
 from ternary_core import TritValue
 from ops.registry import register
 from tail_call import detect_tail_call, run_tail_call, run_normal, is_tail_call
@@ -19,14 +19,14 @@ class Commands:
         if isinstance(cmd_name, list):
             cmd_name = cmd_name[0]
         params = args[1]
-        # 检查是否有类型标注
         param_types = {}
         if len(args) > 2 and isinstance(args[2], dict):
             param_types = args[2]
             body = args[3:]
         else:
             body = args[2:]
-        evaluator.commands[cmd_name] = (params, body, param_types)
+        return_type = param_types.pop('__return__', None) if param_types else None
+        evaluator.commands[cmd_name] = (params, body, param_types, return_type)
         return TritValue(0)
 
     @staticmethod
@@ -54,13 +54,17 @@ class Commands:
             raise SanyanRuntimeError('命令调用超过了最大递归深度')
         evaluator.call_stack.append((op, args))
         try:
-            params, body, param_types = resolve_command(evaluator, op)
+            params, body, param_types, return_type = resolve_command(evaluator, op)
             args = match_params(params, op, args)
             evaluated_args = evaluate_args(evaluator, params, args, param_types)
             tail_body, last_expr, is_tco = detect_tail_call(body, op, params, evaluated_args)
             if is_tco:
-                return run_tail_call(evaluator, params, tail_body, last_expr, op, evaluated_args)
-            return run_normal(evaluator, params, body, evaluated_args)
+                result = run_tail_call(evaluator, params, tail_body, last_expr, op, evaluated_args)
+            else:
+                result = run_normal(evaluator, params, body, evaluated_args)
+            if return_type:
+                check_type(result, return_type, f'返回值 ({op})')
+            return result
         except SanyanError:
             raise
         finally:

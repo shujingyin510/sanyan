@@ -327,6 +327,12 @@ class _Parser:
                     if self.peek() and self.peek().value == ',':
                         self.advance()
                 self._expect(')')
+            return_type = None
+            if self.peek() and self.peek().value == '->':
+                self.advance()
+                return_type = self.advance().value
+            if return_type:
+                param_types['__return__'] = return_type
             body = self.parse_block()
             if param_types:
                 return ['fn', name.value, params, param_types, body]
