@@ -29,6 +29,19 @@ That's how Sanyan was born.
 
 ---
 
+## Why Ternary
+
+Sanyan's native three-valued logic (`true` / `maybe` / `false`) is not a gimmick — it solves real problems that binary logic cannot. Four quantified case studies demonstrate this:
+
+- **Circuit simulation** — 9-input truth tables prove ternary correctness by construction
+- **Data cleaning** — `maybe` stops NULL propagation; binary `None` silently produces misleading 0
+- **API health checks** — timeout ≠ down; binary aggregation triggers false alerts
+- **Game NPCs** — hesitation is a legitimate behavior; binary needs extra state variables
+
+See [Why Ternary](docs/why-ternary.md) for the full comparison.
+
+---
+
 ## Quick Start
 
 ```bash
@@ -56,6 +69,10 @@ Run example files:
 ```bash
 python main.py examples/greenhouse.san
 python main.py examples/sensor_pipeline_simple.san
+python main.py examples/circuit_sim.san     # Ternary truth tables
+python main.py examples/data_cleaning.san   # NULL propagation safety
+python main.py examples/health_check.san    # Timeout ≠ down
+python main.py examples/npc_decision.san    # NPC hesitation behavior
 ```
 
 ---
