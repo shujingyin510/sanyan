@@ -55,7 +55,6 @@
         设 ch = 子串(s, i, 1)
         设 idx = 查找(digs, ch)
         若 (小于(idx, 0)) { 返回(0) }
-        若 (大于(idx, 0)) { idx = 减(idx, 1) }
         设 tmp = 乘(result, 10)
         result = 加(tmp, idx)
         i = 加(i, 1)
@@ -65,6 +64,10 @@
 }
 
 定义 编译 (ast, reg) {
+    // 字符串 → 尝试转数字
+    若 (是字符串(ast)) {
+        设 ast = parse_int(ast)
+    }
     // 数字 → 字面量
     若 (是数字(ast)) {
         设 n = ast
