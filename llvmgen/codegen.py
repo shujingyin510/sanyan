@@ -310,7 +310,6 @@ class CodegenContext:
                 alloca = self._builder.alloca(_PTR, name=pname)
                 self._builder.store(func.args[i], alloca)
                 self._scope[pname] = alloca
-                self._env[pname] = BoxedValue(func.args[i])
             return func
 
         fnty = ir.FunctionType(_PTR, [_PTR] * len(param_names))
@@ -329,7 +328,6 @@ class CodegenContext:
             alloca = self._builder.alloca(_PTR, name=pname)
             self._builder.store(func.args[i], alloca)
             self._scope[pname] = alloca
-            self._env[pname] = BoxedValue(func.args[i])
         return func
 
         fnty = ir.FunctionType(_PTR, [_PTR] * len(param_names))
@@ -472,11 +470,6 @@ class CodegenContext:
         return alloca
 
     def get_var(self, name: str) -> ir.Value:
-        if name in self._env:
-            v = self._env[name]
-            if isinstance(v, RawValue):
-                return self._box_int(v.ll_val)
-            return v.ll_val
         if name in self._scope:
             return self.builder.load(self._scope[name], name=name)
         if name in self._globals:
@@ -494,7 +487,6 @@ class CodegenContext:
             pass
         else:
             value = self._box_int(value)
-        self._env[name] = BoxedValue(value)
         if name in self._scope:
             self.builder.store(value, self._scope[name])
         elif name in self._globals:
@@ -1202,11 +1194,6 @@ def compile_node(node, cg: CodegenContext) -> ir.Value | None:
             raise SyntaxError(f'变量名必须是字符串: {name}')
         val = compile_node(args[1], cg)
         cg.set_var(name, val)
-        # 追踪 raw 值：算术结果存入 _env 供循环 phi 使用
-        if isinstance(args[1], list) and len(args[1]) > 0 and args[1][0] in _ARITH_OPS:
-            cg._env[name] = RawValue(cg._unbox_int(val))
-        elif isinstance(args[1], (int, float)) or (isinstance(args[1], str) and _to_int(args[1]) is not None):
-            cg._env[name] = RawValue(cg._unbox_int(val))
         return val
 
     # ── 顺序块 (做 expr1 expr2 ...) ──
@@ -1272,21 +1259,9 @@ def compile_node(node, cg: CodegenContext) -> ir.Value | None:
         loop_b = cg._add_block(name='loop_b')
         loop_e = cg._add_block(name='loop_e')
         cg._loop_stack.append((loop_h, loop_e))
-        entry_block = cg.builder.block
         cg.builder.branch(loop_h)
 
-        # 为 _env 中已有的 raw 变量创建 phi(i64) 节点
-        loop_phis = {}
-        saved_env = {}
         cg.builder.position_at_start(loop_h)
-        for vname, vval in list(cg._env.items()):
-            if isinstance(vval, RawValue):
-                saved_env[vname] = vval
-                phi = cg.builder.phi(_INT, name=f'{vname}_phi')
-                phi.add_incoming(vval.ll_val, entry_block)
-                loop_phis[vname] = phi
-                cg._env[vname] = RawValue(phi)
-        cg.builder.position_at_end(loop_h)
         cond_val = compile_node(args[0], cg)
         cond = cg.builder.icmp_signed('!=', cg._unbox_int(cond_val), _ZERO, name='loop_cond')
         cg.builder.cbranch(cond, loop_b, loop_e)
@@ -1294,19 +1269,10 @@ def compile_node(node, cg: CodegenContext) -> ir.Value | None:
         cg.builder.position_at_start(loop_b)
         for stmt in body_exprs:
             compile_node(stmt, cg)
-        # 更新 phi 的 incoming 边
-        for vname, phi in loop_phis.items():
-            updated = cg._env.get(vname)
-            if isinstance(updated, RawValue):
-                phi.add_incoming(updated.ll_val, cg.builder.block)
-            else:
-                phi.add_incoming(saved_env[vname].ll_val, cg.builder.block)
         if not cg.builder.block.is_terminated:
             cg.builder.branch(loop_h)
 
         cg.builder.position_at_start(loop_e)
-        # 恢复 _env 为循环前的值
-        cg._env.update(saved_env)
         cg._loop_stack.pop()
         return _NULL
 
