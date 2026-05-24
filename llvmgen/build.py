@@ -64,15 +64,52 @@ def build(input_path: str, output_path: str | None = None, run: bool = False) ->
         f.write(ir_text)
 
     # 用 clang/gcc 编译 IR (需要 LLVM 工具链)
-    # 如果没有 clang，尝试用 llc 编译 IR → .s → as
+    cc_ok = False
+    # clang 原生支持 .ll 文件
     try:
-        subprocess.run([cc, '-c', ir_path, '-o', obj_path], check=True)
-    except subprocess.CalledProcessError:
-        # 回退: 尝试 llc
+        subprocess.run(['clang', '-c', ir_path, '-o', obj_path], check=True)
+        cc_ok = True
+    except (FileNotFoundError, subprocess.CalledProcessError):
+        pass
+
+    if not cc_ok:
+        # 回退: llvmlite 直接生成目标代码
+        try:
+            from llvmlite import binding
+
+            binding.initialize_all_targets()
+            binding.initialize_native_asmprinter()
+            llvm_mod = binding.parse_assembly(ir_text)
+            target = binding.Target.from_default_triple()
+            # Windows COFF 需要 static reloc model
+            tm = target.create_target_machine(reloc='static')
+            obj_code = tm.emit_object(llvm_mod)
+            with open(obj_path, 'wb') as f:
+                f.write(obj_code)
+            cc_ok = True
+        except Exception:
+            # 对象文件生成失败，尝试汇编
+            try:
+                tm = target.create_target_machine(reloc='static', codemodel='large')
+                asm = tm.emit_assembly(llvm_mod)
+                asm_path = os.path.join(tempfile.gettempdir(), f'{name}.s')
+                with open(asm_path, 'w') as f:
+                    f.write(asm)
+                subprocess.run([cc, '-c', asm_path, '-o', obj_path], check=True)
+                cc_ok = True
+            except Exception:
+                pass
+
+    if not cc_ok:
+        # 最后回退: 尝试 llc
         try:
             subprocess.run(['llc', '-filetype=obj', ir_path, '-o', obj_path], check=True)
+            cc_ok = True
         except FileNotFoundError:
-            raise RuntimeError(f'无法编译 LLVM IR。请安装 clang (推荐) 或 llc。\nIR 文件已保存至: {ir_path}') from None
+            raise RuntimeError(
+                '无法编译 LLVM IR。请安装 clang 或 llc，或运行 pip install llvmlite。'
+                f'\nIR 文件已保存至: {ir_path}'
+            ) from None
 
     # 3. 链接
     print(f'[3/3] 链接 → {output_path} ...')
