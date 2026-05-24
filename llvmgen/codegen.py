@@ -1051,25 +1051,33 @@ def _dispatch_runtime(op: str, args: list, func: ir.Function, cg: CodegenContext
     param_types = spec[2]
     ret_type = spec[1]
     # 根据运行时函数的真实参数类型拆箱
+    compiled_unwrapped = []
+    for c in compiled:
+        if isinstance(c, RawValue):
+            compiled_unwrapped.append(cg._box_int(c.ll_val))
+        elif isinstance(c, BoxedValue):
+            compiled_unwrapped.append(c.ll_val)
+        else:
+            compiled_unwrapped.append(c)
+
     call_args = []
     for i, ptype in enumerate(param_types):
-        if i >= len(compiled):
+        if i >= len(compiled_unwrapped):
             call_args.append(ir.Constant(ptype, 0) if isinstance(ptype, ir.IntType) else _NULL)
         elif isinstance(ptype, ir.IntType):
-            call_args.append(cg._unbox_int(compiled[i]))
+            call_args.append(cg._unbox_int(compiled_unwrapped[i]))
             if ptype != _INT:
                 call_args[-1] = cg.builder.trunc(call_args[-1], ptype, name='trunc')
         else:
-            call_args.append(compiled[i])
+            call_args.append(compiled_unwrapped[i])
     ret = cg.builder.call(func, call_args, name=f'rt_{op}')
-    # 返回值若为 i32 则 zext 到 i64 后装箱
     if isinstance(ret_type, ir.IntType):
         if ret_type != _INT:
             ret = cg.builder.zext(ret, _INT, name='zext')
-        return cg._box_int(ret)
+        return RawValue(ret)
     if isinstance(ret_type, ir.VoidType):
         return _NULL
-    return ret
+    return BoxedValue(ret) if ret else _NULL
 
 
 def _from_global_string(val: ir.Value) -> bool:
