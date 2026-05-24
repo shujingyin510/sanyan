@@ -396,6 +396,14 @@ class CodegenContext:
             return val
         return BoxedValue(self._box_int(val.ll_val))
 
+    def _to_bool_i1(self, val) -> ir.Value:
+        if isinstance(val, RawValue):
+            if isinstance(val.ll_val.type, ir.IntType) and val.ll_val.type.width == 1:
+                return val.ll_val
+            return self.builder.icmp_signed('!=', val.ll_val, _ZERO, name='to_bool')
+        raw = self._unbox_int(val.ll_val if isinstance(val, BoxedValue) else val)
+        return self.builder.icmp_signed('!=', raw, _ZERO, name='to_bool')
+
     def _is_tagged_int(self, ptr_val: ir.Value) -> ir.Value:
         """检查 tagged 指针是否为整数（bit0 == 1）。返回 i1。"""
         raw = self.builder.ptrtoint(ptr_val, _INT, name='tag_raw')
@@ -484,7 +492,7 @@ class CodegenContext:
         if name in self._allocas:
             alloca, is_int = self._allocas[name]
             val = self.builder.load(alloca, name=name)
-            return self._box_int(val) if is_int else val
+            return RawValue(val) if is_int else val
         if name in self._scope:
             return self.builder.load(self._scope[name], name=name)
         if name in self._globals:
@@ -513,6 +521,10 @@ class CodegenContext:
         alloca = self._get_alloca(name, is_int=True)
         self.builder.store(raw, alloca)
 
+    def set_var_raw(self, name: str, raw_val: ir.Value):
+        alloca, _ = self._allocas[name]
+        self.builder.store(raw_val, alloca)
+
     def create_global(self, name: str, init_value: ir.Value | None = None):
         """创建模块级全局变量（编译时可见）。"""
         if name in self._globals:
@@ -535,6 +547,10 @@ class CodegenContext:
                 if isinstance(stmt, list) and stmt[0] in ('返回', 'return'):
                     pass  # 已有显式返回
                 elif result is not None:
+                    if isinstance(result, RawValue):
+                        result = self._box_int(result.ll_val)
+                    elif isinstance(result, BoxedValue):
+                        result = result.ll_val
                     self.builder.ret(result)
         self.end_function()
 
@@ -639,7 +655,7 @@ def _compile_if(args: list, cg: CodegenContext) -> ir.Value | None:
         cg.builder.branch(test_block)
         cg.builder.position_at_start(test_block)
         cond_val = compile_node(cond_node, cg)
-        cond = cg.builder.icmp_signed('!=', cg._unbox_int(cond_val), _ZERO, name='if_cond')
+        cond = cg._to_bool_i1(cond_val)
         cg.builder.cbranch(cond, body_block, next_test)
 
         cg.builder.position_at_start(body_block)
@@ -670,7 +686,7 @@ def _compile_if(args: list, cg: CodegenContext) -> ir.Value | None:
 
 def _compile_judge(args: list, cg: CodegenContext) -> ir.Value | None:
     """编译 判/三态分支。AST: ['判', val, true_body, maybe_body, false_body]"""
-    val = cg._unbox_int(compile_node(args[0], cg))
+    val = cg._to_bool_i1(compile_node(args[0], cg))
 
     true_block = cg._add_block(name='judge_true')
     maybe_block = cg._add_block(name='judge_maybe')
@@ -1123,41 +1139,38 @@ def compile_node(node, cg: CodegenContext) -> ir.Value | None:
             )
             _maybe_unwind(cg)
             return result
-        lhs = cg._unbox_int(lv)
-        rhs = cg._unbox_int(rv)
+        l_raw = cg._to_raw(lv).ll_val
+        r_raw = cg._to_raw(rv).ll_val
         if op in ('除', 'div', '余', 'mod'):
-            _check_div_zero(lhs, rhs, cg)
-        return cg._box_int(getattr(cg.builder, arith)(lhs, rhs, name=f'{op}_tmp'))
+            _check_div_zero(l_raw, r_raw, cg)
+        return RawValue(getattr(cg.builder, arith)(l_raw, r_raw, name=f'{op}_tmp'))
 
-    # ── 内置比较（i8* → unbox → icmp → zext → rebox）──
+    # ── 内置比较（raw i64 → icmp → RawValue(i1/i64)）──
     cmp_op = _COMPARE_OPS.get(op)
     if cmp_op is not None:
         if len(args) < 2:
             raise SyntaxError(f'{op} 需要两个参数')
-        lhs = cg._unbox_int(compile_node(args[0], cg))
-        rhs = cg._unbox_int(compile_node(args[1], cg))
-        cond = cg.builder.icmp_signed(cmp_op, lhs, rhs, name=f'{op}_tmp')
-        return cg._box_int(cg.builder.zext(cond, _INT, name=f'{op}_bool'))
+        l_raw = cg._to_raw(compile_node(args[0], cg)).ll_val
+        r_raw = cg._to_raw(compile_node(args[1], cg)).ll_val
+        cond = cg.builder.icmp_signed(cmp_op, l_raw, r_raw, name=f'{op}_tmp')
+        return RawValue(cg.builder.zext(cond, _INT, name=f'{op}_bool'))
 
     # ── 逻辑运算 ──
     logic_op = _LOGIC_OPS.get(op)
     if logic_op is not None:
         if len(args) < 2:
             raise SyntaxError(f'{op} 需要两个参数')
-        lhs = cg._unbox_int(compile_node(args[0], cg))
-        rhs = cg._unbox_int(compile_node(args[1], cg))
-        lb = cg.builder.icmp_signed('!=', lhs, _ZERO, name=f'{op}_lb')
-        rb = cg.builder.icmp_signed('!=', rhs, _ZERO, name=f'{op}_rb')
-        res = cg.builder.and_(lb, rb) if logic_op == 'and' else cg.builder.or_(lb, rb)
-        return cg._box_int(cg.builder.zext(res, _INT, name=f'{op}_bool'))
+        l_bool = cg._to_bool_i1(compile_node(args[0], cg))
+        r_bool = cg._to_bool_i1(compile_node(args[1], cg))
+        res = cg.builder.and_(l_bool, r_bool) if logic_op == 'and' else cg.builder.or_(l_bool, r_bool)
+        return RawValue(cg.builder.zext(res, _INT, name=f'{op}_bool'))
 
     # ── 非 ──
     if op in ('非', 'not'):
         if len(args) < 1:
             raise SyntaxError(f'{op} 需要至少一个参数')
-        val = cg._unbox_int(compile_node(args[0], cg))
-        b = cg.builder.icmp_signed('!=', val, _ZERO, name='not_val')
-        return cg._box_int(cg.builder.zext(cg.builder.not_(b), _INT, name='not_bool'))
+        b = cg._to_bool_i1(compile_node(args[0], cg))
+        return RawValue(cg.builder.zext(cg.builder.not_(b), _INT, name='not_bool'))
 
     # ── 判 三态分支 (判 expr { 真: .. 可能: .. 假: .. }) ──
     if op in ('判', 'judge'):
@@ -1214,10 +1227,14 @@ def compile_node(node, cg: CodegenContext) -> ir.Value | None:
         is_int_val = isinstance(args[1], (int, float)) or (
             isinstance(args[1], list) and len(args[1]) > 0 and args[1][0] in _ARITH_OPS
         ) or (isinstance(args[1], str) and _to_int(args[1]) is not None)
-        if isinstance(val, ir.Instruction) and val.opname == 'call':
-            is_int_val = False
-        cg._get_alloca(name, is_int=bool(is_int_val))
-        cg.set_var(name, val)
+        if isinstance(val, RawValue):
+            cg._get_alloca(name, is_int=True)
+            cg.set_var_raw(name, val.ll_val)
+        elif isinstance(val, (ir.Instruction, BoxedValue)):
+            cg._get_alloca(name, is_int=False)
+            cg.set_var(name, val.ll_val if isinstance(val, BoxedValue) else val)
+        else:
+            cg.set_var(name, val)
         return val
 
     # ── 顺序块 (做 expr1 expr2 ...) ──
@@ -1234,20 +1251,22 @@ def compile_node(node, cg: CodegenContext) -> ir.Value | None:
             val = compile_node(raw, cg)
             if val is None:
                 return _NULL
-            # tag bit0=1→整数, bit0=0→heap: 读 h_type 分 string/float
-            is_int = cg._is_tagged_int(val)
+            if isinstance(val, RawValue):
+                cg.emit_print_int(cg._box_int(val.ll_val))
+                return _NULL
+            pval = val.ll_val if isinstance(val, BoxedValue) else val
+            is_int = cg._is_tagged_int(pval)
             int_block = cg._add_block(name='pr_int')
             heap_block = cg._add_block(name='pr_heap')
             pr_done = cg._add_block(name='pr_done')
             cg.builder.cbranch(is_int, int_block, heap_block)
 
             cg.builder.position_at_start(int_block)
-            cg.emit_print_int(val)
+            cg.emit_print_int(pval)
             cg.builder.branch(pr_done)
 
             cg.builder.position_at_start(heap_block)
-            # 读 h_type (前 4 字节)
-            htype_ptr = cg.builder.bitcast(val, ir.PointerType(_I32), name='htype_ptr')
+            htype_ptr = cg.builder.bitcast(pval, ir.PointerType(_I32), name='htype_ptr')
             htype = cg.builder.load(htype_ptr, name='htype')
             is_float = cg.builder.icmp_signed('==', htype, ir.Constant(_I32, 4), name='is_float')
             str_block = cg._add_block(name='pr_str2')
@@ -1255,11 +1274,11 @@ def compile_node(node, cg: CodegenContext) -> ir.Value | None:
             cg.builder.cbranch(is_float, float_block, str_block)
 
             cg.builder.position_at_start(str_block)
-            cg.emit_print_str(val)
+            cg.emit_print_str(pval)
             cg.builder.branch(pr_done)
 
             cg.builder.position_at_start(float_block)
-            cg.builder.call(cg._get_runtime_func('rt_print_float'), [val], name='pr_float_call')
+            cg.builder.call(cg._get_runtime_func('rt_print_float'), [pval], name='pr_float_call')
             cg.builder.branch(pr_done)
 
             cg.builder.position_at_start(pr_done)
@@ -1287,7 +1306,7 @@ def compile_node(node, cg: CodegenContext) -> ir.Value | None:
 
         cg.builder.position_at_start(loop_h)
         cond_val = compile_node(args[0], cg)
-        cond = cg.builder.icmp_signed('!=', cg._unbox_int(cond_val), _ZERO, name='loop_cond')
+        cond = cg._to_bool_i1(cond_val)
         cg.builder.cbranch(cond, loop_b, loop_e)
 
         cg.builder.position_at_start(loop_b)
@@ -1303,6 +1322,10 @@ def compile_node(node, cg: CodegenContext) -> ir.Value | None:
     # ── 返回 (返回 expr) ──
     if op in ('返回', 'return'):
         val = compile_node(args[0], cg) if args else _NULL
+        if isinstance(val, RawValue):
+            val = cg._box_int(val.ll_val)
+        elif isinstance(val, BoxedValue):
+            val = val.ll_val
         cg.builder.ret(val)
         return val
 
