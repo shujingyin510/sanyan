@@ -141,9 +141,9 @@ int32_t rt_str_find(const void *hs, const void *ndl) {
 }
 
 void *rt_int_to_str(uintptr_t tagged) {
-    int32_t val = (int32_t)((intptr_t)tagged >> 1);  /* untag */
+    int64_t val = (int64_t)((intptr_t)tagged >> 1);
     char buf[32];
-    snprintf(buf, sizeof(buf), "%d", val);
+    snprintf(buf, sizeof(buf), "%lld", (long long)val);
     return _rt_make(buf);
 }
 

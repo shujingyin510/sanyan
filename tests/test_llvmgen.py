@@ -30,16 +30,16 @@ class TestLLVMBasicLiterals(unittest.TestCase):
 
     def test_int_literal(self):
         ir = _compile_ast([['设', 'x', 42]])
-        self.assertIn('shl i32', ir)
-        self.assertIn('or i32', ir)
+        self.assertIn('shl i64', ir)
+        self.assertIn('or i64', ir)
 
     def test_bool_true(self):
         ir = _compile_ast([['设', 'x', '真']])
-        self.assertIn('shl i32 1', ir)
+        self.assertIn('shl i64 1', ir)
 
     def test_bool_false(self):
         ir = _compile_ast([['设', 'x', '假']])
-        self.assertIn('shl i32 0', ir)
+        self.assertIn('shl i64 0', ir)
 
 
 class TestLLVMArithmetic(unittest.TestCase):
@@ -47,23 +47,23 @@ class TestLLVMArithmetic(unittest.TestCase):
 
     def test_add(self):
         ir = _compile_ast([['设', 'x', ['加', 3, 4]]])
-        self.assertIn('add i32', ir)
+        self.assertIn('add i64', ir)
 
     def test_sub(self):
         ir = _compile_ast([['设', 'x', ['减', 10, 3]]])
-        self.assertIn('sub i32', ir)
+        self.assertIn('sub i64', ir)
 
     def test_mul(self):
         ir = _compile_ast([['设', 'x', ['乘', 6, 7]]])
-        self.assertIn('mul i32', ir)
+        self.assertIn('mul i64', ir)
 
     def test_div(self):
         ir = _compile_ast([['设', 'x', ['除', 8, 2]]])
-        self.assertIn('sdiv i32', ir)
+        self.assertIn('sdiv i64', ir)
 
     def test_mod(self):
         ir = _compile_ast([['设', 'x', ['余', 10, 3]]])
-        self.assertIn('srem i32', ir)
+        self.assertIn('srem i64', ir)
 
     def test_nested_arithmetic(self):
         ir = _compile_ast([['设', 'x', ['加', ['乘', 2, 3], 4]]])
@@ -96,11 +96,11 @@ class TestLLVMLogic(unittest.TestCase):
 
     def test_and(self):
         ir = _compile_ast([['设', 'x', ['且', '真', '真']]])
-        self.assertTrue(_has_pattern(ir, 'and i1') or _has_pattern(ir, 'and i32'))
+        self.assertTrue(_has_pattern(ir, 'and i1') or _has_pattern(ir, 'and i64'))
 
     def test_or(self):
         ir = _compile_ast([['设', 'x', ['或', '真', '假']]])
-        self.assertTrue(_has_pattern(ir, 'or i1') or _has_pattern(ir, 'or i32'))
+        self.assertTrue(_has_pattern(ir, 'or i1') or _has_pattern(ir, 'or i64'))
 
     def test_not(self):
         ir = _compile_ast([['设', 'x', ['非', '真']]])
@@ -214,7 +214,7 @@ class TestLLVMPrint(unittest.TestCase):
     def test_print_int(self):
         ir = _compile_ast([['输出', 42]])
         self.assertIn('printf', ir)
-        self.assertIn('%d', ir)
+        self.assertIn('%lld', ir)
 
     def test_print_string(self):
         ir = _compile_ast([['输出', '"hello world"']])

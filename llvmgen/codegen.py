@@ -5,8 +5,9 @@ from llvmlite import ir
 from ternary_core import TritValue
 
 # ── 类型定义 ──
-_INT = ir.IntType(32)
+_INT = ir.IntType(64)  # 63 位有符号整数（LSB=1 为 tag）
 _PTR = ir.PointerType(ir.IntType(8))  # i8* — 变量统一存储类型
+_I32 = ir.IntType(32)  # 兼容 32 位参数（列表长度、字符串长度等）
 _ZERO = ir.Constant(_INT, 0)
 _ONE = ir.Constant(_INT, 1)
 _NULL = ir.Constant(_PTR, None)
@@ -73,23 +74,23 @@ _LOGIC_OPS = {
 # ── 运行时函数声明规范 ──
 # (函数名, 返回类型, [参数类型]) — 使用真实 C 类型（i32 或 i8*）
 _RUNTIME_FUNCS: dict[str, tuple] = {
-    # 随机数 → i32
-    '随机数': ('rt_random_int', _INT, [_INT, _INT]),
-    'randint': ('rt_random_int', _INT, [_INT, _INT]),
+    # 随机数 → i32（C 函数返回 int32_t）
+    '随机数': ('rt_random_int', _I32, [_I32, _I32]),
+    'randint': ('rt_random_int', _I32, [_I32, _I32]),
     # 随机态 → i32（三值：-1/0/1）
-    '随机态': ('rt_random_trit', _INT, []),
+    '随机态': ('rt_random_trit', _I32, []),
     # 类型判断 → i32
-    '是数字': ('rt_is_number', _INT, [_INT]),
-    'is_number': ('rt_is_number', _INT, [_INT]),
-    '是字符串': ('rt_is_string', _INT, [_PTR]),
-    'is_string': ('rt_is_string', _INT, [_PTR]),
-    '是列表': ('rt_is_list', _INT, [_PTR]),
-    'is_list': ('rt_is_list', _INT, [_PTR]),
+    '是数字': ('rt_is_number', _I32, [_I32]),
+    'is_number': ('rt_is_number', _I32, [_I32]),
+    '是字符串': ('rt_is_string', _I32, [_PTR]),
+    'is_string': ('rt_is_string', _I32, [_PTR]),
+    '是列表': ('rt_is_list', _I32, [_PTR]),
+    'is_list': ('rt_is_list', _I32, [_PTR]),
     # 函数应用（桩）
     '应用': ('rt_apply_stub', _PTR, [_PTR, _PTR]),
     # 等待
-    '等待': ('rt_sleep', ir.VoidType(), [_INT]),
-    'wait': ('rt_sleep', ir.VoidType(), [_INT]),
+    '等待': ('rt_sleep', ir.VoidType(), [_I32]),
+    'wait': ('rt_sleep', ir.VoidType(), [_I32]),
     # 文件操作
     '读文件': ('rt_read_file', _PTR, [_PTR]),
     '写文件': ('rt_write_file', ir.VoidType(), [_PTR, _PTR]),
@@ -97,38 +98,11 @@ _RUNTIME_FUNCS: dict[str, tuple] = {
     '连接': ('rt_str_concat', _PTR, [_PTR, _PTR]),
     'concat': ('rt_str_concat', _PTR, [_PTR, _PTR]),
     '整数转字符串': ('rt_int_to_str', _PTR, [_PTR]),
-    '取长': ('rt_str_len', _INT, [_PTR]),
-    'length': ('rt_str_len', _INT, [_PTR]),
-    '字符串相等': ('rt_str_equals', _INT, [_PTR, _PTR]),
-    'str_equals': ('rt_str_equals', _INT, [_PTR, _PTR]),
-    '分割': ('rt_str_split', _PTR, [_PTR, _PTR]),
-    'split': ('rt_str_split', _PTR, [_PTR, _PTR]),
-    '子串': ('rt_str_substr', _PTR, [_PTR, _INT, _INT]),
-    'substring': ('rt_str_substr', _PTR, [_PTR, _INT, _INT]),
-    '包含': ('rt_str_contains', _INT, [_PTR, _PTR]),
-    'contains': ('rt_str_contains', _INT, [_PTR, _PTR]),
-    '查找': ('rt_str_find', _INT, [_PTR, _PTR]),
-    'find': ('rt_str_find', _INT, [_PTR, _PTR]),
-    # 列表操作
-    '列表': ('rt_list_new_cap', _PTR, [_INT]),
-    'list': ('rt_list_new_cap', _PTR, [_INT]),
-    '字典': ('rt_dict_new', _PTR, []),
-    'dict': ('rt_dict_new', _PTR, []),
-    'dict_contains': ('rt_dict_contains', _INT, [_PTR, _PTR]),
-    '含键': ('rt_dict_contains', _INT, [_PTR, _PTR]),
-    'get_key': ('rt_dict_get', _PTR, [_PTR, _PTR]),
-    'set_key': ('rt_dict_set', ir.VoidType(), [_PTR, _PTR, _PTR]),
-    '取键': ('rt_dict_get', _PTR, [_PTR, _PTR]),
-    '置键': ('rt_dict_set', ir.VoidType(), [_PTR, _PTR, _PTR]),
-    '表长': ('rt_list_len', _INT, [_PTR]),
-    'list_len': ('rt_list_len', _INT, [_PTR]),
-    '列表合': ('rt_list_concat', _PTR, [_PTR, _PTR]),
-    'list_concat': ('rt_list_concat', _PTR, [_PTR, _PTR]),
-    '取': ('rt_list_get', _PTR, [_PTR, _INT]),
-    'get': ('rt_list_get', _PTR, [_PTR, _INT]),
-    'slice': ('rt_list_slice', _PTR, [_PTR, _INT, _INT]),
-    '切片': ('rt_list_slice', _PTR, [_PTR, _INT, _INT]),
-    'str_to_list': ('rt_str_to_list', _PTR, [_PTR]),
+    '字符串': ('rt_int_to_str', _PTR, [_PTR]),
+    'to_string': ('rt_int_to_str', _PTR, [_PTR]),
+    '字列': ('rt_str_to_list', _PTR, [_PTR]),
+    '切片': ('rt_list_slice', _PTR, [_PTR, _I32, _I32]),
+    'slice': ('rt_list_slice', _PTR, [_PTR, _I32, _I32]),
     # 输入
     '输入': ('rt_read_input', _PTR, []),
     'input': ('rt_read_input', _PTR, []),
@@ -312,9 +286,8 @@ class CodegenContext:
         return self.builder.inttoptr(tagged, _PTR, name='box')
 
     def _unbox_int(self, ptr_val: ir.Value) -> ir.Value:
-        """tagged i8* → i32 拆箱。ptrtoint 后右移1位去除 tag。"""
         raw = self.builder.ptrtoint(ptr_val, _INT, name='unbox_raw')
-        return self.builder.lshr(raw, _ONE, name='unbox')
+        return self.builder.ashr(raw, _ONE, name='unbox')
 
     def _is_tagged_int(self, ptr_val: ir.Value) -> ir.Value:
         """检查 tagged 指针是否为整数（bit0 == 1）。返回 i1。"""
@@ -322,16 +295,14 @@ class CodegenContext:
         tagged = self.builder.and_(raw, _ONE, name='tag_bit')
         return self.builder.icmp_signed('!=', tagged, _ZERO, name='is_int')
 
-    def _to_i32(self, val: ir.Value) -> ir.Value:
-        """将值转为 i32：若已是 i32 直接返回，若是 i8* 则拆箱。"""
+    def _to_i64(self, val: ir.Value) -> ir.Value:
         if isinstance(val.type, ir.IntType):
             return val
         return self._unbox_int(val)
 
     def emit_print_int(self, value: ir.Value):
-        """生成 printf(\"%d\\n\", i32) 调用。自动拆箱 i8*。"""
-        fmt = self._make_global_string('%d\n')
-        self.builder.call(self._printf, [fmt, self._to_i32(value)])
+        fmt = self._make_global_string('%lld\n')
+        self.builder.call(self._printf, [fmt, self._to_i64(value)])
 
     def emit_print_str(self, value: ir.Value):
         """通过 rt_print_str 打印 rt_str_t 字符串。"""
@@ -731,10 +702,11 @@ def _compile_for(args: list, cg: CodegenContext) -> ir.Value | None:
         len_func = cg._get_runtime_func('表长')
         assert len_func is not None
         len_val = cg.builder.call(len_func, [container], name='list_len')
-        len_i32 = cg._unbox_int(len_val) if isinstance(len_val.type, ir.PointerType) else len_val
-        end_i32 = cg.builder.sub(len_i32, _ONE, name='end_idx')
+        len_i32 = len_val  # i32 from rt_list_len
+        len_i64 = cg.builder.zext(len_i32, _INT, name='len_widen')
+        end_i64 = cg.builder.sub(len_i64, _ONE, name='end_idx')
         start_val = cg._box_int(_ZERO)
-        end_val = cg._box_int(end_i32)
+        end_val = cg._box_int(end_i64)
         is_range = True
         # 包装原体：在每轮循环中加入 取元素 → 设变量
         get_func = cg._get_runtime_func('取')
@@ -742,9 +714,9 @@ def _compile_for(args: list, cg: CodegenContext) -> ir.Value | None:
         _orig_body = body_exprs
 
         def _make_container_body():
-            # 在循环体内取元素
             idx_ptr = cg.builder.load(loop_var, name='idx_ptr')
-            idx_i32 = cg._unbox_int(idx_ptr)
+            idx_i64 = cg._unbox_int(idx_ptr)
+            idx_i32 = cg.builder.trunc(idx_i64, _I32, name='idx_i32')
             elem = cg.builder.call(get_func, [container, idx_i32], name='elem')
             cg.set_var(var_name, elem)
             for e in _orig_body:
@@ -817,7 +789,7 @@ def _check_div_zero(lhs: ir.Value, rhs: ir.Value, cg: CodegenContext):
 
 def _compile_list_create(args: list, cg: CodegenContext) -> ir.Value:
     """编译 列表(元素...) → rt_list_new_cap(N) + rt_list_push_item × N。"""
-    cap = ir.Constant(_INT, max(len(args), 4))
+    cap = ir.Constant(_I32, max(len(args), 4))
     result = cg.builder.call(cg._get_runtime_func('list'), [cap], name='list_new')
     push_name = 'rt_list_push_item'
     if push_name not in cg._rt_funcs:
@@ -907,14 +879,18 @@ def _dispatch_runtime(op: str, args: list, func: ir.Function, cg: CodegenContext
     call_args = []
     for i, ptype in enumerate(param_types):
         if i >= len(compiled):
-            call_args.append(_ZERO if isinstance(ptype, ir.IntType) else _NULL)
+            call_args.append(ir.Constant(ptype, 0) if isinstance(ptype, ir.IntType) else _NULL)
         elif isinstance(ptype, ir.IntType):
             call_args.append(cg._unbox_int(compiled[i]))
+            if ptype != _INT:
+                call_args[-1] = cg.builder.trunc(call_args[-1], ptype, name='trunc')
         else:
             call_args.append(compiled[i])
     ret = cg.builder.call(func, call_args, name=f'rt_{op}')
-    # 返回值若为 i32 则装箱
+    # 返回值若为 i32 则 zext 到 i64 后装箱
     if isinstance(ret_type, ir.IntType):
+        if ret_type != _INT:
+            ret = cg.builder.zext(ret, _INT, name='zext')
         return cg._box_int(ret)
     if isinstance(ret_type, ir.VoidType):
         return _NULL
@@ -1033,10 +1009,10 @@ def compile_node(node, cg: CodegenContext) -> ir.Value | None:
         if op in ('读', '查', '置', '对', 'read', 'query', 'write', 'with'):
             args = [_quote_if_ident(a) for a in args]
         # list/列表 需要逐个 push 元素
-        if op in ('列表', 'list') and len(args) > 0:
+        if op in ('列表', 'list'):
             return _compile_list_create(args, cg)
         # dict/字典 需要逐对 set
-        if op in ('字典', 'dict') and len(args) > 0:
+        if op in ('字典', 'dict'):
             return _compile_dict_create(args, cg)
         # 连接/列表合 支持变参：两两折叠调用
         if op in ('连接', 'concat', '列表合', 'list_concat') and len(args) > 2:
