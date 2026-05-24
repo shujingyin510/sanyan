@@ -144,6 +144,9 @@ _RUNTIME_FUNCS: dict[str, tuple] = {
     'read': ('rt_iot_read', _PTR, [_PTR]),
     'query': ('rt_iot_query', ir.VoidType(), [_PTR]),
     'with': ('rt_iot_with', ir.VoidType(), [_PTR, _PTR]),
+    # 异常
+    'rt_throw': ('rt_throw', ir.VoidType(), [_PTR]),
+    'throw': ('rt_throw', ir.VoidType(), [_PTR]),
 }  # yapf: disable
 
 
@@ -198,6 +201,12 @@ class CodegenContext:
         self._global_inits: list[tuple[str, ir.Value | int | str]] = []  # 全局变量初始化
         self._loop_stack: list[tuple[ir.Block, ir.Block]] = []  # (header, exit) 循环上下文
         self._rt_funcs: dict[str, ir.Function] = {}  # 已声明的运行时函数
+        self._try_depth: int = 0  # 当前嵌套 try 深度
+        # 声明异常全局（所有函数都可访问）
+        g_error = ir.GlobalVariable(self.module, _PTR, name='g_error')
+        g_error.initializer = _NULL
+        g_error.linkage = 'common'
+        self._rt_funcs['g_error'] = g_error
         # 声明外部运行时函数
         self._declare_runtime()
 
@@ -640,33 +649,31 @@ def _compile_try_catch(args: list, cg: CodegenContext) -> ir.Value | None:
     else:
         try_stmts = [try_body]
 
-    # 声明 LLVM 全局错误变量 @g_error (i8*)
-    if 'g_error' not in cg._rt_funcs:
-        g_error = ir.GlobalVariable(cg.module, _PTR, name='g_error')
-        g_error.initializer = _NULL
-        g_error.linkage = 'common'
-        cg._rt_funcs['g_error'] = g_error
-    else:
-        g_error = cg._rt_funcs['g_error']
-
-    # 进入 try 前清除错误
-    cg.builder.store(_NULL, g_error)
-
-    # 执行 try 体 — 每句后不插检查（LLVM 靠全局存储优化）
-    for stmt in try_stmts:
-        compile_node(stmt, cg)
-
-    if cg.builder.block.is_terminated:
-        return _NULL
-
-    # 直接 load @g_error 并比较（替代 opaque rt_try_check 调用）
-    err_val = cg.builder.load(g_error, name='err_val')
-    err_int = cg.builder.ptrtoint(err_val, _INT, name='err_int')
-    has_err = cg.builder.icmp_signed('!=', err_int, _ZERO, name='has_err')
+    g_error = cg._rt_funcs['g_error']
 
     catch_block = cg._add_block(name='catch_body')
     after_block = cg._add_block(name='try_after')
-    cg.builder.cbranch(has_err, catch_block, after_block)
+
+    # 清除错误状态，标记进入 try 深度
+    cg.builder.store(_NULL, g_error)
+    cg._try_depth += 1
+
+    # 每个语句后立即检查 @g_error，发现则跳到 catch
+    for stmt in try_stmts:
+        compile_node(stmt, cg)
+        if cg.builder.block.is_terminated:
+            break
+        err = cg.builder.load(g_error, name='try_err')
+        err_int = cg.builder.ptrtoint(err, _INT, name='try_err_int')
+        has_err = cg.builder.icmp_signed('!=', err_int, _ZERO, name='try_has')
+        next_stmt = cg._add_block(name='try_next')
+        cg.builder.cbranch(has_err, catch_block, next_stmt)
+        cg.builder.position_at_start(next_stmt)
+
+    if cg.builder.block.is_terminated:
+        cg._try_depth -= 1
+        return _NULL
+    cg.builder.branch(after_block)
 
     # catch 块
     cg.builder.position_at_start(catch_block)
@@ -674,12 +681,30 @@ def _compile_try_catch(args: list, cg: CodegenContext) -> ir.Value | None:
     cg.set_var(error_var, err_msg)
     for stmt in catch_body_stmts:
         compile_node(stmt, cg)
-    cg.builder.store(_NULL, g_error)  # 处理完毕，清除错误
+    cg.builder.store(_NULL, g_error)
     if not cg.builder.block.is_terminated:
         cg.builder.branch(after_block)
 
     cg.builder.position_at_start(after_block)
+    cg._try_depth -= 1
     return _NULL
+
+
+def _maybe_unwind(cg: CodegenContext) -> None:
+    if cg._try_depth > 0:
+        return
+    g_error = cg._rt_funcs.get('g_error')
+    if not g_error or cg.builder.block.is_terminated:
+        return
+    err = cg.builder.load(g_error, name='unwind_err')
+    err_int = cg.builder.ptrtoint(err, _INT, name='unwind_int')
+    has_err = cg.builder.icmp_signed('!=', err_int, _ZERO, name='unwind_has')
+    no_err = cg._add_block(name='no_unwind')
+    do_unwind = cg._add_block(name='do_unwind')
+    cg.builder.cbranch(has_err, do_unwind, no_err)
+    cg.builder.position_at_start(do_unwind)
+    cg.builder.ret(err)
+    cg.builder.position_at_start(no_err)
 
 
 def _compile_for(args: list, cg: CodegenContext) -> ir.Value | None:
@@ -1016,7 +1041,9 @@ def compile_node(node, cg: CodegenContext) -> ir.Value | None:
         # 连接/列表合 支持变参：两两折叠调用
         if op in ('连接', 'concat', '列表合', 'list_concat') and len(args) > 2:
             return _compile_fold(op, args, rt_func, cg)
-        return _dispatch_runtime(op, args, rt_func, cg)
+        result = _dispatch_runtime(op, args, rt_func, cg)
+        _maybe_unwind(cg)
+        return result
 
     # ── 定义变量 (设 name value) ──
     if op in ('设', 'set'):
@@ -1129,7 +1156,9 @@ def compile_node(node, cg: CodegenContext) -> ir.Value | None:
     # ── 变量作为容器索引：列表名(索引) → 取(列表名, 索引) ──
     if (op in cg._scope or op in cg._globals) and len(args) == 1:
         assert cg._get_runtime_func('取') is not None
-        return _dispatch_runtime('取', [op, args[0]], cg._get_runtime_func('取'), cg)
+        result = _dispatch_runtime('取', [op, args[0]], cg._get_runtime_func('取'), cg)
+        _maybe_unwind(cg)
+        return result
 
     # ── 导出 (忽略) ──
     if op in ('导出', 'export'):
@@ -1143,13 +1172,17 @@ def compile_node(node, cg: CodegenContext) -> ir.Value | None:
     if resolved_op in cg._funcs:
         callee = cg._funcs[resolved_op]
         arg_vals = [compile_node(a, cg) for a in args]
-        return cg.builder.call(callee, arg_vals, name=f'call_{op}')
+        result = cg.builder.call(callee, arg_vals, name=f'call_{op}')
+        _maybe_unwind(cg)
+        return result
 
     # ── 未知操作 → 当作前向引用函数调用 ──
     resolved_op = op.split('.')[-1] if '.' in op else op
     if resolved_op in cg._funcs:
         arg_vals = [compile_node(a, cg) for a in args]
-        return cg.builder.call(cg._funcs[resolved_op], arg_vals, name=f'call_{op}')
+        result = cg.builder.call(cg._funcs[resolved_op], arg_vals, name=f'call_{op}')
+        _maybe_unwind(cg)
+        return result
     raise NameError(f'编译错误: 未定义的操作或函数 {op}')
 
 
