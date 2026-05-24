@@ -937,10 +937,13 @@ def _is_float_call(val: ir.Value) -> bool:
     return isinstance(val, ir.Instruction) and val.opname == 'call' and val.callee.name == 'rt_float_new'
 
 
-def _val_to_double(val: ir.Value, is_float: bool, cg: CodegenContext) -> ir.Value:
+def _val_to_double(val, is_float: bool, cg: CodegenContext) -> ir.Value:
+    if isinstance(val, RawValue):
+        return cg.builder.sitofp(val.ll_val, ir.DoubleType(), name='tof')
+    v = val.ll_val if isinstance(val, BoxedValue) else val
     if is_float:
-        return cg.builder.call(cg._get_runtime_func('rt_unbox_float'), [val], name='unbox_f')
-    raw = cg.builder.ptrtoint(val, _INT, name='tof_raw')
+        return cg.builder.call(cg._get_runtime_func('rt_unbox_float'), [v], name='unbox_f')
+    raw = cg.builder.ptrtoint(v, _INT, name='tof_raw')
     ival = cg.builder.ashr(raw, _ONE, name='tof_int')
     return cg.builder.sitofp(ival, ir.DoubleType(), name='tof')
 
