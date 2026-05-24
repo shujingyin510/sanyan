@@ -83,8 +83,11 @@
 
     若 (字符串相等(op, "set")) {
         设 name = 取(args, 0)
-        设 val_r = 编译(取(args, 1), reg)
-        设 s = 取(val_r, 0); 设 val_reg = 取(val_r, 1); reg = 取(val_r, 2)
+        设 arg_val = 取(args, 1)
+        设 val_r = 编译(arg_val, reg)
+        设 s = 取(val_r, 0)
+        设 val_reg = 取(val_r, 1)
+        reg = 取(val_r, 2)
         设 r = 新寄存器(reg); 设 a = 取(r, 0); reg = 取(r, 1)
         s = 连接(s, "  ", a, " = alloca i8*", 换行)
         s = 连接(s, "  store i8* ", val_reg, ", i8** ", a, 换行)
@@ -92,9 +95,11 @@
     }
 
     若 (字符串相等(op, "add")) {
-        设 l_r = 编译(取(args, 0), reg)
+        设 l_val = 取(args, 0)
+        设 r_val = 取(args, 1)
+        设 l_r = 编译(l_val, reg)
         设 s = 取(l_r, 0); 设 lv = 取(l_r, 1); reg = 取(l_r, 2)
-        设 r_r = 编译(取(args, 1), reg)
+        设 r_r = 编译(r_val, reg)
         s = 连接(s, 取(r_r, 0)); 设 rv = 取(r_r, 1); reg = 取(r_r, 2)
         设 ub = unbox(lv, reg); s = 连接(s, 取(ub, 0)); 设 l_raw = 取(ub, 1); reg = 取(ub, 2)
         设 ub = unbox(rv, reg); s = 连接(s, 取(ub, 0)); 设 r_raw = 取(ub, 1); reg = 取(ub, 2)
@@ -105,7 +110,8 @@
     }
 
     若 (字符串相等(op, "print")) {
-        设 v_r = 编译(取(args, 0), reg)
+        设 p_val = 取(args, 0)
+        设 v_r = 编译(p_val, reg)
         设 s = 取(v_r, 0); 设 vr = 取(v_r, 1); reg = 取(v_r, 2)
         设 r = 新寄存器(reg); 设 r1 = 取(r, 0); reg = 取(r, 1)
         设 r = 新寄存器(reg); 设 r2 = 取(r, 0); reg = 取(r, 1)
