@@ -195,6 +195,15 @@ _RUNTIME_FUNCS: dict[str, tuple] = {
     '正则查找': ('rt_regex_findall', _PTR, [_PTR, _PTR]),
     '正则替换': ('rt_regex_replace', _PTR, [_PTR, _PTR, _PTR]),
     '正则分割': ('rt_regex_split', _PTR, [_PTR, _PTR]),
+    # 文件读写（别名）
+    'read_file': ('rt_read_file', _PTR, [_PTR]),
+    'write_file': ('rt_write_file', ir.VoidType(), [_PTR, _PTR]),
+    # 数学
+    'pow': ('rt_math_pow', _I32, [_I32, _I32]),
+    'sqrt': ('rt_math_sqrt', _I32, [_I32]),
+    'abs': ('rt_math_abs', _I32, [_I32]),
+    'sleep': ('rt_sleep', ir.VoidType(), [_I32]),
+    'reduce': ('rt_list_reduce', _PTR, [_PTR, _PTR]),
     # 字符串扩展（桩）
     'reverse': ('rt_str_reverse', _PTR, [_PTR]),
     'startswith': ('rt_str_startswith', _I32, [_PTR, _PTR]),
@@ -1126,7 +1135,12 @@ def _to_i8_ptr(val, cg):
 
 
 def compile_node(node, cg: CodegenContext) -> ir.Value | None:
-    return _compile_node_inner(node, cg)
+    result = _compile_node_inner(node, cg)
+    if isinstance(result, RawValue):
+        return cg._box_int(result.ll_val)
+    if isinstance(result, BoxedValue):
+        return result.ll_val
+    return result
 
 
 def _compile_node_inner(node, cg: CodegenContext) -> ir.Value | None:
@@ -1276,7 +1290,7 @@ def _compile_node_inner(node, cg: CodegenContext) -> ir.Value | None:
         name = args[0]
         if not isinstance(name, str):
             raise SyntaxError(f'变量名必须是字符串: {name}')
-        val = compile_node(args[1], cg)
+        val = _compile_node_inner(args[1], cg)
         is_int_val = isinstance(args[1], (int, float)) or (
             isinstance(args[1], list) and len(args[1]) > 0 and args[1][0] in _ARITH_OPS
         ) or (isinstance(args[1], str) and _to_int(args[1]) is not None)
@@ -1284,8 +1298,12 @@ def _compile_node_inner(node, cg: CodegenContext) -> ir.Value | None:
             cg._get_alloca(name, is_int=True)
             cg.set_var_raw(name, val.ll_val)
         elif isinstance(val, (ir.Instruction, BoxedValue)):
-            cg._get_alloca(name, is_int=False)
-            cg.set_var(name, val.ll_val if isinstance(val, BoxedValue) else val)
+            bv = val.ll_val if isinstance(val, BoxedValue) else val
+            if name in cg._allocas and cg._allocas[name][1]:
+                cg.set_var_raw(name, cg._unbox_int(bv))
+            else:
+                cg._get_alloca(name, is_int=False)
+                cg.set_var(name, bv)
         else:
             cg.set_var(name, val)
         return val
@@ -1641,7 +1659,7 @@ def _compile_in_context(ast_nodes: list, cg: CodegenContext) -> None:
         for node in others + imported_setups:
             if isinstance(node, list) and len(node) >= 3 and node[0] in ('设', 'set'):
                 name = node[1]
-                if isinstance(name, str) and not name.startswith('_'):
+                if isinstance(name, str):
                     val = node[2]
                     if isinstance(val, (int, float)):
                         pass  # 数字 — 不预建全局

@@ -193,6 +193,9 @@ void *rt_list_sort(void *lst)         { (void)lst; return _rt_make(\"\"); }
 int32_t rt_list_sum(void *lst)        { (void)lst; return 0; }
 int32_t rt_list_count(void *lst, void *v){ (void)lst;(void)v; return 0; }
 void *rt_list_unique(void *lst)       { (void)lst; return _rt_make(\"\"); }
+int32_t rt_math_pow(int32_t b, int32_t e) { int32_t r=1; while(e-->0) r*=b; return r; }
+int32_t rt_math_sqrt(int32_t v)           { int32_t r=0; while(r*r<=v) r++; return r-1; }
+void *rt_list_reduce(void *fn, void *lst) { (void)fn; (void)lst; return _rt_make(\"\"); }
     const char *p = cs;
     while (p && *p) {
         const char *next = strstr(p, csep);
