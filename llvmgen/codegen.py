@@ -529,7 +529,11 @@ class CodegenContext:
             raise NameError(f'{name} 是函数，不能当作变量')
         raise NameError(f'编译错误: 未定义变量 {name}')
 
-    def set_var(self, name: str, value: ir.Value):
+    def set_var(self, name: str, value):
+        if isinstance(value, RawValue):
+            value = self._box_int(value.ll_val)
+        elif isinstance(value, BoxedValue):
+            value = value.ll_val
         if isinstance(value.type, ir.PointerType):
             boxed = value
             raw = self._unbox_int(value)
@@ -1113,7 +1117,19 @@ def _from_global_string(val: ir.Value) -> bool:
     return False
 
 
+def _to_i8_ptr(val, cg):
+    if isinstance(val, RawValue):
+        return cg._box_int(val.ll_val)
+    if isinstance(val, BoxedValue):
+        return val.ll_val
+    return val
+
+
 def compile_node(node, cg: CodegenContext) -> ir.Value | None:
+    return _compile_node_inner(node, cg)
+
+
+def _compile_node_inner(node, cg: CodegenContext) -> ir.Value | None:
     """递归编译 AST 节点，返回 i8* 值。"""
 
     # 字面量 → i8*
@@ -1406,19 +1422,26 @@ def compile_node(node, cg: CodegenContext) -> ir.Value | None:
         resolved_op = op.split('.')[-1]
     if resolved_op in cg._funcs:
         callee = cg._funcs[resolved_op]
-        arg_vals = [compile_node(a, cg) for a in args]
+        arg_vals = [_unwrap_call_arg(compile_node(a, cg), cg) for a in args]
         result = cg.builder.call(callee, arg_vals, name=f'call_{op}')
         _maybe_unwind(cg)
         return result
 
-    # ── 未知操作 → 当作前向引用函数调用 ──
     resolved_op = op.split('.')[-1] if '.' in op else op
     if resolved_op in cg._funcs:
-        arg_vals = [compile_node(a, cg) for a in args]
+        arg_vals = [_unwrap_call_arg(compile_node(a, cg), cg) for a in args]
         result = cg.builder.call(cg._funcs[resolved_op], arg_vals, name=f'call_{op}')
         _maybe_unwind(cg)
         return result
     raise NameError(f'编译错误: 未定义的操作或函数 {op}')
+
+
+def _unwrap_call_arg(val, cg: CodegenContext) -> ir.Value:
+    if isinstance(val, RawValue):
+        return cg._box_int(val.ll_val)
+    if isinstance(val, BoxedValue):
+        return val.ll_val
+    return val
 
 
 def _merge_if_chain(nodes: list) -> list:
