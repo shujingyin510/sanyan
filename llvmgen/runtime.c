@@ -170,7 +170,29 @@ void *rt_str_split(const char *s, const char *sep) {
     const char *cs = _cstr(s), *csep = _cstr(sep);
     if (!cs || !csep || !*cs) return r;
     int32_t slen = (int32_t)strlen(cs), seplen = (int32_t)strlen(csep);
-    if (seplen <= 0) { rt_list_push_item(r, _rt_make(cs)); return r; }
+    if (seplen <= 0) { rt_list_push_item(r, _rt_make(cs));     return r;
+}
+
+/* ── 桩函数（待完整实现）────────────────── */
+void *rt_http_get(void *url)         { (void)url; return _rt_make(\"\"); }
+void *rt_http_post(void *url, void *d){ (void)url; (void)d; return _rt_make(\"\"); }
+void *rt_regex_match(void *p, void *t){ (void)p; (void)t; return _rt_make(\"\"); }
+void *rt_regex_search(void *p, void *t){ (void)p; (void)t; return _rt_make(\"\"); }
+void *rt_regex_findall(void *p, void *t){ (void)p; (void)t; return _rt_make(\"\"); }
+void *rt_regex_replace(void *p, void *r, void *t){ (void)p; (void)r; (void)t; return _rt_make(\"\"); }
+void *rt_regex_split(void *p, void *t){ (void)p; (void)t; return _rt_make(\"\"); }
+void *rt_str_reverse(void *s)        { return _rt_make(_cstr(s)); }
+int32_t rt_str_startswith(void *s, void *pre) { return strncmp(_cstr(s), _cstr(pre), strlen(_cstr(pre))) == 0; }
+int32_t rt_str_endswith(void *s, void *suf)   { const char *cs=_cstr(s),*csu=_cstr(suf); int32_t l=(int32_t)strlen(cs),ls=(int32_t)strlen(csu); return l>=ls && strcmp(cs+l-ls,csu)==0; }
+void *rt_str_replace(void *s, void *o, void *n){ (void)s;(void)o;(void)n; return _rt_make(\"\"); }
+void *rt_str_trim(void *s)            { return _rt_make(_cstr(s)); }
+void *rt_str_upper(void *s)           { return _rt_make(_cstr(s)); }
+void *rt_str_lower(void *s)           { return _rt_make(_cstr(s)); }
+void *rt_str_join(void *sep, void *lst){ (void)sep;(void)lst; return _rt_make(\"\"); }
+void *rt_list_sort(void *lst)         { (void)lst; return _rt_make(\"\"); }
+int32_t rt_list_sum(void *lst)        { (void)lst; return 0; }
+int32_t rt_list_count(void *lst, void *v){ (void)lst;(void)v; return 0; }
+void *rt_list_unique(void *lst)       { (void)lst; return _rt_make(\"\"); }
     const char *p = cs;
     while (p && *p) {
         const char *next = strstr(p, csep);

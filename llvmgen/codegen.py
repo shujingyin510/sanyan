@@ -183,7 +183,31 @@ _RUNTIME_FUNCS: dict[str, tuple] = {
     'rt_print_float': ('rt_print_float', ir.VoidType(), [_PTR]),
     # JSON（桩）
     '解析JSON': ('rt_json_parse', _PTR, [_PTR]),
+    'from_json': ('rt_json_parse', _PTR, [_PTR]),
     '转JSON': ('rt_json_stringify', _PTR, [_PTR]),
+    'to_json': ('rt_json_stringify', _PTR, [_PTR]),
+    # HTTP（桩）
+    'http读': ('rt_http_get', _PTR, [_PTR]),
+    'http写': ('rt_http_post', _PTR, [_PTR, _PTR]),
+    # 正则（桩）
+    '正则匹配': ('rt_regex_match', _PTR, [_PTR, _PTR]),
+    '正则搜索': ('rt_regex_search', _PTR, [_PTR, _PTR]),
+    '正则查找': ('rt_regex_findall', _PTR, [_PTR, _PTR]),
+    '正则替换': ('rt_regex_replace', _PTR, [_PTR, _PTR, _PTR]),
+    '正则分割': ('rt_regex_split', _PTR, [_PTR, _PTR]),
+    # 字符串扩展（桩）
+    'reverse': ('rt_str_reverse', _PTR, [_PTR]),
+    'startswith': ('rt_str_startswith', _I32, [_PTR, _PTR]),
+    'endswith': ('rt_str_endswith', _I32, [_PTR, _PTR]),
+    'replace': ('rt_str_replace', _PTR, [_PTR, _PTR, _PTR]),
+    'trim': ('rt_str_trim', _PTR, [_PTR]),
+    'upper': ('rt_str_upper', _PTR, [_PTR]),
+    'lower': ('rt_str_lower', _PTR, [_PTR]),
+    'join': ('rt_str_join', _PTR, [_PTR, _PTR]),
+    'sort': ('rt_list_sort', _PTR, [_PTR]),
+    'sum': ('rt_list_sum', _I32, [_PTR]),
+    'count': ('rt_list_count', _I32, [_PTR, _PTR]),
+    'unique': ('rt_list_unique', _PTR, [_PTR]),
 }  # yapf: disable
 
 
@@ -1074,10 +1098,10 @@ def _dispatch_runtime(op: str, args: list, func: ir.Function, cg: CodegenContext
     if isinstance(ret_type, ir.IntType):
         if ret_type != _INT:
             ret = cg.builder.zext(ret, _INT, name='zext')
-        return RawValue(ret)
+        return cg._box_int(ret)
     if isinstance(ret_type, ir.VoidType):
         return _NULL
-    return BoxedValue(ret) if ret else _NULL
+    return ret
 
 
 def _from_global_string(val: ir.Value) -> bool:
@@ -1302,7 +1326,7 @@ def compile_node(node, cg: CodegenContext) -> ir.Value | None:
         return _compile_if(args, cg)
 
     # ── 遍历 (遍历 var 从 start 到 end body) ──
-    if op in ('遍历', 'for'):
+    if op in ('遍历', 'for', 'forin'):
         return _compile_for(args, cg)
 
     # ── 循环 (循环 条件 体) ──
