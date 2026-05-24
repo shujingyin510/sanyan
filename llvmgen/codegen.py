@@ -806,16 +806,25 @@ def _compile_judge(args: list, cg: CodegenContext) -> ir.Value | None:
 
 
 def _compile_lambda(args: list, cg: CodegenContext) -> ir.Value:
-    """编译匿名函数 函数(params) { body } 为命名函数，返回函数指针。"""
     params = args[0] if args and isinstance(args[0], list) else []
     body = args[1] if len(args) > 1 else []
     body_stmts = _unwrap_block(body)
     n = len([k for k in cg._funcs if k.startswith('__lambda_')])
     name = f'__lambda_{n}'
+    saved_scope = dict(cg._scope)
+    saved_allocas = dict(cg._allocas)
+    saved_builder = cg._builder
+    saved_entry = cg._entry_block
+    saved_func = cg._current_func
     cg.begin_function(name, params)
     for stmt in body_stmts:
         compile_node(stmt, cg)
     cg.end_function()
+    cg._scope = saved_scope
+    cg._allocas = saved_allocas
+    cg._builder = saved_builder
+    cg._entry_block = saved_entry
+    cg._current_func = saved_func
     func = cg._funcs[name]
     return cg.builder.bitcast(func, _PTR, name=f'{name}_ptr')
 
@@ -1693,6 +1702,9 @@ def compile_top_level(ast_nodes: list, module_name: str = 'main', module_prefix:
 
 
 def _compile_in_context(ast_nodes: list, cg: CodegenContext) -> None:
+    # 确保顶层是 do 块
+    if not (isinstance(ast_nodes, list) and len(ast_nodes) > 0 and ast_nodes[0] in ('做', 'do')):
+        ast_nodes = ['做'] + ast_nodes
     if isinstance(ast_nodes, list) and len(ast_nodes) > 0 and ast_nodes[0] in ('做', 'do'):
         ast_nodes = ast_nodes[1:]
 

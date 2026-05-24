@@ -19,19 +19,19 @@ def _parse_source(source: str) -> list:
     clear_cache()
     evaluator = SanyanEvaluator()
 
-    # 1. 自举糖解析器
+    # 1. Python SugarConverter（产出 codegen 兼容的内部 AST）
     try:
-        parsed = _parse_with_sugar_san(source, evaluator)
+        from sugar import SugarConverter
+
+        parsed = SugarConverter.convert(source, evaluator.skin_manager)
         if parsed is not None and isinstance(parsed, list):
             return cast(list[Any], parsed)
     except Exception:
         pass
 
-    # 2. Python SugarConverter（优先级高于 S-expression）
+    # 2. 自举糖解析器（产出中文关键字 AST——仅用于求值器路径）
     try:
-        from sugar import SugarConverter
-
-        parsed = SugarConverter.convert(source, evaluator.skin_manager)
+        parsed = _parse_with_sugar_san(source, evaluator)
         if parsed is not None and isinstance(parsed, list):
             return cast(list[Any], parsed)
     except Exception:
