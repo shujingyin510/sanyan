@@ -10,6 +10,8 @@ _PTR = ir.PointerType(ir.IntType(8))  # i8* — 变量统一存储类型
 _I32 = ir.IntType(32)  # 兼容 32 位参数（列表长度、字符串长度等）
 _ZERO = ir.Constant(_INT, 0)
 _ONE = ir.Constant(_INT, 1)
+_ZERO32 = ir.Constant(_I32, 0)
+_ONE32 = ir.Constant(_I32, 1)
 _NULL = ir.Constant(_PTR, None)
 
 # 内置常量
@@ -146,6 +148,9 @@ _RUNTIME_FUNCS: dict[str, tuple] = {
     # 异常
     'rt_throw': ('rt_throw', ir.VoidType(), [_PTR]),
     'throw': ('rt_throw', ir.VoidType(), [_PTR]),
+    # JSON（桩 — 完整实现待 runtime.c 加 JSON 解析器）
+    '解析JSON': ('rt_json_parse', _PTR, [_PTR]),
+    '转JSON': ('rt_json_stringify', _PTR, [_PTR]),
 }  # yapf: disable
 
 
@@ -213,7 +218,7 @@ class CodegenContext:
     def _declare_runtime(self):
         """声明外部运行时函数（printf 等）。"""
         if self._printf is None:
-            fnty = ir.FunctionType(_INT, [_PTR], var_arg=True)
+            fnty = ir.FunctionType(_I32, [_PTR], var_arg=True)
             self._printf = ir.Function(self.module, fnty, name='printf')
 
     def _get_runtime_func(self, op: str) -> ir.Function | None:
@@ -246,7 +251,7 @@ class CodegenContext:
         return self._func.append_basic_block(name=name)
 
     def begin_function(self, name: str, param_names: list[str]) -> ir.Function:
-        if self.module_prefix and name != 'main':
+        if self.module_prefix:
             name = f'san_{self.module_prefix}__{name}'
         if name in self._funcs:
             func = self._funcs[name]
@@ -359,7 +364,7 @@ class CodegenContext:
         gv.linkage = 'private'
         gv.global_constant = True
         gv.initializer = c
-        return self.builder.gep(gv, [_ZERO, _ZERO], inbounds=True)
+        return self.builder.gep(gv, [_ZERO32, _ZERO32], inbounds=True)
 
     def _make_rt_string(self, s: str) -> ir.Value:
         """创建运行时字符串常量（rt_str_t 格式：{i32 len, [N x i8] data}）。
@@ -372,15 +377,15 @@ class CodegenContext:
         slen = len(encoded)
         data_bytes = bytearray(encoded) + b'\x00'
         # 构建 {i32, [N x i8]} 结构体常量
-        st_ty = ir.LiteralStructType([_INT, ir.ArrayType(ir.IntType(8), slen + 1)])
-        len_f = ir.Constant(_INT, slen)
+        st_ty = ir.LiteralStructType([_I32, ir.ArrayType(ir.IntType(8), slen + 1)])
+        len_f = ir.Constant(_I32, slen)
         data_f = ir.Constant(ir.ArrayType(ir.IntType(8), slen + 1), data_bytes)
         c = ir.Constant(st_ty, [len_f, data_f])
         gv = ir.GlobalVariable(self.module, st_ty, name=f'.rt_str.{n}')
         gv.linkage = 'private'
         gv.global_constant = True
         gv.initializer = c
-        raw = self.builder.gep(gv, [_ZERO, _ZERO], inbounds=True)
+        raw = self.builder.gep(gv, [_ZERO32, _ZERO32], inbounds=True)
         return self.builder.bitcast(raw, _PTR, name=f'.rt_str_p{n}')
 
     def _entry_alloca(self, name: str) -> ir.Value:
@@ -1459,7 +1464,15 @@ def _collect_imports(node, collected: set) -> None:
 def _find_module_path(name: str) -> str | None:
     import os
 
-    for p in [name + '.san', os.path.join('stdlib', name + '.san')]:
+    if len(name) >= 2 and name[0] == '"' and name[-1] == '"':
+        name = name[1:-1]
+
+    paths = [name]
+    if not name.endswith('.san'):
+        paths.append(name + '.san')
+    paths.append(os.path.join('stdlib', name if name.endswith('.san') else name + '.san'))
+
+    for p in paths:
         if os.path.exists(p):
             return p
     return None

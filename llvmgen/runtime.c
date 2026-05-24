@@ -173,6 +173,17 @@ void *rt_str_split(const char *s, const char *sep) {
     return r;
 }
 
+/* ── JSON 桩（完整实现待加）── */
+void *rt_json_parse(void *s) {
+    (void)s;
+    return _rt_make("{}");
+}
+
+void *rt_json_stringify(void *v) {
+    (void)v;
+    return _rt_make("\"\"");
+}
+
 /* ── 列表类型 ── */
 struct rt_list_s {
     int32_t len;
