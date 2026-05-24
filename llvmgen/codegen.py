@@ -386,15 +386,19 @@ class CodegenContext:
         raw = self.builder.ptrtoint(ptr_val, _INT, name='unbox_raw')
         return self.builder.ashr(raw, _ONE, name='unbox')
 
-    def _to_raw(self, val: 'BoxedValue | RawValue') -> 'RawValue':
+    def _to_raw(self, val) -> 'RawValue':
         if isinstance(val, RawValue):
             return val
-        return RawValue(self._unbox_int(val.ll_val))
+        if isinstance(val, BoxedValue):
+            return RawValue(self._unbox_int(val.ll_val))
+        return RawValue(self._unbox_int(val))
 
-    def _to_boxed(self, val: 'BoxedValue | RawValue') -> 'BoxedValue':
+    def _to_boxed(self, val) -> 'BoxedValue':
         if isinstance(val, BoxedValue):
             return val
-        return BoxedValue(self._box_int(val.ll_val))
+        if isinstance(val, RawValue):
+            return BoxedValue(self._box_int(val.ll_val))
+        return BoxedValue(val)
 
     def _to_bool_i1(self, val) -> ir.Value:
         if isinstance(val, RawValue):
@@ -494,9 +498,9 @@ class CodegenContext:
             val = self.builder.load(alloca, name=name)
             return RawValue(val) if is_int else val
         if name in self._scope:
-            return self.builder.load(self._scope[name], name=name)
+            return BoxedValue(self.builder.load(self._scope[name], name=name))
         if name in self._globals:
-            return self.builder.load(self._globals[name], name=name)
+            return BoxedValue(self.builder.load(self._globals[name], name=name))
         if name in self._funcs:
             raise NameError(f'{name} 是函数，不能当作变量')
         raise NameError(f'编译错误: 未定义变量 {name}')
@@ -1085,16 +1089,14 @@ def compile_node(node, cg: CodegenContext) -> ir.Value | None:
             name='float_new',
         )
     if isinstance(node, int):
-        return cg._box_int(ir.Constant(_INT, node))
+        return RawValue(ir.Constant(_INT, node))
 
-    # TritValue (sugar.san 解析结果)
     if isinstance(node, TritValue):
-        return cg._box_int(ir.Constant(_INT, node.to_int()))
+        return RawValue(ir.Constant(_INT, node.to_int()))
 
     if isinstance(node, str):
-        # 内置常量
         if node in _BUILTIN_CONSTS:
-            return cg._box_int(ir.Constant(_INT, _BUILTIN_CONSTS[node]))
+            return RawValue(ir.Constant(_INT, _BUILTIN_CONSTS[node]))
         # 字符串字面量 → i8* (rt_str_t 格式)
         if _is_string_literal(node):
             return cg._make_rt_string(_unquote(node))
@@ -1108,7 +1110,7 @@ def compile_node(node, cg: CodegenContext) -> ir.Value | None:
             )
         n = _to_int(node)
         if n is not None:
-            return cg._box_int(ir.Constant(_INT, n))
+            return RawValue(ir.Constant(_INT, n))
         return cg.get_var(node)
 
     if not isinstance(node, list) or len(node) < 1:
