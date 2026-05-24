@@ -42,6 +42,9 @@ _BUILTIN_CONSTS = {
     '可能': 0,
     'maybe': 0,
     'Maybe': 0,
+    '空': 0,
+    'nil': 0,
+    'null': 0,
     # IoT 设备状态
     '开': 1,
     '亮': 1,
@@ -204,6 +207,9 @@ _RUNTIME_FUNCS: dict[str, tuple] = {
     'abs': ('rt_math_abs', _I32, [_I32]),
     'sleep': ('rt_sleep', ir.VoidType(), [_I32]),
     'reduce': ('rt_list_reduce', _PTR, [_PTR, _PTR]),
+    # 时间
+    'time': ('rt_time_now', _I32, []),
+    '当前时间': ('rt_time_now', _I32, []),
     # 字符串扩展（桩）
     'reverse': ('rt_str_reverse', _PTR, [_PTR]),
     'startswith': ('rt_str_startswith', _I32, [_PTR, _PTR]),
@@ -563,8 +569,11 @@ class CodegenContext:
         self.builder.store(raw, alloca)
 
     def set_var_raw(self, name: str, raw_val: ir.Value):
-        alloca, _ = self._allocas[name]
-        self.builder.store(raw_val, alloca)
+        alloca, is_int = self._allocas[name]
+        if is_int:
+            self.builder.store(raw_val, alloca)
+        else:
+            self.builder.store(self._box_int(raw_val), alloca)
 
     def create_global(self, name: str, init_value: ir.Value | None = None):
         """创建模块级全局变量（编译时可见）。"""
@@ -1176,6 +1185,10 @@ def _compile_node_inner(node, cg: CodegenContext) -> ir.Value | None:
         n = _to_int(node)
         if n is not None:
             return RawValue(ir.Constant(_INT, n))
+        # 零参内置函数（如 time）→ 自动调用
+        rt = cg._get_runtime_func(node)
+        if rt is not None:
+            return _dispatch_runtime(node, [], rt, cg)
         return cg.get_var(node)
 
     if not isinstance(node, list) or len(node) < 1:
@@ -1300,7 +1313,9 @@ def _compile_node_inner(node, cg: CodegenContext) -> ir.Value | None:
         elif isinstance(val, (ir.Instruction, BoxedValue)):
             bv = val.ll_val if isinstance(val, BoxedValue) else val
             if name in cg._allocas and cg._allocas[name][1]:
-                cg.set_var_raw(name, cg._unbox_int(bv))
+                # i64 alloca 存 heap 值 → 转为 tagged int
+                raw = cg._unbox_int(bv) if isinstance(bv.type, ir.PointerType) else bv
+                cg.set_var_raw(name, raw)
             else:
                 cg._get_alloca(name, is_int=False)
                 cg.set_var(name, bv)
@@ -1662,12 +1677,16 @@ def _compile_in_context(ast_nodes: list, cg: CodegenContext) -> None:
                 if isinstance(name, str):
                     val = node[2]
                     if isinstance(val, (int, float)):
-                        pass  # 数字 — 不预建全局
+                        if name.startswith('_'):
+                            cg.create_global(name, val)
+                        # 数字 — 不预建全局（走 alloca）
                     elif isinstance(val, str):
                         if _is_string_literal(val):
-                            pass  # 字符串字面量 — 不预建全局
+                            pass
                         elif _to_int(val) is not None:
-                            pass  # 数字字符串 — 不预建全局
+                            if name.startswith('_'):
+                                cg.create_global(name, val)
+                            # 数字字符串 — 不预建全局
                         else:
                             cg.create_global(name, val)
                             cg._global_inits.append((name, val))
