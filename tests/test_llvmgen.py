@@ -318,8 +318,8 @@ class TestLLVMTryCatch(unittest.TestCase):
                 ]
             ]
         )
-        self.assertIn('rt_try_begin', ir)
-        self.assertIn('rt_try_check', ir)
+        self.assertIn('g_error', ir)
+        self.assertIn('catch_body', ir)
 
 
 class TestLLVMNoRegression(unittest.TestCase):

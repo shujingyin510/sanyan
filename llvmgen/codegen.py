@@ -621,10 +621,6 @@ def _compile_lambda(args: list, cg: CodegenContext) -> ir.Value:
 
 
 def _compile_try_catch(args: list, cg: CodegenContext) -> ir.Value | None:
-    """编译 尝试/捕获 异常处理。
-
-    AST 格式: ['尝试', try_body, ['捕获', error_var, catch_body...]]
-    """
     if len(args) < 2:
         raise SyntaxError('尝试 需要 (try_body 捕获 (err) catch_body)')
 
@@ -639,51 +635,46 @@ def _compile_try_catch(args: list, cg: CodegenContext) -> ir.Value | None:
         error_var = error_var[0] if len(error_var) > 0 else '错误'
     catch_body_stmts = _unwrap_block(catch_spec[2]) if len(catch_spec) > 2 else []
 
-    # 展开 try 体
     if isinstance(try_body, list) and len(try_body) > 0 and try_body[0] in ('做', 'do'):
         try_stmts = try_body[1:]
     else:
         try_stmts = [try_body]
 
-    # 调用 rt_try_begin
-    if 'rt_try_begin' not in cg._rt_funcs:
-        ft = ir.FunctionType(ir.VoidType(), [])
-        try_func = ir.Function(cg.module, ft, name='rt_try_begin')
-        cg._rt_funcs['rt_try_begin'] = try_func
+    # 声明 LLVM 全局错误变量 @g_error (i8*)
+    if 'g_error' not in cg._rt_funcs:
+        g_error = ir.GlobalVariable(cg.module, _PTR, name='g_error')
+        g_error.initializer = _NULL
+        g_error.linkage = 'common'
+        cg._rt_funcs['g_error'] = g_error
     else:
-        try_func = cg._rt_funcs['rt_try_begin']
-    cg.builder.call(try_func, [], name='try_begin')
+        g_error = cg._rt_funcs['g_error']
 
-    # 执行 try 体
+    # 进入 try 前清除错误
+    cg.builder.store(_NULL, g_error)
+
+    # 执行 try 体 — 每句后不插检查（LLVM 靠全局存储优化）
     for stmt in try_stmts:
         compile_node(stmt, cg)
 
-    # 若 try 体已终止（如 return），跳过 catch
     if cg.builder.block.is_terminated:
         return _NULL
 
-    # 检查异常
-    fnty = ir.FunctionType(_INT, [])
-    rt_check = ir.Function(cg.module, fnty, name='rt_try_check')
-    has_err = cg.builder.call(rt_check, [], name='has_err')
-    cond = cg.builder.icmp_signed('!=', has_err, _ZERO, name='catch_cond')
+    # 直接 load @g_error 并比较（替代 opaque rt_try_check 调用）
+    err_val = cg.builder.load(g_error, name='err_val')
+    err_int = cg.builder.ptrtoint(err_val, _INT, name='err_int')
+    has_err = cg.builder.icmp_signed('!=', err_int, _ZERO, name='has_err')
 
     catch_block = cg._add_block(name='catch_body')
     after_block = cg._add_block(name='try_after')
-    cg.builder.cbranch(cond, catch_block, after_block)
+    cg.builder.cbranch(has_err, catch_block, after_block)
 
-    # catch 体
+    # catch 块
     cg.builder.position_at_start(catch_block)
-    e_fnty = ir.FunctionType(_PTR, [])
-    rt_get_err = ir.Function(cg.module, e_fnty, name='rt_try_get_error')
-    err_val = cg.builder.call(rt_get_err, [], name='err_msg')
-    cg.set_var(error_var, err_val)
+    err_msg = cg.builder.load(g_error, name='err_msg')
+    cg.set_var(error_var, err_msg)
     for stmt in catch_body_stmts:
         compile_node(stmt, cg)
-    # 清除错误
-    end_fnty = ir.FunctionType(ir.VoidType(), [])
-    rt_end = ir.Function(cg.module, end_fnty, name='rt_try_end')
-    cg.builder.call(rt_end, [], name='try_clear')
+    cg.builder.store(_NULL, g_error)  # 处理完毕，清除错误
     if not cg.builder.block.is_terminated:
         cg.builder.branch(after_block)
 

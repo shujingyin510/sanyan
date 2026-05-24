@@ -488,13 +488,16 @@ int32_t rt_is_list(void *p) {
     return 1;
 }
 
-/* ── 异常处理 ── */
-static rt_str_t *_rt_error = NULL;
-void    rt_try_begin(void)          { _rt_error = NULL; }
-int32_t rt_try_check(void)          { return _rt_error != NULL; }
-void   *rt_try_get_error(void)      { return _rt_error; }
-void    rt_throw(void *msg)         { _rt_error = (rt_str_t *)msg; }
-void    rt_try_end(void)            { _rt_error = NULL; }
+/* ── 异常处理（LLVM IR 可见全局）──
+ *
+ * LLVM codegen 直接 load/store @g_error，不再调用 opaque 函数。
+ * rt_throw 仅设置标记，try/catch 的检查由 LLVM IR 内联完成。
+ */
+void *g_error = NULL;                   /* LLVM 可见：@g_error = global i8* null */
+
+void rt_throw(void *msg) {
+    g_error = msg;
+}
 
 /* ── 桩 ── */
 void *rt_import(void *path)              { (void)path; return _rt_make(""); }
