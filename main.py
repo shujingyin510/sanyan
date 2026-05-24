@@ -1,6 +1,7 @@
 """三言 —— 中文三进制编程语言（主入口）"""
 
 import sys
+import os
 from repl import demo, repl
 import tomllib
 
@@ -32,6 +33,8 @@ def main():
 
     # --profile 标志
     profiling = '--profile' in args
+    # --vm 标志：使用字节码 VM 执行（更快，但部分复杂程序可能不兼容）
+    use_vm = '--vm' in args
     positional = [a for a in args if not a.startswith('--')]
 
     if positional:
@@ -52,6 +55,19 @@ def main():
         from preprocess import preprocess_includes
 
         code = preprocess_includes(code)
+
+        # ── 字节码缓存检查（仅 --vm 模式）──
+        bin_path = os.path.join('build', os.path.basename(filepath).replace('.san', '.bin'))
+        if use_vm and not profiling:
+            if not os.path.exists(bin_path) or os.path.getmtime(bin_path) < os.path.getmtime(filepath):
+                os.makedirs('build', exist_ok=True)
+                from compile_bytecode import compile_san
+
+                compile_san(filepath, bin_path)
+            from vm import VM as SanyanVM
+
+            SanyanVM.from_bin(bin_path)
+            sys.exit(0)
 
         skin_mgr = SkinManager('chinese')
         env = SanyanEvaluator(skin_manager=skin_mgr)
@@ -90,6 +106,15 @@ def main():
             traceback.print_exc()
             print(f'执行错误: {e}')
             sys.exit(1)
+
+        # ── 保存字节码缓存 ──
+        os.makedirs('build', exist_ok=True)
+        try:
+            from compile_bytecode import compile_san
+
+            compile_san(filepath, bin_path)
+        except Exception:
+            pass
 
         if profiling:
             print(env.profile_report())

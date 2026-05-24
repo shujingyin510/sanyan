@@ -145,14 +145,18 @@ static void rt_list_push(rt_list_t *l, void *v) {
     l->items[l->len++] = v;
 }
 
-/* ── 字典（支持 int 和 string 键）─────────────── */
-#define DICT_MAX 256
+/* ── 字典（支持 int 和 string 键，动态扩容）─────── */
+#define DICT_INIT_CAP 16
 typedef struct { void *k; void *v; } rt_entry_t;
-typedef struct { OBJ_HDR; int32_t n; rt_entry_t e[DICT_MAX]; } rt_dict_t;
+typedef struct { OBJ_HDR; int32_t n; int32_t cap; rt_entry_t *entries; } rt_dict_t;
 
 static rt_dict_t *rt_dict_new(void) {
     rt_dict_t *d = (rt_dict_t*)calloc(1, sizeof(rt_dict_t));
-    if (d) d->type = TYPE_DICT;
+    if (!d) return NULL;
+    d->type = TYPE_DICT;
+    d->cap = DICT_INIT_CAP;
+    d->entries = (rt_entry_t*)calloc(DICT_INIT_CAP, sizeof(rt_entry_t));
+    if (!d->entries) { free(d); return NULL; }
     return d;
 }
 
@@ -167,24 +171,26 @@ static int key_eq(void *a, void *b) {
 static int rt_dict_find(rt_dict_t *d, void *k) {
     if (!d) return -1;
     for (int32_t i = 0; i < d->n; i++)
-        if (key_eq(d->e[i].k, k)) return i;
+        if (key_eq(d->entries[i].k, k)) return i;
     return -1;
 }
 
 static void rt_dict_set(rt_dict_t *d, void *k, void *v) {
     if (!d) return;
     int i = rt_dict_find(d, k);
-    if (i >= 0) { d->e[i].v = v; return; }
-    if (d->n >= DICT_MAX) return;
-    /* 存储键: 对字符串做深拷贝，int 直接存 */
-    d->e[d->n].k = is_int_val(k) ? k : (void*)rt_str_new(rt_str_c(k));
-    d->e[d->n].v = v;
+    if (i >= 0) { d->entries[i].v = v; return; }
+    if (d->n >= d->cap) {
+        d->cap *= 2;
+        d->entries = (rt_entry_t*)realloc(d->entries, (size_t)d->cap * sizeof(rt_entry_t));
+    }
+    d->entries[d->n].k = is_int_val(k) ? k : (void*)rt_str_new(rt_str_c(k));
+    d->entries[d->n].v = v;
     d->n++;
 }
 
 static void *rt_dict_get(rt_dict_t *d, void *k) {
     int i = rt_dict_find(d, k);
-    return i >= 0 ? d->e[i].v : tag_i(0);
+    return i >= 0 ? d->entries[i].v : tag_i(0);
 }
 
 static int rt_dict_has(rt_dict_t *d, void *k) {
@@ -212,9 +218,9 @@ static void print_value(void *v) {
         printf("{");
         for (int32_t i = 0; i < d->n; i++) {
             if (i > 0) printf(", ");
-            print_value(d->e[i].k);
+            print_value(d->entries[i].k);
             printf(": ");
-            print_value(d->e[i].v);
+            print_value(d->entries[i].v);
         }
         printf("}");
         break;
@@ -636,7 +642,7 @@ int vm_run(VM *vm) {
                 rt_dict_t *d = (rt_dict_t*)a;
                 rt_list_t *l = rt_list_new();
                 for (int32_t i = 0; i < d->n; i++) {
-                    void *k = d->e[i].k;
+                    void *k = d->entries[i].k;
                     if (is_int_val(k)) rt_list_push(l, k);
                     else rt_list_push(l, rt_str_new(rt_str_c(k)));
                 }
@@ -716,12 +722,24 @@ int vm_run(VM *vm) {
         }
         case CALL_EXT: {
             int32_t mod_id = to_int(pop(vm));
-            /* const char *func_name = rt_str_c(pop(vm)); */
-            pop(vm); /* func_name — 简化实现未使用 */
+            pop(vm); /* func_name */
             int32_t arg_cnt = to_int(pop(vm));
             for (int32_t i = 0; i < arg_cnt; i++) pop(vm);
-            (void)mod_id;
-            push(vm, tag_i(0));
+            if (mod_id < 1 || mod_id > _mod_cnt) {
+                push(vm, tag_i(0));
+                break;
+            }
+            int mid = mod_id - 1;
+            VM *caller = vm;
+            VM mod_vm;
+            memset(&mod_vm, 0, sizeof(mod_vm));
+            mod_vm.code = _mods[mid].code;
+            mod_vm.code_len = _mods[mid].size;
+            mod_vm.var_count = _mods[mid].var_cnt;
+            vm_run(&mod_vm);
+            void *result = mod_vm.sp > 0 ? mod_vm.stack[mod_vm.sp - 1] : tag_i(0);
+            memcpy(_mods[mid].vars, mod_vm.vars, sizeof(void*) * VAR_MAX);
+            push(caller, result);
             break;
         }
 
