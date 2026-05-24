@@ -67,8 +67,7 @@
     若 (大于(取长(existing), 0)) {
         返回(existing)
     }
-    设 idx = 字符串计数器
-    字符串计数器 = 加(字符串计数器, 1)
+    设 idx = 字典取长(字符串常量表)
     设 name = 连接("@.str.", idx)
     存变量(字符串常量表, content, name)
     返回(name)
