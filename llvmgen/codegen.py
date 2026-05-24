@@ -77,21 +77,16 @@ _RUNTIME_FUNCS: dict[str, tuple] = {
     # 随机数 → i32（C 函数返回 int32_t）
     '随机数': ('rt_random_int', _I32, [_I32, _I32]),
     'randint': ('rt_random_int', _I32, [_I32, _I32]),
-    # 随机态 → i32（三值：-1/0/1）
     '随机态': ('rt_random_trit', _I32, []),
-    # 类型判断 → i32
     '是数字': ('rt_is_number', _I32, [_I32]),
     'is_number': ('rt_is_number', _I32, [_I32]),
     '是字符串': ('rt_is_string', _I32, [_PTR]),
     'is_string': ('rt_is_string', _I32, [_PTR]),
     '是列表': ('rt_is_list', _I32, [_PTR]),
     'is_list': ('rt_is_list', _I32, [_PTR]),
-    # 函数应用（桩）
     '应用': ('rt_apply_stub', _PTR, [_PTR, _PTR]),
-    # 等待
     '等待': ('rt_sleep', ir.VoidType(), [_I32]),
     'wait': ('rt_sleep', ir.VoidType(), [_I32]),
-    # 文件操作
     '读文件': ('rt_read_file', _PTR, [_PTR]),
     '写文件': ('rt_write_file', ir.VoidType(), [_PTR, _PTR]),
     # 字符串操作
@@ -100,9 +95,39 @@ _RUNTIME_FUNCS: dict[str, tuple] = {
     '整数转字符串': ('rt_int_to_str', _PTR, [_PTR]),
     '字符串': ('rt_int_to_str', _PTR, [_PTR]),
     'to_string': ('rt_int_to_str', _PTR, [_PTR]),
+    '取长': ('rt_str_len', _I32, [_PTR]),
+    'length': ('rt_str_len', _I32, [_PTR]),
+    '字符串相等': ('rt_str_equals', _I32, [_PTR, _PTR]),
+    'str_equals': ('rt_str_equals', _I32, [_PTR, _PTR]),
+    '分割': ('rt_str_split', _PTR, [_PTR, _PTR]),
+    'split': ('rt_str_split', _PTR, [_PTR, _PTR]),
+    '子串': ('rt_str_substr', _PTR, [_PTR, _I32, _I32]),
+    'substring': ('rt_str_substr', _PTR, [_PTR, _I32, _I32]),
+    '包含': ('rt_str_contains', _I32, [_PTR, _PTR]),
+    'contains': ('rt_str_contains', _I32, [_PTR, _PTR]),
+    '查找': ('rt_str_find', _I32, [_PTR, _PTR]),
+    'find': ('rt_str_find', _I32, [_PTR, _PTR]),
     '字列': ('rt_str_to_list', _PTR, [_PTR]),
-    '切片': ('rt_list_slice', _PTR, [_PTR, _I32, _I32]),
+    'str_to_list': ('rt_str_to_list', _PTR, [_PTR]),
+    # 列表操作
+    '列表': ('rt_list_new_cap', _PTR, [_I32]),
+    'list': ('rt_list_new_cap', _PTR, [_I32]),
+    '字典': ('rt_dict_new', _PTR, []),
+    'dict': ('rt_dict_new', _PTR, []),
+    'dict_contains': ('rt_dict_contains', _I32, [_PTR, _PTR]),
+    '含键': ('rt_dict_contains', _I32, [_PTR, _PTR]),
+    'get_key': ('rt_dict_get', _PTR, [_PTR, _PTR]),
+    'set_key': ('rt_dict_set', ir.VoidType(), [_PTR, _PTR, _PTR]),
+    '取键': ('rt_dict_get', _PTR, [_PTR, _PTR]),
+    '置键': ('rt_dict_set', ir.VoidType(), [_PTR, _PTR, _PTR]),
+    '表长': ('rt_list_len', _I32, [_PTR]),
+    'list_len': ('rt_list_len', _I32, [_PTR]),
+    '列表合': ('rt_list_concat', _PTR, [_PTR, _PTR]),
+    'list_concat': ('rt_list_concat', _PTR, [_PTR, _PTR]),
+    '取': ('rt_list_get', _PTR, [_PTR, _I32]),
+    'get': ('rt_list_get', _PTR, [_PTR, _I32]),
     'slice': ('rt_list_slice', _PTR, [_PTR, _I32, _I32]),
+    '切片': ('rt_list_slice', _PTR, [_PTR, _I32, _I32]),
     # 输入
     '输入': ('rt_read_input', _PTR, []),
     'input': ('rt_read_input', _PTR, []),
@@ -157,8 +182,9 @@ def _unquote(s: str) -> str:
 class CodegenContext:
     """编译上下文：模块、IR 构建器、符号表。"""
 
-    def __init__(self, module_name: str = 'main'):
+    def __init__(self, module_name: str = 'main', module_prefix: str = ''):
         self.module = ir.Module(name=module_name)
+        self.module_prefix = module_prefix
         try:
             from llvmlite import binding as _llvm_bind
 
@@ -220,6 +246,8 @@ class CodegenContext:
         return self._func.append_basic_block(name=name)
 
     def begin_function(self, name: str, param_names: list[str]) -> ir.Function:
+        if self.module_prefix and name != 'main':
+            name = f'san_{self.module_prefix}__{name}'
         if name in self._funcs:
             func = self._funcs[name]
             self._current_func = func
@@ -1334,33 +1362,28 @@ def _make_bootstrap_harness(cg: CodegenContext):
     cg.end_function()
 
 
-def compile_top_level(ast_nodes: list, module_name: str = 'main') -> CodegenContext:
-    """编译顶层 AST 节点列表。返回 CodegenContext 用于验证/导出。"""
-    cg = CodegenContext(module_name)
+def compile_top_level(ast_nodes: list, module_name: str = 'main', module_prefix: str = '') -> CodegenContext:
+    cg = CodegenContext(module_name, module_prefix=module_prefix)
+    _compile_in_context(ast_nodes, cg)
+    return cg
 
-    # 若顶层是单个 做/do 块，展开其内部语句
+
+def _compile_in_context(ast_nodes: list, cg: CodegenContext) -> None:
     if isinstance(ast_nodes, list) and len(ast_nodes) > 0 and ast_nodes[0] in ('做', 'do'):
         ast_nodes = ast_nodes[1:]
 
-    # 规范化 fn 格式: ['fn', 'name', ['p'], body] → ['fn', ['name', 'p'], body]
     ast_nodes = _normalize_fn_format(ast_nodes)
-
-    # 规范化：合并 再若/否则 到前一个 若 节点
     ast_nodes = _merge_if_chain(ast_nodes)
 
     def collect_and_compile(nodes):
-        """三遍：全局变量 → 函数定义 → main(顶层代码)。"""
         nodes, imported_setups = _resolve_imports(nodes, cg)
-
-        defs = []
-        others = []
+        defs, others = [], []
         for node in nodes:
             if isinstance(node, list) and len(node) > 0 and node[0] in ('定义', 'define', 'fn'):
                 defs.append(node)
             else:
                 others.append(node)
 
-        # 第 0 遍：预创建顶层 设 为全局变量
         for node in others + imported_setups:
             if isinstance(node, list) and len(node) >= 3 and node[0] in ('设', 'set'):
                 name = node[1]
@@ -1371,47 +1394,33 @@ def compile_top_level(ast_nodes: list, module_name: str = 'main') -> CodegenCont
                     elif isinstance(val, str) and _is_string_literal(val):
                         cg.create_global(name, _unquote(val))
                     else:
-                        # 复杂表达式（dict, list 等）→ 存 AST 节点
                         cg.create_global(name, val)
-                        # Mark that this needs runtime init
                         cg._global_inits.append((name, val))
 
-        # 第一遍：先注册所有函数名（预创建空函数），解决前向引用
-        class _DeferredFn:
-            def __init__(self, node):
-                self.node = node
+        class _Df:
+            def __init__(self, n):
+                self.node = n
 
-        deferred: list[_DeferredFn] = []
+        deferred: list[_Df] = []
         for node in defs:
-            deferred.append(_DeferredFn(node))
-            # fn 格式: ['fn', 'name', ['p1', ...], body...]
+            deferred.append(_Df(node))
             if isinstance(node[1], list):
-                name = node[1][0]
-                params = node[1][1:]
+                n, p = node[1][0], node[1][1:]
             elif node[0] == 'fn' and len(node) >= 3:
-                # _bootstrap.san 格式: ['fn', 'name', ['p'], e1, ...]
-                name = node[1]
-                params = node[2] if isinstance(node[2], list) else []
+                n, p = node[1], node[2] if isinstance(node[2], list) else []
             else:
-                name = node[1] if isinstance(node[1], str) else str(node[1])
-                params = node[2] if len(node) > 2 and isinstance(node[2], list) else []
-            cg.begin_function(name, params)
-            # 不调用 end_function：留空体让第二遍填充
-
-        # 第二遍：重新编译每个函数体
+                n = node[1] if isinstance(node[1], str) else str(node[1])
+                p = node[2] if len(node) > 2 and isinstance(node[2], list) else []
+            cg.begin_function(n, p)
         for d in deferred:
             compile_node(d.node, cg)
 
-        # 若编译 bootstrap，添加 ASCII 入口包装
-        if module_name == 'bootstrap' and '解析' in cg._funcs:
+        if cg.module.name == 'bootstrap' and '解析' in cg._funcs:
             _make_bootstrap_harness(cg)
 
-        # 第三遍：编译顶层代码（放入 main 函数），含全局变量初始化
-        # bootstrap 模块由 harness 提供 main，跳过
-        all_others = imported_setups + others
-        if module_name != 'bootstrap' and (all_others or cg._global_inits):
+        all_other = imported_setups + others
+        if cg.module.name != 'bootstrap' and (all_other or cg._global_inits):
             cg.begin_function('main', [])
-            # 全局变量初始化
             for gname, gval in cg._global_inits:
                 if isinstance(gval, (int, float)):
                     init_val = cg._box_int(ir.Constant(_INT, int(gval)))
@@ -1420,12 +1429,77 @@ def compile_top_level(ast_nodes: list, module_name: str = 'main') -> CodegenCont
                 else:
                     init_val = _NULL
                 cg.builder.store(init_val, cg._globals[gname])
-            for node in all_others:
+            for node in all_other:
+                if isinstance(node, list) and len(node) > 0 and node[0] in ('导入', 'import'):
+                    continue
                 compile_node(node, cg)
             cg.end_function()
-        elif module_name != 'bootstrap':
+        elif cg.module.name != 'bootstrap':
             cg.begin_function('main', [])
             cg.end_function()
 
     collect_and_compile(ast_nodes)
+
+
+def _parse_source(source: str) -> list:
+    from llvmgen.compiler import _parse_source as _ps
+
+    return _ps(source)
+
+
+def _collect_imports(node, collected: set) -> None:
+    if isinstance(node, list) and len(node) > 0:
+        if node[0] in ('导入', 'import') and len(node) > 1 and isinstance(node[1], str):
+            collected.add(node[1])
+            return
+        for child in node:
+            _collect_imports(child, collected)
+
+
+def _find_module_path(name: str) -> str | None:
+    import os
+
+    for p in [name + '.san', os.path.join('stdlib', name + '.san')]:
+        if os.path.exists(p):
+            return p
+    return None
+
+
+def compile_program(source: str, module_name: str = 'main') -> 'CodegenContext':
+    """编译完整程序，含 import 静态链接。
+
+    递归编译所有 导入 引用的 .san 模块，通过 llvmlite link_modules
+    合并到一个 IR 模块中。依赖模块函数名加 san_{module}__ 前缀。
+    """
+    import os
+
+    ast = _parse_source(source)
+    if not isinstance(ast, list):
+        raise SyntaxError(f'解析结果不是列表: {type(ast)}')
+
+    imports: set[str] = set()
+    _collect_imports(ast, imports)
+
+    cg = compile_top_level(ast, module_name)
+
+    if not imports:
+        return cg
+
+    from llvmlite import binding as llvm_bind
+
+    main_mod = llvm_bind.parse_assembly(cg.verify())
+
+    for imp in imports:
+        path = _find_module_path(imp)
+        if path is None:
+            continue
+        with open(path, 'r', encoding='utf-8') as f:
+            dep_src = f.read()
+        dep_ast = _parse_source(dep_src)
+        dep_name = os.path.splitext(os.path.basename(path))[0]
+        dep_cg = compile_top_level(dep_ast, dep_name, module_prefix=dep_name)
+        dep_mod = llvm_bind.parse_assembly(dep_cg.verify())
+        llvm_bind.link_modules(dst=main_mod, src=dep_mod)
+
+    cg._linked_ir = str(main_mod)
     return cg
