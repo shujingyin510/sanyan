@@ -35,6 +35,8 @@ def main():
     profiling = '--profile' in args
     # --vm 标志：使用字节码 VM 执行（更快，但部分复杂程序可能不兼容）
     use_vm = '--vm' in args
+    # --san 标志：使用自举编译器（sugar.san + llvmgen.san）生成原生可执行文件
+    use_san = '--san' in args
     positional = [a for a in args if not a.startswith('--')]
 
     if positional:
@@ -48,6 +50,48 @@ def main():
         except UnicodeDecodeError:
             print(f'错误: 文件编码不是UTF-8 - {filepath}')
             sys.exit(1)
+
+        if use_san and not profiling:
+            # ── 自举编译路径：sugar.san 解析 + llvmgen.san 生成 IR → 原生可执行文件 ──
+            from llvmgen.compiler import self_hosted_compile
+            import tempfile, subprocess
+
+            ir_text = self_hosted_compile(code)
+            out_name = os.path.splitext(os.path.basename(filepath))[0]
+            out_exe = os.path.join('build', out_name + '_san.exe')
+
+            os.makedirs('build', exist_ok=True)
+            ir_path = os.path.join('build', out_name + '_san.ll')
+            asm_path = os.path.join('build', out_name + '_san.s')
+
+            with open(ir_path, 'w', encoding='utf-8') as f:
+                f.write(ir_text)
+            print(f'[san] LLVM IR → {ir_path}')
+
+            # llvmlite → asm
+            from llvmlite import binding as llvm_binding
+            llvm_binding.initialize_all_targets()
+            llvm_binding.initialize_native_asmprinter()
+            target = llvm_binding.Target.from_default_triple()
+            tm = target.create_target_machine(reloc='static', codemodel='large')
+            asm = tm.emit_assembly(llvm_binding.parse_assembly(ir_text))
+            with open(asm_path, 'w') as f:
+                f.write(asm)
+            print(f'[san] ASM → {asm_path}')
+
+            # GCC → exe
+            rt_o = os.path.join('build', 'sanyan_rt.o')
+            import subprocess as sp
+            sp.run(['gcc', '-c', 'llvmgen/runtime.c', '-o', rt_o, '-std=c99', '-O2'], check=True)
+            sp.run(['gcc', '-c', asm_path, '-o', asm_path.replace('.s', '.o')], check=True)
+            sp.run(['gcc', asm_path.replace('.s', '.o'), rt_o, '-o', out_exe, '-lm'], check=True)
+            print(f'[san] EXE → {out_exe}')
+
+            result = sp.run([out_exe], capture_output=True, text=True)
+            print(result.stdout, end='')
+            if result.stderr:
+                print(result.stderr, end='', file=sys.stderr)
+            sys.exit(result.returncode)
 
         if not code.strip():
             sys.exit(0)

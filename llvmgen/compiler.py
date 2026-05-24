@@ -90,6 +90,60 @@ def compile_source(source: str, module_name: str = 'main') -> tuple[str, 'Codege
     return cg.verify(), cg
 
 
+def self_hosted_compile(source: str, module_name: str = 'main') -> str:
+    """自举编译：sugar.san 解析 + llvmgen.san 生成 IR。零 Python codegen。"""
+    from evaluator import SanyanEvaluator
+    from skin import SkinManager
+    from ops.file_ops import clear_cache
+    import os
+
+    clear_cache()
+    evaluator = SanyanEvaluator(skin_manager=SkinManager('chinese'))
+    evaluator.commands['新字典'] = ([], [['return', {}]], {}, None)
+    evaluator.commands['存变量'] = (['d', 'k', 'v'], [['container_ops_dict_set', 'd', 'k', 'v']], {}, None)
+    # Register dict_set as an op
+    from ops.container_ops import ContainerOps
+    from ops.registry import register
+
+    register('container_ops_dict_set', ContainerOps.dict_set)
+
+    stdlib_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'stdlib')
+
+    # 1. 加载 sugar.san
+    with open(os.path.join(stdlib_dir, 'sugar.san'), encoding='utf-8') as f:
+        sugar_code = f.read()
+    sugar_ast = _parse_source(sugar_code)
+    if isinstance(sugar_ast, list) and len(sugar_ast) > 0 and sugar_ast[0] == 'do':
+        sugar_ast = sugar_ast[1:]
+    for stmt in sugar_ast:
+        if isinstance(stmt, list) and stmt[0] == 'export':
+            continue
+        evaluator.eval(stmt)
+
+    # 2. 加载 llvmgen.san
+    with open(os.path.join(stdlib_dir, 'llvmgen.san'), encoding='utf-8') as f:
+        llvmgen_code = f.read()
+    llvmgen_ast = _parse_source(llvmgen_code)
+    if isinstance(llvmgen_ast, list) and len(llvmgen_ast) > 0 and llvmgen_ast[0] == 'do':
+        llvmgen_ast = llvmgen_ast[1:]
+    for stmt in llvmgen_ast:
+        if isinstance(stmt, list) and stmt[0] == 'export':
+            continue
+        evaluator.eval(stmt)
+
+    # 3. sugar.san 解析用户源码
+    ast = evaluator.eval(['解析', source])
+    if not isinstance(ast, list):
+        raise SyntaxError(f'sugar.san 解析失败: {ast}')
+
+    # 4. llvmgen.san 生成 IR
+    ir_text = evaluator.eval(['编译顶层', ast])
+    if not isinstance(ir_text, str):
+        raise RuntimeError(f'llvmgen.san 生成失败: {type(ir_text).__name__}')
+
+    return ir_text
+
+
 def compile_file(input_path: str, output_path: str | None = None) -> str:
     """编译 .san 文件，返回 IR 文本。若指定 output_path 则写入文件。"""
     with open(input_path, 'r', encoding='utf-8') as f:

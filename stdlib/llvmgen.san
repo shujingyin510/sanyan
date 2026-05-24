@@ -27,6 +27,7 @@
     设 s = "; ModuleID = 'sanyan'"; s = 连接(s, 换行)
     s = 连接(s, "target triple = \"x86_64-pc-linux-gnu\""); s = 连接(s, 换行)
     s = 连接(s, 换行); s = 连接(s, "declare i32 @printf(i8*, ...)"); s = 连接(s, 换行)
+    s = 连接(s, 声明运行时())
     s = 连接(s, 换行)
     s = 连接(s, "@.fmt = private constant [4 x i8] c\"%d\\0a\\00\""); s = 连接(s, 换行)
     s = 连接(s, 换行); s = 连接(s, "define i8* @main() {"); s = 连接(s, 换行)
@@ -39,6 +40,15 @@
 }
 
 设 换行 = "\n"
+
+设 变量表 = 新字典()   // name → alloca register
+
+定义 声明运行时 () {
+    设 s = "declare i8* @rt_awake(i8* noalias, i8* noalias, i8* noalias, i8* nocapture readonly)" ; s = 连接(s, 换行)
+    s = 连接(s, "declare void @rt_print_str(i8*)"); s = 连接(s, 换行)
+    s = 连接(s, "declare void @rt_print_int(i64)"); s = 连接(s, 换行)
+    返回(s)
+}
 
 定义 parse_int (s) {
     若 (是数字(s)) { 返回(s) }
@@ -63,26 +73,26 @@
     返回(result)
 }
 
+定义 是数字字符串 (s) {
+    若 (非(是字符串(s))) { 返回(假) }
+    若 (等于(取长(s), 0)) { 返回(假) }
+    设 i = 0; 设 len = 取长(s)
+    若 (前缀(s, "-")) { i = 1 }
+    若 (等于(i, len)) { 返回(假) }
+    设 digs = "0123456789"
+    循环 (小于(i, len)) {
+        设 ch = 子串(s, i, 1)
+        设 idx = 查找(digs, ch)
+        若 (小于(idx, 0)) { 返回(假) }
+        i = 加(i, 1)
+    }
+    返回(真)
+}
+
 定义 编译 (ast, reg) {
-    // 字符串 → 尝试转数字
-    若 (是字符串(ast)) {
-        设 ast = parse_int(ast)
-    }
-    // 数字 → 字面量
-    若 (是数字(ast)) {
-        设 n = ast
-        设 r = 新寄存器(reg); 设 rn = 取(r, 0); reg = 取(r, 1)
-        设 s = 连接("  ", rn, " = add i64 0, ", n, 换行)
-        设 bb = box(rn, reg); s = 连接(s, 取(bb, 0)); 设 bv = 取(bb, 1); reg = 取(bb, 2)
-        返回(列表(s, bv, reg))
-    }
-
-    若 (非(是列表(ast))) {
-        返回(列表("", "null", reg))
-    }
-
-    设 op = 取(ast, 0)
-    设 args = 切片(ast, 1)
+    若 (是列表(ast)) {
+        设 op = 取(ast, 0)
+        设 args = 切片(ast, 1)
 
     若 (字符串相等(op, "set")) {
         设 name = 取(args, 0)
@@ -94,10 +104,11 @@
         设 r = 新寄存器(reg); 设 a = 取(r, 0); reg = 取(r, 1)
         s = 连接(s, "  ", a, " = alloca i8*", 换行)
         s = 连接(s, "  store i8* ", val_reg, ", i8** ", a, 换行)
+        存变量(变量表, name, a)
         返回(列表(s, val_reg, reg))
     }
 
-    若 (字符串相等(op, "add")) {
+    若 (字符串相等(op, "加")) {
         设 l_val = 取(args, 0)
         设 r_val = 取(args, 1)
         设 l_r = 编译(l_val, reg)
@@ -109,6 +120,96 @@
         设 r = 新寄存器(reg); 设 res = 取(r, 0); reg = 取(r, 1)
         s = 连接(s, "  ", res, " = add i64 ", l_raw, ", ", r_raw, 换行)
         设 bb = box(res, reg); s = 连接(s, 取(bb, 0)); 设 bv = 取(bb, 1); reg = 取(bb, 2)
+         返回(列表(s, bv, reg))
+    }
+
+    若 (字符串相等(op, "减")) {
+        设 l_val = 取(args, 0); 设 r_val = 取(args, 1)
+        设 l_r = 编译(l_val, reg)
+        设 s = 取(l_r, 0); 设 lv = 取(l_r, 1); reg = 取(l_r, 2)
+        设 r_r = 编译(r_val, reg)
+        s = 连接(s, 取(r_r, 0)); 设 rv = 取(r_r, 1); reg = 取(r_r, 2)
+        设 ub = unbox(lv, reg); s = 连接(s, 取(ub, 0)); 设 l_raw = 取(ub, 1); reg = 取(ub, 2)
+        设 ub = unbox(rv, reg); s = 连接(s, 取(ub, 0)); 设 r_raw = 取(ub, 1); reg = 取(ub, 2)
+        设 r = 新寄存器(reg); 设 res = 取(r, 0); reg = 取(r, 1)
+        s = 连接(s, "  ", res, " = sub i64 ", l_raw, ", ", r_raw, 换行)
+        设 bb = box(res, reg); s = 连接(s, 取(bb, 0)); 设 bv = 取(bb, 1); reg = 取(bb, 2)
+        返回(列表(s, bv, reg))
+    }
+
+    若 (字符串相等(op, "乘")) {
+        设 l_val = 取(args, 0); 设 r_val = 取(args, 1)
+        设 l_r = 编译(l_val, reg)
+        设 s = 取(l_r, 0); 设 lv = 取(l_r, 1); reg = 取(l_r, 2)
+        设 r_r = 编译(r_val, reg)
+        s = 连接(s, 取(r_r, 0)); 设 rv = 取(r_r, 1); reg = 取(r_r, 2)
+        设 ub = unbox(lv, reg); s = 连接(s, 取(ub, 0)); 设 l_raw = 取(ub, 1); reg = 取(ub, 2)
+        设 ub = unbox(rv, reg); s = 连接(s, 取(ub, 0)); 设 r_raw = 取(ub, 1); reg = 取(ub, 2)
+        设 r = 新寄存器(reg); 设 res = 取(r, 0); reg = 取(r, 1)
+        s = 连接(s, "  ", res, " = mul i64 ", l_raw, ", ", r_raw, 换行)
+        设 bb = box(res, reg); s = 连接(s, 取(bb, 0)); 设 bv = 取(bb, 1); reg = 取(bb, 2)
+        返回(列表(s, bv, reg))
+    }
+
+    若 (字符串相等(op, "除")) {
+        设 l_val = 取(args, 0); 设 r_val = 取(args, 1)
+        设 l_r = 编译(l_val, reg)
+        设 s = 取(l_r, 0); 设 lv = 取(l_r, 1); reg = 取(l_r, 2)
+        设 r_r = 编译(r_val, reg)
+        s = 连接(s, 取(r_r, 0)); 设 rv = 取(r_r, 1); reg = 取(r_r, 2)
+        设 ub = unbox(lv, reg); s = 连接(s, 取(ub, 0)); 设 l_raw = 取(ub, 1); reg = 取(ub, 2)
+        设 ub = unbox(rv, reg); s = 连接(s, 取(ub, 0)); 设 r_raw = 取(ub, 1); reg = 取(ub, 2)
+        设 r = 新寄存器(reg); 设 res = 取(r, 0); reg = 取(r, 1)
+        s = 连接(s, "  ", res, " = sdiv i64 ", l_raw, ", ", r_raw, 换行)
+        设 bb = box(res, reg); s = 连接(s, 取(bb, 0)); 设 bv = 取(bb, 1); reg = 取(bb, 2)
+        返回(列表(s, bv, reg))
+    }
+
+    若 (字符串相等(op, "小于")) {
+        设 l_val = 取(args, 0); 设 r_val = 取(args, 1)
+        设 l_r = 编译(l_val, reg)
+        设 s = 取(l_r, 0); 设 lv = 取(l_r, 1); reg = 取(l_r, 2)
+        设 r_r = 编译(r_val, reg)
+        s = 连接(s, 取(r_r, 0)); 设 rv = 取(r_r, 1); reg = 取(r_r, 2)
+        设 ub = unbox(lv, reg); s = 连接(s, 取(ub, 0)); 设 l_raw = 取(ub, 1); reg = 取(ub, 2)
+        设 ub = unbox(rv, reg); s = 连接(s, 取(ub, 0)); 设 r_raw = 取(ub, 1); reg = 取(ub, 2)
+        设 r = 新寄存器(reg); 设 cmp = 取(r, 0); reg = 取(r, 1)
+        设 r = 新寄存器(reg); 设 result = 取(r, 0); reg = 取(r, 1)
+        s = 连接(s, "  ", cmp, " = icmp slt i64 ", l_raw, ", ", r_raw, 换行)
+        s = 连接(s, "  ", result, " = zext i1 ", cmp, " to i64", 换行)
+        设 bb = box(result, reg); s = 连接(s, 取(bb, 0)); 设 bv = 取(bb, 1); reg = 取(bb, 2)
+        返回(列表(s, bv, reg))
+    }
+
+    若 (字符串相等(op, "大于")) {
+        设 l_val = 取(args, 0); 设 r_val = 取(args, 1)
+        设 l_r = 编译(l_val, reg)
+        设 s = 取(l_r, 0); 设 lv = 取(l_r, 1); reg = 取(l_r, 2)
+        设 r_r = 编译(r_val, reg)
+        s = 连接(s, 取(r_r, 0)); 设 rv = 取(r_r, 1); reg = 取(r_r, 2)
+        设 ub = unbox(lv, reg); s = 连接(s, 取(ub, 0)); 设 l_raw = 取(ub, 1); reg = 取(ub, 2)
+        设 ub = unbox(rv, reg); s = 连接(s, 取(ub, 0)); 设 r_raw = 取(ub, 1); reg = 取(ub, 2)
+        设 r = 新寄存器(reg); 设 cmp = 取(r, 0); reg = 取(r, 1)
+        设 r = 新寄存器(reg); 设 result = 取(r, 0); reg = 取(r, 1)
+        s = 连接(s, "  ", cmp, " = icmp sgt i64 ", l_raw, ", ", r_raw, 换行)
+        s = 连接(s, "  ", result, " = zext i1 ", cmp, " to i64", 换行)
+        设 bb = box(result, reg); s = 连接(s, 取(bb, 0)); 设 bv = 取(bb, 1); reg = 取(bb, 2)
+        返回(列表(s, bv, reg))
+    }
+
+    若 (字符串相等(op, "等于")) {
+        设 l_val = 取(args, 0); 设 r_val = 取(args, 1)
+        设 l_r = 编译(l_val, reg)
+        设 s = 取(l_r, 0); 设 lv = 取(l_r, 1); reg = 取(l_r, 2)
+        设 r_r = 编译(r_val, reg)
+        s = 连接(s, 取(r_r, 0)); 设 rv = 取(r_r, 1); reg = 取(r_r, 2)
+        设 ub = unbox(lv, reg); s = 连接(s, 取(ub, 0)); 设 l_raw = 取(ub, 1); reg = 取(ub, 2)
+        设 ub = unbox(rv, reg); s = 连接(s, 取(ub, 0)); 设 r_raw = 取(ub, 1); reg = 取(ub, 2)
+        设 r = 新寄存器(reg); 设 cmp = 取(r, 0); reg = 取(r, 1)
+        设 r = 新寄存器(reg); 设 result = 取(r, 0); reg = 取(r, 1)
+        s = 连接(s, "  ", cmp, " = icmp eq i64 ", l_raw, ", ", r_raw, 换行)
+        s = 连接(s, "  ", result, " = zext i1 ", cmp, " to i64", 换行)
+        设 bb = box(result, reg); s = 连接(s, 取(bb, 0)); 设 bv = 取(bb, 1); reg = 取(bb, 2)
         返回(列表(s, bv, reg))
     }
 
@@ -116,21 +217,34 @@
         设 p_val = 取(args, 0)
         设 v_r = 编译(p_val, reg)
         设 s = 取(v_r, 0); 设 vr = 取(v_r, 1); reg = 取(v_r, 2)
-        设 r = 新寄存器(reg); 设 r1 = 取(r, 0); reg = 取(r, 1)
-        设 r = 新寄存器(reg); 设 r2 = 取(r, 0); reg = 取(r, 1)
-        设 r = 新寄存器(reg); 设 r3 = 取(r, 0); reg = 取(r, 1)
-        设 r = 新寄存器(reg); 设 r4 = 取(r, 0); reg = 取(r, 1)
+        设 lb_reg = 新寄存器(reg)
+        设 r1 = 取(lb_reg, 0); 设 lbn = 取(lb_reg, 1); reg = lbn
+        设 lb_reg = 新寄存器(reg)
+        设 r2 = 取(lb_reg, 0); 设 lbn = 取(lb_reg, 1); reg = lbn
+        设 lb_reg = 新寄存器(reg)
+        设 r3 = 取(lb_reg, 0); 设 lbn = 取(lb_reg, 1); reg = lbn
+        设 lb_reg = 新寄存器(reg)
+        设 r4 = 取(lb_reg, 0); 设 lbn = 取(lb_reg, 1); reg = lbn
+        // Labels use just the number, without %
+        设 label_num = lbn
         s = 连接(s, "  ", r1, " = ptrtoint i8* ", vr, " to i64", 换行)
         s = 连接(s, "  ", r2, " = and i64 ", r1, ", 1", 换行)
         s = 连接(s, "  ", r3, " = icmp ne i64 ", r2, ", 0", 换行)
-        s = 连接(s, "  br i1 ", r3, ", label %int_", r4, ", label %str_", r4, 换行)
-        s = 连接(s, "int_", r4, ":", 换行)
-        s = 连接(s, "  call i32 (i8*, ...) @printf(i8* getelementptr inbounds ([4 x i8], [4 x i8]* @.fmt, i32 0, i32 0), i64 ", vr, ")", 换行)
-        s = 连接(s, "  br label %done_", r4, 换行)
-        s = 连接(s, "str_", r4, ":", 换行)
+        s = 连接(s, "  br i1 ", r3, ", label %int_", label_num, ", label %str_", label_num, 换行)
+        s = 连接(s, "int_", label_num, ":", 换行)
+        // unbox before printf
+        设 ub_reg = 新寄存器(reg)
+        设 ru1 = 取(ub_reg, 0); 设 lbn = 取(ub_reg, 1); reg = lbn
+        设 ub_reg = 新寄存器(reg)
+        设 ru2 = 取(ub_reg, 0); 设 lbn = 取(ub_reg, 1); reg = lbn
+        s = 连接(s, "  ", ru1, " = ptrtoint i8* ", vr, " to i64", 换行)
+        s = 连接(s, "  ", ru2, " = ashr i64 ", ru1, ", 1", 换行)
+        s = 连接(s, "  call i32 (i8*, ...) @printf(i8* getelementptr inbounds ([4 x i8], [4 x i8]* @.fmt, i32 0, i32 0), i64 ", ru2, ")", 换行)
+        s = 连接(s, "  br label %done_", label_num, 换行)
+        s = 连接(s, "str_", label_num, ":", 换行)
         s = 连接(s, "  call void @rt_print_str(i8* ", vr, ")", 换行)
-        s = 连接(s, "  br label %done_", r4, 换行)
-        s = 连接(s, "done_", r4, ":", 换行)
+        s = 连接(s, "  br label %done_", label_num, 换行)
+        s = 连接(s, "done_", label_num, ":", 换行)
         返回(列表(s, vr, reg))
     }
 
@@ -140,7 +254,29 @@
             设 r = 编译(stmt, reg)
             s = 连接(s, 取(r, 0)); last = 取(r, 1); reg = 取(r, 2)
         }
-        返回(列表(s, last, reg))
+         返回(列表(s, last, reg))
+    }
+    }
+
+    若 (是字符串(ast)) {
+        若 (是数字字符串(ast)) {
+            设 ast = parse_int(ast)
+         }
+    }
+
+    若 (是数字(ast)) {
+        设 n = ast
+        设 r = 新寄存器(reg); 设 rn = 取(r, 0); reg = 取(r, 1)
+        设 s = 连接("  ", rn, " = add i64 0, ", n, 换行)
+        设 bb = box(rn, reg); s = 连接(s, 取(bb, 0)); 设 bv = 取(bb, 1); reg = 取(bb, 2)
+        返回(列表(s, bv, reg))
+    }
+
+    若 (是字符串(ast)) {
+        设 alloca = 取(变量表, ast)
+        设 r = 新寄存器(reg); 设 r1 = 取(r, 0); reg = 取(r, 1)
+        设 s = 连接("  ", r1, " = load i8*, i8** ", alloca, 换行)
+        返回(列表(s, r1, reg))
     }
 
     返回(列表("", "null", reg))

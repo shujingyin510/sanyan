@@ -76,13 +76,24 @@ class ContainerOps:
         if len(args) != 2:
             raise SanyanSyntaxError('取 需要容器和索引')
         container = evaluator.eval(args[0])
-        index = evaluator.eval(args[1]).to_int()
+        raw_index = evaluator.eval(args[1])
+        if isinstance(raw_index, str):
+            index = raw_index  # string key for dict access
+        else:
+            index = raw_index.to_int()
+        if isinstance(container, dict):
+            if isinstance(index, str):
+                if index in container:
+                    return container[index]
+                raise SanyanKeyError(f'键 {index!r} 不存在')
+            raise SanyanTypeError('字典键必须是字符串')
         if isinstance(container, (list, ArrayValue)):
             try:
-                return container[index]
-            except IndexError:
+                idx = index if isinstance(index, int) else int(index)
+                return container[idx]
+            except (IndexError, ValueError):
                 raise SanyanValueError(f'索引 {index} 超出范围，容器长度 {len(container)}')  # type: ignore[arg-type]
-        raise SanyanTypeError('第一个参数必须是列表或数组')
+        raise SanyanTypeError('第一个参数必须是列表、数组或字典')
 
     @staticmethod
     def generic_set(evaluator, args):

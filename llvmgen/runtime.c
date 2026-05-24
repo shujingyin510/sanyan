@@ -174,25 +174,25 @@ void *rt_str_split(const char *s, const char *sep) {
 }
 
 /* ── 桩函数（待完整实现）────────────────── */
-void *rt_http_get(void *url)         { (void)url; return _rt_make(\"\"); }
-void *rt_http_post(void *url, void *d){ (void)url; (void)d; return _rt_make(\"\"); }
-void *rt_regex_match(void *p, void *t){ (void)p; (void)t; return _rt_make(\"\"); }
-void *rt_regex_search(void *p, void *t){ (void)p; (void)t; return _rt_make(\"\"); }
-void *rt_regex_findall(void *p, void *t){ (void)p; (void)t; return _rt_make(\"\"); }
-void *rt_regex_replace(void *p, void *r, void *t){ (void)p; (void)r; (void)t; return _rt_make(\"\"); }
-void *rt_regex_split(void *p, void *t){ (void)p; (void)t; return _rt_make(\"\"); }
+void *rt_http_get(void *url)         { (void)url; return _rt_make(""); }
+void *rt_http_post(void *url, void *d){ (void)url; (void)d; return _rt_make(""); }
+void *rt_regex_match(void *p, void *t){ (void)p; (void)t; return _rt_make(""); }
+void *rt_regex_search(void *p, void *t){ (void)p; (void)t; return _rt_make(""); }
+void *rt_regex_findall(void *p, void *t){ (void)p; (void)t; return _rt_make(""); }
+void *rt_regex_replace(void *p, void *r, void *t){ (void)p; (void)r; (void)t; return _rt_make(""); }
+void *rt_regex_split(void *p, void *t){ (void)p; (void)t; return _rt_make(""); }
 void *rt_str_reverse(void *s)        { return _rt_make(_cstr(s)); }
 int32_t rt_str_startswith(void *s, void *pre) { return strncmp(_cstr(s), _cstr(pre), strlen(_cstr(pre))) == 0; }
 int32_t rt_str_endswith(void *s, void *suf)   { const char *cs=_cstr(s),*csu=_cstr(suf); int32_t l=(int32_t)strlen(cs),ls=(int32_t)strlen(csu); return l>=ls && strcmp(cs+l-ls,csu)==0; }
-void *rt_str_replace(void *s, void *o, void *n){ (void)s;(void)o;(void)n; return _rt_make(\"\"); }
+void *rt_str_replace(void *s, void *o, void *n){ (void)s;(void)o;(void)n; return _rt_make(""); }
 void *rt_str_trim(void *s)            { return _rt_make(_cstr(s)); }
 void *rt_str_upper(void *s)           { return _rt_make(_cstr(s)); }
 void *rt_str_lower(void *s)           { return _rt_make(_cstr(s)); }
-void *rt_str_join(void *sep, void *lst){ (void)sep;(void)lst; return _rt_make(\"\"); }
-void *rt_list_sort(void *lst)         { (void)lst; return _rt_make(\"\"); }
+void *rt_str_join(void *sep, void *lst){ (void)sep;(void)lst; return _rt_make(""); }
+void *rt_list_sort(void *lst)         { (void)lst; return _rt_make(""); }
 int32_t rt_list_sum(void *lst)        { (void)lst; return 0; }
 int32_t rt_list_count(void *lst, void *v){ (void)lst;(void)v; return 0; }
-void *rt_list_unique(void *lst)       { (void)lst; return _rt_make(\"\"); }
+void *rt_list_unique(void *lst)       { (void)lst; return _rt_make(""); }
 void rt_list_set(void *lst, int32_t i, void *v) { (void)lst; (void)i; (void)v; }
 int32_t rt_math_pow(int32_t b, int32_t e) { int32_t r=1; while(e-->0) r*=b; return r; }
 int32_t rt_math_sqrt(int32_t v)           { int32_t r=0; while(r*r<=v) r++; return r-1; }
@@ -202,7 +202,7 @@ int32_t rt_math_ceil(int32_t v)           { return v; }
 int32_t rt_math_round(int32_t v)          { return v; }
 int32_t rt_math_ngt(int32_t a, int32_t b) { return a <= b; }
 int32_t rt_math_nlt(int32_t a, int32_t b) { return a >= b; }
-void *rt_list_reduce(void *fn, void *lst) { (void)fn; (void)lst; return _rt_make(\"\"); }
+void *rt_list_reduce(void *fn, void *lst) { (void)fn; (void)lst; return _rt_make(""); }
 int32_t rt_time_now(void) { return (int32_t)time(NULL); }
     const char *p = cs;
     while (p && *p) {

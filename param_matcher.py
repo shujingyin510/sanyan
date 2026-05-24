@@ -18,10 +18,25 @@ def match_params(params: list, op: str, args: list) -> list:
 
 
 def evaluate_args(evaluator, params: list, args: list, param_types: dict) -> list:
+    from ops.registry import has_op
+    from runtime import BUILTIN_OPS
+
     evaluated = []
     for param, arg_node in zip(params, args):
         if isinstance(arg_node, list):
-            value = arg_node
+            first = arg_node[0] if arg_node else None
+            if (
+                isinstance(first, str)
+                and (
+                    evaluator.has_var(first)
+                    or first in evaluator.commands
+                    or has_op(first)
+                    or first in BUILTIN_OPS
+                )
+            ):
+                value = evaluator.eval(arg_node)
+            else:
+                value = arg_node
         elif (
             isinstance(arg_node, str)
             and not arg_node.isdigit()

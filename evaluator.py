@@ -78,18 +78,6 @@ class SanyanEvaluator(SanyanRuntime):
                 return node
             if isinstance(node[0], str) and node[0].lstrip('-').replace('.', '', 1).replace('x', '', 1).isdigit():
                 return node
-            # 检查是否已知操作——若非操作名且元素全是字面量，按数据列表处理
-            from runtime import BUILTIN_OPS
-            from ops.registry import has_op
-
-            if not has_op(node[0]) and node[0] not in BUILTIN_OPS and node[0] not in self.commands:
-                is_data = True
-                for item in node[1:]:
-                    if isinstance(item, list) or (isinstance(item, str) and (has_op(item) or item in BUILTIN_OPS or item in self.commands)):
-                        is_data = False
-                        break
-                if is_data:
-                    return node
             return self._eval_list(node)
         if isinstance(node, (int, float)):
             return TritValue(node)
