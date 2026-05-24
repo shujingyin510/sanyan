@@ -1,4 +1,4 @@
-# 三言 Sanyan v3.14.0
+# 三言 Sanyan v3.15.0
 
 [![VS Code Marketplace](https://img.shields.io/badge/VS%20Code-Marketplace-%23007ACC?logo=visualstudiocode)](https://marketplace.visualstudio.com/items?itemName=sanyan-lang.sanyan-language)
 [![CI](https://github.com/shujingyin510/sanyan/actions/workflows/ci.yml/badge.svg)](https://github.com/shujingyin510/sanyan/actions)
@@ -290,6 +290,20 @@ tests/
 | `定义 f (x) { 返回(x+1) }` | `（定义 f （x） （返回 （+ x 1）））` |
 | `若 (x > 0) { … } 否则 { … }` | `（若 （大于 x 0） … …）` |
 
+## 新增特性速览（v3.15.0）
+
+| 特性 | 说明 |
+|---|---|
+| 🏷️ **渐进类型系统** | 返回类型标注 `-> 类型`，可选类型 `?类型`，运行期自动校验 |
+| 🔢 **LLVM 63 位整数** | tagged pointer 升 i64，值域 ±4.6×10^18，内联 add/shl/mul |
+| 📐 **LLVM 浮点支持** | IEEE 754 double，`fadd`/`fmul`/`fdiv` 内联，整数自动提升 |
+| 📦 **LLVM import 静态链接** | 编译期递归编译依赖，`san_{mod}__{fn}` 名字修饰，llvmlite 合并 IR |
+| ⚡ **LLVM try/catch 重写** | 消除 opaque 函数调用，`@g_error` LLVM 可见全局 + 手动栈展开 |
+| 🧵 **Arena 字符串分配器** | 64KB 初始化，auto-grow，搬指针替代 malloc |
+| 📚 **标准库新增 4 个** | `json.san` `http.san` `regex.san` `csv.san` |
+| 🔧 **C VM 全指令对齐** | CALL/比较/算术/CONCAT/DICT 全修复，与 Python VM 字节码兼容 |
+| 📝 **四案例论证文档** | `circuit_sim` `data_cleaning` `health_check` `npc_decision` + `why-ternary.md` |
+
 ## 新增特性速览（v3.14.0）
 
 | 特性 | 说明 |
@@ -390,9 +404,11 @@ sanyan/
 ├── CHANGELOG.md
 ├── CONTRIBUTING.md
 ├── README.md
+├── README_EN.md
 ├── VERSION.py
 ├── ast_json.py              # AST JSON 导出
 ├── commands.py              # 自定义命令调用
+├── compile_bytecode.py      # .san → .bin 编译器
 ├── dap_server.py            # DAP 调试适配器
 ├── debug_eval.py            # 调试辅助模块
 ├── doc_sync.py              # 文档同步检查
@@ -400,7 +416,7 @@ sanyan/
 ├── evaluator.py             # 求值器
 ├── lexer.py                 # S 表达式词法
 ├── lsp_server.py            # LSP 服务器
-├── main.py                  # 入口
+├── main.py                  # 入口（支持 --vm 字节码缓存）
 ├── parser.py                # S 表达式语法
 ├── param_matcher.py         # 参数匹配与类型检查
 ├── preprocess.py            # #include 预处理器
@@ -410,15 +426,12 @@ sanyan/
 ├── runtime_components.py    # 运行组件（作用域/IoT/调试/性能）
 ├── sandbox.py               # 沙箱安全机制
 ├── sanfmt.py                # 源码格式化器
-├── sanyancc.py              # 交叉编译器
+├── sanyancc.py              # STM32 交叉编译器
 ├── skin.py                  # 皮肤管理器
 ├── tail_call.py             # 尾递归优化
-├── ternary_core.py          # 平衡三进制核心
-├── values.py                # 值类型与语言异常
-├── vm.py                    # 字节码虚拟机
-├── runtime.c                # C 语言字节码解释器（主机端）
-├── dp.c                     # S 表达式解析回归测试（C）
-├── sanyan_parse.dll         # S 表达式 C 共享库解析器
+├── ternary_core.py          # 平衡三进制算术（模拟）
+├── values.py                # 值类型 + 异常体系
+├── vm.py                    # 字节码 VM（自举能力）
 ├── sugar/                   # 糖语法转换器
 │   ├── __init__.py
 │   ├── errors.py
@@ -475,19 +488,31 @@ sanyan/
 │   ├── handler.py
 │   ├── keywords.py
 │   └── protocol.py
-├── examples/                # 示例
-│   └── stm32-blinky/        # STM32 固件示例
-│       ├── blinky.san
-│       ├── firmware_data.h
-│       ├── gen_header.py
-│       ├── Makefile
-│       ├── runtime_stm32.c
-│       └── stm32_flash.ld
-├── stdlib/                  # 标准库
-├── tests/                   # 自动测试
-├── docs/                    # 语言手册 + LLVM 文档
-├── benchmark/               # 性能基准测试
-└── packages/                # 包管理器缓存
+├── csrc/                     # C 语言 VM（52 指令完整版）
+│   └── runtime.c
+├── stdlib/                   # 标准库
+│   ├── bytecode_compiler.san # 自举编译器
+│   ├── sugar.san             # 糖语法解析器
+│   ├── json.san              # JSON 解析/序列化
+│   ├── http.san              # HTTP 客户端
+│   ├── regex.san             # 正则表达式
+│   ├── csv.san               # CSV 解析/生成
+│   ├── string.san            # 字符串工具
+│   ├── list.san              # 列表操作
+│   ├── math.san              # 数学函数
+│   └── ...                   # 更多标准库
+├── examples/                 # 示例
+│   ├── circuit_sim.san       # Kleene 三值电路模拟
+│   ├── data_cleaning.san     # 三态数据清洗管道
+│   ├── health_check.san      # API 健康检测
+│   ├── npc_decision.san      # NPC 犹豫决策
+│   ├── greenhouse.san        # 温室监控
+│   ├── voting.san            # 三态投票
+│   └── ...                   # 更多示例
+├── tests/                    # 自动测试
+├── docs/                     # 语言手册 + LLVM 文档
+├── benchmark/                # 性能基准测试
+└── packages/                 # 包管理器缓存
 ```
 
 ## 三态词表
@@ -534,6 +559,10 @@ sanyan/
 - [x] AST JSON 导出（v3.10.0）
 - [x] DAP 调试适配器（v3.10.0）
 - [x] LLVM 代码生成器 + C 运行时库（v3.12.0）
+- [x] LLVM 原生编译（AOT，LLVM → 汇编 → 可执行文件）
+- [x] C 字节码 VM（52 指令完整版）
+- [x] 浮点支持 + 整数自动提升
+- [x] import 静态链接
 - [ ] GPIO 真实硬件控制
 - [ ] Web IDE
 - [ ] 标准库扩展（更多自举模块）

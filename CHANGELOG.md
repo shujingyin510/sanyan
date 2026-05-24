@@ -2,6 +2,44 @@
 
 ---
 
+## [v3.15.0] — 2026-05-24
+
+### 新增
+- **渐进类型系统**: 返回类型标注 `定义 fn() -> 数字 { }`，可选类型 `?数字` 接受数字或 `可能`，运行期自动校验（`sugar/parser.py`, `commands.py`, `values.py`）
+- **标准库**: 新增 `stdlib/json.san`（JSON 解析/序列化）、`stdlib/http.san`（HTTP GET/POST）、`stdlib/regex.san`（正则匹配/查找/替换）、`stdlib/csv.san`（CSV 解析/生成）
+- **LLVM 浮点支持**: IEEE 754 double，`fadd`/`fmul`/`fdiv` 内联，整数自动 `sitofp` 提升，`rt_float_new` 走 arena 分配（`llvmgen/codegen.py`, `llvmgen/runtime.c`）
+- **LLVM 63 位整数**: tagged pointer 从 i32 升至 i64，63 位值域 ±4.6×10^18（`llvmgen/codegen.py`）
+- **LLVM import 静态链接**: `compile_program()` 递归编译 import 依赖，`llvmlite.link_modules` 合并 IR，`san_{mod}__{fn}` 名字修饰避免符号冲突（`llvmgen/codegen.py`）
+- **LLVM try/catch 重写**: 消除 `rt_try_begin`/`rt_try_check`/`rt_try_get_error` opaque 调用，改为 `@g_error` LLVM 可见全局 + 手动栈展开（`llvmgen/codegen.py`, `llvmgen/runtime.c`）
+- **LLVM 优化 passes**: mem2reg + instcombine + reassociate + GVN + simplifycfg，所有函数 `alwaysinline`（`llvmgen/codegen.py`）
+- **字节码缓存**: `main.py --vm` 模式编译并缓存 `.bin`，首次编译后跳过词法/解析（`main.py`）
+- **案例文档**: `examples/circuit_sim.san`、`data_cleaning.san`、`health_check.san`、`npc_decision.san` 四个三态逻辑对比案例 + `docs/why-ternary.md` 论证文档
+- **Arena 字符串分配器**: `g_arena` 64KB 初始化，auto-grow 双倍，`_rt_make` 搬指针替代 malloc（`llvmgen/runtime.c`）
+
+### 变更
+- **LLVM 字典**: 从固定 64 条目线性查找改为 FNV-1a 哈希表 + 开放寻址 + 动态扩容（`llvmgen/runtime.c`）
+- **LLVM 列表**: 新增 `rt_list_new_cap(cap)`，codegen 传 `len(args)` 作初始容量，免 comprehension 重复 realloc（`llvmgen/codegen.py`, `llvmgen/runtime.c`）
+- **LLVM 堆对象**: 统一 `SAN_HEADER` (uint32_t h_type)，str/list/dict 均设类型标签（`llvmgen/runtime.c`）
+- **READM: 优先展示中文版**，英文版移至 `README_EN.md`
+- **版本号**: 更新至 v3.15.0
+
+### 修复
+- **C VM CALL 格式**: 改为指令流 2 字节 addr + STORE 扫描 arg_count，与 Python VM 一致（`csrc/runtime.c`）
+- **C VM 缺算术/比较/NOT**: 全补 12 个 handler（ADD/SUB/MUL/DIV/MOD/EQ/NE/GT/LT/GTE/LTE/NOT）（`csrc/runtime.c`）
+- **C VM 比较结果**: 改用 `1/0` 替代 `1/-1`，修正 JZ 不退出循环（`csrc/runtime.c`）
+- **C VM LOAD/STORE**: `var_count=0` 程序不再拒存，改用 `VAR_MAX` 256（`csrc/runtime.c`）
+- **C VM CONCAT**: 从 2 参数改为 N 参数，栈不再泄漏（`csrc/runtime.c`）
+- **C VM DICT**: 固定 256→realloc 动态扩容，初始 16（`csrc/runtime.c`）
+- **C VM CALL_EXT**: 从 stub 改为临时 VM 执行模块字节码（`csrc/runtime.c`）
+- **重复文件清理**: 删除 `data_clean.san`（被 `data_cleaning.san` 替代）、GCC 测试工件（`gcc_*.txt` 等）
+- **ruff/mypy 全清**: 修复 4 个 ruff check 错误 + 9 个 mypy 类型错误
+
+### 文档
+- **docs/why-ternary.md**: 四案例论证文档——电路模拟器、数据清洗、API 健康检测、游戏 NPC
+- **CHANGELOG.md**: 新增 v3.15.0 条目
+
+---
+
 ## [v3.14.0] — 2026-05-23
 
 ### 新增
