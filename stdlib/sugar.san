@@ -327,7 +327,8 @@
                 args = 列表合(args, 列表(取(r, 0)))
                 rest = 取(r, 1)
             }
-            设 node = 列表合(列表(tval), args)
+            设 fname = 键取值(函数名映射, tval, tval)
+            设 node = 列表合(列表(fname), args)
             返回(列表(node, rest))
         }
         // 点号访问 a.b 或 a.b(...)
@@ -369,7 +370,11 @@
             stmts = 列表合(stmts, 列表(取(r, 0)))
             rest = 取(r, 1)
         }
-        设 node = 列表合(列表("做"), stmts)
+        若 (表长(stmts) == 1) {
+            设 node = 取(stmts, 0)
+        } 否则 {
+            设 node = 列表合(列表("do"), stmts)
+        }
         返回(列表(node, rest))
     }
 
@@ -379,10 +384,20 @@
 // 运算符优先级
 设 前缀运算符 = 列表("-", "!")
 
+// 函数名映射（中文 → 内部名）
+设 函数名映射 = 字典(
+    "输出", "print", "输入", "input",
+    "读", "read", "读取", "read",
+    "查", "query", "查询", "query",
+    "置", "write", "写入", "write",
+    "等待", "sleep",
+    "导入", "import",
+)
+
 设 运算符映射 = 字典(
-    "+", "加", "-", "减", "*", "乘", "/", "除", "%", "余", "^", "幂",
-    ">", "大于", "<", "小于", ">=", "大于等于", "<=", "小于等于",
-    "=", "等于", "!=", "不等于", "==", "等于", "!", "非",
+    "+", "add", "-", "sub", "*", "mul", "/", "div", "%", "mod", "^", "pow",
+    ">", "gt", "<", "lt", ">=", "gte", "<=", "lte",
+    "=", "eq", "!=", "ne", "==", "eq", "!", "非",
 )
 
 定义 映射运算符 (op) {
@@ -391,20 +406,20 @@
 
 定义 获取优先级 (op) {
     若 (str_equals(op, ".")) { 返回(80) }
-    若 (str_equals(op, "!") 或 str_equals(op, "非")) { 返回(70) }
-    若 (str_equals(op, "^") 或 str_equals(op, "幂")) { 返回(70) }
+    若 (str_equals(op, "!") 或 str_equals(op, "非") 或 str_equals(op, "not")) { 返回(70) }
+    若 (str_equals(op, "^") 或 str_equals(op, "pow")) { 返回(70) }
     若 (str_equals(op, "*") 或 str_equals(op, "/") 或 str_equals(op, "%") 或
-        str_equals(op, "乘") 或 str_equals(op, "除") 或 str_equals(op, "余")) { 返回(60) }
+        str_equals(op, "mul") 或 str_equals(op, "div") 或 str_equals(op, "mod")) { 返回(60) }
     若 (str_equals(op, "+") 或 str_equals(op, "-") 或
-        str_equals(op, "加") 或 str_equals(op, "减")) { 返回(50) }
+        str_equals(op, "add") 或 str_equals(op, "sub")) { 返回(50) }
     若 (str_equals(op, ">") 或 str_equals(op, "<") 或
         str_equals(op, ">=") 或 str_equals(op, "<=") 或
-        str_equals(op, "大于") 或 str_equals(op, "小于") 或
-        str_equals(op, "大于等于") 或 str_equals(op, "小于等于")) { 返回(40) }
+        str_equals(op, "gt") 或 str_equals(op, "lt") 或
+        str_equals(op, "gte") 或 str_equals(op, "lte")) { 返回(40) }
     若 (str_equals(op, "=") 或 str_equals(op, "!=") 或 str_equals(op, "==") 或
-        str_equals(op, "等于") 或 str_equals(op, "不等于")) { 返回(30) }
-    若 (str_equals(op, "且")) { 返回(20) }
-    若 (str_equals(op, "或")) { 返回(10) }
+        str_equals(op, "eq") 或 str_equals(op, "ne")) { 返回(30) }
+    若 (str_equals(op, "and")) { 返回(20) }
+    若 (str_equals(op, "or")) { 返回(10) }
     返回(0)
 }
 
@@ -440,15 +455,15 @@
 
         若 (str_equals(ttype2, "运算符") 或
              (str_equals(ttype2, "标识符") 且
-              (str_equals(tval2, "且") 或 str_equals(tval2, "或") 或
-               str_equals(tval2, "非") 或 str_equals(tval2, "等于") 或
-               str_equals(tval2, "不等于") 或 str_equals(tval2, "大于") 或
-               str_equals(tval2, "小于") 或 str_equals(tval2, "大于等于") 或
-               str_equals(tval2, "小于等于") 或 str_equals(tval2, "不大于") 或
+              (str_equals(tval2, "and") 或 str_equals(tval2, "or") 或
+               str_equals(tval2, "非") 或 str_equals(tval2, "eq") 或
+               str_equals(tval2, "ne") 或 str_equals(tval2, "gt") 或
+               str_equals(tval2, "lt") 或 str_equals(tval2, "gte") 或
+               str_equals(tval2, "lte") 或 str_equals(tval2, "不大于") 或
                str_equals(tval2, "不小于") 或 str_equals(tval2, "同") 或
-               str_equals(tval2, "加") 或 str_equals(tval2, "减") 或
-               str_equals(tval2, "乘") 或 str_equals(tval2, "除") 或
-               str_equals(tval2, "余") 或 str_equals(tval2, "幂")))) {
+               str_equals(tval2, "add") 或 str_equals(tval2, "sub") 或
+               str_equals(tval2, "mul") 或 str_equals(tval2, "div") 或
+               str_equals(tval2, "mod") 或 str_equals(tval2, "pow")))) {
              is_op = 真
         }
 
@@ -475,7 +490,7 @@
         若 (str_equals(tval2, "=")) {
             // a = b → ["设", a, b]
             设 r = 解析表达式(rest, prec)
-            left = 列表("设", left, 取(r, 0))
+            left = 列表("set", left, 取(r, 0))
             rest = 取(r, 1)
             继续
         }
@@ -517,7 +532,7 @@
             设 elif_body_r = 解析主表达式(rest)
             设 elif_body = 取(elif_body_r, 0)
             rest = 取(elif_body_r, 1)
-            else_body = 列表("若", elif_cond, elif_body)
+            else_body = 列表("if", elif_cond, elif_body)
             // 检查再若/否则后缀
             若 (匹配(rest, "标识符", "否则")) {
                 rest = 消耗(rest, "标识符", "否则")
@@ -539,7 +554,7 @@
             }
         }
 
-        设 node = 列表("若", cond, then_body)
+        设 node = 列表("if", cond, then_body)
         若 (是列表(else_body)) { node = 列表合(node, 列表(else_body)) }
         返回(列表(node, rest))
     }
@@ -553,7 +568,7 @@
         设 body_r = 解析主表达式(rest)
         设 body = 取(body_r, 0)
         rest = 取(body_r, 1)
-        返回(列表(列表("循环", cond, body), rest))
+        返回(列表(列表("loop", cond, body), rest))
     }
 
     // 遍历 var 从 start 到 end { body }  或  遍历 var 在 container { body }
@@ -573,7 +588,7 @@
             设 body_r = 解析主表达式(rest)
             设 body = 取(body_r, 0)
             rest = 取(body_r, 1)
-            返回(列表(列表("遍历", var_name, container, body), rest))
+            返回(列表(列表("forin", var_name, container, body), rest))
         }
 
         // 遍历 var 从 start 到 end { body }
@@ -594,7 +609,7 @@
         设 body_r = 解析主表达式(rest)
         设 body = 取(body_r, 0)
         rest = 取(body_r, 1)
-        返回(列表(列表("遍历", var_name, start_ast, end_ast, body), rest))
+        返回(列表(列表("for", var_name, start_ast, end_ast, body), rest))
     }
 
     // 设 x = val
@@ -612,7 +627,7 @@
 
         设 val_r = 解析表达式(rest, 0)
         设 val = 取(val_r, 0)
-            返回(列表(列表("设", name, val), 取(val_r, 1)))
+            返回(列表(列表("set", name, val), 取(val_r, 1)))
     }
 
     // 置 设备 = 状态
@@ -691,7 +706,7 @@
         设 body_r = 解析主表达式(rest)
         设 body = 取(body_r, 0)
         rest = 取(body_r, 1)
-        返回(列表(列表("定义", name, params, body), rest))
+        返回(列表(列表("fn", name, params, body), rest))
     }
 
     // 函数 (params) { body } — 匿名函数
@@ -742,9 +757,9 @@
             rest = 取(ch_r, 1)
             has_catch = 真
         }
-        设 node = 列表("尝试", try_body)
+        设 node = 列表("try", try_body)
         若 (has_catch) {
-            node = 列表合(node, 列表(列表("捕获", catch_var, catch_body)))
+            node = 列表合(node, 列表(列表("catch", catch_var, catch_body)))
         }
         返回(列表(node, rest))
     }
@@ -753,7 +768,7 @@
     若 (str_equals(ttype, "标识符") 且 str_equals(tval, "返回")) {
         设 rest = 切片(tokens, 1)
         设 val_r = 解析表达式(rest, 0)
-        返回(列表(列表("返回", 取(val_r, 0)), 取(val_r, 1)))
+        返回(列表(列表("return", 取(val_r, 0)), 取(val_r, 1)))
     }
 
     // 跳出
@@ -803,7 +818,7 @@
     }
     若 (表长(asts) == 0) { 返回(假) }
     若 (表长(asts) == 1) { 返回(取(asts, 0)) }
-    返回(列表合(列表("做"), asts))
+    返回(列表合(列表("do"), asts))
 }
 
 导出 词法分析
