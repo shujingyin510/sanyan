@@ -93,7 +93,7 @@ def compile_source(source: str, module_name: str = 'main') -> tuple[str, 'Codege
 
 def _dict_get_safe(evaluator, args):
     """安全取字典键：存在返回值，不存在返回空串。"""
-    d = evaluator.eval(args[0])
+    d = args[0] if isinstance(args[0], dict) else evaluator.eval(args[0])
     k = evaluator.eval(args[1])
     if isinstance(k, TritValue):
         k = k.to_int()
@@ -104,11 +104,84 @@ def _dict_get_safe(evaluator, args):
 
 def _list_contains(evaluator, args):
     """检查列表是否包含元素，返回 TritValue(1/0)。"""
+    lst = args[0] if isinstance(args[0], list) else evaluator.eval(args[0])
+    item = evaluator.eval(args[1])
+    if isinstance(lst, (list, tuple)):
+        return TritValue(1 if item in lst else 0)
+    return TritValue(0)
+
+
+def _list_len(evaluator, args):
+    """返回列表长度。"""
+    lst = args[0] if isinstance(args[0], list) else evaluator.eval(args[0])
+    if isinstance(lst, (list, tuple)):
+        return TritValue(len(lst))
+    return TritValue(0)
+
+
+def _dict_len(evaluator, args):
+    """返回字典键数量。"""
+    d = args[0] if isinstance(args[0], dict) else evaluator.eval(args[0])
+    if isinstance(d, dict):
+        return TritValue(len(d))
+    return TritValue(0)
+
+
+def _list_get_safe(evaluator, args):
+    """安全列表取值，索引越界返回空串。"""
+    lst = args[0] if isinstance(args[0], list) else evaluator.eval(args[0])
+    idx = evaluator.eval(args[1])
+    if isinstance(idx, TritValue):
+        idx = idx.to_int()
+    if isinstance(lst, (list, tuple)) and isinstance(idx, int) and 0 <= idx < len(lst):
+        val = lst[idx]
+        return val
+    return ""
+
+
+def _list_contains(evaluator, args):
+    """检查列表是否包含元素，返回 TritValue(1/0)。"""
     lst = evaluator.eval(args[0])
     item = evaluator.eval(args[1])
     if isinstance(lst, (list, tuple)):
         return TritValue(1 if item in lst else 0)
     return TritValue(0)
+
+
+def _list_len(evaluator, args):
+    """返回列表长度。"""
+    lst = args[0] if isinstance(args[0], list) else evaluator.eval(args[0])
+    if isinstance(lst, (list, tuple)):
+        return TritValue(len(lst))
+    return TritValue(0)
+
+
+def _dict_len(evaluator, args):
+    """返回字典键数量。"""
+    d = evaluator.eval(args[0])
+    if isinstance(d, dict):
+        return TritValue(len(d))
+    return TritValue(0)
+
+
+def _list_get_safe(evaluator, args):
+    """安全列表取值，索引越界返回空串。"""
+    lst = evaluator.eval(args[0])
+    idx = evaluator.eval(args[1])
+    if isinstance(idx, TritValue):
+        idx = idx.to_int()
+    if isinstance(lst, (list, tuple)) and 0 <= idx < len(lst):
+        return lst[idx]
+    return ""
+
+
+def _list_append(evaluator, args):
+    """列表追加元素，返回列表本身。"""
+    lst = args[0] if isinstance(args[0], list) else evaluator.eval(args[0])
+    item = evaluator.eval(args[1])
+    if isinstance(lst, list):
+        lst.append(item)
+    return lst
 
 
 from ops.registry import register as _register
@@ -138,6 +211,18 @@ def self_hosted_compile(source: str, module_name: str = 'main') -> str:
     register('container_ops_dict_get_safe', _dict_get_safe)
     # 包含: 列表包含检查
     evaluator.commands['包含'] = (['lst', 'item'], [['container_ops_list_contains', 'lst', 'item']], {}, None)
+    # 列表取长: 获取列表长度
+    evaluator.commands['列表取长'] = (['lst'], [['container_ops_list_len', 'lst']], {}, None)
+    register('container_ops_list_len', _list_len)
+    # 字典取长: 获取字典键数量
+    evaluator.commands['字典取长'] = (['d'], [['container_ops_dict_len', 'd']], {}, None)
+    register('container_ops_dict_len', _dict_len)
+    # 列表取: 安全列表取值，索引越界返回空串
+    evaluator.commands['列表取'] = (['lst', 'idx'], [['container_ops_list_get_safe', 'lst', 'idx']], {}, None)
+    # 列表追加: lst.append(item)，返回列表本身
+    evaluator.commands['列表追加'] = (['lst', 'item'], [['container_ops_list_append', 'lst', 'item']], {}, None)
+    register('container_ops_list_append', _list_append)
+    register('container_ops_list_get_safe', _list_get_safe)
 
     stdlib_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'stdlib')
 

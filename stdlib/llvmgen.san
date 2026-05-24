@@ -30,7 +30,7 @@
     s = 连接(s, 声明运行时())
     s = 连接(s, 换行)
     s = 连接(s, "@.fmt = private constant [4 x i8] c\"%d\\0a\\00\""); s = 连接(s, 换行)
-    s = 连接(s, 换行); s = 连接(s, "define i8* @main() {"); s = 连接(s, 换行)
+    s = 连接(s, 换行)
     返回(s)
 }
 
@@ -40,7 +40,9 @@
 
 设 换行 = "\n"
 
-设 alloca表 = 新字典()          // name → alloca register (e.g., "%5")
+设 alloca表 = 新字典()          // name → alloca register
+设 函数库列表 = 新列表()         // list of function IR strings
+设 函数参数表 = 新字典()         // name → param_count (e.g., "%5")
 
 定义 声明运行时 () {
     设 s = "declare i8* @rt_awake(i8* noalias, i8* noalias, i8* noalias, i8* nocapture readonly)" ; s = 连接(s, 换行)
@@ -261,19 +263,16 @@
         设 ub = unbox(cv, reg); s = 连接(s, 取(ub, 0)); 设 raw = 取(ub, 1); reg = 取(ub, 2)
         设 r = 新寄存器(reg); 设 i1v = 取(r, 0); reg = 取(r, 1)
         s = 连接(s, "  ", i1v, " = trunc i64 ", raw, " to i1", 换行)
-        设 merge_num = 加(reg, 0)
+        // 标签只用编号，不消耗寄存器
+        设 merge_num = reg
         设 then_num = 加(reg, 1)
         设 else_num = 加(reg, 2)
-        设 r_tmp = 新寄存器(reg); reg = 取(r_tmp, 1)
-        设 r_tmp = 新寄存器(reg); reg = 取(r_tmp, 1)
-        设 r_tmp = 新寄存器(reg); reg = 取(r_tmp, 1)
         设 then_l = 连接("then_", then_num)
         设 else_l = 连接("else_", else_num)
         设 merge_l = 连接("merge_", merge_num)
         s = 连接(s, "  br i1 ", i1v, ", label %", then_l, ", label %", else_l, 换行)
         s = 连接(s, then_l, ":", 换行)
         设 t_r = 编译(then_ast, reg); s = 连接(s, 取(t_r, 0)); reg = 取(t_r, 2)
-        s = 连接(s, "  br label %", merge_l, 换行)
         s = 连接(s, else_l, ":", 换行)
         s = 连接(s, "  br label %", merge_l, 换行)
         s = 连接(s, merge_l, ":", 换行)
@@ -282,10 +281,7 @@
 
     若 (字符串相等(op, "循环")) {
         设 cond_ast = 取(args, 0); 设 body_ast = 取(args, 1)
-        设 hdr_num = 加(reg, 0); 设 body_num = 加(reg, 1); 设 end_num = 加(reg, 2)
-        设 r_tmp = 新寄存器(reg); reg = 取(r_tmp, 1)
-        设 r_tmp = 新寄存器(reg); reg = 取(r_tmp, 1)
-        设 r_tmp = 新寄存器(reg); reg = 取(r_tmp, 1)
+        设 hdr_num = reg; 设 body_num = 加(reg, 1); 设 end_num = 加(reg, 2)
         设 hdr_l = 连接("loop_hdr_", hdr_num); 设 body_l = 连接("loop_body_", body_num); 设 end_l = 连接("loop_end_", end_num)
         设 s = 连接("  br label %", hdr_l, 换行)
         s = 连接(s, hdr_l, ":", 换行)
@@ -303,10 +299,7 @@
 
     若 (字符串相等(op, "loop")) {
         设 cond_ast = 取(args, 0); 设 body_ast = 取(args, 1)
-        设 hdr_num = 加(reg, 0); 设 body_num = 加(reg, 1); 设 end_num = 加(reg, 2)
-        设 r_tmp = 新寄存器(reg); reg = 取(r_tmp, 1)
-        设 r_tmp = 新寄存器(reg); reg = 取(r_tmp, 1)
-        设 r_tmp = 新寄存器(reg); reg = 取(r_tmp, 1)
+        设 hdr_num = reg; 设 body_num = 加(reg, 1); 设 end_num = 加(reg, 2)
         设 hdr_l = 连接("loop_hdr_", hdr_num); 设 body_l = 连接("loop_body_", body_num); 设 end_l = 连接("loop_end_", end_num)
         设 s = 连接("  br label %", hdr_l, 换行)
         s = 连接(s, hdr_l, ":", 换行)
@@ -330,6 +323,95 @@
         }
          返回(列表(s, last, reg))
     }
+
+    若 (字符串相等(op, "fn")) {
+        设 fn_name = 取(args, 0)
+        设 fn_params = 取(args, 1)
+        设 fn_body = 取(args, 2)
+        // 保存主函数上下文
+        设 saved_alloca = alloca表
+        设 saved_reg = reg
+        alloca表 = 新字典()
+        reg = 0
+        // 函数头: define i8* @name(i8* %p1, i8* %p2, ...)
+        设 fn_ir = 连接(换行, "define i8* @", fn_name, "(")
+        设 param_count = 列表取长(fn_params)
+        设 pi = 0
+        循环 (小于(pi, param_count)) {
+            设 pn = 列表取(fn_params, pi)
+            若 (大于(pi, 0)) { fn_ir = 连接(fn_ir, ", ") }
+            fn_ir = 连接(fn_ir, "i8* %", pn, "_arg")
+            pi = 加(pi, 1)
+        }
+        fn_ir = 连接(fn_ir, ") {", 换行, "entry:", 换行)
+        // 参数 unbox 到 alloca
+        设 pi = 0
+        循环 (小于(pi, param_count)) {
+            设 pn = 列表取(fn_params, pi)
+            设 r = 新寄存器(reg); 设 raw = 取(r, 0); reg = 取(r, 1)
+            设 r = 新寄存器(reg); 设 val = 取(r, 0); reg = 取(r, 1)
+            设 r = 新寄存器(reg); 设 a = 取(r, 0); reg = 取(r, 1)
+            fn_ir = 连接(fn_ir, "  ", raw, " = ptrtoint i8* %", pn, "_arg to i64", 换行)
+            fn_ir = 连接(fn_ir, "  ", val, " = ashr i64 ", raw, ", 1", 换行)
+            fn_ir = 连接(fn_ir, "  ", a, " = alloca i8*", 换行)
+            // box the unboxed value: shl → or → inttoptr → store
+            设 r = 新寄存器(reg); 设 b1 = 取(r, 0); reg = 取(r, 1)
+            设 r = 新寄存器(reg); 设 b2 = 取(r, 0); reg = 取(r, 1)
+            设 r = 新寄存器(reg); 设 bp = 取(r, 0); reg = 取(r, 1)
+            fn_ir = 连接(fn_ir, "  ", b1, " = shl i64 ", val, ", 1", 换行)
+            fn_ir = 连接(fn_ir, "  ", b2, " = or i64 ", b1, ", 1", 换行)
+            fn_ir = 连接(fn_ir, "  ", bp, " = inttoptr i64 ", b2, " to i8*", 换行)
+            fn_ir = 连接(fn_ir, "  store i8* ", bp, ", i8** ", a, 换行)
+            存变量(alloca表, pn, a)
+            pi = 加(pi, 1)
+        }
+        // 先注册函数名（递归调用需要）
+        存变量(函数参数表, fn_name, param_count)
+        // 编译函数体
+        设 body_r = 编译(fn_body, reg)
+        fn_ir = 连接(fn_ir, 取(body_r, 0))
+        reg = 取(body_r, 2)
+        // 默认 ret
+        fn_ir = 连接(fn_ir, "  ret i8* null", 换行)
+        fn_ir = 连接(fn_ir, "}", 换行)
+        // 存入函数库
+        设 函数库列表 = 列表追加(函数库列表, fn_ir)
+        // 恢复主函数上下文
+        alloca表 = saved_alloca
+        reg = saved_reg
+        返回(列表("", "null", reg))
+    }
+
+    若 (字符串相等(op, "return")) {
+        设 ret_val = 取(args, 0)
+        设 v_r = 编译(ret_val, reg)
+        设 s = 取(v_r, 0); 设 vr = 取(v_r, 1); reg = 取(v_r, 2)
+        // 返回值已经boxed，直接ret
+        s = 连接(s, "  ret i8* ", vr, 换行)
+        返回(列表(s, vr, reg))
+    }
+
+    // 函数调用: op是函数名且在函数参数表中
+    设 fn_arity = 查键(函数参数表, op)
+    若 (大于(取长(fn_arity), 0)) {
+        设 call_ir = ""
+        设 arg_regs = ""
+        设 arg_count = 列表取长(args)
+        设 ai = 0
+        循环 (小于(ai, arg_count)) {
+            设 a_val = 取(args, ai)
+            设 a_r = 编译(a_val, reg)
+            call_ir = 连接(call_ir, 取(a_r, 0))
+            设 av = 取(a_r, 1); reg = 取(a_r, 2)
+            若 (大于(ai, 0)) { arg_regs = 连接(arg_regs, ", ") }
+            arg_regs = 连接(arg_regs, "i8* ", av)
+            ai = 加(ai, 1)
+        }
+        设 r = 新寄存器(reg); 设 result_reg = 取(r, 0); reg = 取(r, 1)
+        call_ir = 连接(call_ir, "  ", result_reg, " = call i8* @", op, "(", arg_regs, ")", 换行)
+        返回(列表(call_ir, result_reg, reg))
+    }
+
     }
 
     若 (是字符串(ast)) {
@@ -361,9 +443,20 @@
 定义 编译顶层 (ast) {
     设 reg = 0
     设 alloca表 = 新字典()
+    设 函数库列表 = 新列表()
+    设 函数参数表 = 新字典()
     设 s = header()
-    s = 连接(s, "entry:"); s = 连接(s, 换行)
     设 r = 编译(ast, reg)
+    // 拼接所有函数定义
+    设 fn_count = 列表取长(函数库列表)
+    设 fi = 0
+    循环 (小于(fi, fn_count)) {
+        设 fn_ir = 列表取(函数库列表, fi)
+        s = 连接(s, fn_ir)
+        fi = 加(fi, 1)
+    }
+    s = 连接(s, "define i8* @main() {"); s = 连接(s, 换行)
+    s = 连接(s, "entry:"); s = 连接(s, 换行)
     s = 连接(s, 取(r, 0))
     s = 连接(s, footer())
     返回(s)
