@@ -216,8 +216,29 @@ class TritValue:
     _pool: OrderedDict = OrderedDict()
     _pool_lock = threading.Lock()
     _MAX_POOL_SIZE = max(1, int(os.environ.get('TRIT_POOL_SIZE', '10000')))
+    _SMALL_INT_CACHE: dict = {}
+    _SMALL_INT_BUILT = False
+
+    @classmethod
+    def _build_small_cache(cls):
+        if cls._SMALL_INT_BUILT:
+            return
+        for i in range(-256, 257):
+            obj = super().__new__(cls)
+            obj._initialized = True
+            obj.precision = 0
+            obj.float_val = None
+            obj.value = BT.from_int(i)
+            obj.symbol = BT.to_str(obj.value)
+            cls._SMALL_INT_CACHE[i] = obj
+        cls._SMALL_INT_BUILT = True
 
     def __new__(cls, value, precision: Optional[int] = None):
+        if isinstance(value, int) and precision is None:
+            cls._build_small_cache()
+            cached = cls._SMALL_INT_CACHE.get(value)
+            if cached is not None:
+                return cached
         def _hashable(v):
             if isinstance(v, list):
                 return tuple(_hashable(x) for x in v)

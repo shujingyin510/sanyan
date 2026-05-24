@@ -1491,9 +1491,15 @@ def _compile_in_context(ast_nodes: list, cg: CodegenContext) -> None:
                 if isinstance(name, str) and not name.startswith('_'):
                     val = node[2]
                     if isinstance(val, (int, float)):
-                        cg.create_global(name, val)
-                    elif isinstance(val, str) and _is_string_literal(val):
-                        cg.create_global(name, _unquote(val))
+                        pass  # 数字 — 不预建全局
+                    elif isinstance(val, str):
+                        if _is_string_literal(val):
+                            pass  # 字符串字面量 — 不预建全局
+                        elif _to_int(val) is not None:
+                            pass  # 数字字符串 — 不预建全局
+                        else:
+                            cg.create_global(name, val)
+                            cg._global_inits.append((name, val))
                     else:
                         cg.create_global(name, val)
                         cg._global_inits.append((name, val))
