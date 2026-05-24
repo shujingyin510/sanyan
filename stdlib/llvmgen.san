@@ -1,0 +1,124 @@
+// llvmgen.san V3 — 极简版
+
+设 _reg = 0
+定义 新寄存器 () {
+    设 _reg = 加(_reg, 1)
+    返回(连接("%", _reg))
+}
+
+定义 box (v) {
+    设 r1 = 新寄存器()
+    设 r2 = 新寄存器()
+    设 r3 = 新寄存器()
+    设 s = 连接("  ", r1, " = shl i64 ", v, ", 1", 换行)
+    s = 连接(s, "  ", r2, " = or i64 ", r1, ", 1", 换行)
+    s = 连接(s, "  ", r3, " = inttoptr i64 ", r2, " to i8*", 换行)
+    返回(列表(s, r3))
+}
+
+定义 unbox (p) {
+    设 r1 = 新寄存器()
+    设 r2 = 新寄存器()
+    设 s = 连接("  ", r1, " = ptrtoint i8* ", p, " to i64", 换行)
+    s = 连接(s, "  ", r2, " = ashr i64 ", r1, ", 1", 换行)
+    返回(列表(s, r2))
+}
+
+定义 header () {
+    设 s = "; ModuleID = 'sanyan'"
+    s = 连接(s, 换行)
+    s = 连接(s, "target triple = \"x86_64-pc-linux-gnu\"", 换行)
+    s = 连接(s, 换行)
+    s = 连接(s, "declare i32 @printf(i8*, ...)", 换行)
+    s = 连接(s, 换行)
+    s = 连接(s, "@.fmt = private constant [4 x i8] c\"%d\\0a\\00\"", 换行)
+    s = 连接(s, 换行)
+    s = 连接(s, "define i8* @main() {", 换行)
+    s = 连接(s, "entry:", 换行)
+    返回(s)
+}
+
+定义 footer () {
+    返回(连接("  ret i8* null", 换行, "}", 换行))
+}
+
+设 换行 = "\n"
+
+定义 编译 (ast) {
+    设 op = 取(ast, 0)
+    设 args = 切片(ast, 1)
+
+    若 (op == "set") {
+        设 name = 取(args, 0)
+        设 val = 取(args, 1)
+        设 r = 新寄存器()
+        设 b = box(r)
+        设 a = 新寄存器()
+        设 s = 连接("  ", r, " = add i64 0, ", val, 换行)
+        s = 连接(s, 取(b, 0))
+        s = 连接(s, "  ", a, " = alloca i8*", 换行)
+        s = 连接(s, "  store i8* ", 取(b, 1), ", i8** ", a, 换行)
+        返回(列表(s, a, name))
+    }
+
+    若 (op == "add") {
+        设 l = 取(args, 0)
+        设 r = 取(args, 1)
+        设 lr = 编译(l)
+        设 rr = 编译(r)
+        设 l_reg = 取(lr, 1)
+        设 r_reg = 取(rr, 1)
+        设 lb = unbox(l_reg)
+        设 rb = unbox(r_reg)
+        设 res = 新寄存器()
+        设 s = 连接(取(lr, 0), 取(rr, 0))
+        s = 连接(s, 取(lb, 0), 取(rb, 0))
+        s = 连接(s, "  ", res, " = add i64 ", 取(lb, 1), ", ", 取(rb, 1), 换行)
+        s = 连接(s, 取(box(res), 0))
+        返回(列表(s, 取(box(res), 1)))
+    }
+
+    若 (op == "print") {
+        设 v = 编译(取(args, 0))
+        设 vr = 取(v, 1)
+        设 r1 = 新寄存器()
+        设 r2 = 新寄存器()
+        设 r3 = 新寄存器()
+        设 r4 = 新寄存器()
+        设 s = 取(v, 0)
+        s = 连接(s, "  ", r1, " = ptrtoint i8* ", vr, " to i64", 换行)
+        s = 连接(s, "  ", r2, " = and i64 ", r1, ", 1", 换行)
+        s = 连接(s, "  ", r3, " = icmp ne i64 ", r2, ", 0", 换行)
+        s = 连接(s, "  br i1 ", r3, ", label %int_", r4, ", label %str_", r4, 换行)
+        s = 连接(s, "int_", r4, ":", 换行)
+        s = 连接(s, "  call i32 (i8*, ...) @printf(i8* getelementptr inbounds ([4 x i8], [4 x i8]* @.fmt, i32 0, i32 0), i64 ", vr, ")", 换行)
+        s = 连接(s, "  br label %done_", r4, 换行)
+        s = 连接(s, "str_", r4, ":", 换行)
+        s = 连接(s, "  call void @rt_print_str(i8* ", vr, ")", 换行)
+        s = 连接(s, "  br label %done_", r4, 换行)
+        s = 连接(s, "done_", r4, ":", 换行)
+        返回(列表(s, vr))
+    }
+
+    若 (op == "do") {
+        设 s = ""
+        遍历 stmt 在 args {
+            设 r = 编译(stmt)
+            s = 连接(s, 取(r, 0))
+        }
+        返回(列表(s, "null"))
+    }
+
+    返回(列表("", "null"))
+}
+
+定义 编译顶层 (ast) {
+    设 _reg = 0
+    设 s = header()
+    设 r = 编译(ast)
+    s = 连接(s, 取(r, 0))
+    s = 连接(s, footer())
+    返回(s)
+}
+
+导出 编译顶层
