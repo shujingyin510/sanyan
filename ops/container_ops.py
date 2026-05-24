@@ -78,9 +78,11 @@ class ContainerOps:
         container = evaluator.eval(args[0])
         raw_index = evaluator.eval(args[1])
         if isinstance(raw_index, str):
-            index = raw_index  # string key for dict access
-        else:
+            index = raw_index
+        elif isinstance(raw_index, TritValue):
             index = raw_index.to_int()
+        else:
+            index = raw_index
         if isinstance(container, dict):
             if isinstance(index, str):
                 if index in container:
@@ -89,9 +91,8 @@ class ContainerOps:
             raise SanyanTypeError('字典键必须是字符串')
         if isinstance(container, (list, ArrayValue)):
             try:
-                idx = index if isinstance(index, int) else int(index)
-                return container[idx]
-            except (IndexError, ValueError):
+                return container[index]
+            except (IndexError, ValueError, TypeError):
                 raise SanyanValueError(f'索引 {index} 超出范围，容器长度 {len(container)}')  # type: ignore[arg-type]
         raise SanyanTypeError('第一个参数必须是列表、数组或字典')
 

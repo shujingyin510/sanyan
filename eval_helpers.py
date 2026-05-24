@@ -3,7 +3,7 @@
 from __future__ import annotations
 from typing import Any, Optional
 from ternary_core import TritValue
-from values import SanyanNameError
+from values import SanyanNameError, SanyanSyntaxError, SanyanTypeError
 
 
 def parse_string_literal(s: str) -> str:
@@ -96,15 +96,20 @@ def eval_str(evaluator, node: str) -> Any:
     if numeric is not None:
         return numeric
     if is_valid_identifier(node):
-        # 如果标识符经皮肤映射为已注册的内部操作，则作为零参数操作分派（如 跳出→break, 继续→continue）
         if evaluator.skin_manager:
             resolved = evaluator.skin_manager.get_internal_keyword(node) or evaluator.skin_manager.get_internal_op(node)
             if resolved:
                 from ops.registry import has_op
 
                 if has_op(resolved):
-                    return evaluator._apply(node, [])
-        return resolve_identifier(evaluator, node)
+                    try:
+                        return evaluator._apply(node, [])
+                    except (SanyanSyntaxError, SanyanTypeError):
+                        pass  # not a zero-arg op, treat as literal
+        try:
+            return resolve_identifier(evaluator, node)
+        except SanyanNameError:
+            pass  # not a variable, treat as literal string
     return node
 
 
