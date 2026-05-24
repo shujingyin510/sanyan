@@ -110,6 +110,11 @@ void *rt_int_to_str(uintptr_t tagged) {
     return _rt_make(buf);
 }
 
+/* ── 前置声明 ── */
+typedef struct rt_list_s rt_list_t;
+rt_list_t *rt_list_new(void);
+void rt_list_push_item(void *lstp, void *item);
+
 void *rt_str_split(const char *s, const char *sep) {
     rt_list_t *r = rt_list_new();
     if (!s || !sep || !r) return r;
@@ -132,11 +137,12 @@ void *rt_str_split(const char *s, const char *sep) {
 }
 
 /* ── 列表类型 ── */
-typedef struct {
+struct rt_list_s {
     int32_t len;
     int32_t cap;
     void **items;
-} rt_list_t;
+};
+/* rt_list_t 已在文件顶部通过 typedef 声明 */
 
 rt_list_t *rt_list_new(void) {
     rt_list_t *lst = (rt_list_t *)calloc(1, sizeof(rt_list_t));
@@ -174,14 +180,62 @@ rt_list_t *rt_list_concat(rt_list_t *a, rt_list_t *b) {
     return r;
 }
 
-/* ── 字典类型 ── */
-#define RT_DICT_MAX 64
-typedef struct { char *key; void *value; } rt_entry_t;
-typedef struct { int32_t count; rt_entry_t entries[RT_DICT_MAX]; } rt_dict_t;
+/* ── 字典类型（开放寻址哈希表）── */
+#define RT_DICT_INIT_CAP 16
+#define RT_DICT_LOAD_FACTOR 70  /* 百分比 */
 
-void *rt_dict_new(void) { return calloc(1, sizeof(rt_dict_t)); }
+typedef struct {
+    char *key;
+    void *value;
+    int used;   /* 0=empty, 1=occupied */
+} rt_entry_t;
 
-/* 字典 key 统一复制（兼容 rt_str_t* 和裸 const char*） */
+typedef struct {
+    int32_t count;
+    int32_t cap;
+    rt_entry_t *entries;
+} rt_dict_t;
+
+/* FNV-1a hash */
+static uint32_t _hash_str(const char *s) {
+    uint32_t h = 2166136261u;
+    for (; *s; s++) {
+        h ^= (uint8_t)*s;
+        h *= 16777619u;
+    }
+    return h;
+}
+
+static void _dict_resize(rt_dict_t *d, int32_t new_cap) {
+    rt_entry_t *old = d->entries;
+    int32_t old_cap = d->cap;
+    d->entries = (rt_entry_t*)calloc((size_t)new_cap, sizeof(rt_entry_t));
+    d->cap = new_cap;
+    d->count = 0;
+    for (int32_t i = 0; i < old_cap; i++) {
+        if (old[i].used) {
+            uint32_t h = _hash_str(old[i].key);
+            for (int32_t j = 0; j < new_cap; j++) {
+                int32_t idx = (int32_t)((h + (uint32_t)j) % (uint32_t)new_cap);
+                if (!d->entries[idx].used) {
+                    d->entries[idx] = old[i];
+                    d->count++;
+                    break;
+                }
+            }
+        }
+    }
+    free(old);
+}
+
+void *rt_dict_new(void) {
+    rt_dict_t *d = (rt_dict_t*)calloc(1, sizeof(rt_dict_t));
+    if (!d) return NULL;
+    d->cap = RT_DICT_INIT_CAP;
+    d->entries = (rt_entry_t*)calloc(RT_DICT_INIT_CAP, sizeof(rt_entry_t));
+    return d;
+}
+
 static char *_strdup_key(const void *kp) {
     const char *s = _cstr(kp);
     if (!s) return NULL;
@@ -191,36 +245,59 @@ static char *_strdup_key(const void *kp) {
     return d;
 }
 
+static int32_t _dict_find(rt_dict_t *d, const char *key) {
+    if (!d || d->count == 0) return -1;
+    uint32_t h = _hash_str(key);
+    for (int32_t j = 0; j < d->cap; j++) {
+        int32_t idx = (int32_t)((h + (uint32_t)j) % (uint32_t)d->cap);
+        if (!d->entries[idx].used) return -1;
+        if (d->entries[idx].key && strcmp(d->entries[idx].key, key) == 0)
+            return idx;
+    }
+    return -1;
+}
+
+static void _dict_grow(rt_dict_t *d) {
+    int32_t new_cap = d->cap * 2;
+    if (new_cap < RT_DICT_INIT_CAP) new_cap = RT_DICT_INIT_CAP;
+    _dict_resize(d, new_cap);
+}
+
 int32_t rt_dict_contains(void *dp, void *kp) {
     rt_dict_t *d = (rt_dict_t *)dp;
     if (!d || !kp) return 0;
-    const char *key = _cstr(kp);
-    for (int32_t i = 0; i < d->count; i++)
-        if (d->entries[i].key && strcmp(d->entries[i].key, key) == 0) return 1;
-    return 0;
+    return _dict_find(d, _cstr(kp)) >= 0 ? 1 : 0;
 }
 
 void *rt_dict_get(void *dp, void *kp) {
     rt_dict_t *d = (rt_dict_t *)dp;
     if (!d || !kp) return NULL;
-    const char *key = _cstr(kp);
-    for (int32_t i = 0; i < d->count; i++)
-        if (d->entries[i].key && strcmp(d->entries[i].key, key) == 0) return d->entries[i].value;
-    return NULL;
+    int32_t idx = _dict_find(d, _cstr(kp));
+    return idx >= 0 ? d->entries[idx].value : NULL;
 }
 
 void rt_dict_set(void *dp, void *kp, void *vp) {
     rt_dict_t *d = (rt_dict_t *)dp;
-    if (!d || !kp || d->count >= RT_DICT_MAX) return;
+    if (!d || !kp) return;
     const char *key = _cstr(kp);
-    for (int32_t i = 0; i < d->count; i++) {
-        if (d->entries[i].key && strcmp(d->entries[i].key, key) == 0) {
-            d->entries[i].value = vp; return;
+    int32_t idx = _dict_find(d, key);
+    if (idx >= 0) {
+        d->entries[idx].value = vp;
+        return;
+    }
+    if (d->count * 100 >= d->cap * RT_DICT_LOAD_FACTOR)
+        _dict_grow(d);
+    uint32_t h = _hash_str(key);
+    for (int32_t j = 0; j < d->cap; j++) {
+        idx = (int32_t)((h + (uint32_t)j) % (uint32_t)d->cap);
+        if (!d->entries[idx].used) {
+            d->entries[idx].key = _strdup_key(kp);
+            d->entries[idx].value = vp;
+            d->entries[idx].used = 1;
+            d->count++;
+            return;
         }
     }
-    d->entries[d->count].key = _strdup_key(kp);
-    d->entries[d->count].value = vp;
-    d->count++;
 }
 
 /* rt_dict_from_pairs: 从键值对列表填充字典 */

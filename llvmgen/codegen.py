@@ -237,12 +237,10 @@ class CodegenContext:
         return self._func.append_basic_block(name=name)
 
     def begin_function(self, name: str, param_names: list[str]) -> ir.Function:
-        """创建函数并进入其 entry 块。若已存在则复用（清空旧指令）。"""
         if name in self._funcs:
             func = self._funcs[name]
             self._current_func = func
             self._scope = {}
-            # 清空旧 entry 块指令，重新填充
             entry = func.blocks[0]
             entry.instructions.clear()
             self._builder = ir.IRBuilder(entry)
@@ -255,6 +253,7 @@ class CodegenContext:
 
         fnty = ir.FunctionType(_PTR, [_PTR] * len(param_names))
         func = ir.Function(self.module, fnty, name=name)
+        func.attributes.add('alwaysinline')
         for i, pname in enumerate(param_names):
             func.args[i].name = pname
         self._funcs[name] = func
@@ -268,15 +267,6 @@ class CodegenContext:
             self._builder.store(func.args[i], alloca)
             self._scope[pname] = alloca
         return func
-
-        fnty = ir.FunctionType(_PTR, [_PTR] * len(param_names))
-        func = ir.Function(self.module, fnty, name=name)
-        for i, pname in enumerate(param_names):
-            func.args[i].name = pname
-        self._funcs[name] = func
-        self._current_func = func
-        self._scope = {}
-        entry = func.append_basic_block(name='entry')
         self._builder = ir.IRBuilder(entry)
         self._entry_block = entry
         for i, pname in enumerate(param_names):
@@ -444,11 +434,27 @@ class CodegenContext:
         self.end_function()
 
     def verify(self) -> str:
-        """验证模块并返回 IR 文本。"""
         try:
-            return str(self.module)
+            ir_text = str(self.module)
         except Exception as e:
             raise RuntimeError(f'LLVM IR 生成失败: {e}') from e
+        try:
+            from llvmlite import binding
+
+            binding.initialize()
+            binding.initialize_native_target()
+            binding.initialize_native_asmprinter()
+            llvm_mod = binding.parse_assembly(ir_text)
+            pm = binding.ModulePassManager()
+            pm.add_promote_memory_to_register_pass()
+            pm.add_instruction_combining_pass()
+            pm.add_reassociate_expressions_pass()
+            pm.add_gvn_pass()
+            pm.add_cfg_simplification_pass()
+            pm.run(llvm_mod)
+            return str(llvm_mod)
+        except Exception:
+            return ir_text
 
 
 # ── 辅助函数 ──
