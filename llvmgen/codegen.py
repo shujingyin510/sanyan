@@ -204,7 +204,9 @@ _RUNTIME_FUNCS: dict[str, tuple] = {
     # 数学
     'pow': ('rt_math_pow', _I32, [_I32, _I32]),
     'sqrt': ('rt_math_sqrt', _I32, [_I32]),
+    '平方根': ('rt_math_sqrt', _I32, [_I32]),
     'abs': ('rt_math_abs', _I32, [_I32]),
+    '绝对值': ('rt_math_abs', _I32, [_I32]),
     'floor': ('rt_math_floor', _I32, [_I32]),
     '向下取整': ('rt_math_floor', _I32, [_I32]),
     'ceil': ('rt_math_ceil', _I32, [_I32]),
@@ -220,17 +222,35 @@ _RUNTIME_FUNCS: dict[str, tuple] = {
     '当前时间': ('rt_time_now', _I32, []),
     # 字符串扩展（桩）
     'reverse': ('rt_str_reverse', _PTR, [_PTR]),
+    '反转': ('rt_str_reverse', _PTR, [_PTR]),
     'startswith': ('rt_str_startswith', _I32, [_PTR, _PTR]),
+    '前缀': ('rt_str_startswith', _I32, [_PTR, _PTR]),
     'endswith': ('rt_str_endswith', _I32, [_PTR, _PTR]),
+    '后缀': ('rt_str_endswith', _I32, [_PTR, _PTR]),
     'replace': ('rt_str_replace', _PTR, [_PTR, _PTR, _PTR]),
+    '替换': ('rt_str_replace', _PTR, [_PTR, _PTR, _PTR]),
     'trim': ('rt_str_trim', _PTR, [_PTR]),
+    '去空白': ('rt_str_trim', _PTR, [_PTR]),
     'upper': ('rt_str_upper', _PTR, [_PTR]),
+    '大写': ('rt_str_upper', _PTR, [_PTR]),
     'lower': ('rt_str_lower', _PTR, [_PTR]),
+    '小写': ('rt_str_lower', _PTR, [_PTR]),
     'join': ('rt_str_join', _PTR, [_PTR, _PTR]),
+    '合并': ('rt_str_join', _PTR, [_PTR, _PTR]),
     'sort': ('rt_list_sort', _PTR, [_PTR]),
+    '排序': ('rt_list_sort', _PTR, [_PTR]),
     'sum': ('rt_list_sum', _I32, [_PTR]),
+    '求和': ('rt_list_sum', _I32, [_PTR]),
     'count': ('rt_list_count', _I32, [_PTR, _PTR]),
+    '计数': ('rt_list_count', _I32, [_PTR, _PTR]),
     'unique': ('rt_list_unique', _PTR, [_PTR]),
+    '去重': ('rt_list_unique', _PTR, [_PTR]),
+    # 容器扩展
+    'set_element': ('rt_list_set', ir.VoidType(), [_PTR, _I32, _PTR]),
+    '置元素': ('rt_list_set', ir.VoidType(), [_PTR, _I32, _PTR]),
+    # 数学补充
+    'pow': ('rt_math_pow', _I32, [_I32, _I32]),
+    '幂': ('rt_math_pow', _I32, [_I32, _I32]),
 }  # yapf: disable
 
 
@@ -1208,7 +1228,13 @@ def _compile_node_inner(node, cg: CodegenContext) -> ir.Value | None:
     # ── 内置二元算术（整数 i64 内联 / 浮点 fadd 内联 + 自动提升）──
     arith = _ARITH_OPS.get(op)
     if arith is not None:
-        if len(args) < 2:
+        if len(args) < 1:
+            raise SyntaxError(f'{op} 需要参数')
+        # 一元操作（减/取负）
+        if len(args) == 1:
+            if op in ('减', 'sub'):
+                v = cg._to_raw(_compile_node_inner(args[0], cg)).ll_val
+                return RawValue(cg.builder.sub(_ZERO, v, name='neg_tmp'))
             raise SyntaxError(f'{op} 需要两个参数')
         lv = compile_node(args[0], cg)
         rv = compile_node(args[1], cg)

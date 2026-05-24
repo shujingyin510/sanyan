@@ -193,9 +193,15 @@ void *rt_list_sort(void *lst)         { (void)lst; return _rt_make(\"\"); }
 int32_t rt_list_sum(void *lst)        { (void)lst; return 0; }
 int32_t rt_list_count(void *lst, void *v){ (void)lst;(void)v; return 0; }
 void *rt_list_unique(void *lst)       { (void)lst; return _rt_make(\"\"); }
+void rt_list_set(void *lst, int32_t i, void *v) { (void)lst; (void)i; (void)v; }
 int32_t rt_math_pow(int32_t b, int32_t e) { int32_t r=1; while(e-->0) r*=b; return r; }
 int32_t rt_math_sqrt(int32_t v)           { int32_t r=0; while(r*r<=v) r++; return r-1; }
 int32_t rt_math_abs(int32_t v)            { return v < 0 ? -v : v; }
+int32_t rt_math_floor(int32_t v)          { return v; }
+int32_t rt_math_ceil(int32_t v)           { return v; }
+int32_t rt_math_round(int32_t v)          { return v; }
+int32_t rt_math_ngt(int32_t a, int32_t b) { return a <= b; }
+int32_t rt_math_nlt(int32_t a, int32_t b) { return a >= b; }
 void *rt_list_reduce(void *fn, void *lst) { (void)fn; (void)lst; return _rt_make(\"\"); }
 int32_t rt_time_now(void) { return (int32_t)time(NULL); }
     const char *p = cs;
