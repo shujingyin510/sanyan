@@ -31,7 +31,6 @@
     s = 连接(s, 换行)
     s = 连接(s, "@.fmt = private constant [4 x i8] c\"%d\\0a\\00\""); s = 连接(s, 换行)
     s = 连接(s, 换行); s = 连接(s, "define i8* @main() {"); s = 连接(s, 换行)
-    s = 连接(s, "entry:"); s = 连接(s, 换行)
     返回(s)
 }
 
@@ -41,7 +40,7 @@
 
 设 换行 = "\n"
 
-设 变量表 = 新字典()   // name → alloca register
+设 alloca表 = 新字典()          // name → alloca register (e.g., "%5")
 
 定义 声明运行时 () {
     设 s = "declare i8* @rt_awake(i8* noalias, i8* noalias, i8* noalias, i8* nocapture readonly)" ; s = 连接(s, 换行)
@@ -101,10 +100,16 @@
         设 s = 取(val_r, 0)
         设 val_reg = 取(val_r, 1)
         reg = 取(val_r, 2)
-        设 r = 新寄存器(reg); 设 a = 取(r, 0); reg = 取(r, 1)
-        s = 连接(s, "  ", a, " = alloca i8*", 换行)
-        s = 连接(s, "  store i8* ", val_reg, ", i8** ", a, 换行)
-        存变量(变量表, name, a)
+        设 existing = 查键(alloca表, name)
+        若 (等于(取长(existing), 0)) {
+            设 r = 新寄存器(reg); 设 a = 取(r, 0); reg = 取(r, 1)
+            s = 连接(s, "  ", a, " = alloca i8*", 换行)
+            s = 连接(s, "  store i8* ", val_reg, ", i8** ", a, 换行)
+            存变量(alloca表, name, a)
+        } 否则 {
+            设 a = existing
+            s = 连接(s, "  store i8* ", val_reg, ", i8** ", a, 换行)
+        }
         返回(列表(s, val_reg, reg))
     }
 
@@ -342,10 +347,12 @@
     }
 
     若 (是字符串(ast)) {
-        设 alloca = 取(变量表, ast)
-        设 r = 新寄存器(reg); 设 r1 = 取(r, 0); reg = 取(r, 1)
-        设 s = 连接("  ", r1, " = load i8*, i8** ", alloca, 换行)
-        返回(列表(s, r1, reg))
+        设 alloca = 查键(alloca表, ast)
+        若 (大于(取长(alloca), 0)) {
+            设 r = 新寄存器(reg); 设 r1 = 取(r, 0); reg = 取(r, 1)
+            设 s = 连接("  ", r1, " = load i8*, i8** ", alloca, 换行)
+            返回(列表(s, r1, reg))
+        }
     }
 
     返回(列表("", "null", reg))
@@ -353,7 +360,9 @@
 
 定义 编译顶层 (ast) {
     设 reg = 0
+    设 alloca表 = 新字典()
     设 s = header()
+    s = 连接(s, "entry:"); s = 连接(s, 换行)
     设 r = 编译(ast, reg)
     s = 连接(s, 取(r, 0))
     s = 连接(s, footer())

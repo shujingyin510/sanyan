@@ -7,6 +7,7 @@ import sys
 from typing import TYPE_CHECKING, Any, cast
 
 from llvmgen.codegen import compile_top_level
+from ternary_core import TritValue
 
 if TYPE_CHECKING:
     from llvmgen.codegen import CodegenContext
@@ -90,6 +91,31 @@ def compile_source(source: str, module_name: str = 'main') -> tuple[str, 'Codege
     return cg.verify(), cg
 
 
+def _dict_get_safe(evaluator, args):
+    """安全取字典键：存在返回值，不存在返回空串。"""
+    d = evaluator.eval(args[0])
+    k = evaluator.eval(args[1])
+    if isinstance(k, TritValue):
+        k = k.to_int()
+    if isinstance(d, dict) and k in d:
+        return d[k]
+    return ""
+
+
+def _list_contains(evaluator, args):
+    """检查列表是否包含元素，返回 TritValue(1/0)。"""
+    lst = evaluator.eval(args[0])
+    item = evaluator.eval(args[1])
+    if isinstance(lst, (list, tuple)):
+        return TritValue(1 if item in lst else 0)
+    return TritValue(0)
+
+
+from ops.registry import register as _register
+
+_register('container_ops_list_contains', _list_contains)
+
+
 def self_hosted_compile(source: str, module_name: str = 'main') -> str:
     """自举编译：sugar.san 解析 + llvmgen.san 生成 IR。零 Python codegen。"""
     from evaluator import SanyanEvaluator
@@ -101,11 +127,17 @@ def self_hosted_compile(source: str, module_name: str = 'main') -> str:
     evaluator = SanyanEvaluator(skin_manager=SkinManager('chinese'))
     evaluator.commands['新字典'] = ([], [['return', {}]], {}, None)
     evaluator.commands['存变量'] = (['d', 'k', 'v'], [['container_ops_dict_set', 'd', 'k', 'v']], {}, None)
-    # Register dict_set as an op
+    evaluator.commands['新列表'] = ([], [['return', []]], {}, None)
+    # 注册辅助函数
     from ops.container_ops import ContainerOps
     from ops.registry import register
 
     register('container_ops_dict_set', ContainerOps.dict_set)
+    # 查键: 字典键存在返回 value，否则返回空串
+    evaluator.commands['查键'] = (['d', 'k'], [['container_ops_dict_get_safe', 'd', 'k']], {}, None)
+    register('container_ops_dict_get_safe', _dict_get_safe)
+    # 包含: 列表包含检查
+    evaluator.commands['包含'] = (['lst', 'item'], [['container_ops_list_contains', 'lst', 'item']], {}, None)
 
     stdlib_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'stdlib')
 
