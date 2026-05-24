@@ -356,47 +356,44 @@ int vm_run(VM *vm) {
             break;
         }
 
+        /* ── 算术 ── */
+        case ADD: b = pop(vm); a = pop(vm);
+            push(vm, tag_i(to_int(a) + to_int(b))); break;
+        case SUB: b = pop(vm); a = pop(vm);
+            push(vm, tag_i(to_int(a) - to_int(b))); break;
+        case MUL: b = pop(vm); a = pop(vm);
+            push(vm, tag_i(to_int(a) * to_int(b))); break;
+        case DIV: b = pop(vm); a = pop(vm);
+            ib = to_int(b); push(vm, ib ? tag_i(to_int(a) / ib) : tag_i(0)); break;
+        case MOD: b = pop(vm); a = pop(vm);
+            ib = to_int(b); push(vm, ib ? tag_i(to_int(a) % ib) : tag_i(0)); break;
+
+        /* ── 比较 ── */
+        case EQ:  b = pop(vm); a = pop(vm);
+            push(vm, tag_i(to_int(a) == to_int(b) ? 1 : 0)); break;
+        case NE:  b = pop(vm); a = pop(vm);
+            push(vm, tag_i(to_int(a) != to_int(b) ? 1 : 0)); break;
+        case GT:  b = pop(vm); a = pop(vm);
+            push(vm, tag_i(to_int(a) > to_int(b) ? 1 : 0)); break;
+        case LT:  b = pop(vm); a = pop(vm);
+            push(vm, tag_i(to_int(a) < to_int(b) ? 1 : 0)); break;
+        case GTE: b = pop(vm); a = pop(vm);
+            push(vm, tag_i(to_int(a) >= to_int(b) ? 1 : 0)); break;
+        case LTE: b = pop(vm); a = pop(vm);
+            push(vm, tag_i(to_int(a) <= to_int(b) ? 1 : 0)); break;
+        case NOT: a = pop(vm);
+            push(vm, tag_i(!to_int(a))); break;
+
         case LOAD: {
             uint8_t idx = rd_u8(vm->code, &vm->pc);
-            push(vm, idx < vm->var_count ? vm->vars[idx] : tag_i(0));
+            push(vm, vm->vars[idx]);
             break;
         }
         case STORE: {
             uint8_t idx = rd_u8(vm->code, &vm->pc);
-            if (idx < vm->var_count) vm->vars[idx] = pop(vm);
-            else pop(vm);
+            vm->vars[idx] = pop(vm);
             break;
         }
-
-        /* ── 算术 ── */
-        case ADD:  b = pop(vm); a = pop(vm); push(vm, tag_i(to_int(a) + to_int(b))); break;
-        case SUB:  b = pop(vm); a = pop(vm); push(vm, tag_i(to_int(a) - to_int(b))); break;
-        case MUL:  b = pop(vm); a = pop(vm); push(vm, tag_i(to_int(a) * to_int(b))); break;
-        case DIV:
-            b = pop(vm); a = pop(vm); ib = to_int(b);
-            push(vm, ib ? tag_i(to_int(a) / ib) : tag_i(0));
-            break;
-        case MOD:
-            b = pop(vm); a = pop(vm); ib = to_int(b);
-            push(vm, ib ? tag_i(to_int(a) % ib) : tag_i(0));
-            break;
-
-        /* ── 比较 ── */
-        case EQ:
-            b = pop(vm); a = pop(vm);
-            ia = is_int_val(a) && is_int_val(b) ? untag_i(a) == untag_i(b) : a == b;
-            push(vm, tag_i(ia ? 1 : 0));
-            break;
-        case NE:
-            b = pop(vm); a = pop(vm);
-            ia = is_int_val(a) && is_int_val(b) ? untag_i(a) != untag_i(b) : a != b;
-            push(vm, tag_i(ia ? 1 : 0));
-            break;
-        case GT:  b = pop(vm); a = pop(vm); push(vm, tag_i(to_int(a) > to_int(b) ? 1 : 0)); break;
-        case LT:  b = pop(vm); a = pop(vm); push(vm, tag_i(to_int(a) < to_int(b) ? 1 : 0)); break;
-        case GTE: b = pop(vm); a = pop(vm); push(vm, tag_i(to_int(a) >= to_int(b) ? 1 : 0)); break;
-        case LTE: b = pop(vm); a = pop(vm); push(vm, tag_i(to_int(a) <= to_int(b) ? 1 : 0)); break;
-        case NOT: a = pop(vm); push(vm, tag_i(val_true(a) ? 0 : 1)); break;
 
         /* ── 控制流 ── */
         case JMP: {
@@ -416,10 +413,18 @@ int vm_run(VM *vm) {
         }
         case CALL: {
             int16_t addr = rd_i16(vm->code, &vm->pc);
+            if (addr == 0) break;
             if (vm->call_depth >= CALL_STACK_DEPTH) { fprintf(stderr, "调用栈溢出\n"); return 1; }
+            // 扫描目标地址连续 STORE 指令个数 = 参数数量（与 Python VM 一致）
+            int32_t arg_count = 0;
+            uint32_t p = (uint32_t)addr;
+            while (p + 1 < vm->code_len && vm->code[p] == STORE) {
+                arg_count++;
+                p += 2;
+            }
             CallFrame *fr = &vm->call_stack[vm->call_depth++];
             fr->ret_pc = vm->pc;
-            fr->stack_base = vm->sp;
+            fr->stack_base = vm->sp - arg_count;
             fr->saved_var_cnt = vm->var_count;
             memcpy(fr->saved_vars, vm->vars, sizeof(void*) * vm->var_count);
             vm->pc = (uint32_t)addr;
@@ -472,15 +477,30 @@ int vm_run(VM *vm) {
 
         /* ── 字符串操作 ── */
         case CONCAT: {
-            b = pop(vm); a = pop(vm);
-            const char *sa = rt_str_c(a), *sb = rt_str_c(b);
-            int32_t la = (int32_t)strlen(sa), lb = (int32_t)strlen(sb);
-            rt_str_t *r = (rt_str_t*)malloc(sizeof(rt_str_t) + la + lb + 1);
-            if (!r) { push(vm, rt_str_new("")); break; }
+            int32_t n = to_int(pop(vm));
+            if (n <= 0) { push(vm, rt_str_new("")); break; }
+            // 收集所有字符串并计算总长度
+            int32_t total = 0;
+            int32_t *lens = (int32_t*)malloc((size_t)n * sizeof(int32_t));
+            const char **strs = (const char**)malloc((size_t)n * sizeof(char*));
+            if (!lens || !strs) { free(lens); free(strs); push(vm, rt_str_new("")); break; }
+            for (int32_t i = n - 1; i >= 0; i--) {
+                void *item = pop(vm);
+                strs[i] = rt_str_c(item);
+                lens[i] = (int32_t)strlen(strs[i]);
+                total += lens[i];
+            }
+            rt_str_t *r = (rt_str_t*)malloc(sizeof(rt_str_t) + total + 1);
+            if (!r) { free(lens); free(strs); push(vm, rt_str_new("")); break; }
             r->type = TYPE_STR;
-            r->len = la + lb;
-            memcpy(r->data, sa, la);
-            memcpy(r->data + la, sb, lb + 1);
+            r->len = total;
+            char *dst = r->data;
+            for (int32_t i = 0; i < n; i++) {
+                memcpy(dst, strs[i], lens[i]);
+                dst += lens[i];
+            }
+            *dst = '\0';
+            free(lens); free(strs);
             push(vm, r);
             break;
         }
