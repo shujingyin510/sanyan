@@ -14,6 +14,23 @@ _ZERO32 = ir.Constant(_I32, 0)
 _ONE32 = ir.Constant(_I32, 1)
 _NULL = ir.Constant(_PTR, None)
 
+# ── 值追踪：raw i64 vs boxed i8* ──
+
+
+class RawValue:
+    __slots__ = ('ll_val',)
+
+    def __init__(self, ll_val: ir.Value):
+        self.ll_val = ll_val
+
+
+class BoxedValue:
+    __slots__ = ('ll_val',)
+
+    def __init__(self, ll_val: ir.Value):
+        self.ll_val = ll_val
+
+
 # 内置常量
 _BUILTIN_CONSTS = {
     '真': 1,
@@ -226,6 +243,7 @@ class CodegenContext:
         self._builder: ir.IRBuilder | None = None
         self._entry_block: ir.Block | None = None
         self._scope: dict[str, ir.Value] = {}  # 当前函数作用域
+        self._env: dict[str, RawValue | BoxedValue] = {}  # SSA 值追踪（raw i64 优先）
         self._funcs: dict[str, ir.Function] = {}  # 已定义的函数
         self._current_func: ir.Function | None = None
         self._globals: dict[str, ir.GlobalVariable] = {}  # 模块级全局变量
@@ -277,12 +295,13 @@ class CodegenContext:
         return self._func.append_basic_block(name=name)
 
     def begin_function(self, name: str, param_names: list[str]) -> ir.Function:
-        if self.module_prefix:
+        if self.module_prefix and name != 'main':
             name = f'san_{self.module_prefix}__{name}'
         if name in self._funcs:
             func = self._funcs[name]
             self._current_func = func
             self._scope = {}
+            self._env = {}
             entry = func.blocks[0]
             entry.instructions.clear()
             self._builder = ir.IRBuilder(entry)
@@ -291,7 +310,27 @@ class CodegenContext:
                 alloca = self._builder.alloca(_PTR, name=pname)
                 self._builder.store(func.args[i], alloca)
                 self._scope[pname] = alloca
+                self._env[pname] = BoxedValue(func.args[i])
             return func
+
+        fnty = ir.FunctionType(_PTR, [_PTR] * len(param_names))
+        func = ir.Function(self.module, fnty, name=name)
+        func.attributes.add('alwaysinline')
+        for i, pname in enumerate(param_names):
+            func.args[i].name = pname
+        self._funcs[name] = func
+        self._current_func = func
+        self._scope = {}
+        self._env = {}
+        entry = func.append_basic_block(name='entry')
+        self._builder = ir.IRBuilder(entry)
+        self._entry_block = entry
+        for i, pname in enumerate(param_names):
+            alloca = self._builder.alloca(_PTR, name=pname)
+            self._builder.store(func.args[i], alloca)
+            self._scope[pname] = alloca
+            self._env[pname] = BoxedValue(func.args[i])
+        return func
 
         fnty = ir.FunctionType(_PTR, [_PTR] * len(param_names))
         func = ir.Function(self.module, fnty, name=name)
@@ -339,7 +378,6 @@ class CodegenContext:
             self.builder.ret(_NULL)
 
     def _box_int(self, int_val: ir.Value) -> ir.Value:
-        """i32 → tagged i8* 装箱。值左移1位, bit0=1 标记为整数。"""
         shifted = self.builder.shl(int_val, _ONE, name='box_shl')
         tagged = self.builder.or_(shifted, _ONE, name='box_tag')
         return self.builder.inttoptr(tagged, _PTR, name='box')
@@ -347,6 +385,16 @@ class CodegenContext:
     def _unbox_int(self, ptr_val: ir.Value) -> ir.Value:
         raw = self.builder.ptrtoint(ptr_val, _INT, name='unbox_raw')
         return self.builder.ashr(raw, _ONE, name='unbox')
+
+    def _to_raw(self, val: 'BoxedValue | RawValue') -> 'RawValue':
+        if isinstance(val, RawValue):
+            return val
+        return RawValue(self._unbox_int(val.ll_val))
+
+    def _to_boxed(self, val: 'BoxedValue | RawValue') -> 'BoxedValue':
+        if isinstance(val, BoxedValue):
+            return val
+        return BoxedValue(self._box_int(val.ll_val))
 
     def _is_tagged_int(self, ptr_val: ir.Value) -> ir.Value:
         """检查 tagged 指针是否为整数（bit0 == 1）。返回 i1。"""
@@ -424,7 +472,9 @@ class CodegenContext:
         return alloca
 
     def get_var(self, name: str) -> ir.Value:
-        """加载变量值，返回 i8*（需调用方按需拆箱为 i32）。先查局部变量，再查全局变量。"""
+        if name in self._env:
+            v = self._env[name]
+            return v.ll_val if isinstance(v, (RawValue, BoxedValue)) else v
         if name in self._scope:
             return self.builder.load(self._scope[name], name=name)
         if name in self._globals:
@@ -433,12 +483,16 @@ class CodegenContext:
             raise NameError(f'{name} 是函数，不能当作变量')
         raise NameError(f'编译错误: 未定义变量 {name}')
 
+    def _get_env(self, name: str):
+        """获取变量的追踪值（RawValue 或 BoxedValue），用于类型感知编译。"""
+        return self._env.get(name)
+
     def set_var(self, name: str, value: ir.Value):
-        """存储变量值。i32 自动装箱为 i8*，i8* 直接存储。"""
         if isinstance(value.type, ir.PointerType):
             pass
         else:
             value = self._box_int(value)
+        self._env[name] = BoxedValue(value)
         if name in self._scope:
             self.builder.store(value, self._scope[name])
         elif name in self._globals:
@@ -1207,12 +1261,10 @@ def compile_node(node, cg: CodegenContext) -> ir.Value | None:
             raise SyntaxError(f'{op} 需要 (条件 体)')
 
         body_exprs = _unwrap_block(args[1])
-
         loop_h = cg._add_block(name='loop_h')
         loop_b = cg._add_block(name='loop_b')
         loop_e = cg._add_block(name='loop_e')
-
-        cg._loop_stack.append((loop_h, loop_e))  # push 循环上下文
+        cg._loop_stack.append((loop_h, loop_e))
         cg.builder.branch(loop_h)
 
         cg.builder.position_at_start(loop_h)
@@ -1227,7 +1279,7 @@ def compile_node(node, cg: CodegenContext) -> ir.Value | None:
             cg.builder.branch(loop_h)
 
         cg.builder.position_at_start(loop_e)
-        cg._loop_stack.pop()  # pop
+        cg._loop_stack.pop()
         return _NULL
 
     # ── 返回 (返回 expr) ──
