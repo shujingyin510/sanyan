@@ -13,17 +13,13 @@ if TYPE_CHECKING:
 
 
 def _parse_source(source: str) -> list:
-    """解析三言源码为 AST 列表。
-
-    顺序: 糖解析器 → C S表达式 → Python SugarConverter
-    """
     from ops.file_ops import _parse_with_sugar_san, clear_cache
     from evaluator import SanyanEvaluator
 
     clear_cache()
     evaluator = SanyanEvaluator()
 
-    # 1. 糖解析器
+    # 1. 自举糖解析器
     try:
         parsed = _parse_with_sugar_san(source, evaluator)
         if parsed is not None and isinstance(parsed, list):
@@ -31,12 +27,22 @@ def _parse_source(source: str) -> list:
     except Exception:
         pass
 
-    # 2. C S 表达式解析器
+    # 2. Python SugarConverter（优先级高于 S-expression）
+    try:
+        from sugar import SugarConverter
+
+        parsed = SugarConverter.convert(source, evaluator.skin_manager)
+        if parsed is not None and isinstance(parsed, list):
+            return cast(list[Any], parsed)
+    except Exception:
+        pass
+
+    # 3. C S 表达式解析器
     parsed = _parse_c_s_expr(source)
     if parsed is not None:
         return parsed
 
-    # 3. Python S 表达式解析器（lexer.py + parser.py）
+    # 4. Python S 表达式解析器（fallback）
     try:
         from lexer import tokenize
         from parser import parse
@@ -45,16 +51,6 @@ def _parse_source(source: str) -> list:
         parsed = parse(tokens)
         if parsed is not None and isinstance(parsed, list):
             return cast(list[Any], parsed)
-    except Exception:
-        pass
-
-    # 4. Python SugarConverter
-    try:
-        from sugar import SugarConverter
-
-        parsed = SugarConverter.convert(source, evaluator.skin_manager)
-        if parsed is not None and isinstance(parsed, list):
-            return parsed
     except Exception:
         pass
 
