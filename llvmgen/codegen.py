@@ -540,9 +540,12 @@ class CodegenContext:
 
     def verify(self) -> str:
         try:
-            ir_text = str(self.module)
+            return str(self.module)
         except Exception as e:
             raise RuntimeError(f'LLVM IR 生成失败: {e}') from e
+
+    def verify_opt(self) -> str:
+        ir_text = str(self.module)
         try:
             from llvmlite import binding
             from llvmlite.binding.newpassmanagers import PassBuilder, PipelineTuningOptions
@@ -555,10 +558,7 @@ class CodegenContext:
             pb = PassBuilder(tm, pto)
             mpm = pb.getModulePassManager()
             mpm.run(llvm_mod, pb)
-            try:
-                return str(llvm_mod)
-            except Exception:
-                return ir_text
+            return str(llvm_mod)
         except Exception:
             return ir_text
 
