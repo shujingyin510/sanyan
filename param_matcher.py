@@ -18,17 +18,17 @@ def match_params(params: list, op: str, args: list) -> list:
 
 
 def evaluate_args(evaluator, params: list, args: list, param_types: dict) -> list:
-    """求值参数列表，支持类型检查"""
     evaluated = []
     for param, arg_node in zip(params, args):
-        if (
+        if isinstance(arg_node, list):
+            value = arg_node
+        elif (
             isinstance(arg_node, str)
             and not arg_node.isdigit()
             and arg_node not in TritValue.STATE_MAP
             and not evaluator.has_var(arg_node)
         ):
             value = arg_node
-            # Strip surrounding quotes from string literals
             if (
                 len(value) >= 2
                 and value[0] in ('"', "'", '\u201c', '\u2018')
