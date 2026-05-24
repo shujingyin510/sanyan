@@ -192,6 +192,14 @@ def _dict_keys(evaluator, args):
     return []
 
 
+def _dict_new_empty(evaluator, args):
+    return {}
+
+
+def _list_new_empty(evaluator, args):
+    return []
+
+
 from ops.registry import register as _register
 
 _register('container_ops_list_contains', _list_contains)
@@ -206,34 +214,36 @@ def self_hosted_compile(source: str, module_name: str = 'main') -> str:
 
     clear_cache()
     evaluator = SanyanEvaluator(skin_manager=SkinManager('chinese'))
-    evaluator.commands['新字典'] = ([], [['return', {}]], {}, None)
-    evaluator.commands['存变量'] = (['d', 'k', 'v'], [['container_ops_dict_set', 'd', 'k', 'v']], {}, None)
-    evaluator.commands['新列表'] = ([], [['return', []]], {}, None)
     # 注册辅助函数
     from ops.container_ops import ContainerOps
-    from ops.registry import register
 
-    register('container_ops_dict_set', ContainerOps.dict_set)
+    evaluator.commands['新字典'] = ([], [['return', ['container_ops_dict_new_empty']]], {}, None)
+    _register('container_ops_dict_new_empty', _dict_new_empty)
+    evaluator.commands['存变量'] = (['d', 'k', 'v'], [['container_ops_dict_set', 'd', 'k', 'v']], {}, None)
+    evaluator.commands['新列表'] = ([], [['return', ['container_ops_list_new_empty']]], {}, None)
+    _register('container_ops_list_new_empty', _list_new_empty)
+
+    _register('container_ops_dict_set', ContainerOps.dict_set)
     # 查键: 字典键存在返回 value，否则返回空串
     evaluator.commands['查键'] = (['d', 'k'], [['container_ops_dict_get_safe', 'd', 'k']], {}, None)
-    register('container_ops_dict_get_safe', _dict_get_safe)
+    _register('container_ops_dict_get_safe', _dict_get_safe)
     # 包含: 列表包含检查
     evaluator.commands['包含'] = (['lst', 'item'], [['container_ops_list_contains', 'lst', 'item']], {}, None)
     # 列表取长: 获取列表长度
     evaluator.commands['列表取长'] = (['lst'], [['container_ops_list_len', 'lst']], {}, None)
-    register('container_ops_list_len', _list_len)
+    _register('container_ops_list_len', _list_len)
     # 字典取长: 获取字典键数量
     evaluator.commands['字典取长'] = (['d'], [['container_ops_dict_len', 'd']], {}, None)
-    register('container_ops_dict_len', _dict_len)
+    _register('container_ops_dict_len', _dict_len)
     # 列表取: 安全列表取值，索引越界返回空串
     evaluator.commands['列表取'] = (['lst', 'idx'], [['container_ops_list_get_safe', 'lst', 'idx']], {}, None)
     # 列表追加: lst.append(item)，返回列表本身
     evaluator.commands['列表追加'] = (['lst', 'item'], [['container_ops_list_append', 'lst', 'item']], {}, None)
-    register('container_ops_list_append', _list_append)
+    _register('container_ops_list_append', _list_append)
     # 字典取所有键
     evaluator.commands['字典键列表'] = (['d'], [['container_ops_dict_keys', 'd']], {}, None)
-    register('container_ops_dict_keys', _dict_keys)
-    register('container_ops_list_get_safe', _list_get_safe)
+    _register('container_ops_dict_keys', _dict_keys)
+    _register('container_ops_list_get_safe', _list_get_safe)
 
     stdlib_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'stdlib')
 
