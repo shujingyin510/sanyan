@@ -55,8 +55,19 @@ static void *_arena_alloc(san_arena_t *a, size_t size) {
     return ptr;
 }
 
+/* ── 堆对象类型标签 ── */
+typedef enum {
+    OBJ_STRING = 1,
+    OBJ_LIST   = 2,
+    OBJ_DICT   = 3,
+    OBJ_FLOAT  = 4,
+} san_obj_type_t;
+
+#define SAN_HEADER uint32_t h_type
+
 /* ── 内部字符串类型 ── */
 typedef struct {
+    SAN_HEADER;
     int32_t len;
     char data[];
 } rt_str_t;
@@ -68,6 +79,7 @@ static rt_str_t *_rt_make(const char *s) {
     size_t total = sizeof(rt_str_t) + (size_t)len + 1;
     rt_str_t *st = (rt_str_t *)_arena_alloc(&g_arena, total);
     if (!st) return NULL;
+    st->h_type = OBJ_STRING;
     st->len = len;
     memcpy(st->data, s, (size_t)len + 1);
     return st;
@@ -184,8 +196,36 @@ void *rt_json_stringify(void *v) {
     return _rt_make("\"\"");
 }
 
+/* ── 浮点类型 ── */
+typedef struct {
+    SAN_HEADER;
+    double value;
+} rt_float_t;
+
+static san_arena_t g_float_arena;
+
+void *rt_float_new(double v) {
+    if (!g_float_arena.base) rt_arena_init(65536);
+    rt_float_t *f = (rt_float_t *)_arena_alloc(&g_float_arena, sizeof(rt_float_t));
+    if (!f) return NULL;
+    f->h_type = OBJ_FLOAT;
+    f->value = v;
+    return f;
+}
+
+double rt_unbox_float(void *v) {
+    if (!v) return 0.0;
+    return ((rt_float_t *)v)->value;
+}
+
+void *rt_int_to_float(uintptr_t tagged) {
+    int64_t val = (int64_t)((intptr_t)tagged >> 1);
+    return rt_float_new((double)val);
+}
+
 /* ── 列表类型 ── */
 struct rt_list_s {
+    SAN_HEADER;
     int32_t len;
     int32_t cap;
     void **items;
@@ -195,6 +235,7 @@ struct rt_list_s {
 rt_list_t *rt_list_new(void) {
     rt_list_t *lst = (rt_list_t *)calloc(1, sizeof(rt_list_t));
     if (!lst) return NULL;
+    lst->h_type = OBJ_LIST;
     lst->cap = 4;
     lst->items = (void **)calloc(4, sizeof(void *));
     return lst;
@@ -204,6 +245,7 @@ rt_list_t *rt_list_new_cap(int32_t cap) {
     rt_list_t *lst = (rt_list_t *)calloc(1, sizeof(rt_list_t));
     if (!lst) return NULL;
     if (cap < 4) cap = 4;
+    lst->h_type = OBJ_LIST;
     lst->cap = cap;
     lst->items = (void **)calloc((size_t)cap, sizeof(void *));
     return lst;
@@ -248,6 +290,7 @@ typedef struct {
 } rt_entry_t;
 
 typedef struct {
+    SAN_HEADER;
     int32_t count;
     int32_t cap;
     rt_entry_t *entries;
@@ -288,6 +331,7 @@ static void _dict_resize(rt_dict_t *d, int32_t new_cap) {
 void *rt_dict_new(void) {
     rt_dict_t *d = (rt_dict_t*)calloc(1, sizeof(rt_dict_t));
     if (!d) return NULL;
+    d->h_type = OBJ_DICT;
     d->cap = RT_DICT_INIT_CAP;
     d->entries = (rt_entry_t*)calloc(RT_DICT_INIT_CAP, sizeof(rt_entry_t));
     return d;
@@ -385,6 +429,11 @@ int32_t rt_random_trit(void) {
 void rt_print_str(const void *p) {
     if (!p) return;
     printf("%s\n", _cstr(p));
+}
+
+void rt_print_float(void *v) {
+    if (!v) return;
+    printf("%.15g\n", ((rt_float_t *)v)->value);
 }
 
 /* ── 等待（参数为秒）── */

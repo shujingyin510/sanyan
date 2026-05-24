@@ -48,6 +48,17 @@ _ARITH_OPS = {
     '取余': 'srem',
 }
 
+_FLOAT_ARITH = {
+    '加': 'fadd',
+    'add': 'fadd',
+    '减': 'fsub',
+    'sub': 'fsub',
+    '乘': 'fmul',
+    'mul': 'fmul',
+    '除': 'fdiv',
+    'div': 'fdiv',
+}
+
 _COMPARE_OPS = {
     '等于': '==',
     'eq': '==',
@@ -148,10 +159,25 @@ _RUNTIME_FUNCS: dict[str, tuple] = {
     # 异常
     'rt_throw': ('rt_throw', ir.VoidType(), [_PTR]),
     'throw': ('rt_throw', ir.VoidType(), [_PTR]),
-    # JSON（桩 — 完整实现待 runtime.c 加 JSON 解析器）
+    # 浮点
+    'rt_float_new': ('rt_float_new', _PTR, [ir.DoubleType()]),
+    'rt_unbox_float': ('rt_unbox_float', ir.DoubleType(), [_PTR]),
+    'rt_int_to_float': ('rt_int_to_float', _PTR, [_PTR]),
+    'rt_print_float': ('rt_print_float', ir.VoidType(), [_PTR]),
+    # JSON（桩）
     '解析JSON': ('rt_json_parse', _PTR, [_PTR]),
     '转JSON': ('rt_json_stringify', _PTR, [_PTR]),
 }  # yapf: disable
+
+
+def _to_float_str(s: str) -> float | None:
+    try:
+        f = float(s)
+        if '.' in s or 'e' in s.lower():
+            return f
+    except ValueError:
+        pass
+    return None
 
 
 def _to_int(s: str) -> int | None:
@@ -377,15 +403,16 @@ class CodegenContext:
         slen = len(encoded)
         data_bytes = bytearray(encoded) + b'\x00'
         # 构建 {i32, [N x i8]} 结构体常量
-        st_ty = ir.LiteralStructType([_I32, ir.ArrayType(ir.IntType(8), slen + 1)])
+        st_ty = ir.LiteralStructType([_I32, _I32, ir.ArrayType(ir.IntType(8), slen + 1)])
+        type_f = ir.Constant(_I32, 1)  # OBJ_STRING = 1
         len_f = ir.Constant(_I32, slen)
         data_f = ir.Constant(ir.ArrayType(ir.IntType(8), slen + 1), data_bytes)
-        c = ir.Constant(st_ty, [len_f, data_f])
+        c = ir.Constant(st_ty, [type_f, len_f, data_f])
         gv = ir.GlobalVariable(self.module, st_ty, name=f'.rt_str.{n}')
         gv.linkage = 'private'
         gv.global_constant = True
         gv.initializer = c
-        raw = self.builder.gep(gv, [_ZERO32, _ZERO32], inbounds=True)
+        raw = self.builder.gep(gv, [_ZERO32, ir.Constant(_I32, 2), _ZERO32], inbounds=True)
         return self.builder.bitcast(raw, _PTR, name=f'.rt_str_p{n}')
 
     def _entry_alloca(self, name: str) -> ir.Value:
@@ -820,6 +847,32 @@ def _check_div_zero(lhs: ir.Value, rhs: ir.Value, cg: CodegenContext):
         cg.builder.position_at_start(ok_block)
 
 
+def _is_float_call(val: ir.Value) -> bool:
+    return isinstance(val, ir.Instruction) and val.opname == 'call' and val.callee.name == 'rt_float_new'
+
+
+def _val_to_double(val: ir.Value, is_float: bool, cg: CodegenContext) -> ir.Value:
+    if is_float:
+        return cg.builder.call(cg._get_runtime_func('rt_unbox_float'), [val], name='unbox_f')
+    raw = cg.builder.ptrtoint(val, _INT, name='tof_raw')
+    ival = cg.builder.ashr(raw, _ONE, name='tof_int')
+    return cg.builder.sitofp(ival, ir.DoubleType(), name='tof')
+
+
+def _check_div_zero_f(lhs: ir.Value, rhs: ir.Value, cg: CodegenContext) -> None:
+    is_zero = cg.builder.fcmp_ordered('==', rhs, ir.Constant(ir.DoubleType(), 0.0), name='fdivz')
+    ok_block = cg._add_block(name='fdiv_ok')
+    err_block = cg._add_block(name='fdiv_err')
+    cg.builder.cbranch(is_zero, err_block, ok_block)
+    cg.builder.position_at_start(err_block)
+    msg = cg._make_rt_string('除零错误')
+    throw_fn = cg._get_runtime_func('rt_throw') or cg._rt_funcs.get('rt_throw')
+    if throw_fn:
+        cg.builder.call(throw_fn, [msg], name='throw_fdiv')
+    cg.builder.ret(msg)
+    cg.builder.position_at_start(ok_block)
+
+
 def _compile_list_create(args: list, cg: CodegenContext) -> ir.Value:
     """编译 列表(元素...) → rt_list_new_cap(N) + rt_list_push_item × N。"""
     cap = ir.Constant(_I32, max(len(args), 4))
@@ -943,8 +996,14 @@ def compile_node(node, cg: CodegenContext) -> ir.Value | None:
     """递归编译 AST 节点，返回 i8* 值。"""
 
     # 字面量 → i8*
-    if isinstance(node, (int, float)):
-        return cg._box_int(ir.Constant(_INT, int(node)))
+    if isinstance(node, float):
+        return cg.builder.call(
+            cg._get_runtime_func('rt_float_new'),
+            [ir.Constant(ir.DoubleType(), node)],
+            name='float_new',
+        )
+    if isinstance(node, int):
+        return cg._box_int(ir.Constant(_INT, node))
 
     # TritValue (sugar.san 解析结果)
     if isinstance(node, TritValue):
@@ -957,6 +1016,14 @@ def compile_node(node, cg: CodegenContext) -> ir.Value | None:
         # 字符串字面量 → i8* (rt_str_t 格式)
         if _is_string_literal(node):
             return cg._make_rt_string(_unquote(node))
+        # 浮点数字字符串 → rt_float_new
+        ft = _to_float_str(node)
+        if ft is not None:
+            return cg.builder.call(
+                cg._get_runtime_func('rt_float_new'),
+                [ir.Constant(ir.DoubleType(), ft)],
+                name='float_new',
+            )
         n = _to_int(node)
         if n is not None:
             return cg._box_int(ir.Constant(_INT, n))
@@ -968,14 +1035,30 @@ def compile_node(node, cg: CodegenContext) -> ir.Value | None:
     op = node[0]
     args = node[1:]
 
-    # ── 内置二元算术（i8* → unbox → op → rebox → i8*）──
+    # ── 内置二元算术（整数 i64 内联 / 浮点 fadd 内联 + 自动提升）──
     arith = _ARITH_OPS.get(op)
     if arith is not None:
         if len(args) < 2:
             raise SyntaxError(f'{op} 需要两个参数')
-        lhs = cg._unbox_int(compile_node(args[0], cg))
-        rhs = cg._unbox_int(compile_node(args[1], cg))
-        # 除/余：零除检查
+        lv = compile_node(args[0], cg)
+        rv = compile_node(args[1], cg)
+        l_is_float = _is_float_call(lv)
+        r_is_float = _is_float_call(rv)
+        if l_is_float or r_is_float:
+            lf = _val_to_double(lv, l_is_float, cg)
+            rf = _val_to_double(rv, r_is_float, cg)
+            fop = _FLOAT_ARITH.get(op, 'fadd')
+            if op in ('除', 'div'):
+                _check_div_zero_f(lf, rf, cg)
+            result = cg.builder.call(
+                cg._get_runtime_func('rt_float_new'),
+                [getattr(cg.builder, fop)(lf, rf)],
+                name='float_result',
+            )
+            _maybe_unwind(cg)
+            return result
+        lhs = cg._unbox_int(lv)
+        rhs = cg._unbox_int(rv)
         if op in ('除', 'div', '余', 'mod'):
             _check_div_zero(lhs, rhs, cg)
         return cg._box_int(getattr(cg.builder, arith)(lhs, rhs, name=f'{op}_tmp'))
@@ -1079,19 +1162,32 @@ def compile_node(node, cg: CodegenContext) -> ir.Value | None:
             val = compile_node(raw, cg)
             if val is None:
                 return _NULL
-            # 使用 tag 区分 int/str：bit0=1 → 整数, bit0=0 → 字符串指针
+            # tag bit0=1→整数, bit0=0→heap: 读 h_type 分 string/float
             is_int = cg._is_tagged_int(val)
             int_block = cg._add_block(name='pr_int')
-            str_block = cg._add_block(name='pr_str')
+            heap_block = cg._add_block(name='pr_heap')
             pr_done = cg._add_block(name='pr_done')
-            cg.builder.cbranch(is_int, int_block, str_block)
+            cg.builder.cbranch(is_int, int_block, heap_block)
 
             cg.builder.position_at_start(int_block)
             cg.emit_print_int(val)
             cg.builder.branch(pr_done)
 
+            cg.builder.position_at_start(heap_block)
+            # 读 h_type (前 4 字节)
+            htype_ptr = cg.builder.bitcast(val, ir.PointerType(_I32), name='htype_ptr')
+            htype = cg.builder.load(htype_ptr, name='htype')
+            is_float = cg.builder.icmp_signed('==', htype, ir.Constant(_I32, 4), name='is_float')
+            str_block = cg._add_block(name='pr_str2')
+            float_block = cg._add_block(name='pr_float')
+            cg.builder.cbranch(is_float, float_block, str_block)
+
             cg.builder.position_at_start(str_block)
             cg.emit_print_str(val)
+            cg.builder.branch(pr_done)
+
+            cg.builder.position_at_start(float_block)
+            cg.builder.call(cg._get_runtime_func('rt_print_float'), [val], name='pr_float_call')
             cg.builder.branch(pr_done)
 
             cg.builder.position_at_start(pr_done)
