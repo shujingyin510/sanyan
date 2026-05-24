@@ -184,6 +184,14 @@ def _list_append(evaluator, args):
     return lst
 
 
+def _dict_keys(evaluator, args):
+    """返回字典所有键的列表。"""
+    d = args[0] if isinstance(args[0], dict) else evaluator.eval(args[0])
+    if isinstance(d, dict):
+        return list(d.keys())
+    return []
+
+
 from ops.registry import register as _register
 
 _register('container_ops_list_contains', _list_contains)
@@ -222,6 +230,9 @@ def self_hosted_compile(source: str, module_name: str = 'main') -> str:
     # 列表追加: lst.append(item)，返回列表本身
     evaluator.commands['列表追加'] = (['lst', 'item'], [['container_ops_list_append', 'lst', 'item']], {}, None)
     register('container_ops_list_append', _list_append)
+    # 字典取所有键
+    evaluator.commands['字典键列表'] = (['d'], [['container_ops_dict_keys', 'd']], {}, None)
+    register('container_ops_dict_keys', _dict_keys)
     register('container_ops_list_get_safe', _list_get_safe)
 
     stdlib_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'stdlib')
