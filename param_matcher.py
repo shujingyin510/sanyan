@@ -20,7 +20,7 @@ def match_params(params: list, op: str, args: list) -> list:
 def evaluate_args(evaluator, params: list, args: list, param_types: dict) -> list:
     evaluated = []
     for param, arg_node in zip(params, args):
-        if isinstance(arg_node, list):
+        if isinstance(arg_node, list) and _is_data_list(arg_node, evaluator):
             value = arg_node
         elif (
             isinstance(arg_node, str)
@@ -41,6 +41,20 @@ def evaluate_args(evaluator, params: list, args: list, param_types: dict) -> lis
             check_type(value, param_types[param], param)
         evaluated.append(value)
     return evaluated
+
+
+def _is_data_list(node, evaluator) -> bool:
+    if not isinstance(node, list) or len(node) == 0:
+        return False
+    from ops.registry import has_op
+    from runtime import BUILTIN_OPS
+
+    if has_op(node[0]) or node[0] in BUILTIN_OPS or node[0] in evaluator.commands:
+        return False
+    for item in node:
+        if isinstance(item, list):
+            return False
+    return True
 
 
 def resolve_command(evaluator, op: str):

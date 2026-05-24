@@ -41,21 +41,37 @@
 设 换行 = "\n"
 
 定义 parse_int (s) {
-    // stub — 暂用 0
-    返回(0)
+    若 (是数字(s)) { 返回(s) }
+    设 result = 0
+    设 i = 0
+    设 len = 取长(s)
+    设 neg = 假
+    若 (前缀(s, "-")) {
+        neg = 真
+        i = 1
+    }
+    设 digs = "0123456789"
+    循环 (小于(i, len)) {
+        设 ch = 子串(s, i, 1)
+        设 idx = 查找(digs, ch)
+        若 (小于(idx, 0)) { 返回(0) }
+        若 (大于(idx, 0)) { idx = 减(idx, 1) }
+        设 tmp = 乘(result, 10)
+        result = 加(tmp, idx)
+        i = 加(i, 1)
+    }
+    若 (neg) { result = 减(0, result) }
+    返回(result)
 }
 
 定义 编译 (ast, reg) {
-    // 字符串 → 字面量或变量
-    若 (是字符串(ast)) {
-        设 n = parse_int(ast)
-        若 (大于(n, 0) 或 字符串相等(ast, "0")) {
-            设 r = 新寄存器(reg); 设 rn = 取(r, 0); reg = 取(r, 1)
-            设 s = 连接("  ", rn, " = add i64 0, ", n, 换行)
-            设 bb = box(rn, reg); s = 连接(s, 取(bb, 0)); 设 bv = 取(bb, 1); reg = 取(bb, 2)
-            返回(列表(s, bv, reg))
-        }
-        返回(列表("", "null", reg))
+    // 数字 → 字面量
+    若 (是数字(ast)) {
+        设 n = ast
+        设 r = 新寄存器(reg); 设 rn = 取(r, 0); reg = 取(r, 1)
+        设 s = 连接("  ", rn, " = add i64 0, ", n, 换行)
+        设 bb = box(rn, reg); s = 连接(s, 取(bb, 0)); 设 bv = 取(bb, 1); reg = 取(bb, 2)
+        返回(列表(s, bv, reg))
     }
 
     若 (非(是列表(ast))) {
