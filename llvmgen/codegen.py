@@ -1466,6 +1466,9 @@ def _compile_node_inner(node, cg: CodegenContext) -> ir.Value | None:
         result = cg.builder.call(cg._funcs[resolved_op], arg_vals, name=f'call_{op}')
         _maybe_unwind(cg)
         return result
+    # 单元素列表 → 变量引用（如 ['lst'] → 'lst'）
+    if isinstance(node, list) and len(node) == 1 and isinstance(node[0], str):
+        return cg.get_var(node[0])
     raise NameError(f'编译错误: 未定义的操作或函数 {op}')
 
 
