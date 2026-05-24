@@ -20,6 +20,41 @@ void __chkstk(void) {}
 #include <stdio.h>
 #include <time.h>
 
+/* ── 字符串 Arena 分配器 ──
+ *
+ * 替代逐次 malloc：所有字符串操作从 arena 分配，搬指针而非调 malloc。
+ * auto-grow：容量不足时双倍扩容（不 free 旧块，等程序结束一次性回收）。
+ */
+typedef struct {
+    char *base;
+    size_t used;
+    size_t cap;
+} san_arena_t;
+
+static san_arena_t g_arena;
+
+void rt_arena_init(size_t cap) {
+    if (cap < 65536) cap = 65536;
+    g_arena.base = (char*)malloc(cap);
+    g_arena.used = 0;
+    g_arena.cap = cap;
+}
+
+static void *_arena_alloc(san_arena_t *a, size_t size) {
+    size_t aligned = (size + 7) & ~(size_t)7;
+    if (a->used + aligned > a->cap) {
+        size_t new_cap = a->cap * 2;
+        if (new_cap < a->used + aligned) new_cap = (a->used + aligned) * 2;
+        char *nb = (char*)malloc(new_cap);
+        if (nb && a->base) memcpy(nb, a->base, a->used);
+        a->base = nb;
+        a->cap = new_cap;
+    }
+    void *ptr = a->base + a->used;
+    a->used += aligned;
+    return ptr;
+}
+
 /* ── 内部字符串类型 ── */
 typedef struct {
     int32_t len;
@@ -28,11 +63,13 @@ typedef struct {
 
 static rt_str_t *_rt_make(const char *s) {
     if (!s) return NULL;
+    if (!g_arena.base) rt_arena_init(65536);
     int32_t len = (int32_t)strlen(s);
-    rt_str_t *st = (rt_str_t *)malloc(sizeof(rt_str_t) + len + 1);
+    size_t total = sizeof(rt_str_t) + (size_t)len + 1;
+    rt_str_t *st = (rt_str_t *)_arena_alloc(&g_arena, total);
     if (!st) return NULL;
     st->len = len;
-    memcpy(st->data, s, len + 1);
+    memcpy(st->data, s, (size_t)len + 1);
     return st;
 }
 
@@ -149,6 +186,15 @@ rt_list_t *rt_list_new(void) {
     if (!lst) return NULL;
     lst->cap = 4;
     lst->items = (void **)calloc(4, sizeof(void *));
+    return lst;
+}
+
+rt_list_t *rt_list_new_cap(int32_t cap) {
+    rt_list_t *lst = (rt_list_t *)calloc(1, sizeof(rt_list_t));
+    if (!lst) return NULL;
+    if (cap < 4) cap = 4;
+    lst->cap = cap;
+    lst->items = (void **)calloc((size_t)cap, sizeof(void *));
     return lst;
 }
 

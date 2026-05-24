@@ -107,8 +107,7 @@ def build(input_path: str, output_path: str | None = None, run: bool = False) ->
             cc_ok = True
         except FileNotFoundError:
             raise RuntimeError(
-                '无法编译 LLVM IR。请安装 clang 或 llc，或运行 pip install llvmlite。'
-                f'\nIR 文件已保存至: {ir_path}'
+                f'无法编译 LLVM IR。请安装 clang 或 llc，或运行 pip install llvmlite。\nIR 文件已保存至: {ir_path}'
             ) from None
 
     # 3. 链接

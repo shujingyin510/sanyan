@@ -110,8 +110,8 @@ _RUNTIME_FUNCS: dict[str, tuple] = {
     '查找': ('rt_str_find', _INT, [_PTR, _PTR]),
     'find': ('rt_str_find', _INT, [_PTR, _PTR]),
     # 列表操作
-    '列表': ('rt_list_new', _PTR, []),
-    'list': ('rt_list_new', _PTR, []),
+    '列表': ('rt_list_new_cap', _PTR, [_INT]),
+    'list': ('rt_list_new_cap', _PTR, [_INT]),
     '字典': ('rt_dict_new', _PTR, []),
     'dict': ('rt_dict_new', _PTR, []),
     'dict_contains': ('rt_dict_contains', _INT, [_PTR, _PTR]),
@@ -800,10 +800,9 @@ def _check_div_zero(lhs: ir.Value, rhs: ir.Value, cg: CodegenContext):
 
 
 def _compile_list_create(args: list, cg: CodegenContext) -> ir.Value:
-    """编译 列表(元素...) → rt_list_new + rt_list_push_item × N。"""
-    new_fn = cg._get_runtime_func('list')
-    assert new_fn is not None
-    result = cg.builder.call(new_fn, [], name='list_new')
+    """编译 列表(元素...) → rt_list_new_cap(N) + rt_list_push_item × N。"""
+    cap = ir.Constant(_INT, max(len(args), 4))
+    result = cg.builder.call(cg._get_runtime_func('list'), [cap], name='list_new')
     push_name = 'rt_list_push_item'
     if push_name not in cg._rt_funcs:
         ft = ir.FunctionType(ir.VoidType(), [_PTR, _PTR])
