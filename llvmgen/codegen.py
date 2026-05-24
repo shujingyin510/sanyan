@@ -302,6 +302,7 @@ class CodegenContext:
             self._current_func = func
             self._scope = {}
             self._env = {}
+            self._allocas = {}
             entry = func.blocks[0]
             entry.instructions.clear()
             self._builder = ir.IRBuilder(entry)
@@ -321,6 +322,7 @@ class CodegenContext:
         self._current_func = func
         self._scope = {}
         self._env = {}
+        self._allocas = {}
         entry = func.append_basic_block(name='entry')
         self._builder = ir.IRBuilder(entry)
         self._entry_block = entry
@@ -461,8 +463,17 @@ class CodegenContext:
         raw = self.builder.gep(gv, [_ZERO32, ir.Constant(_I32, 2), _ZERO32], inbounds=True)
         return self.builder.bitcast(raw, _PTR, name=f'.rt_str_p{n}')
 
+    def _get_alloca(self, name: str, is_int: bool = True) -> ir.Value:
+        if name not in self._allocas:
+            ty = _INT if is_int else _PTR
+            saved = self.builder.block
+            self.builder.position_at_start(self._entry_block)
+            alloca = self.builder.alloca(ty, name=name)
+            self.builder.position_at_end(saved)
+            self._allocas[name] = (alloca, is_int)
+        return self._allocas[name][0]
+
     def _entry_alloca(self, name: str) -> ir.Value:
-        """在函数 entry 块创建 alloca（确保支配所有使用）。"""
         saved_pos = self.builder.block
         self.builder.position_at_start(self._entry_block)
         alloca = self.builder.alloca(_PTR, name=name)
@@ -470,6 +481,10 @@ class CodegenContext:
         return alloca
 
     def get_var(self, name: str) -> ir.Value:
+        if name in self._allocas:
+            alloca, is_int = self._allocas[name]
+            val = self.builder.load(alloca, name=name)
+            return self._box_int(val) if is_int else val
         if name in self._scope:
             return self.builder.load(self._scope[name], name=name)
         if name in self._globals:
@@ -478,23 +493,25 @@ class CodegenContext:
             raise NameError(f'{name} 是函数，不能当作变量')
         raise NameError(f'编译错误: 未定义变量 {name}')
 
-    def _get_env(self, name: str):
-        """获取变量的追踪值（RawValue 或 BoxedValue），用于类型感知编译。"""
-        return self._env.get(name)
-
     def set_var(self, name: str, value: ir.Value):
         if isinstance(value.type, ir.PointerType):
-            pass
+            boxed = value
+            raw = self._unbox_int(value)
         else:
-            value = self._box_int(value)
+            boxed = self._box_int(value)
+            raw = value
+        if name in self._allocas:
+            alloca, is_int = self._allocas[name]
+            self.builder.store(raw if is_int else boxed, alloca)
+            return
         if name in self._scope:
-            self.builder.store(value, self._scope[name])
-        elif name in self._globals:
-            self.builder.store(value, self._globals[name])
-        else:
-            alloca = self._entry_alloca(name)
-            self.builder.store(value, alloca)
-            self._scope[name] = alloca
+            self.builder.store(boxed, self._scope[name])
+            return
+        if name in self._globals:
+            self.builder.store(boxed, self._globals[name])
+            return
+        alloca = self._get_alloca(name, is_int=True)
+        self.builder.store(raw, alloca)
 
     def create_global(self, name: str, init_value: ir.Value | None = None):
         """创建模块级全局变量（编译时可见）。"""
@@ -528,19 +545,20 @@ class CodegenContext:
             raise RuntimeError(f'LLVM IR 生成失败: {e}') from e
         try:
             from llvmlite import binding
+            from llvmlite.binding.newpassmanagers import PassBuilder, PipelineTuningOptions
 
-            binding.initialize()
-            binding.initialize_native_target()
+            binding.initialize_all_targets()
             binding.initialize_native_asmprinter()
             llvm_mod = binding.parse_assembly(ir_text)
-            pm = binding.ModulePassManager()
-            pm.add_promote_memory_to_register_pass()
-            pm.add_instruction_combining_pass()
-            pm.add_reassociate_expressions_pass()
-            pm.add_gvn_pass()
-            pm.add_cfg_simplification_pass()
-            pm.run(llvm_mod)
-            return str(llvm_mod)
+            tm = binding.Target.from_default_triple().create_target_machine()
+            pto = PipelineTuningOptions()
+            pb = PassBuilder(tm, pto)
+            mpm = pb.getModulePassManager()
+            mpm.run(llvm_mod, pb)
+            try:
+                return str(llvm_mod)
+            except Exception:
+                return ir_text
         except Exception:
             return ir_text
 
@@ -1193,6 +1211,12 @@ def compile_node(node, cg: CodegenContext) -> ir.Value | None:
         if not isinstance(name, str):
             raise SyntaxError(f'变量名必须是字符串: {name}')
         val = compile_node(args[1], cg)
+        is_int_val = isinstance(args[1], (int, float)) or (
+            isinstance(args[1], list) and len(args[1]) > 0 and args[1][0] in _ARITH_OPS
+        ) or (isinstance(args[1], str) and _to_int(args[1]) is not None)
+        if isinstance(val, ir.Instruction) and val.opname == 'call':
+            is_int_val = False
+        cg._get_alloca(name, is_int=bool(is_int_val))
         cg.set_var(name, val)
         return val
 
