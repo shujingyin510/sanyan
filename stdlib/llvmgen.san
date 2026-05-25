@@ -708,14 +708,14 @@
         设 s = 取(c_r, 0); 设 cv = 取(c_r, 1); reg = 取(c_r, 2)
         设 r = 新寄存器(reg); 设 raw_len = 取(r, 0); reg = 取(r, 1)
         s = 连接(s, "  ", raw_len, " = call i32 @rt_list_len(i8* ", cv, ")", 换行)
-        // box the i32 result
         设 r = 新寄存器(reg); 设 b1 = 取(r, 0); reg = 取(r, 1)
         设 r = 新寄存器(reg); 设 b2 = 取(r, 0); reg = 取(r, 1)
+        设 r = 新寄存器(reg); 设 b3 = 取(r, 0); reg = 取(r, 1)
         设 r = 新寄存器(reg); 设 bp = 取(r, 0); reg = 取(r, 1)
         s = 连接(s, "  ", b1, " = zext i32 ", raw_len, " to i64", 换行)
         s = 连接(s, "  ", b2, " = shl i64 ", b1, ", 1", 换行)
-        s = 连接(s, "  ", b2, " = or i64 ", b1, ", 1", 换行)
-        s = 连接(s, "  ", bp, " = inttoptr i64 ", b2, " to i8*", 换行)
+        s = 连接(s, "  ", b3, " = or i64 ", b2, ", 1", 换行)
+        s = 连接(s, "  ", bp, " = inttoptr i64 ", b3, " to i8*", 换行)
         返回(列表(s, bp, reg))
     }
 
