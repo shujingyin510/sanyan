@@ -154,3 +154,158 @@ define i8* @rt_list_get(i8* %lst, i32 %idx) {
   %_v = load i8*, i8** %_p
   ret i8* %_v
 }
+
+; ── 字符串比较 ──
+define i32 @_rt_str_eq(i8* %a, i8* %b) {
+entry:
+  br label %loop
+
+loop:
+  %_ap = phi i8* [ %a, %entry ], [ %_a2, %next ]
+  %_bp = phi i8* [ %b, %entry ], [ %_b2, %next ]
+  %_ca = load i8, i8* %_ap
+  %_cb = load i8, i8* %_bp
+  %_ne = icmp ne i8 %_ca, %_cb
+  br i1 %_ne, label %neq, label %chk
+
+chk:
+  %_z = icmp eq i8 %_ca, 0
+  br i1 %_z, label %eq, label %next
+
+next:
+  %_a2 = getelementptr inbounds i8, i8* %_ap, i32 1
+  %_b2 = getelementptr inbounds i8, i8* %_bp, i32 1
+  br label %loop
+
+eq:
+  ret i32 1
+
+neq:
+  ret i32 0
+}
+
+; ── 字典运行时（线性搜索）──
+; 布局: [entries:i8*][count:i32][cap:i32] = 16 bytes
+; 条目: [key:i8*][val:i8*] = 16 bytes
+
+define i8* @rt_dict_new() {
+  %_p = call i8* @_rt_malloc(i32 16)
+  ; count=0, cap=0, entries=null (zeroed by HeapAlloc)
+  ret i8* %_p
+}
+
+define void @rt_dict_set(i8* %d, i8* %key, i8* %val) {
+entry:
+  ; 先查 key 是否存在
+  %_cntp = getelementptr inbounds i8, i8* %d, i32 8
+  %_cnt = load i32, i32* %_cntp
+  %_epp = bitcast i8* %d to i8**
+  %_ep = load i8*, i8** %_epp
+  br label %find
+
+find:
+  %_fi = phi i32 [ 0, %entry ], [ %_fni, %fnext ]
+  %_fd = icmp slt i32 %_fi, %_cnt
+  br i1 %_fd, label %cmp, label %not_found
+
+cmp:
+  %_fkp = getelementptr inbounds i8*, i8** %_ep, i32 %_fi
+  %_fk = load i8*, i8** %_fkp
+  %_feq = call i32 @_rt_str_eq(i8* %_fk, i8* %key)
+  %_ft = icmp ne i32 %_feq, 0
+  br i1 %_ft, label %update, label %fnext
+
+fnext:
+  %_fni = add i32 %_fi, 1
+  br label %find
+
+update:
+  %_vpo = getelementptr inbounds i8*, i8** %_ep, i32 %_fi
+  %_vpd = getelementptr inbounds i8*, i8** %_vpo, i32 1
+  store i8* %val, i8** %_vpd
+  ret void
+
+not_found:
+  ; 扩容并追加
+  %_capp = getelementptr inbounds i8, i8* %d, i32 12
+  %_cap = load i32, i32* %_capp
+  %_ful = icmp sge i32 %_cnt, %_cap
+  br i1 %_ful, label %grow, label %append
+
+grow:
+  %_ncap = add i32 %_cap, 4
+  ; 每个条目 16 bytes (key+i8*, val+i8*)
+  %_nsize = mul i32 %_ncap, 16
+  %_nep = call i8* @_rt_malloc(i32 %_nsize)
+  ; copy old entries
+  %_cn = icmp sgt i32 %_cnt, 0
+  br i1 %_cn, label %copy, label %set_new
+
+copy:
+  %_ci = phi i32 [ 0, %grow ], [ %_cni, %copy ]
+  %_csrc = getelementptr inbounds i8*, i8** %_ep, i32 %_ci
+  %_ck = load i8*, i8** %_csrc
+  %_cvp = getelementptr inbounds i8*, i8** %_csrc, i32 1
+  %_cv = load i8*, i8** %_cvp
+  %_cdst = getelementptr inbounds i8*, i8** %_nep, i32 %_ci
+  store i8* %_ck, i8** %_cdst
+  %_cdstv = getelementptr inbounds i8*, i8** %_cdst, i32 1
+  store i8* %_cv, i8** %_cdstv
+  %_cni = add i32 %_ci, 1
+  %_cd = icmp slt i32 %_cni, %_cnt
+  br i1 %_cd, label %copy, label %free_old
+
+free_old:
+  call void @_rt_free(i8* %_ep)
+  br label %set_new
+
+set_new:
+  store i8* %_nep, i8** %_epp
+  store i32 %_ncap, i32* %_capp
+  br label %append
+
+append:
+  %_aep = bitcast i8* %d to i8**
+  %_ae = load i8*, i8** %_aep
+  %_akp = getelementptr inbounds i8*, i8** %_ae, i32 %_cnt
+  store i8* %key, i8** %_akp
+  %_avp = getelementptr inbounds i8*, i8** %_akp, i32 1
+  store i8* %val, i8** %_avp
+  %_nc = add i32 %_cnt, 1
+  store i32 %_nc, i32* %_cntp
+  ret void
+}
+
+define i8* @rt_dict_get(i8* %d, i8* %key) {
+entry:
+  %_cntp = getelementptr inbounds i8, i8* %d, i32 8
+  %_cnt = load i32, i32* %_cntp
+  %_epp = bitcast i8* %d to i8**
+  %_ep = load i8*, i8** %_epp
+  br label %find
+
+find:
+  %_fi = phi i32 [ 0, %entry ], [ %_fni, %fnext ]
+  %_fd = icmp slt i32 %_fi, %_cnt
+  br i1 %_fd, label %cmp, label %nf
+
+cmp:
+  %_fkp = getelementptr inbounds i8*, i8** %_ep, i32 %_fi
+  %_fk = load i8*, i8** %_fkp
+  %_feq = call i32 @_rt_str_eq(i8* %_fk, i8* %key)
+  %_ft = icmp ne i32 %_feq, 0
+  br i1 %_ft, label %found, label %fnext
+
+fnext:
+  %_fni = add i32 %_fi, 1
+  br label %find
+
+found:
+  %_vp = getelementptr inbounds i8*, i8** %_ep, i32 %_fi
+  %_vpp = getelementptr inbounds i8*, i8** %_vp, i32 1
+  %_v = load i8*, i8** %_vpp
+  ret i8* %_v
+
+nf:
+  ret i8* null
+}
