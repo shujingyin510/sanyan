@@ -358,12 +358,8 @@ def self_hosted_compile(source: str, module_name: str = 'main') -> str:
     if not isinstance(ast, list):
         raise SyntaxError(f'sugar.san 解析失败: {ast}')
 
-    # 4. 合并所有 AST（sugar + llvmgen + 用户）→ 编译顶层
-    # sugar.san 和 llvmgen.san 的函数定义需要在 LLVM IR 中
-    combined_ast = sugar_ast + llvmgen_ast + [ast]
-    combined_ast = ['do'] + [s for s in combined_ast if not (isinstance(s, list) and s[0] == 'export')]
-
-    ir_text = evaluator.eval(['编译顶层', combined_ast])
+    # 4. llvmgen.san 生成 IR（只编译用户代码）
+    ir_text = evaluator.eval(['编译顶层', ast])
     if not isinstance(ir_text, str):
         raise RuntimeError(f'llvmgen.san 生成失败: {type(ir_text).__name__}')
 
