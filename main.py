@@ -73,40 +73,8 @@ def main():
             llvm_binding.initialize_all_targets()
             llvm_binding.initialize_native_asmprinter()
 
-            # 自举生成运行时 IR + runtime.ll（列表/字典运行时）
+            # runtime.ll 已完全为空（所有运行时已迁移到 llvmgen.san）
             combined_ir = ir_text
-            runtime_ll_path = os.path.join('llvmgen', 'runtime.ll')
-            if os.path.exists(runtime_ll_path):
-                with open(runtime_ll_path, encoding='utf-8') as f:
-                    runtime_ir = f.read()
-                # runtime.ll 定义列表/字典函数，llvmgen.san 已生成 print 函数
-                user_lines = ir_text.split('\n')
-                filtered = []
-                skip_depth = 0
-                seen_defines = set(['rt_print_int', 'rt_print_str'])
-                for line in user_lines:
-                    if 'target triple' in line or 'ModuleID' in line:
-                        continue
-                    if line.startswith('declare ') and any(x in line for x in [
-                        '@rt_print_int', '@rt_print_str',
-                        '@rt_list_new', '@rt_list_push_item', '@rt_list_len', '@rt_list_get',
-                        '@rt_dict_new', '@rt_dict_set', '@rt_dict_get',
-                        '@rt_awake', '@san_sys_write'
-                    ]):
-                        continue
-                    if '@_rt_buf' in line or '@g_error' in line:
-                        continue
-                    if skip_depth > 0:
-                        skip_depth += line.count('{') - line.count('}')
-                        continue
-                    if line.startswith('define ') and '@' in line:
-                        name = line.split('@')[1].split('(')[0]
-                        if name in seen_defines:
-                            skip_depth = 1
-                            continue
-                        seen_defines.add(name)
-                    filtered.append(line)
-                combined_ir = runtime_ir + '\n' + '\n'.join(filtered)
 
             target = llvm_binding.Target.from_default_triple()
             tm = target.create_target_machine(reloc='static', codemodel='large')
