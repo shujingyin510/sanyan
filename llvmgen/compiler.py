@@ -221,6 +221,24 @@ def _escape_llvm_str(evaluator, args):
     return ""
 
 
+def _str_endswith(evaluator, args):
+    """检查字符串是否以指定后缀结尾。"""
+    s = evaluator.eval(args[0])
+    suffix = evaluator.eval(args[1])
+    if isinstance(s, str) and isinstance(suffix, str):
+        return TritValue(1 if s.rstrip().endswith(suffix.strip()) else 0)
+    return TritValue(0)
+
+
+def _str_contains(evaluator, args):
+    """检查字符串是否包含子串。"""
+    s = evaluator.eval(args[0])
+    sub = evaluator.eval(args[1])
+    if isinstance(s, str) and isinstance(sub, str):
+        return TritValue(1 if sub in s else 0)
+    return TritValue(0)
+
+
 def _register_func_name(evaluator, args):
     """注册函数名→ASCII映射，返回映射后的ASCII名。"""
     name = evaluator.eval(args[0])
@@ -296,6 +314,12 @@ def self_hosted_compile(source: str, module_name: str = 'main') -> str:
     # LLVM IR 字符串转义
     evaluator.commands['转义LLVM字符串'] = (['s'], [['container_ops_str_escape_llvm', 's']], {}, None)
     _register('container_ops_str_escape_llvm', _escape_llvm_str)
+    # 字符串后缀检查
+    evaluator.commands['后缀'] = (['s', 'suffix'], [['container_ops_str_endswith', 's', 'suffix']], {}, None)
+    _register('container_ops_str_endswith', _str_endswith)
+    # 字符串包含检查
+    evaluator.commands['字符串包含'] = (['s', 'sub'], [['container_ops_str_contains', 's', 'sub']], {}, None)
+    _register('container_ops_str_contains', _str_contains)
     # 非ASCII函数名映射 (Chinese → _fnN, 使用模块级全局变量)
     evaluator.commands['注册函数名'] = (['name'], [['container_ops_register_func_name', 'name']], {}, None)
     _register('container_ops_register_func_name', _register_func_name)

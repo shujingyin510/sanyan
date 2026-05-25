@@ -167,11 +167,58 @@
     }
 
     若 (字符串相等(op, "减")) {
+        设 arg_count = 列表取长(args)
+        若 (等于(arg_count, 1)) {
+            设 v_val = 取(args, 0)
+            设 v_r = 编译(v_val, reg)
+            设 s = 取(v_r, 0); 设 vv = 取(v_r, 1); reg = 取(v_r, 2)
+            设 ub = unbox(vv, reg); s = 连接(s, 取(ub, 0)); 设 raw = 取(ub, 1); reg = 取(ub, 2)
+            设 r = 新寄存器(reg); 设 res = 取(r, 0); reg = 取(r, 1)
+            s = 连接(s, "  ", res, " = sub i64 0, ", raw, 换行)
+            设 bb = box(res, reg); s = 连接(s, 取(bb, 0)); 设 bv = 取(bb, 1); reg = 取(bb, 2)
+            返回(列表(s, bv, reg))
+        }
+        设 l_val = 取(args, 0); 设 r_val = 取(args, 1)
+        设 arg_count = 列表取长(args)
+        若 (等于(arg_count, 1)) {
+            // Unary negation: -x → sub 0, x
+            设 v_val = 取(args, 0)
+            设 v_r = 编译(v_val, reg)
+            设 s = 取(v_r, 0); 设 vv = 取(v_r, 1); reg = 取(v_r, 2)
+            设 ub = unbox(vv, reg); s = 连接(s, 取(ub, 0)); 设 raw = 取(ub, 1); reg = 取(ub, 2)
+            设 r = 新寄存器(reg); 设 res = 取(r, 0); reg = 取(r, 1)
+            s = 连接(s, "  ", res, " = sub i64 0, ", raw, 换行)
+            设 bb = box(res, reg); s = 连接(s, 取(bb, 0)); 设 bv = 取(bb, 1); reg = 取(bb, 2)
+            返回(列表(s, bv, reg))
+        }
         设 l_val = 取(args, 0); 设 r_val = 取(args, 1)
         设 l_r = 编译(l_val, reg)
         设 s = 取(l_r, 0); 设 lv = 取(l_r, 1); reg = 取(l_r, 2)
         设 r_r = 编译(r_val, reg)
         s = 连接(s, 取(r_r, 0)); 设 rv = 取(r_r, 1); reg = 取(r_r, 2)
+        设 ub = unbox(lv, reg); s = 连接(s, 取(ub, 0)); 设 l_raw = 取(ub, 1); reg = 取(ub, 2)
+        设 ub = unbox(rv, reg); s = 连接(s, 取(ub, 0)); 设 r_raw = 取(ub, 1); reg = 取(ub, 2)
+        设 r = 新寄存器(reg); 设 res = 取(r, 0); reg = 取(r, 1)
+        s = 连接(s, "  ", res, " = sub i64 ", l_raw, ", ", r_raw, 换行)
+        设 bb = box(res, reg); s = 连接(s, 取(bb, 0)); 设 bv = 取(bb, 1); reg = 取(bb, 2)
+        返回(列表(s, bv, reg))
+    }
+
+    若 (字符串相等(op, "sub")) {
+        设 arg_count = 列表取长(args)
+        若 (等于(arg_count, 1)) {
+            设 v_val = 取(args, 0)
+            设 v_r = 编译(v_val, reg)
+            设 s = 取(v_r, 0); 设 vv = 取(v_r, 1); reg = 取(v_r, 2)
+            设 ub = unbox(vv, reg); s = 连接(s, 取(ub, 0)); 设 raw = 取(ub, 1); reg = 取(ub, 2)
+            设 r = 新寄存器(reg); 设 res = 取(r, 0); reg = 取(r, 1)
+            s = 连接(s, "  ", res, " = sub i64 0, ", raw, 换行)
+            设 bb = box(res, reg); s = 连接(s, 取(bb, 0)); 设 bv = 取(bb, 1); reg = 取(bb, 2)
+            返回(列表(s, bv, reg))
+        }
+        设 l_val = 取(args, 0); 设 r_val = 取(args, 1)
+        设 l_r = 编译(l_val, reg); 设 s = 取(l_r, 0); 设 lv = 取(l_r, 1); reg = 取(l_r, 2)
+        设 r_r = 编译(r_val, reg); s = 连接(s, 取(r_r, 0)); 设 rv = 取(r_r, 1); reg = 取(r_r, 2)
         设 ub = unbox(lv, reg); s = 连接(s, 取(ub, 0)); 设 l_raw = 取(ub, 1); reg = 取(ub, 2)
         设 ub = unbox(rv, reg); s = 连接(s, 取(ub, 0)); 设 r_raw = 取(ub, 1); reg = 取(ub, 2)
         设 r = 新寄存器(reg); 设 res = 取(r, 0); reg = 取(r, 1)
@@ -304,9 +351,13 @@
         设 merge_l = 连接("merge_", merge_num)
         s = 连接(s, "  br i1 ", i1v, ", label %", then_l, ", label %", else_l, 换行)
         s = 连接(s, then_l, ":", 换行)
-        设 t_r = 编译(then_ast, reg); s = 连接(s, 取(t_r, 0)); 设 tv = 取(t_r, 1); 设 reg_then = 取(t_r, 2)
-        s = 连接(s, "  store i8* ", tv, ", i8** ", result_a, 换行)
-        s = 连接(s, "  br label %", merge_l, 换行)
+        设 t_r = 编译(then_ast, reg); 设 then_ir = 取(t_r, 0); s = 连接(s, then_ir)
+        设 tv = 取(t_r, 1); 设 reg_then = 取(t_r, 2)
+        设 then_ends_ret = 字符串包含(then_ir, "ret")
+        若 (非(then_ends_ret)) {
+            s = 连接(s, "  store i8* ", tv, ", i8** ", result_a, 换行)
+            s = 连接(s, "  br label %", merge_l, 换行)
+        }
         s = 连接(s, else_l, ":", 换行)
         设 reg_else = reg_then
         若 (has_else) {
