@@ -255,6 +255,61 @@
         返回(列表(node, rest2))
     }
 
+    // 匹配表达式: 匹配 expr { pat → body, ... }
+    若 (str_equals(ttype, "标识符") 且 str_equals(tval, "匹配")) {
+        设 rest = 切片(tokens, 1)
+        // 解析被匹配的表达式
+        设 expr_r = 解析表达式(rest, 0)
+        设 expr = 取(expr_r, 0)
+        rest = 取(expr_r, 1)
+        rest = 消耗(rest, "符号", "{")
+        // 收集分支: pat → body
+        设 分支列表 = 列表()
+        循环 (真) {
+            若 (等于(表长(rest), 0)) { 1 / 0 }
+            设 check = 取当前(rest)
+            若 (是列表(check) 且 str_equals(取(check, 0), "符号") 且 str_equals(取(check, 1), "}")) {
+                rest = 切片(rest, 1)
+                跳出
+            }
+            // 解析模式
+            设 pat_r = 解析主表达式(rest)
+            设 pat = 取(pat_r, 0)
+            rest = 取(pat_r, 1)
+            // 跳过 →
+            rest = 消耗(rest, "标识符", "→")
+            // 解析体
+            设 body_r = 解析主表达式(rest)
+            设 body = 取(body_r, 0)
+            rest = 取(body_r, 1)
+            分支列表 = 列表合(分支列表, 列表(列表(pat, body)))
+            // 跳过逗号
+            设 comma = 取当前(rest)
+            若 (是列表(comma) 且 str_equals(取(comma, 0), "符号") 且 str_equals(取(comma, 1), ",")) {
+                rest = 切片(rest, 1)
+            }
+        }
+        // 构建嵌套 if-else 链
+        设 n_branches = 表长(分支列表)
+        若 (等于(n_branches, 0)) { 1 / 0 }
+        // 从最后一个分支开始逆序构建
+        设 result_node = 取(取(分支列表, 减(n_branches, 1)), 1)  // 最后一个body
+        设 i = 减(n_branches, 2)
+        循环 (i >= 0) {
+            设 branch = 取(分支列表, i)
+            设 pat_i = 取(branch, 0)
+            设 body_i = 取(branch, 1)
+            // 检查是否为通配符 _
+            若 (是字符串(pat_i) 且 str_equals(pat_i, "_")) {
+                result_node = body_i
+            } 否则 {
+                result_node = 列表("if", 列表("等于", expr, pat_i), body_i, result_node)
+            }
+            i = 减(i, 1)
+        }
+        返回(列表(result_node, rest))
+    }
+
     // 符号 '[' — 列表字面量
     若 (str_equals(ttype, "符号") 且 str_equals(tval, "[")) {
         设 rest = 切片(tokens, 1)
