@@ -445,6 +445,48 @@
     设 left = 取(result, 0)
     设 rest = 取(result, 1)
 
+    // 处理管道 |> 运算符
+    循环 (真) {
+        设 ptok = 取当前(rest)
+        若 (非(是列表(ptok))) { 跳出 }
+        设 ptype = 取(ptok, 0)
+        设 pval = 取(ptok, 1)
+        若 (非(str_equals(ptype, "标识符") 且 str_equals(pval, "|>"))) { 跳出 }
+        rest = 切片(rest, 1)
+        // 解析右侧: 标识符 可选后跟 (...)
+        设 rtok = 取当前(rest)
+        若 (非(是列表(rtok))) { 跳出 }
+        若 (str_equals(取(rtok, 0), "标识符")) {
+            设 fn_name = 取(rtok, 1)
+            rest = 切片(rest, 1)
+            设 ptok2 = 取当前(rest)
+            若 (是列表(ptok2) 且 str_equals(取(ptok2, 0), "符号") 且 str_equals(取(ptok2, 1), "(")) {
+                rest = 切片(rest, 1)
+                设 call_args = 列表(left)
+                循环 (真) {
+                    设 ctok = 取当前(rest)
+                    若 (非(是列表(ctok))) { 跳出 }
+                    若 (str_equals(取(ctok, 0), "符号") 且 str_equals(取(ctok, 1), ")")) {
+                        rest = 切片(rest, 1)
+                        跳出
+                    }
+                    设 check_comma = 取当前(rest)
+                    若 (是列表(check_comma) 且 str_equals(取(check_comma, 0), "符号") 且 str_equals(取(check_comma, 1), ",")) {
+                        rest = 切片(rest, 1)
+                    }
+                    设 arg_r = 解析表达式(rest, 0)
+                    call_args = 列表合(call_args, 列表(取(arg_r, 0)))
+                    rest = 取(arg_r, 1)
+                }
+                left = 列表合(列表(fn_name), call_args)
+            } 否则 {
+                left = 列表(fn_name, left)
+            }
+        } 否则 {
+            跳出
+        }
+    }
+
     // 处理中缀运算符
     循环 (真) {
         设 tok2 = 取当前(rest)
