@@ -80,7 +80,8 @@
         设 content = 列表取(全部键列表, ki)
         设 name = 查键(字符串常量表, content)
         设 len = 加(取字长(content), 1)
-        result = 连接(result, name, " = private constant [", len, " x i8] c\"", content, "\\00\"", 换行)
+        设 escaped = 转义LLVM字符串(content)
+        result = 连接(result, name, " = private constant [", len, " x i8] c\"", escaped, "\\00\"", 换行)
         ki = 加(ki, 1)
     }
     返回(result)
@@ -366,6 +367,8 @@
 
     若 (字符串相等(op, "fn")) {
         设 fn_name = 取(args, 0)
+        // ASCII函数名映射（LLVM不支持中文函数名）
+       设 ascii_name = 注册函数名(fn_name)
         设 fn_params = 取(args, 1)
         设 fn_body = 取(args, 2)
         // 保存主函数上下文
@@ -374,7 +377,7 @@
         alloca表 = 新字典()
         reg = 0
         // 函数头: define i8* @name(i8* %p1, i8* %p2, ...)
-        设 fn_ir = 连接(换行, "define i8* @", fn_name, "(")
+        设 fn_ir = 连接(换行, "define i8* @", ascii_name, "(")
         设 param_count = 列表取长(fn_params)
         设 pi = 0
         循环 (小于(pi, param_count)) {
@@ -406,7 +409,7 @@
             pi = 加(pi, 1)
         }
         // 先注册函数名（递归调用需要）
-        存变量(函数参数表, fn_name, param_count)
+        存变量(函数参数表, ascii_name, param_count)
         // 编译函数体
         设 body_r = 编译(fn_body, reg)
         fn_ir = 连接(fn_ir, 取(body_r, 0))
@@ -432,7 +435,8 @@
     }
 
     // 函数调用: op是函数名且在函数参数表中
-    设 fn_arity = 查键(函数参数表, op)
+    设 ascii_op = 取函数名(op)
+    设 fn_arity = 查键(函数参数表, ascii_op)
     若 (大于(取长(fn_arity), 0)) {
         设 call_ir = ""
         设 arg_regs = ""
@@ -448,7 +452,7 @@
             ai = 加(ai, 1)
         }
         设 r = 新寄存器(reg); 设 result_reg = 取(r, 0); reg = 取(r, 1)
-        call_ir = 连接(call_ir, "  ", result_reg, " = call i8* @", op, "(", arg_regs, ")", 换行)
+        call_ir = 连接(call_ir, "  ", result_reg, " = call i8* @", ascii_op, "(", arg_regs, ")", 换行)
         返回(列表(call_ir, result_reg, reg))
     }
 
@@ -493,7 +497,7 @@
             ai = 加(ai, 1)
         }
         设 r = 新寄存器(reg); 设 result_reg = 取(r, 0); reg = 取(r, 1)
-        call_ir = 连接(call_ir, "  ", result_reg, " = call i8* @", op, "(", arg_regs, ")", 换行)
+        call_ir = 连接(call_ir, "  ", result_reg, " = call i8* @", ascii_op, "(", arg_regs, ")", 换行)
         返回(列表(call_ir, result_reg, reg))
     }
 
@@ -513,7 +517,7 @@
         ai = 加(ai, 1)
     }
     设 r = 新寄存器(reg); 设 result_reg = 取(r, 0); reg = 取(r, 1)
-    call_ir = 连接(call_ir, "  ", result_reg, " = call i8* @", op, "(", arg_regs, ")", 换行)
+    call_ir = 连接(call_ir, "  ", result_reg, " = call i8* @", ascii_op, "(", arg_regs, ")", 换行)
     返回(列表(call_ir, result_reg, reg))
 
     若 (字符串相等(op, "列表")) {

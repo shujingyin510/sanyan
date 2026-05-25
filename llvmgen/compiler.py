@@ -208,7 +208,44 @@ def _str_bytelen(evaluator, args):
     return TritValue(0)
 
 
+def _escape_llvm_str(evaluator, args):
+    """转义字符串用于 LLVM IR c\"...\" 格式。"""
+    s = evaluator.eval(args[0])
+    if isinstance(s, str):
+        s = s.replace('\\', '\\\\')
+        s = s.replace('"', '\\22')
+        s = s.replace('\n', '\\0A')
+        s = s.replace('\r', '\\0D')
+        s = s.replace('\t', '\\09')
+        return s
+    return ""
+
+
+def _register_func_name(evaluator, args):
+    """注册函数名→ASCII映射，返回映射后的ASCII名。"""
+    name = evaluator.eval(args[0])
+    if isinstance(name, str) and not name.isascii():
+        if name not in _func_name_map:
+            idx = _func_name_counter[0]
+            _func_name_counter[0] += 1
+            _func_name_map[name] = f'_fn{idx}'
+        return _func_name_map[name]
+    return name
+
+
+def _get_func_name(evaluator, args):
+    """取函数的ASCII名（用于LLVM IR）。"""
+    name = evaluator.eval(args[0])
+    if isinstance(name, str):
+        return _func_name_map.get(name, name)
+    return name
+
+
 from ops.registry import register as _register
+
+# 非ASCII函数名映射 (Chinese → _fnN)
+_func_name_map = {}
+_func_name_counter = [0]
 
 _register('container_ops_list_contains', _list_contains)
 
@@ -256,6 +293,14 @@ def self_hosted_compile(source: str, module_name: str = 'main') -> str:
     # 字符串字节长度 (UTF-8)
     evaluator.commands['取字长'] = (['s'], [['container_ops_str_bytelen', 's']], {}, None)
     _register('container_ops_str_bytelen', _str_bytelen)
+    # LLVM IR 字符串转义
+    evaluator.commands['转义LLVM字符串'] = (['s'], [['container_ops_str_escape_llvm', 's']], {}, None)
+    _register('container_ops_str_escape_llvm', _escape_llvm_str)
+    # 非ASCII函数名映射 (Chinese → _fnN, 使用模块级全局变量)
+    evaluator.commands['注册函数名'] = (['name'], [['container_ops_register_func_name', 'name']], {}, None)
+    _register('container_ops_register_func_name', _register_func_name)
+    evaluator.commands['取函数名'] = (['name'], [['container_ops_get_func_name', 'name']], {}, None)
+    _register('container_ops_get_func_name', _get_func_name)
 
     _register('container_ops_dict_set', ContainerOps.dict_set)
     # 查键: 字典键存在返回 value，否则返回空串
