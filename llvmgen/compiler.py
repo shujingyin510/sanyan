@@ -395,6 +395,11 @@ def self_hosted_compile(source: str, module_name: str = 'main') -> str:
 
     clear_cache()
     evaluator = SanyanEvaluator(skin_manager=SkinManager('chinese'))
+    # 强制覆盖 box/unbox 派发 + 清所有缓存
+    from ops.registry import _OP_DISPATCH
+    _OP_DISPATCH['box'] = (_box_py, None)
+    _OP_DISPATCH['unbox'] = (_unbox_py, None)
+    evaluator._op_cache.clear()
     # 注册辅助函数
     from ops.container_ops import ContainerOps
 
@@ -497,6 +502,7 @@ def self_hosted_compile(source: str, module_name: str = 'main') -> str:
         raise SyntaxError(f'sugar.san 解析失败: {ast}')
 
     # 4. llvmgen.san 生成 IR（只编译用户代码）
+    evaluator._op_cache.clear()  # 编译前清空
     ir_text = evaluator.eval(['编译顶层', ast])
     if not isinstance(ir_text, str):
         raise RuntimeError(f'llvmgen.san 生成失败: {type(ir_text).__name__}')
@@ -514,6 +520,11 @@ def compile_module_test(module_name: str) -> str:
 
     clear_cache()
     evaluator = SanyanEvaluator(skin_manager=SkinManager('chinese'))
+    # 强制覆盖 box/unbox 派发 + 清所有缓存
+    from ops.registry import _OP_DISPATCH
+    _OP_DISPATCH['box'] = (_box_py, None)
+    _OP_DISPATCH['unbox'] = (_unbox_py, None)
+    evaluator._op_cache.clear()
     evaluator.commands['新字典'] = ([], [['return', ['container_ops_dict_new_empty']]], {}, None)
     evaluator.commands['存变量'] = (['d', 'k', 'v'], [['container_ops_dict_set', 'd', 'k', 'v']], {}, None)
     evaluator.commands['新列表'] = ([], [['return', ['container_ops_list_new_empty']]], {}, None)
@@ -590,6 +601,7 @@ def compile_module_test(module_name: str) -> str:
     module_ast = ['do'] + [s for s in ast if not (isinstance(s, list) and s[0] == 'export')]
 
     evaluator.eval(['设置模块ID', 0])
+    evaluator._op_cache.clear()  # 编译前清空(防box/unbox旧缓存)
     ir = evaluator.eval(['编译顶层', module_ast])
     return ir if isinstance(ir, str) else ''
 
