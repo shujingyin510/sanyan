@@ -543,6 +543,44 @@
         返回(列表(s, d_reg, reg))
     }
 
+    若 (字符串相等(op, "forin")) {
+        设 var_name = 取(args, 0)
+        设 lst_ast = 取(args, 1)
+        设 body_ast = 取(args, 2)
+        设 c_r = 编译(lst_ast, reg)
+        设 s = 取(c_r, 0); 设 lst_ptr = 取(c_r, 1); reg = 取(c_r, 2)
+        设 r = 新寄存器(reg); 设 len_reg = 取(r, 0); reg = 取(r, 1)
+        s = 连接(s, "  ", len_reg, " = call i32 @rt_list_len(i8* ", lst_ptr, ")", 换行)
+        设 r = 新寄存器(reg); 设 idx_a = 取(r, 0); reg = 取(r, 1)
+        s = 连接(s, "  ", idx_a, " = alloca i32", 换行)
+        s = 连接(s, "  store i32 0, i32* ", idx_a, 换行)
+        设 hdr_num = reg; 设 body_num = 加(reg, 1); 设 end_num = 加(reg, 2)
+        设 hdr_l = 连接("forin_hdr_", hdr_num)
+        设 body_l = 连接("forin_body_", body_num)
+        设 end_l = 连接("forin_end_", end_num)
+        s = 连接(s, "  br label %", hdr_l, 换行)
+        s = 连接(s, hdr_l, ":", 换行)
+        设 r = 新寄存器(reg); 设 i_val = 取(r, 0); reg = 取(r, 1)
+        s = 连接(s, "  ", i_val, " = load i32, i32* ", idx_a, 换行)
+        设 r = 新寄存器(reg); 设 cmp = 取(r, 0); reg = 取(r, 1)
+        s = 连接(s, "  ", cmp, " = icmp slt i32 ", i_val, ", ", len_reg, 换行)
+        s = 连接(s, "  br i1 ", cmp, ", label %", body_l, ", label %", end_l, 换行)
+        s = 连接(s, body_l, ":", 换行)
+        设 r = 新寄存器(reg); 设 elem = 取(r, 0); reg = 取(r, 1)
+        s = 连接(s, "  ", elem, " = call i8* @rt_list_get(i8* ", lst_ptr, ", i32 ", i_val, ")", 换行)
+        设 r = 新寄存器(reg); 设 var_a = 取(r, 0); reg = 取(r, 1)
+        s = 连接(s, "  ", var_a, " = alloca i8*", 换行)
+        s = 连接(s, "  store i8* ", elem, ", i8** ", var_a, 换行)
+        存变量(alloca表, var_name, var_a)
+        设 b_r = 编译(body_ast, reg); s = 连接(s, 取(b_r, 0)); reg = 取(b_r, 2)
+        设 r = 新寄存器(reg); 设 i_next = 取(r, 0); reg = 取(r, 1)
+        s = 连接(s, "  ", i_next, " = add i32 ", i_val, ", 1", 换行)
+        s = 连接(s, "  store i32 ", i_next, ", i32* ", idx_a, 换行)
+        s = 连接(s, "  br label %", hdr_l, 换行)
+        s = 连接(s, end_l, ":", 换行)
+        返回(列表(s, "null", reg))
+    }
+
     }
 
     若 (是字符串(ast)) {
