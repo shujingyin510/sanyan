@@ -18,5 +18,7 @@ void _rt_free(void *ptr) {
     HeapFree(GetProcessHeap(), 0, ptr);
 }
 
-/* __chkstk: Windows x64 栈探测，alloca 需要 */
-void __chkstk(void) {}
+/* __chkstk: Windows x64 栈探测 */
+void __chkstk(void) {
+    /* 空实现：small code model 下 alloca < 4KB 不需要探测 */
+}

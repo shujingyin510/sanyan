@@ -83,7 +83,8 @@ def main():
                 user_lines = ir_text.split('\n')
                 filtered = []
                 skip_depth = 0
-                seen_defines = set(['rt_print_int', 'rt_print_str'])  # 由llvmgen.san生成
+                seen_defines = set(['rt_print_int', 'rt_print_str',
+                                     'rt_list_new', 'rt_list_push_item', 'rt_list_len', 'rt_list_get'])
                 for line in user_lines:
                     if 'target triple' in line or 'ModuleID' in line:
                         continue
@@ -91,10 +92,10 @@ def main():
                         '@rt_print_int', '@rt_print_str',
                         '@rt_list_new', '@rt_list_push_item', '@rt_list_len', '@rt_list_get',
                         '@rt_dict_new', '@rt_dict_set', '@rt_dict_get',
-                        '@rt_awake', '@san_sys_write'
+                        '@rt_awake', '@san_sys_write', '@_rt_malloc', '@_rt_free'
                     ]):
                         continue
-                    if '@_rt_buf' in line:
+                    if '@_rt_buf' in line or '@g_error' in line:
                         continue
                     if skip_depth > 0:
                         skip_depth += line.count('{') - line.count('}')
@@ -127,7 +128,8 @@ def main():
             sp.run([gcc, '-c', asm_path, '-o', asm_path.replace('.s', '.o')],
                    check=True, env=env)
             sp.run([gcc, asm_path.replace('.s', '.o'), sc_o, '-o', out_exe,
-                     '-nostartfiles', '-e', 'main', '-lkernel32', '-lgcc'],
+                     '-nostartfiles', '-e', 'main', '-lkernel32', '-lgcc',
+                     '-fno-stack-check', '-fno-stack-protector'],
                    check=True, env=env)
             print(f'[san] EXE → {out_exe}')
 
