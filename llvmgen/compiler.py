@@ -392,12 +392,86 @@ def self_hosted_compile(source: str, module_name: str = 'main') -> str:
     if not isinstance(ast, list):
         raise SyntaxError(f'sugar.san 解析失败: {ast}')
 
-    # 4. llvmgen.san 生成 IR（只编译用户代码，sugar/llvmgen作为求值器命令）
+    # 4. llvmgen.san 生成 IR（只编译用户代码）
     ir_text = evaluator.eval(['编译顶层', ast])
     if not isinstance(ir_text, str):
         raise RuntimeError(f'llvmgen.san 生成失败: {type(ir_text).__name__}')
 
     return ir_text
+
+
+def compile_module_test(module_name: str) -> str:
+    """编译单个 .san 模块到 LLVM IR（测试用）。"""
+    from evaluator import SanyanEvaluator
+    from skin import SkinManager
+    from ops.file_ops import clear_cache
+    from ops.container_ops import ContainerOps
+    import os
+
+    clear_cache()
+    evaluator = SanyanEvaluator(skin_manager=SkinManager('chinese'))
+    evaluator.commands['新字典'] = ([], [['return', ['container_ops_dict_new_empty']]], {}, None)
+    evaluator.commands['存变量'] = (['d', 'k', 'v'], [['container_ops_dict_set', 'd', 'k', 'v']], {}, None)
+    evaluator.commands['新列表'] = ([], [['return', ['container_ops_list_new_empty']]], {}, None)
+    _register('container_ops_dict_new_empty', _dict_new_empty)
+    _register('container_ops_list_new_empty', _list_new_empty)
+    _register('container_ops_dict_set', ContainerOps.dict_set)
+    _register('container_ops_dict_get_safe', _dict_get_safe)
+    _register('container_ops_list_len', _list_len)
+    _register('container_ops_dict_len', _dict_len)
+    _register('container_ops_list_get_safe', _list_get_safe)
+    _register('container_ops_list_append', _list_append)
+    _register('container_ops_dict_keys', _dict_keys)
+    _register('container_ops_list_contains', _list_contains)
+    _register('container_ops_str_bytelen', _str_bytelen)
+    _register('container_ops_str_escape_llvm', _escape_llvm_str)
+    _register('container_ops_register_func_name', _register_func_name)
+    _register('container_ops_get_func_name', _get_func_name)
+    _register('container_ops_set_module_id', _set_module_id)
+    _register('container_ops_str_endswith', _str_endswith)
+    _register('container_ops_str_contains', _str_contains)
+    evaluator.commands['查键'] = (['d', 'k'], [['container_ops_dict_get_safe', 'd', 'k']], {}, None)
+    evaluator.commands['包含'] = (['lst', 'item'], [['container_ops_list_contains', 'lst', 'item']], {}, None)
+    evaluator.commands['列表取长'] = (['lst'], [['container_ops_list_len', 'lst']], {}, None)
+    evaluator.commands['字典取长'] = (['d'], [['container_ops_dict_len', 'd']], {}, None)
+    evaluator.commands['列表取'] = (['lst', 'idx'], [['container_ops_list_get_safe', 'lst', 'idx']], {}, None)
+    evaluator.commands['列表追加'] = (['lst', 'item'], [['container_ops_list_append', 'lst', 'item']], {}, None)
+    evaluator.commands['字典键列表'] = (['d'], [['container_ops_dict_keys', 'd']], {}, None)
+    evaluator.commands['取字长'] = (['s'], [['container_ops_str_bytelen', 's']], {}, None)
+    evaluator.commands['转义LLVM字符串'] = (['s'], [['container_ops_str_escape_llvm', 's']], {}, None)
+    evaluator.commands['注册函数名'] = (['name'], [['container_ops_register_func_name', 'name']], {}, None)
+    evaluator.commands['取函数名'] = (['name'], [['container_ops_get_func_name', 'name']], {}, None)
+    evaluator.commands['设置模块ID'] = (['mid'], [['container_ops_set_module_id', 'mid']], {}, None)
+    evaluator.commands['后缀'] = (['s', 'suffix'], [['container_ops_str_endswith', 's', 'suffix']], {}, None)
+    evaluator.commands['字符串包含'] = (['s', 'sub'], [['container_ops_str_contains', 's', 'sub']], {}, None)
+    evaluator.commands['进入合并上下文'] = (['label'], [['container_ops_set_merge_label', 'label']], {}, None)
+    evaluator.commands['退出合并上下文'] = ([], [['container_ops_clear_merge_label']], {}, None)
+    evaluator.commands['取合并标签'] = ([], [['return', ['container_ops_get_merge_label']]], {}, None)
+    _register('container_ops_get_merge_label', _get_merge_label)
+
+    stdlib_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'stdlib')
+    # Load llvmgen.san
+    with open(os.path.join(stdlib_dir, 'llvmgen.san'), encoding='utf-8') as f:
+        llvmgen_code = f.read()
+    llvmgen_ast = _parse_source(llvmgen_code)
+    if isinstance(llvmgen_ast, list) and len(llvmgen_ast) > 0 and llvmgen_ast[0] == 'do':
+        llvmgen_ast = llvmgen_ast[1:]
+    for stmt in llvmgen_ast:
+        if isinstance(stmt, list) and stmt[0] == 'export':
+            continue
+        evaluator.eval(stmt)
+
+    # Compile the target module
+    with open(os.path.join(stdlib_dir, module_name), encoding='utf-8') as f:
+        code = f.read()
+    ast = _parse_source(code)
+    if isinstance(ast, list) and len(ast) > 0 and ast[0] == 'do':
+        ast = ast[1:]
+    module_ast = ['do'] + [s for s in ast if not (isinstance(s, list) and s[0] == 'export')]
+
+    evaluator.eval(['设置模块ID', 0])
+    ir = evaluator.eval(['编译顶层', module_ast])
+    return ir if isinstance(ir, str) else ''
 
 
 def _merge_ir_modules(ir_parts: list[str]) -> str:
