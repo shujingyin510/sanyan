@@ -370,8 +370,7 @@
         若 (不以终止指令结尾(then_ir)) {
             s = 连接(s, "  store i8* ", tv, ", i8** ", result_a, 换行)
         }
-        s = 确保终止(s, merge_l)
-        s = 连接(s, else_l, ":", 换行)
+        s = 连接(s, "  br label %", merge_l, 换行)
         s = 连接(s, else_l, ":", 换行)
         设 reg_else = reg_then
         若 (has_else) {
@@ -382,7 +381,7 @@
                 s = 连接(s, "  store i8* ", ev, ", i8** ", result_a, 换行)
             }
         }
-        s = 确保终止(s, merge_l)
+        s = 连接(s, "  br label %", merge_l, 换行)
         s = 连接(s, merge_l, ":", 换行)
         若 (大于(reg_then, reg_else)) { reg = reg_then } 否则 { reg = reg_else }
         设 r = 新寄存器(reg); 设 result_val = 取(r, 0); reg = 取(r, 1)
@@ -402,8 +401,8 @@
         s = 连接(s, "  ", i1v, " = trunc i64 ", raw, " to i1", 换行)
         s = 连接(s, "  br i1 ", i1v, ", label %", body_l, ", label %", end_l, 换行)
         s = 连接(s, body_l, ":", 换行)
-        设 b_r = 编译(body_ast, reg); 设 body_ir = 取(b_r, 0); s = 连接(s, body_ir); reg = 取(b_r, 2)
-        s = 确保终止(s, hdr_l)
+        设 b_r = 编译(body_ast, reg); s = 连接(s, 取(b_r, 0)); reg = 取(b_r, 2)
+        s = 连接(s, "  br label %", hdr_l, 换行)
         s = 连接(s, end_l, ":", 换行)
         返回(列表(s, "null", reg))
     }
@@ -421,8 +420,8 @@
         s = 连接(s, "  ", i1v, " = trunc i64 ", raw, " to i1", 换行)
         s = 连接(s, "  br i1 ", i1v, ", label %", body_l, ", label %", end_l, 换行)
         s = 连接(s, body_l, ":", 换行)
-        设 b_r = 编译(body_ast, reg); 设 body_ir2 = 取(b_r, 0); s = 连接(s, body_ir2); reg = 取(b_r, 2)
-        s = 确保终止(s, hdr_l)
+        设 b_r = 编译(body_ast, reg); s = 连接(s, 取(b_r, 0)); reg = 取(b_r, 2)
+        s = 连接(s, "  br label %", hdr_l, 换行)
         s = 连接(s, end_l, ":", 换行)
         返回(列表(s, "null", reg))
     }
