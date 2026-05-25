@@ -490,12 +490,7 @@
         s = 连接(s, then_l, ":", 换行)
     设 t_r = 编译(then_ast, reg); 设 then_ir = 取(t_r, 0); s = 连接(s, then_ir)
     设 tv = 取(t_r, 1); 设 reg_then = 取(t_r, 2)
-    若 (不以终止指令结尾(then_ir)) {
-        s = 连接(s, "  store i8* ", tv, ", i8** ", result_a, 换行)
-        s = 连接(s, "  br label %", merge_l, 换行)
-    } 否则 {
-        设 dead_l = 新标签("dead_t")
-        s = 连接(s, dead_l, ":", 换行)
+    若 (非(是终止指令(then_ir))) {
         s = 连接(s, "  store i8* ", tv, ", i8** ", result_a, 换行)
         s = 连接(s, "  br label %", merge_l, 换行)
     }
@@ -1486,6 +1481,31 @@
     返回(ir)
 }
 
+定义 生成_桩函数 () {
+    设 ir = ""
+    // rt_list_concat
+    ir = 连接(ir, "define i8* @rt_list_concat(i8* %a, i8* %b) {", 换行)
+    ir = 连接(ir, "  ret i8* %a", 换行)
+    ir = 连接(ir, "}", 换行)
+    ir = 连接(ir, 换行)
+    // rt_list_slice
+    ir = 连接(ir, "define i8* @rt_list_slice(i8* %a, i8* %b, i8* %c) {", 换行)
+    ir = 连接(ir, "  ret i8* %a", 换行)
+    ir = 连接(ir, "}", 换行)
+    ir = 连接(ir, 换行)
+    // rt_str_substr
+    ir = 连接(ir, "define i8* @rt_str_substr(i8* %a, i8* %b, i8* %c) {", 换行)
+    ir = 连接(ir, "  ret i8* %a", 换行)
+    ir = 连接(ir, "}", 换行)
+    ir = 连接(ir, 换行)
+    // rt_str_to_list
+    ir = 连接(ir, "define i8* @rt_str_to_list(i8* %a) {", 换行)
+    ir = 连接(ir, "  ret i8* null", 换行)
+    ir = 连接(ir, "}", 换行)
+    ir = 连接(ir, 换行)
+    返回(ir)
+}
+
 定义 编译顶层 (ast) {
     设 reg = 0
     设 alloca表 = 新字典()
@@ -1519,6 +1539,7 @@
     s = 连接(s, 换行)
     // 生成运行时函数定义（rt_print_int, rt_print_str 等）
     s = 连接(s, 生成运行时IR())
+    s = 连接(s, 生成_桩函数())
     // 拼接用户函数定义
     设 fn_count = 列表取长(函数库列表)
     设 fi = 0

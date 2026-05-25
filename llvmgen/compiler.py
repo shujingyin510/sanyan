@@ -314,14 +314,15 @@ def _next_reg(evaluator=None, args=None):
 
 
 def _is_terminated(evaluator, args):
-    """检查 LLVM IR 文本是否以终止指令 (ret/br) 结尾。返回 TritValue(1)=已终止, TritValue(0)=未终止。"""
-    text = evaluator.eval(args[0]) if args else ""
+    """检查 LLVM IR 文本是否以终止指令 (ret/br) 结尾。返回 TritValue(1)=已终止, TritValue(-1)=未终止。"""
+    sym = args[0] if args else ""
+    text = evaluator.get_var(sym) if isinstance(sym, str) else str(sym)
     if not text:
-        return TritValue(0)
+        return TritValue(-1)  # 空文本→未终止,非(未终止)=真→需要emit br
     last = str(text).rstrip().rsplit('\n', 1)[-1].strip()
     if last.startswith('ret') or last.startswith('br'):
-        return TritValue(1)
-    return TritValue(0)
+        return TritValue(1)  # 已终止,非(已终止)=假→不emit
+    return TritValue(-1)  # 未终止,非(未终止)=真→emit store+br
 
 
 _register('container_ops_next_label', _next_label)
