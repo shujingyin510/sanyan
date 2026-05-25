@@ -1242,9 +1242,16 @@
         fi = 加(fi, 1)
     }
     s = 连接(s, 换行)
-    s = 连接(s, "define i8* @main() {"); s = 连接(s, 换行)
+    // 把所有顶层代码包装为 __init 函数（解决顶层设语句的全局变量问题）
+    s = 连接(s, "define void @__init() {"); s = 连接(s, 换行)
     s = 连接(s, "entry:"); s = 连接(s, 换行)
     s = 连接(s, 取(r, 0))
+    s = 连接(s, "  ret void"); s = 连接(s, 换行)
+    s = 连接(s, "}"); s = 连接(s, 换行)
+    s = 连接(s, 换行)
+    s = 连接(s, "define i8* @main() {"); s = 连接(s, 换行)
+    s = 连接(s, "entry:"); s = 连接(s, 换行)
+    s = 连接(s, "  call void @__init()"); s = 连接(s, 换行)
     s = 连接(s, footer())
     返回(s)
 }
