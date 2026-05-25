@@ -242,13 +242,11 @@ def _str_contains(evaluator, args):
 def _register_func_name(evaluator, args):
     """注册函数名→ASCII映射，返回映射后的ASCII名。"""
     name = evaluator.eval(args[0])
-    if isinstance(name, str) and not name.isascii():
-        if name not in _func_name_map:
-            idx = _func_name_counter[0]
-            _func_name_counter[0] += 1
-            _func_name_map[name] = f'_fn{idx}'
-        return _func_name_map[name]
-    return name
+    if isinstance(name, str) and name not in _func_name_map:
+        idx = _func_name_counter[0]
+        _func_name_counter[0] += 1
+        _func_name_map[name] = f'_m{_module_id}_fn{idx}'
+    return _func_name_map.get(name, name)
 
 
 def _get_func_name(evaluator, args):
@@ -261,9 +259,18 @@ def _get_func_name(evaluator, args):
 
 from ops.registry import register as _register
 
-# 非ASCII函数名映射 (Chinese → _fnN)
+# 非ASCII函数名映射 (Chinese → _mN_fnM)
 _func_name_map = {}
 _func_name_counter = [0]
+_module_id = 0
+
+
+def _set_module_id(evaluator, args):
+    global _module_id, _func_name_map, _func_name_counter
+    _module_id = evaluator.eval(args[0]).to_int()
+    _func_name_map = {}
+    _func_name_counter = [0]
+    return TritValue(0)
 
 _register('container_ops_list_contains', _list_contains)
 
@@ -317,6 +324,9 @@ def self_hosted_compile(source: str, module_name: str = 'main') -> str:
     # 字符串后缀检查
     evaluator.commands['后缀'] = (['s', 'suffix'], [['container_ops_str_endswith', 's', 'suffix']], {}, None)
     _register('container_ops_str_endswith', _str_endswith)
+    # 模块ID设置
+    evaluator.commands['设置模块ID'] = (['mid'], [['container_ops_set_module_id', 'mid']], {}, None)
+    _register('container_ops_set_module_id', _set_module_id)
     # 字符串包含检查
     evaluator.commands['字符串包含'] = (['s', 'sub'], [['container_ops_str_contains', 's', 'sub']], {}, None)
     _register('container_ops_str_contains', _str_contains)
@@ -382,12 +392,40 @@ def self_hosted_compile(source: str, module_name: str = 'main') -> str:
     if not isinstance(ast, list):
         raise SyntaxError(f'sugar.san 解析失败: {ast}')
 
-    # 4. llvmgen.san 生成 IR（只编译用户代码）
+    # 4. llvmgen.san 生成 IR（只编译用户代码，sugar/llvmgen作为求值器命令）
     ir_text = evaluator.eval(['编译顶层', ast])
     if not isinstance(ir_text, str):
         raise RuntimeError(f'llvmgen.san 生成失败: {type(ir_text).__name__}')
 
     return ir_text
+
+
+def _merge_ir_modules(ir_parts: list[str]) -> str:
+    """合并多个LLVM IR模块，去重define/declare。"""
+    if not ir_parts:
+        return ""
+    result = ""
+    seen_defines = set()
+    seen_declares = set()
+    for i, part in enumerate(ir_parts):
+        for line in part.split('\n'):
+            s = line.strip()
+            if i > 0 and ('target triple' in s or 'ModuleID' in s):
+                continue
+            if s.startswith('declare '):
+                fn = s.split('@')[1].split('(')[0] if '@' in s else ''
+                if fn in seen_declares:
+                    continue
+                seen_declares.add(fn)
+            if s.startswith('define '):
+                fn = s.split('@')[1].split('(')[0] if '@' in s else ''
+                if fn in ('main', '__init') and i > 0:
+                    continue
+                if fn in seen_defines and fn not in ('main', '__init'):
+                    continue
+                seen_defines.add(fn)
+            result += line + '\n'
+    return result
 
 
 def compile_file(input_path: str, output_path: str | None = None) -> str:
