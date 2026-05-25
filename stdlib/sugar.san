@@ -447,12 +447,14 @@
 
     // 处理管道 |> 运算符
     循环 (真) {
+        若 (等于(表长(rest), 0)) { 跳出 }
         设 ptok = 取当前(rest)
         若 (非(是列表(ptok))) { 跳出 }
         设 ptype = 取(ptok, 0)
         设 pval = 取(ptok, 1)
         若 (非(str_equals(ptype, "标识符") 且 str_equals(pval, "|>"))) { 跳出 }
         rest = 切片(rest, 1)
+        若 (等于(表长(rest), 0)) { 跳出 }
         // 解析右侧: 标识符 可选后跟 (...)
         设 rtok = 取当前(rest)
         若 (非(是列表(rtok))) { 跳出 }
@@ -464,6 +466,7 @@
                 rest = 切片(rest, 1)
                 设 call_args = 列表(left)
                 循环 (真) {
+                    若 (等于(表长(rest), 0)) { 跳出 }
                     设 ctok = 取当前(rest)
                     若 (非(是列表(ctok))) { 跳出 }
                     若 (str_equals(取(ctok, 0), "符号") 且 str_equals(取(ctok, 1), ")")) {
