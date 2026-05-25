@@ -72,19 +72,39 @@ def main():
             from llvmlite import binding as llvm_binding
             llvm_binding.initialize_all_targets()
             llvm_binding.initialize_native_asmprinter()
+
+            # 合并 runtime.ll + 用户 IR（字符串拼接，移除用户模块头）
+            runtime_ll_path = os.path.join('llvmgen', 'runtime.ll')
+            if os.path.exists(runtime_ll_path):
+                with open(runtime_ll_path, encoding='utf-8') as f:
+                    runtime_ir = f.read()
+                # 移除用户 IR 的 target triple 和 declare（runtime.ll 已提供）
+                user_lines = ir_text.split('\n')
+                filtered = []
+                skip = False
+                for line in user_lines:
+                    if 'target triple' in line or 'ModuleID' in line:
+                        continue
+                    if line.startswith('declare ') and ('@rt_print_int' in line or '@rt_print_str' in line):
+                        continue
+                    filtered.append(line)
+                combined_ir = runtime_ir + '\n' + '\n'.join(filtered)
+            else:
+                combined_ir = ir_text
+
             target = llvm_binding.Target.from_default_triple()
             tm = target.create_target_machine(reloc='static', codemodel='large')
-            asm = tm.emit_assembly(llvm_binding.parse_assembly(ir_text))
+            asm = tm.emit_assembly(llvm_binding.parse_assembly(combined_ir))
             with open(asm_path, 'w') as f:
                 f.write(asm)
             print(f'[san] ASM → {asm_path}')
 
-            # GCC → exe
-            rt_o = os.path.join('build', 'sanyan_rt.o')
+            # GCC → exe (用 syscall.c 代替 runtime.c)
             import subprocess as sp
-            sp.run(['gcc', '-c', 'llvmgen/runtime.c', '-o', rt_o, '-std=c99', '-O2'], check=True)
+            sc_o = os.path.join('build', 'syscall.o')
+            sp.run(['gcc', '-c', 'llvmgen/syscall.c', '-o', sc_o, '-std=c99', '-O2'], check=True)
             sp.run(['gcc', '-c', asm_path, '-o', asm_path.replace('.s', '.o')], check=True)
-            sp.run(['gcc', asm_path.replace('.s', '.o'), rt_o, '-o', out_exe, '-lm'], check=True)
+            sp.run(['gcc', asm_path.replace('.s', '.o'), sc_o, '-o', out_exe, '-lm', '-lgcc'], check=True)
             print(f'[san] EXE → {out_exe}')
 
             result = sp.run([out_exe], capture_output=True, text=True)

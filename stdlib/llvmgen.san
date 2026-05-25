@@ -26,11 +26,10 @@
 定义 header () {
     设 s = "; ModuleID = 'sanyan'"; s = 连接(s, 换行)
     s = 连接(s, "target triple = \"x86_64-pc-linux-gnu\""); s = 连接(s, 换行)
-    s = 连接(s, 换行); s = 连接(s, "declare i32 @printf(i8*, ...)"); s = 连接(s, 换行)
-    s = 连接(s, 声明运行时())
     s = 连接(s, 换行)
-    s = 连接(s, "@.fmt = private constant [4 x i8] c\"%d\\0a\\00\""); s = 连接(s, 换行)
+    s = 连接(s, 声明运行时())
     s = 连接(s, "@g_error = external global i8*"); s = 连接(s, 换行)
+    s = 连接(s, 换行)
     s = 连接(s, 换行)
     返回(s)
 }
@@ -280,13 +279,7 @@
         s = 连接(s, "  ", r3, " = icmp ne i64 ", r2, ", 0", 换行)
         s = 连接(s, "  br i1 ", r3, ", label %int_", label_num, ", label %str_", label_num, 换行)
         s = 连接(s, "int_", label_num, ":", 换行)
-        设 ub_reg = 新寄存器(reg)
-        设 ru1 = 取(ub_reg, 0); 设 lbn = 取(ub_reg, 1); reg = lbn
-        设 ub_reg = 新寄存器(reg)
-        设 ru2 = 取(ub_reg, 0); 设 lbn = 取(ub_reg, 1); reg = lbn
-        s = 连接(s, "  ", ru1, " = ptrtoint i8* ", vr, " to i64", 换行)
-        s = 连接(s, "  ", ru2, " = ashr i64 ", ru1, ", 1", 换行)
-        s = 连接(s, "  call i32 (i8*, ...) @printf(i8* getelementptr inbounds ([4 x i8], [4 x i8]* @.fmt, i32 0, i32 0), i64 ", ru2, ")", 换行)
+        s = 连接(s, "  call void @rt_print_int(i64 ", r1, ")", 换行)
         s = 连接(s, "  br label %", done_l, 换行)
         s = 连接(s, "str_", label_num, ":", 换行)
         s = 连接(s, "  call void @rt_print_str(i8* ", vr, ")", 换行)
