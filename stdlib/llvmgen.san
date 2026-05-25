@@ -547,6 +547,30 @@
         返回(列表(s, d_reg, reg))
     }
 
+    若 (字符串相等(op, "连接")) {
+        设 s = ""
+        设 count = 列表取长(args)
+        若 (等于(count, 0)) {
+            返回(列表(s, "null", reg))
+        }
+        // 编译第一个参数
+        设 a1 = 取(args, 0)
+        设 r1 = 编译(a1, reg)
+        s = 连接(s, 取(r1, 0)); 设 cur = 取(r1, 1); reg = 取(r1, 2)
+        // 依次拼接后续参数
+        设 i = 1
+        循环 (小于(i, count)) {
+            设 ai = 取(args, i)
+            设 ri = 编译(ai, reg)
+            s = 连接(s, 取(ri, 0)); 设 av = 取(ri, 1); reg = 取(ri, 2)
+            设 r = 新寄存器(reg); 设 new_str = 取(r, 0); reg = 取(r, 1)
+            s = 连接(s, "  ", new_str, " = call i8* @rt_str_concat(i8* ", cur, ", i8* ", av, ")", 换行)
+            cur = new_str
+            i = 加(i, 1)
+        }
+        返回(列表(s, cur, reg))
+    }
+
     若 (字符串相等(op, "forin")) {
         设 var_name = 取(args, 0)
         设 lst_ast = 取(args, 1)
@@ -637,13 +661,17 @@
     若 (是字符串(ast)) {
         设 first_char = 子串(ast, 0, 1)
         若 (前缀(ast, "\"")) {
-            // 字符串字面量: "content" → 全局常量 + gep
+            // 字符串字面量: "content" → 全局常量gep → rt_str_new创建堆对象
             设 content = 子串(ast, 1, 减(取长(ast), 2))
             设 gname = 取字符串常量(content)
+            设 s = ""
             设 r = 新寄存器(reg); 设 gep = 取(r, 0); reg = 取(r, 1)
             设 len = 加(取长(content), 1)
-            设 s = 连接("  ", gep, " = getelementptr inbounds [", len, " x i8], [", len, " x i8]* ", gname, ", i32 0, i32 0", 换行)
-            返回(列表(s, gep, reg))
+            s = 连接("  ", gep, " = getelementptr inbounds [", len, " x i8], [", len, " x i8]* ", gname, ", i32 0, i32 0", 换行)
+            设 slen = 取长(content)
+            设 r = 新寄存器(reg); 设 str_obj = 取(r, 0); reg = 取(r, 1)
+            s = 连接(s, "  ", str_obj, " = call i8* @rt_str_new(i8* ", gep, ", i32 ", slen, ")", 换行)
+            返回(列表(s, str_obj, reg))
          }
         设 alloca = 查键(alloca表, ast)
         若 (大于(取长(alloca), 0)) {
