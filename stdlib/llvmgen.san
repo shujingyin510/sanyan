@@ -79,7 +79,7 @@
     循环 (小于(ki, kc)) {
         设 content = 列表取(全部键列表, ki)
         设 name = 查键(字符串常量表, content)
-        设 len = 加(取长(content), 1)
+        设 len = 加(取字长(content), 1)
         result = 连接(result, name, " = private constant [", len, " x i8] c\"", content, "\\00\"", 换行)
         ki = 加(ki, 1)
     }
@@ -489,7 +489,6 @@
             call_ir = 连接(call_ir, 取(a_r, 0))
             设 av = 取(a_r, 1); reg = 取(a_r, 2)
             若 (大于(ai, 0)) { arg_regs = 连接(arg_regs, ", ") }
-            // 外部函数参数类型取决于声明; 对所有i8*参数直接传值
             arg_regs = 连接(arg_regs, "i8* ", av)
             ai = 加(ai, 1)
         }
@@ -497,6 +496,25 @@
         call_ir = 连接(call_ir, "  ", result_reg, " = call i8* @", op, "(", arg_regs, ")", 换行)
         返回(列表(call_ir, result_reg, reg))
     }
+
+    // 通用函数调用 fallback: 任何未知标识符作为函数名
+    // 这包括已加载的SanYan函数(解析, 编译顶层等)和用户定义函数
+    设 call_ir = ""
+    设 arg_regs = ""
+    设 arg_count = 列表取长(args)
+    设 ai = 0
+    循环 (小于(ai, arg_count)) {
+        设 a_val = 取(args, ai)
+        设 a_r = 编译(a_val, reg)
+        call_ir = 连接(call_ir, 取(a_r, 0))
+        设 av = 取(a_r, 1); reg = 取(a_r, 2)
+        若 (大于(ai, 0)) { arg_regs = 连接(arg_regs, ", ") }
+        arg_regs = 连接(arg_regs, "i8* ", av)
+        ai = 加(ai, 1)
+    }
+    设 r = 新寄存器(reg); 设 result_reg = 取(r, 0); reg = 取(r, 1)
+    call_ir = 连接(call_ir, "  ", result_reg, " = call i8* @", op, "(", arg_regs, ")", 换行)
+    返回(列表(call_ir, result_reg, reg))
 
     若 (字符串相等(op, "列表")) {
         设 s = ""
@@ -712,9 +730,9 @@
             设 gname = 取字符串常量(content)
             设 s = ""
             设 r = 新寄存器(reg); 设 gep = 取(r, 0); reg = 取(r, 1)
-            设 len = 加(取长(content), 1)
+            设 len = 加(取字长(content), 1)
             s = 连接("  ", gep, " = getelementptr inbounds [", len, " x i8], [", len, " x i8]* ", gname, ", i32 0, i32 0", 换行)
-            设 slen = 取长(content)
+            设 slen = 取字长(content)
             设 r = 新寄存器(reg); 设 str_obj = 取(r, 0); reg = 取(r, 1)
             s = 连接(s, "  ", str_obj, " = call i8* @rt_str_new(i8* ", gep, ", i32 ", slen, ")", 换行)
             返回(列表(s, str_obj, reg))

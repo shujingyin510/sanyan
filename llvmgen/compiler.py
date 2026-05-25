@@ -200,6 +200,14 @@ def _list_new_empty(evaluator, args):
     return []
 
 
+def _str_bytelen(evaluator, args):
+    """返回字符串 UTF-8 字节长度。"""
+    s = evaluator.eval(args[0])
+    if isinstance(s, str):
+        return TritValue(len(s.encode('utf-8')))
+    return TritValue(0)
+
+
 from ops.registry import register as _register
 
 _register('container_ops_list_contains', _list_contains)
@@ -245,6 +253,9 @@ def self_hosted_compile(source: str, module_name: str = 'main') -> str:
     evaluator.commands['存变量'] = (['d', 'k', 'v'], [['container_ops_dict_set', 'd', 'k', 'v']], {}, None)
     evaluator.commands['新列表'] = ([], [['return', ['container_ops_list_new_empty']]], {}, None)
     _register('container_ops_list_new_empty', _list_new_empty)
+    # 字符串字节长度 (UTF-8)
+    evaluator.commands['取字长'] = (['s'], [['container_ops_str_bytelen', 's']], {}, None)
+    _register('container_ops_str_bytelen', _str_bytelen)
 
     _register('container_ops_dict_set', ContainerOps.dict_set)
     # 查键: 字典键存在返回 value，否则返回空串
@@ -286,7 +297,7 @@ def self_hosted_compile(source: str, module_name: str = 'main') -> str:
             continue
         evaluator.eval(stmt)
 
-    # 2. 加载 llvmgen.san
+    # 2. 加载 llvmgen.san（求值 + 编译到 LLVM IR）
     with open(os.path.join(stdlib_dir, 'llvmgen.san'), encoding='utf-8') as f:
         llvmgen_code = f.read()
     llvmgen_ast = _parse_source(llvmgen_code)
@@ -302,8 +313,12 @@ def self_hosted_compile(source: str, module_name: str = 'main') -> str:
     if not isinstance(ast, list):
         raise SyntaxError(f'sugar.san 解析失败: {ast}')
 
-    # 4. llvmgen.san 生成 IR
-    ir_text = evaluator.eval(['编译顶层', ast])
+    # 4. 合并所有 AST（sugar + llvmgen + 用户）→ 编译顶层
+    # sugar.san 和 llvmgen.san 的函数定义需要在 LLVM IR 中
+    combined_ast = sugar_ast + llvmgen_ast + [ast]
+    combined_ast = ['do'] + [s for s in combined_ast if not (isinstance(s, list) and s[0] == 'export')]
+
+    ir_text = evaluator.eval(['编译顶层', combined_ast])
     if not isinstance(ir_text, str):
         raise RuntimeError(f'llvmgen.san 生成失败: {type(ir_text).__name__}')
 
