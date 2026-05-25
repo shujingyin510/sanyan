@@ -3,7 +3,6 @@
 #include "llvmgen.san"
 
 // 读取输入文件 → 解析 → 编译 → 输出 LLVM IR
-// 用法: 将输入路径替换到 san_read_file 的第一个参数
 设 content = san_read_file("build/_test_in.san", 0)
 若 (等于(content, 0)) {
     输出("error")
