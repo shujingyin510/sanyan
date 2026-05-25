@@ -37,6 +37,8 @@ def main():
     use_vm = '--vm' in args
     # --san 标志：使用自举编译器（sugar.san + llvmgen.san）生成原生可执行文件
     use_san = '--san' in args
+    # --pycc 标志：使用 Python codegen（SugarConverter 解析 + Python LLVM codegen）生成原生可执行文件
+    use_pycc = '--pycc' in args
     positional = [a for a in args if not a.startswith('--')]
 
     if positional:
@@ -50,6 +52,64 @@ def main():
         except UnicodeDecodeError:
             print(f'错误: 文件编码不是UTF-8 - {filepath}')
             sys.exit(1)
+
+        if use_pycc and not profiling:
+            # ── Python 原生编译路径：SugarConverter 解析 + Python codegen 生成 IR → 原生可执行文件 ──
+            from sugar import SugarConverter
+            from skin import SkinManager
+            import tempfile, subprocess, os
+
+            skin_mgr = SkinManager('chinese')
+            ast = SugarConverter.convert(code, skin_mgr)
+            from llvmgen.codegen import compile_top_level
+            cg = compile_top_level(ast)
+            ir_text = str(cg.module)
+
+            out_name = os.path.splitext(os.path.basename(filepath))[0]
+            out_exe = os.path.join('build', out_name + '_pycc.exe')
+
+            os.makedirs('build', exist_ok=True)
+            ir_path = os.path.join('build', out_name + '_pycc.ll')
+            asm_path = os.path.join('build', out_name + '_pycc.s')
+
+            with open(ir_path, 'w', encoding='utf-8') as f:
+                f.write(ir_text)
+            print(f'[pycc] LLVM IR → {ir_path} ({len(ir_text)} bytes)')
+
+            # llvmlite → asm
+            from llvmlite import binding as llvm_binding
+            llvm_binding.initialize_all_targets()
+            llvm_binding.initialize_native_asmprinter()
+
+            target = llvm_binding.Target.from_default_triple()
+            tm = target.create_target_machine(reloc='static', codemodel='large')
+            asm = tm.emit_assembly(llvm_binding.parse_assembly(ir_text))
+            with open(asm_path, 'w') as f:
+                f.write(asm)
+            print(f'[pycc] ASM → {asm_path}')
+
+            # GCC → exe
+            import subprocess as sp
+            gcc = os.environ.get('GCC', 'gcc')
+            env = os.environ.copy()
+            if 'GCC_PATH' in os.environ:
+                env['PATH'] = os.environ['GCC_PATH'] + os.pathsep + env.get('PATH', '')
+            sc_o = os.path.join('build', 'syscall.o')
+            sp.run([gcc, '-c', 'llvmgen/syscall.c', '-o', sc_o, '-std=c99', '-O2', '-nostartfiles'],
+                   check=True, env=env)
+            sp.run([gcc, '-c', asm_path, '-o', asm_path.replace('.s', '.o')],
+                   check=True, env=env)
+            sp.run([gcc, asm_path.replace('.s', '.o'), sc_o, '-o', out_exe,
+                     '-nostartfiles', '-e', 'main', '-lkernel32', '-lgcc',
+                     '-fno-stack-check', '-fno-stack-protector'],
+                    check=True, env=env)
+            print(f'[pycc] EXE → {out_exe}')
+
+            result = sp.run([out_exe], capture_output=True, text=True)
+            print(result.stdout, end='')
+            if result.stderr:
+                print(result.stderr, end='', file=sys.stderr)
+            sys.exit(result.returncode)
 
         if use_san and not profiling:
             # ── 自举编译路径：sugar.san 解析 + llvmgen.san 生成 IR → 原生可执行文件 ──
