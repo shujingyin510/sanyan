@@ -151,7 +151,7 @@
         返回(列表(s, val_reg, reg))
     }
 
-    若 (字符串相等(op, "加")) {
+    若 (字符串相等(op, "加") 或 字符串相等(op, "add")) {
         设 l_val = 取(args, 0)
         设 r_val = 取(args, 1)
         设 l_r = 编译(l_val, reg)
@@ -166,7 +166,7 @@
          返回(列表(s, bv, reg))
     }
 
-    若 (字符串相等(op, "减")) {
+    若 (字符串相等(op, "减") 或 字符串相等(op, "sub")) {
         设 arg_count = 列表取长(args)
         若 (等于(arg_count, 1)) {
             设 v_val = 取(args, 0)
@@ -204,30 +204,7 @@
         返回(列表(s, bv, reg))
     }
 
-    若 (字符串相等(op, "sub")) {
-        设 arg_count = 列表取长(args)
-        若 (等于(arg_count, 1)) {
-            设 v_val = 取(args, 0)
-            设 v_r = 编译(v_val, reg)
-            设 s = 取(v_r, 0); 设 vv = 取(v_r, 1); reg = 取(v_r, 2)
-            设 ub = unbox(vv, reg); s = 连接(s, 取(ub, 0)); 设 raw = 取(ub, 1); reg = 取(ub, 2)
-            设 r = 新寄存器(reg); 设 res = 取(r, 0); reg = 取(r, 1)
-            s = 连接(s, "  ", res, " = sub i64 0, ", raw, 换行)
-            设 bb = box(res, reg); s = 连接(s, 取(bb, 0)); 设 bv = 取(bb, 1); reg = 取(bb, 2)
-            返回(列表(s, bv, reg))
-        }
-        设 l_val = 取(args, 0); 设 r_val = 取(args, 1)
-        设 l_r = 编译(l_val, reg); 设 s = 取(l_r, 0); 设 lv = 取(l_r, 1); reg = 取(l_r, 2)
-        设 r_r = 编译(r_val, reg); s = 连接(s, 取(r_r, 0)); 设 rv = 取(r_r, 1); reg = 取(r_r, 2)
-        设 ub = unbox(lv, reg); s = 连接(s, 取(ub, 0)); 设 l_raw = 取(ub, 1); reg = 取(ub, 2)
-        设 ub = unbox(rv, reg); s = 连接(s, 取(ub, 0)); 设 r_raw = 取(ub, 1); reg = 取(ub, 2)
-        设 r = 新寄存器(reg); 设 res = 取(r, 0); reg = 取(r, 1)
-        s = 连接(s, "  ", res, " = sub i64 ", l_raw, ", ", r_raw, 换行)
-        设 bb = box(res, reg); s = 连接(s, 取(bb, 0)); 设 bv = 取(bb, 1); reg = 取(bb, 2)
-        返回(列表(s, bv, reg))
-    }
-
-    若 (字符串相等(op, "乘")) {
+    若 (字符串相等(op, "乘") 或 字符串相等(op, "mul")) {
         设 l_val = 取(args, 0); 设 r_val = 取(args, 1)
         设 l_r = 编译(l_val, reg)
         设 s = 取(l_r, 0); 设 lv = 取(l_r, 1); reg = 取(l_r, 2)
@@ -241,7 +218,7 @@
         返回(列表(s, bv, reg))
     }
 
-    若 (字符串相等(op, "除")) {
+    若 (字符串相等(op, "除") 或 字符串相等(op, "div")) {
         设 l_val = 取(args, 0); 设 r_val = 取(args, 1)
         设 l_r = 编译(l_val, reg)
         设 s = 取(l_r, 0); 设 lv = 取(l_r, 1); reg = 取(l_r, 2)
@@ -255,7 +232,7 @@
         返回(列表(s, bv, reg))
     }
 
-    若 (字符串相等(op, "小于")) {
+    若 (字符串相等(op, "小于") 或 字符串相等(op, "lt")) {
         设 l_val = 取(args, 0); 设 r_val = 取(args, 1)
         设 l_r = 编译(l_val, reg)
         设 s = 取(l_r, 0); 设 lv = 取(l_r, 1); reg = 取(l_r, 2)
@@ -271,7 +248,7 @@
         返回(列表(s, bv, reg))
     }
 
-    若 (字符串相等(op, "大于")) {
+    若 (字符串相等(op, "大于") 或 字符串相等(op, "gt")) {
         设 l_val = 取(args, 0); 设 r_val = 取(args, 1)
         设 l_r = 编译(l_val, reg)
         设 s = 取(l_r, 0); 设 lv = 取(l_r, 1); reg = 取(l_r, 2)
@@ -287,7 +264,7 @@
         返回(列表(s, bv, reg))
     }
 
-    若 (字符串相等(op, "等于")) {
+    若 (字符串相等(op, "等于") 或 字符串相等(op, "eq")) {
         设 l_val = 取(args, 0); 设 r_val = 取(args, 1)
         设 l_r = 编译(l_val, reg)
         设 s = 取(l_r, 0); 设 lv = 取(l_r, 1); reg = 取(l_r, 2)
@@ -574,7 +551,7 @@
     call_ir = 连接(call_ir, "  ", result_reg, " = call i8* @", ascii_op, "(", arg_regs, ")", 换行)
     返回(列表(call_ir, result_reg, reg))
 
-    若 (字符串相等(op, "列表")) {
+    若 (字符串相等(op, "列表") 或 字符串相等(op, "list")) {
         设 s = ""
         设 r = 新寄存器(reg); 设 lst_reg = 取(r, 0); reg = 取(r, 1)
         s = 连接(s, "  ", lst_reg, " = call i8* @rt_list_new()", 换行)
@@ -592,7 +569,7 @@
         返回(列表(s, lst_reg, reg))
     }
 
-    若 (字符串相等(op, "取")) {
+    若 (字符串相等(op, "取") 或 字符串相等(op, "get")) {
         设 container_ast = 取(args, 0)
         设 index_ast = 取(args, 1)
         设 c_r = 编译(container_ast, reg)
@@ -607,7 +584,7 @@
         返回(列表(s, result, reg))
     }
 
-    若 (字符串相等(op, "取长")) {
+    若 (字符串相等(op, "取长") 或 字符串相等(op, "len")) {
         设 c_ast = 取(args, 0)
         设 c_r = 编译(c_ast, reg)
         设 s = 取(c_r, 0); 设 cv = 取(c_r, 1); reg = 取(c_r, 2)
@@ -669,7 +646,7 @@
         返回(列表(s, d_reg, reg))
     }
 
-    若 (字符串相等(op, "连接")) {
+    若 (字符串相等(op, "连接") 或 字符串相等(op, "concat")) {
         设 s = ""
         设 count = 列表取长(args)
         若 (等于(count, 0)) {
