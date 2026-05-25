@@ -99,12 +99,13 @@ def main():
                 f.write(asm)
             print(f'[san] ASM → {asm_path}')
 
-            # GCC → exe (用 syscall.c 代替 runtime.c)
+            # GCC → exe (零 stdio: -nostartfiles -e main -lkernel32)
             import subprocess as sp
             sc_o = os.path.join('build', 'syscall.o')
-            sp.run(['gcc', '-c', 'llvmgen/syscall.c', '-o', sc_o, '-std=c99', '-O2'], check=True)
+            sp.run(['gcc', '-c', 'llvmgen/syscall.c', '-o', sc_o, '-std=c99', '-O2', '-nostartfiles'], check=True)
             sp.run(['gcc', '-c', asm_path, '-o', asm_path.replace('.s', '.o')], check=True)
-            sp.run(['gcc', asm_path.replace('.s', '.o'), sc_o, '-o', out_exe, '-lm', '-lgcc'], check=True)
+            sp.run(['gcc', asm_path.replace('.s', '.o'), sc_o, '-o', out_exe,
+                     '-nostartfiles', '-e', 'main', '-lkernel32', '-lgcc'], check=True)
             print(f'[san] EXE → {out_exe}')
 
             result = sp.run([out_exe], capture_output=True, text=True)

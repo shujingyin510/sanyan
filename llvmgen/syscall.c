@@ -1,8 +1,15 @@
-/* syscall.c — 最小的 syscall 桩，替代 runtime.c 的 libc printf 依赖 */
-#include <unistd.h>
+/* syscall.c — Windows 原生 syscall，零 stdio 依赖 */
+#include <windows.h>
 
 void san_sys_write(int fd, const char *buf, int len) {
-    write(fd, buf, len);
+    HANDLE h;
+    if (fd == 1) {
+        h = GetStdHandle(STD_OUTPUT_HANDLE);
+    } else if (fd == 2) {
+        h = GetStdHandle(STD_ERROR_HANDLE);
+    } else {
+        return;
+    }
+    DWORD written;
+    WriteFile(h, buf, (DWORD)len, &written, NULL);
 }
-
-void _start_rt(void) {}  /* 占位，避免链接器报错 */
