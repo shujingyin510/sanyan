@@ -27,9 +27,10 @@
     设 s = "; ModuleID = 'sanyan'"; s = 连接(s, 换行)
     s = 连接(s, "target triple = \"x86_64-pc-linux-gnu\""); s = 连接(s, 换行)
     s = 连接(s, 换行)
+    s = 连接(s, "declare void @san_sys_write(i32, i8*, i32)"); s = 连接(s, 换行)
+    s = 连接(s, "@_rt_buf = global [22 x i8] zeroinitializer"); s = 连接(s, 换行)
     s = 连接(s, 声明运行时())
     s = 连接(s, "@g_error = external global i8*"); s = 连接(s, 换行)
-    s = 连接(s, 换行)
     s = 连接(s, 换行)
     返回(s)
 }
@@ -46,8 +47,6 @@
 
 定义 声明运行时 () {
     设 s = "declare i8* @rt_awake(i8* noalias, i8* noalias, i8* noalias, i8* nocapture readonly)" ; s = 连接(s, 换行)
-    s = 连接(s, "declare void @rt_print_str(i8*)"); s = 连接(s, 换行)
-    s = 连接(s, "declare void @rt_print_int(i64)"); s = 连接(s, 换行)
     s = 连接(s, "declare i8* @rt_list_new()"); s = 连接(s, 换行)
     s = 连接(s, "declare void @rt_list_push_item(i8*, i8*)"); s = 连接(s, 换行)
     s = 连接(s, "declare i32 @rt_list_len(i8*)"); s = 连接(s, 换行)
@@ -307,9 +306,8 @@
         设 merge_l = 连接("merge_", merge_num)
         s = 连接(s, "  br i1 ", i1v, ", label %", then_l, ", label %", else_l, 换行)
         s = 连接(s, then_l, ":", 换行)
-        进入合并上下文(merge_l)
         设 t_r = 编译(then_ast, reg); s = 连接(s, 取(t_r, 0)); reg = 取(t_r, 2)
-        退出合并上下文()
+        s = 连接(s, "  br label %", merge_l, 换行)
         s = 连接(s, else_l, ":", 换行)
         s = 连接(s, "  br label %", merge_l, 换行)
         s = 连接(s, merge_l, ":", 换行)
@@ -651,6 +649,86 @@
     返回(列表("", "null", reg))
 }
 
+定义 生成运行时IR () {
+    // 返回所有运行时函数的 LLVM IR 定义
+    设 ir = ""
+
+    // ── rt_print_str ──
+    ir = 连接(ir, "define void @rt_print_str(i8* %str) {", 换行)
+    ir = 连接(ir, "entry:", 换行)
+    ir = 连接(ir, "  br label %scan", 换行)
+    ir = 连接(ir, "scan:", 换行)
+    ir = 连接(ir, "  %_si = phi i32 [ 0, %entry ], [ %_ni, %scan ]", 换行)
+    ir = 连接(ir, "  %_sp = getelementptr inbounds i8, i8* %str, i32 %_si", 换行)
+    ir = 连接(ir, "  %_sc = load i8, i8* %_sp", 换行)
+    ir = 连接(ir, "  %_sd = icmp eq i8 %_sc, 0", 换行)
+    ir = 连接(ir, "  %_ni = add i32 %_si, 1", 换行)
+    ir = 连接(ir, "  br i1 %_sd, label %write, label %scan", 换行)
+    ir = 连接(ir, "write:", 换行)
+    ir = 连接(ir, "  call void @san_sys_write(i32 1, i8* %str, i32 %_si)", 换行)
+    ir = 连接(ir, "  ret void", 换行)
+    ir = 连接(ir, "}", 换行)
+    ir = 连接(ir, 换行)
+
+    // ── rt_print_int ──
+    ir = 连接(ir, "define void @rt_print_int(i64 %tagged) {", 换行)
+    ir = 连接(ir, "entry:", 换行)
+    ir = 连接(ir, "  %raw = ashr i64 %tagged, 1", 换行)
+    ir = 连接(ir, "  %is_neg = icmp slt i64 %raw, 0", 换行)
+    ir = 连接(ir, "  %abs = sub i64 0, %raw", 换行)
+    ir = 连接(ir, "  %val = select i1 %is_neg, i64 %abs, i64 %raw", 换行)
+    ir = 连接(ir, "  br i1 %is_neg, label %put_sign, label %build", 换行)
+    ir = 连接(ir, "put_sign:", 换行)
+    ir = 连接(ir, "  %sp = getelementptr inbounds [22 x i8], [22 x i8]* @_rt_buf, i64 0, i32 0", 换行)
+    ir = 连接(ir, "  store i8 45, i8* %sp", 换行)
+    ir = 连接(ir, "  br label %build", 换行)
+    ir = 连接(ir, "build:", 换行)
+    ir = 连接(ir, "  %off = phi i32 [ 1, %put_sign ], [ 0, %entry ]", 换行)
+    ir = 连接(ir, "  br label %loop", 换行)
+    ir = 连接(ir, "loop:", 换行)
+    ir = 连接(ir, "  %i = phi i32 [ %off, %build ], [ %ni, %loop ]", 换行)
+    ir = 连接(ir, "  %v = phi i64 [ %val, %build ], [ %nv, %loop ]", 换行)
+    ir = 连接(ir, "  %p = getelementptr inbounds [22 x i8], [22 x i8]* @_rt_buf, i64 0, i32 %i", 换行)
+    ir = 连接(ir, "  %d = urem i64 %v, 10", 换行)
+    ir = 连接(ir, "  %ch64 = add i64 %d, 48", 换行)
+    ir = 连接(ir, "  %ch = trunc i64 %ch64 to i8", 换行)
+    ir = 连接(ir, "  store i8 %ch, i8* %p", 换行)
+    ir = 连接(ir, "  %nv = udiv i64 %v, 10", 换行)
+    ir = 连接(ir, "  %ni = add i32 %i, 1", 换行)
+    ir = 连接(ir, "  %ld = icmp eq i64 %nv, 0", 换行)
+    ir = 连接(ir, "  br i1 %ld, label %exit, label %loop", 换行)
+    ir = 连接(ir, "exit:", 换行)
+    ir = 连接(ir, "  %ei = phi i32 [ %ni, %loop ]", 换行)
+    ir = 连接(ir, "  %nl = getelementptr inbounds [22 x i8], [22 x i8]* @_rt_buf, i64 0, i32 %ei", 换行)
+    ir = 连接(ir, "  store i8 10, i8* %nl", 换行)
+    ir = 连接(ir, "  %re = sub i32 %ei, 1", 换行)
+    ir = 连接(ir, "  br label %rev_loop", 换行)
+    ir = 连接(ir, "rev_loop:", 换行)
+    ir = 连接(ir, "  %l = phi i32 [ %off, %exit ], [ %nl2, %rev_swap ]", 换行)
+    ir = 连接(ir, "  %r = phi i32 [ %re, %exit ], [ %nr2, %rev_swap ]", 换行)
+    ir = 连接(ir, "  %rd = icmp sge i32 %l, %r", 换行)
+    ir = 连接(ir, "  br i1 %rd, label %done, label %rev_swap", 换行)
+    ir = 连接(ir, "rev_swap:", 换行)
+    ir = 连接(ir, "  %lp = getelementptr inbounds [22 x i8], [22 x i8]* @_rt_buf, i64 0, i32 %l", 换行)
+    ir = 连接(ir, "  %rp = getelementptr inbounds [22 x i8], [22 x i8]* @_rt_buf, i64 0, i32 %r", 换行)
+    ir = 连接(ir, "  %lc = load i8, i8* %lp", 换行)
+    ir = 连接(ir, "  %rc = load i8, i8* %rp", 换行)
+    ir = 连接(ir, "  store i8 %rc, i8* %lp", 换行)
+    ir = 连接(ir, "  store i8 %lc, i8* %rp", 换行)
+    ir = 连接(ir, "  %nl2 = add i32 %l, 1", 换行)
+    ir = 连接(ir, "  %nr2 = sub i32 %r, 1", 换行)
+    ir = 连接(ir, "  br label %rev_loop", 换行)
+    ir = 连接(ir, "done:", 换行)
+    ir = 连接(ir, "  %tl = add i32 %ei, 1", 换行)
+    ir = 连接(ir, "  %startp = getelementptr inbounds [22 x i8], [22 x i8]* @_rt_buf, i64 0, i32 %off", 换行)
+    ir = 连接(ir, "  call void @san_sys_write(i32 1, i8* %startp, i32 %tl)", 换行)
+    ir = 连接(ir, "  ret void", 换行)
+    ir = 连接(ir, "}", 换行)
+    ir = 连接(ir, 换行)
+
+    返回(ir)
+}
+
 定义 编译顶层 (ast) {
     设 reg = 0
     设 alloca表 = 新字典()
@@ -661,10 +739,12 @@
     设 字符串计数器 = 0
     设 s = header()
     设 r = 编译(ast, reg)
-    // 生成字符串常量定义（从常量表去重生成）
+    // 生成字符串常量定义
     s = 连接(s, 生成字符串常量定义())
     s = 连接(s, 换行)
-    // 拼接所有函数定义
+    // 生成运行时函数定义（rt_print_int, rt_print_str 等）
+    s = 连接(s, 生成运行时IR())
+    // 拼接用户函数定义
     设 fn_count = 列表取长(函数库列表)
     设 fi = 0
     循环 (小于(fi, fn_count)) {
@@ -673,14 +753,6 @@
         fi = 加(fi, 1)
     }
     s = 连接(s, 换行)
-    // 拼接所有函数定义
-    设 fn_count = 列表取长(函数库列表)
-    设 fi = 0
-    循环 (小于(fi, fn_count)) {
-        设 fn_ir = 列表取(函数库列表, fi)
-        s = 连接(s, fn_ir)
-        fi = 加(fi, 1)
-    }
     s = 连接(s, "define i8* @main() {"); s = 连接(s, 换行)
     s = 连接(s, "entry:"); s = 连接(s, 换行)
     s = 连接(s, 取(r, 0))

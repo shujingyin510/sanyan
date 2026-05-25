@@ -73,26 +73,28 @@ def main():
             llvm_binding.initialize_all_targets()
             llvm_binding.initialize_native_asmprinter()
 
-            # 合并 runtime.ll + 用户 IR（字符串拼接，移除用户模块头）
+            # 自举生成运行时 IR + runtime.ll（列表/字典运行时）
+            combined_ir = ir_text
             runtime_ll_path = os.path.join('llvmgen', 'runtime.ll')
             if os.path.exists(runtime_ll_path):
                 with open(runtime_ll_path, encoding='utf-8') as f:
                     runtime_ir = f.read()
-                # 移除用户 IR 的 target triple、ModuleID、declare（runtime.ll 已提供）
+                # runtime.ll 定义列表/字典函数，llvmgen.san 已生成 print 函数
                 user_lines = ir_text.split('\n')
                 filtered = []
                 skip_depth = 0
-                seen_defines = set()
+                seen_defines = set(['rt_print_int', 'rt_print_str'])  # 由llvmgen.san生成
                 for line in user_lines:
                     if 'target triple' in line or 'ModuleID' in line:
                         continue
-                    if line.startswith('declare ') and ('@rt_print_int' in line or '@rt_print_str' in line):
-                        continue
                     if line.startswith('declare ') and any(x in line for x in [
+                        '@rt_print_int', '@rt_print_str',
                         '@rt_list_new', '@rt_list_push_item', '@rt_list_len', '@rt_list_get',
                         '@rt_dict_new', '@rt_dict_set', '@rt_dict_get',
-                        '@rt_awake'
+                        '@rt_awake', '@san_sys_write'
                     ]):
+                        continue
+                    if '@_rt_buf' in line:
                         continue
                     if skip_depth > 0:
                         skip_depth += line.count('{') - line.count('}')
@@ -105,8 +107,6 @@ def main():
                         seen_defines.add(name)
                     filtered.append(line)
                 combined_ir = runtime_ir + '\n' + '\n'.join(filtered)
-            else:
-                combined_ir = ir_text
 
             target = llvm_binding.Target.from_default_triple()
             tm = target.create_target_machine(reloc='static', codemodel='large')
