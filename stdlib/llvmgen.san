@@ -126,6 +126,42 @@
     返回(真)
 }
 
+定义 最后一行 (text) {
+    设 len = 取长(text)
+    若 (等于(len, 0)) { 返回("") }
+    设 end = 减(len, 1)
+    循环 (end >= 0) {
+        设 ch = 子串(text, end, 1)
+        若 (非(字符串包含(换行, ch))) { 跳出 }
+        end = 减(end, 1)
+    }
+    若 (end < 0) { 返回("") }
+    设 i = end
+    循环 (i >= 0) {
+        设 ch = 子串(text, i, 1)
+        若 (字符串包含(换行, ch)) {
+            返回(子串(text, 加(i, 1), 减(end, i)))
+        }
+        i = 减(i, 1)
+    }
+    返回(子串(text, 0, 加(end, 1)))
+}
+
+定义 不以终止指令结尾 (text) {
+    设 last = 最后一行(text)
+    若 (等于(取长(last), 0)) { 返回(假) }
+    若 (前缀(last, "ret ")) { 返回(假) }
+    若 (前缀(last, "br ")) { 返回(假) }
+    返回(真)
+}
+
+定义 确保终止 (s, merge_label) {
+    若 (不以终止指令结尾(s)) {
+        s = 连接(s, "  br label %", merge_label, 换行)
+    }
+    返回(s)
+}
+
 定义 编译 (ast, reg) {
     若 (是列表(ast)) {
         设 op = 取(ast, 0)
@@ -324,25 +360,29 @@
         设 r = 新寄存器(reg); 设 result_a = 取(r, 0); reg = 取(r, 1)
         s = 连接(s, "  ", result_a, " = alloca i8*", 换行)
         设 merge_num = reg; 设 then_num = 加(reg, 1); 设 else_num = 加(reg, 2)
+        reg = 加(reg, 3)   // 跳过标签编号，防止嵌套IF冲突
         设 then_l = 连接("then_", then_num); 设 else_l = 连接("else_", else_num)
         设 merge_l = 连接("merge_", merge_num)
         s = 连接(s, "  br i1 ", i1v, ", label %", then_l, ", label %", else_l, 换行)
         s = 连接(s, then_l, ":", 换行)
         设 t_r = 编译(then_ast, reg); 设 then_ir = 取(t_r, 0); s = 连接(s, then_ir)
         设 tv = 取(t_r, 1); 设 reg_then = 取(t_r, 2)
-        设 then_ends_ret = 字符串包含(then_ir, "ret")
-        若 (非(then_ends_ret)) {
+        若 (不以终止指令结尾(then_ir)) {
             s = 连接(s, "  store i8* ", tv, ", i8** ", result_a, 换行)
-            s = 连接(s, "  br label %", merge_l, 换行)
         }
+        s = 确保终止(s, merge_l)
+        s = 连接(s, else_l, ":", 换行)
         s = 连接(s, else_l, ":", 换行)
         设 reg_else = reg_then
         若 (has_else) {
             设 else_ast = 取(args, 2)
-            设 e_r = 编译(else_ast, reg_then); s = 连接(s, 取(e_r, 0)); 设 ev = 取(e_r, 1); reg_else = 取(e_r, 2)
-            s = 连接(s, "  store i8* ", ev, ", i8** ", result_a, 换行)
+            设 e_r = 编译(else_ast, reg_then); 设 else_ir = 取(e_r, 0); s = 连接(s, else_ir)
+            设 ev = 取(e_r, 1); reg_else = 取(e_r, 2)
+            若 (不以终止指令结尾(else_ir)) {
+                s = 连接(s, "  store i8* ", ev, ", i8** ", result_a, 换行)
+            }
         }
-        s = 连接(s, "  br label %", merge_l, 换行)
+        s = 确保终止(s, merge_l)
         s = 连接(s, merge_l, ":", 换行)
         若 (大于(reg_then, reg_else)) { reg = reg_then } 否则 { reg = reg_else }
         设 r = 新寄存器(reg); 设 result_val = 取(r, 0); reg = 取(r, 1)
@@ -362,8 +402,8 @@
         s = 连接(s, "  ", i1v, " = trunc i64 ", raw, " to i1", 换行)
         s = 连接(s, "  br i1 ", i1v, ", label %", body_l, ", label %", end_l, 换行)
         s = 连接(s, body_l, ":", 换行)
-        设 b_r = 编译(body_ast, reg); s = 连接(s, 取(b_r, 0)); reg = 取(b_r, 2)
-        s = 连接(s, "  br label %", hdr_l, 换行)
+        设 b_r = 编译(body_ast, reg); 设 body_ir = 取(b_r, 0); s = 连接(s, body_ir); reg = 取(b_r, 2)
+        s = 确保终止(s, hdr_l)
         s = 连接(s, end_l, ":", 换行)
         返回(列表(s, "null", reg))
     }
@@ -371,6 +411,7 @@
     若 (字符串相等(op, "loop")) {
         设 cond_ast = 取(args, 0); 设 body_ast = 取(args, 1)
         设 hdr_num = reg; 设 body_num = 加(reg, 1); 设 end_num = 加(reg, 2)
+        reg = 加(reg, 3)   // 跳过标签编号
         设 hdr_l = 连接("loop_hdr_", hdr_num); 设 body_l = 连接("loop_body_", body_num); 设 end_l = 连接("loop_end_", end_num)
         设 s = 连接("  br label %", hdr_l, 换行)
         s = 连接(s, hdr_l, ":", 换行)
@@ -380,8 +421,8 @@
         s = 连接(s, "  ", i1v, " = trunc i64 ", raw, " to i1", 换行)
         s = 连接(s, "  br i1 ", i1v, ", label %", body_l, ", label %", end_l, 换行)
         s = 连接(s, body_l, ":", 换行)
-        设 b_r = 编译(body_ast, reg); s = 连接(s, 取(b_r, 0)); reg = 取(b_r, 2)
-        s = 连接(s, "  br label %", hdr_l, 换行)
+        设 b_r = 编译(body_ast, reg); 设 body_ir2 = 取(b_r, 0); s = 连接(s, body_ir2); reg = 取(b_r, 2)
+        s = 确保终止(s, hdr_l)
         s = 连接(s, end_l, ":", 换行)
         返回(列表(s, "null", reg))
     }
