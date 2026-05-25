@@ -1,0 +1,14 @@
+// sanyan-cc.san — 自举编译器
+// 包含 sugar.san 解析器 和 llvmgen.san 代码生成器
+#include "sugar.san"
+#include "llvmgen.san"
+
+// 入口：读取输入文件，编译为 LLVM IR，输出到标准输出
+设 content = san_read_file(san_argv(1), 0)
+若 (等于(content, 0)) {
+    输出("error")
+} 否则 {
+    设 ast = 解析(content)
+    设 ir = 编译顶层(ast)
+    输出(ir)
+}

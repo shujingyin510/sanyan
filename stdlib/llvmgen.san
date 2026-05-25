@@ -30,6 +30,8 @@
     s = 连接(s, "declare void @san_sys_write(i32, i8*, i32)"); s = 连接(s, 换行)
     s = 连接(s, "declare i8* @_rt_malloc(i32)"); s = 连接(s, 换行)
     s = 连接(s, "declare void @_rt_free(i8*)"); s = 连接(s, 换行)
+    s = 连接(s, "declare i8* @san_read_file(i8*, i32*)"); s = 连接(s, 换行)
+    s = 连接(s, "declare void @san_write_file(i8*, i8*, i32)"); s = 连接(s, 换行)
     s = 连接(s, "@_rt_buf = global [22 x i8] zeroinitializer"); s = 连接(s, 换行)
     s = 连接(s, 声明运行时())
     s = 连接(s, "@g_error = external global i8*"); s = 连接(s, 换行)
