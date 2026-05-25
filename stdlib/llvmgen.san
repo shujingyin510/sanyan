@@ -615,8 +615,7 @@
         设 body_r = 编译(fn_body, reg)
         fn_ir = 连接(fn_ir, 取(body_r, 0))
         reg = 取(body_r, 2)
-        // 如果函数体没有显式返回，补充 ret i8* null
-        // 注意: 这会和显式return冲突产生死代码，但不妨碍IR解析
+        fn_ir = 连接(fn_ir, "dead_ret:", 换行)
         fn_ir = 连接(fn_ir, "  ret i8* null", 换行)
         fn_ir = 连接(fn_ir, "}", 换行)
         // 存入函数库
@@ -661,6 +660,7 @@
         设 c_r = 编译(catch_body, reg); 设 catch_ir = 取(c_r, 0); s = 连接(s, catch_ir); reg = 取(c_r, 2)
         退出合并上下文()
         s = 连接(s, cont_l, ":", 换行)
+        s = 连接(s, "  ret i8* null", 换行)
         返回(列表(s, "null", reg))
     }
 

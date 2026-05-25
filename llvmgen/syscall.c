@@ -19,27 +19,9 @@ void _rt_free(void *ptr) {
 }
 
 /* ── 运行时桩函数 ── */
-/* 字符串打印: 检查堆类型tag=1, 输出数据 */
-void rt_print_str(void *str) {
-    if (!str) return;
-    int *type = (int *)str;
-    if (*type == 1) {
-        // rt_str_t: [type:i32][len:i32][data:...]
-        int *len_ptr = (int *)((char *)str + 4);
-        char *data = (char *)str + 8;
-        san_sys_write(1, data, *len_ptr);
-    } else {
-        // raw C string
-        int len = 0;
-        char *s = (char *)str;
-        while (s[len]) len++;
-        san_sys_write(1, s, len);
-    }
-}
-
 /* 浮点打印: 暂用整数近似 */
 void rt_print_float(void *f) {
-    rt_print_str((void *)"<float>");
+    (void)f;
 }
 
 /* ── 文件 I/O ── */
