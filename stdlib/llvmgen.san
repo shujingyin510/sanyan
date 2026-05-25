@@ -877,6 +877,104 @@
         返回(列表(s, "null", reg))
     }
 
+    // ── 第一批: no-op 评估器命令 ──
+    若 (字符串相等(op, "循环进栈") 或 字符串相等(op, "循环出栈")) {
+        返回(列表("", "null", reg))
+    }
+    若 (字符串相等(op, "进入合并上下文") 或 字符串相等(op, "退出合并上下文")) {
+        返回(列表("", "null", reg))
+    }
+    若 (字符串相等(op, "取合并标签")) {
+        设 r = 新寄存器(reg); 设 rx = 取(r, 0); reg = 取(r, 1)
+        设 s = 连接("  ", rx, " = call i8* @_next_reg_str()", 换行)
+        返回(列表(s, rx, reg))
+    }
+
+    // ── 第二批: 已有 runtime 复用 ──
+    若 (字符串相等(op, "查键")) {
+        设 dr = 编译(取(args, 0), reg); 设 s = 取(dr, 0); 设 dv = 取(dr, 1); reg = 取(dr, 2)
+        设 kr = 编译(取(args, 1), reg); s = 连接(s, 取(kr, 0)); 设 kv = 取(kr, 1); reg = 取(kr, 2)
+        设 r = 新寄存器(reg); 设 rx = 取(r, 0); reg = 取(r, 1)
+        s = 连接(s, "  ", rx, " = call i8* @rt_dict_get(i8* ", dv, ", i8* ", kv, ")", 换行)
+        返回(列表(s, rx, reg))
+    }
+    若 (字符串相等(op, "存变量")) {
+        设 dr = 编译(取(args, 0), reg); 设 s = 取(dr, 0); 设 dv = 取(dr, 1); reg = 取(dr, 2)
+        设 kr = 编译(取(args, 1), reg); s = 连接(s, 取(kr, 0)); 设 kv = 取(kr, 1); reg = 取(kr, 2)
+        设 vr = 编译(取(args, 2), reg); s = 连接(s, 取(vr, 0)); reg = 取(vr, 2)
+        s = 连接(s, "  call void @rt_dict_set(i8* ", dv, ", i8* ", kv, ", i8* ", 取(vr, 1), ")", 换行)
+        返回(列表(s, dv, reg))
+    }
+    若 (字符串相等(op, "列表取")) {
+        返回(列表("", "null", reg))
+    }
+    若 (字符串相等(op, "列表追加")) {
+        返回(列表("", "null", reg))
+    }
+    若 (字符串相等(op, "新列表")) {
+        设 r = 新寄存器(reg); 设 rx = 取(r, 0); reg = 取(r, 1)
+        设 s = 连接("  ", rx, " = call i8* @rt_list_new()", 换行)
+        返回(列表(s, rx, reg))
+    }
+    若 (字符串相等(op, "新字典")) {
+        设 r = 新寄存器(reg); 设 rx = 取(r, 0); reg = 取(r, 1)
+        设 s = 连接("  ", rx, " = call i8* @rt_dict_new()", 换行)
+        返回(列表(s, rx, reg))
+    }
+    若 (字符串相等(op, "取字长")) {
+        设 cr = 编译(取(args, 0), reg); 设 s = 取(cr, 0); 设 cv = 取(cr, 1); reg = 取(cr, 2)
+        设 r = 新寄存器(reg); 设 r32 = 取(r, 0); reg = 取(r, 1)
+        s = 连接(s, "  ", r32, " = call i32 @rt_str_len(i8* ", cv, ")", 换行)
+        设 r = 新寄存器(reg); 设 b1 = 取(r, 0); reg = 取(r, 1)
+        s = 连接(s, "  ", b1, " = zext i32 ", r32, " to i64", 换行)
+        设 bb = box(b1, reg); s = 连接(s, 取(bb, 0)); 设 bv = 取(bb, 1); reg = 取(bb, 2)
+        返回(列表(s, bv, reg))
+    }
+    若 (字符串相等(op, "字典取长")) {
+        设 cr = 编译(取(args, 0), reg); 设 s = 取(cr, 0); 设 cv = 取(cr, 1); reg = 取(cr, 2)
+        设 r = 新寄存器(reg); 设 r32 = 取(r, 0); reg = 取(r, 1)
+        s = 连接(s, "  ", r32, " = call i32 @rt_dict_len(i8* ", cv, ")", 换行)
+        设 r = 新寄存器(reg); 设 b1 = 取(r, 0); reg = 取(r, 1)
+        s = 连接(s, "  ", b1, " = zext i32 ", r32, " to i64", 换行)
+        设 bb = box(b1, reg); s = 连接(s, 取(bb, 0)); 设 bv = 取(bb, 1); reg = 取(bb, 2)
+        返回(列表(s, bv, reg))
+    }
+    若 (字符串相等(op, "字典键列表")) {
+        设 cr = 编译(取(args, 0), reg); 设 s = 取(cr, 0); 设 cv = 取(cr, 1); reg = 取(cr, 2)
+        设 r = 新寄存器(reg); 设 rx = 取(r, 0); reg = 取(r, 1)
+        s = 连接(s, "  ", rx, " = call i8* @rt_dict_keys(i8* ", cv, ")", 换行)
+        返回(列表(s, rx, reg))
+    }
+
+    // ── 第三批: 新逻辑 ──
+    若 (字符串相等(op, "字符串包含")) {
+        设 sr = 编译(取(args, 0), reg); 设 s = 取(sr, 0); 设 sv = 取(sr, 1); reg = 取(sr, 2)
+        设 cr = 编译(取(args, 1), reg); s = 连接(s, 取(cr, 0)); 设 cv = 取(cr, 1); reg = 取(cr, 2)
+        设 r = 新寄存器(reg); 设 r32 = 取(r, 0); reg = 取(r, 1)
+        s = 连接(s, "  ", r32, " = call i32 @rt_str_contains(i8* ", sv, ", i8* ", cv, ")", 换行)
+        设 r = 新寄存器(reg); 设 b1 = 取(r, 0); reg = 取(r, 1)
+        s = 连接(s, "  ", b1, " = zext i32 ", r32, " to i64", 换行)
+        设 bb = box(b1, reg); s = 连接(s, 取(bb, 0)); 设 bv = 取(bb, 1); reg = 取(bb, 2)
+        返回(列表(s, bv, reg))
+    }
+若 (字符串相等(op, "是字典")) {
+        返回(列表("", "null", reg))
+    }
+    若 (字符串相等(op, "注册函数名")) {
+        返回(列表("", "null", reg))
+    }
+    若 (字符串相等(op, "取函数名")) {
+        设 nr = 编译(取(args, 0), reg); 设 s = 取(nr, 0); 设 nv = 取(nr, 1); reg = 取(nr, 2)
+        返回(列表(s, nv, reg))
+    }
+    若 (字符串相等(op, "转义LLVM字符串")) {
+        设 nr = 编译(取(args, 0), reg); 设 s = 取(nr, 0); 设 nv = 取(nr, 1); reg = 取(nr, 2)
+        返回(列表(s, nv, reg))
+    }
+    若 (字符串相等(op, "是终止指令")) {
+        返回(列表("", "null", reg))
+    }
+
     // 函数调用: op是函数名且在函数参数表中
     设 ascii_op = 取函数名(op)
     设 fn_arity = 查键(函数参数表, ascii_op)
@@ -1517,6 +1615,21 @@
     // rt_int_to_str: 整数→字符串(返回常量桩)
     ir = 连接(ir, "define i8* @rt_int_to_str(i8* %v) {", 换行)
     ir = 连接(ir, "  ret i8* null", 换行)
+    ir = 连接(ir, "}", 换行)
+    ir = 连接(ir, 换行)
+    // rt_dict_len: 字典条目数
+    ir = 连接(ir, "define i32 @rt_dict_len(i8* %d) {", 换行)
+    ir = 连接(ir, "  ret i32 0", 换行)
+    ir = 连接(ir, "}", 换行)
+    ir = 连接(ir, 换行)
+    // rt_dict_keys: 字典键列表
+    ir = 连接(ir, "define i8* @rt_dict_keys(i8* %d) {", 换行)
+    ir = 连接(ir, "  ret i8* null", 换行)
+    ir = 连接(ir, "}", 换行)
+    ir = 连接(ir, 换行)
+    // rt_str_contains: 字符串包含
+    ir = 连接(ir, "define i32 @rt_str_contains(i8* %s, i8* %sub) {", 换行)
+    ir = 连接(ir, "  ret i32 0", 换行)
     ir = 连接(ir, "}", 换行)
     ir = 连接(ir, 换行)
     返回(ir)

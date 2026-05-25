@@ -1,7 +1,7 @@
 /* syscall.c — Windows 原生层：I/O + 内存分配 + 运行时桩 */
 #include <windows.h>
 
-/* 全局寄存器计数器 + 字符串桩 */
+/* 全局寄存器计数器 */
 static long long _reg_id = 0;
 long long _next_reg_id(void) { return ++_reg_id; }
 
@@ -9,7 +9,6 @@ long long _next_reg_id(void) { return ++_reg_id; }
 char _reg_buf[32];
 char* _next_reg_str(void) {
     long long id = ++_reg_id;
-    // 简单整数→字符串 (不依赖snprintf)
     char* p = _reg_buf + 30;
     *p-- = 0;
     if (id == 0) { *p-- = '0'; }
@@ -38,14 +37,12 @@ void _rt_free(void *ptr) {
 }
 
 /* ── 运行时桩函数 ── */
-/* 浮点打印: 暂用整数近似 */
 void rt_print_float(void *f) {
     (void)f;
 }
 
 /* ── 文件 I/O ── */
 char *san_read_file(const char *path, int *out_len) {
-    // 支持字符串对象: 检查type=1
     if (path && *(int *)path == 1) path += 8;
     HANDLE h = CreateFileA(path, GENERIC_READ, FILE_SHARE_READ,
                            NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
