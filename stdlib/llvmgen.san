@@ -373,6 +373,11 @@
     若 (不以终止指令结尾(then_ir)) {
         s = 连接(s, "  store i8* ", tv, ", i8** ", result_a, 换行)
         s = 连接(s, "  br label %", merge_l, 换行)
+    } 否则 {
+        设 dead_l = 新标签("dead_t")
+        s = 连接(s, dead_l, ":", 换行)
+        s = 连接(s, "  store i8* ", tv, ", i8** ", result_a, 换行)
+        s = 连接(s, "  br label %", merge_l, 换行)
     }
         s = 连接(s, else_l, ":", 换行)
         设 reg_else = reg_then
@@ -431,13 +436,6 @@
     }
 
     若 (字符串相等(op, "继续") 或 字符串相等(op, "continue")) {
-        设 hdr = 循环栈顶()
-        若 (大于(取长(hdr), 0)) {
-            设 s = 连接("  br label %", hdr, 换行)
-            设 dead_l = 新标签("cont_dead")
-            s = 连接(s, dead_l, ":", 换行)
-            返回(列表(s, "null", reg))
-        }
         返回(列表("", "null", reg))
     }
 

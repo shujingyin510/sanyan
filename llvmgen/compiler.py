@@ -306,7 +306,19 @@ def _next_label(evaluator=None, args=None):
     return _label_counter
 
 
+def _is_terminated(evaluator, args):
+    """检查 LLVM IR 文本是否以终止指令 (ret/br) 结尾"""
+    text = args[0] if args else ""
+    if not text:
+        return TritValue(0)
+    last = text.rstrip().rsplit('\n', 1)[-1].strip()
+    if last.startswith('ret') or last.startswith('br'):
+        return TritValue(1)
+    return TritValue(0)
+
+
 _register('container_ops_next_label', _next_label)
+_register('container_ops_is_terminated', _is_terminated)
 
 _loop_stack_global = []
 
@@ -409,6 +421,9 @@ def self_hosted_compile(source: str, module_name: str = 'main') -> str:
     _register('container_ops_loop_pop', _loop_pop)
     _register('container_ops_loop_top', _loop_top)
 
+    evaluator.commands['是终止指令'] = (['s'], [['container_ops_is_terminated', 's']], {}, None)
+    _register('container_ops_is_terminated', _is_terminated)
+
     stdlib_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'stdlib')
 
     # 1. 加载 sugar.san
@@ -504,6 +519,9 @@ def compile_module_test(module_name: str) -> str:
     _register('container_ops_loop_push', _loop_push)
     _register('container_ops_loop_pop', _loop_pop)
     _register('container_ops_loop_top', _loop_top)
+
+    evaluator.commands['是终止指令'] = (['s'], [['container_ops_is_terminated', 's']], {}, None)
+    _register('container_ops_is_terminated', _is_terminated)
 
     stdlib_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'stdlib')
     # Load llvmgen.san
