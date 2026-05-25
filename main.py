@@ -78,15 +78,25 @@ def main():
             if os.path.exists(runtime_ll_path):
                 with open(runtime_ll_path, encoding='utf-8') as f:
                     runtime_ir = f.read()
-                # 移除用户 IR 的 target triple 和 declare（runtime.ll 已提供）
+                # 移除用户 IR 的 target triple、ModuleID、declare（runtime.ll 已提供）
                 user_lines = ir_text.split('\n')
                 filtered = []
-                skip = False
+                skip_depth = 0
+                seen_defines = set()
                 for line in user_lines:
                     if 'target triple' in line or 'ModuleID' in line:
                         continue
                     if line.startswith('declare ') and ('@rt_print_int' in line or '@rt_print_str' in line):
                         continue
+                    if skip_depth > 0:
+                        skip_depth += line.count('{') - line.count('}')
+                        continue
+                    if line.startswith('define ') and '@' in line:
+                        name = line.split('@')[1].split('(')[0]
+                        if name in seen_defines:
+                            skip_depth = 1
+                            continue
+                        seen_defines.add(name)
                     filtered.append(line)
                 combined_ir = runtime_ir + '\n' + '\n'.join(filtered)
             else:
@@ -101,11 +111,18 @@ def main():
 
             # GCC → exe (零 stdio: -nostartfiles -e main -lkernel32)
             import subprocess as sp
+            gcc = os.environ.get('GCC', 'gcc')
+            env = os.environ.copy()
+            if 'GCC_PATH' in os.environ:
+                env['PATH'] = os.environ['GCC_PATH'] + os.pathsep + env.get('PATH', '')
             sc_o = os.path.join('build', 'syscall.o')
-            sp.run(['gcc', '-c', 'llvmgen/syscall.c', '-o', sc_o, '-std=c99', '-O2', '-nostartfiles'], check=True)
-            sp.run(['gcc', '-c', asm_path, '-o', asm_path.replace('.s', '.o')], check=True)
-            sp.run(['gcc', asm_path.replace('.s', '.o'), sc_o, '-o', out_exe,
-                     '-nostartfiles', '-e', 'main', '-lkernel32', '-lgcc'], check=True)
+            sp.run([gcc, '-c', 'llvmgen/syscall.c', '-o', sc_o, '-std=c99', '-O2', '-nostartfiles'],
+                   check=True, env=env)
+            sp.run([gcc, '-c', asm_path, '-o', asm_path.replace('.s', '.o')],
+                   check=True, env=env)
+            sp.run([gcc, asm_path.replace('.s', '.o'), sc_o, '-o', out_exe,
+                     '-nostartfiles', '-e', 'main', '-lkernel32', '-lgcc'],
+                   check=True, env=env)
             print(f'[san] EXE → {out_exe}')
 
             result = sp.run([out_exe], capture_output=True, text=True)
