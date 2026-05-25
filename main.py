@@ -83,8 +83,7 @@ def main():
                 user_lines = ir_text.split('\n')
                 filtered = []
                 skip_depth = 0
-                seen_defines = set(['rt_print_int', 'rt_print_str',
-                                     'rt_list_new', 'rt_list_push_item', 'rt_list_len', 'rt_list_get'])
+                seen_defines = set(['rt_print_int', 'rt_print_str'])
                 for line in user_lines:
                     if 'target triple' in line or 'ModuleID' in line:
                         continue
@@ -92,7 +91,7 @@ def main():
                         '@rt_print_int', '@rt_print_str',
                         '@rt_list_new', '@rt_list_push_item', '@rt_list_len', '@rt_list_get',
                         '@rt_dict_new', '@rt_dict_set', '@rt_dict_get',
-                        '@rt_awake', '@san_sys_write', '@_rt_malloc', '@_rt_free'
+                        '@rt_awake', '@san_sys_write'
                     ]):
                         continue
                     if '@_rt_buf' in line or '@g_error' in line:

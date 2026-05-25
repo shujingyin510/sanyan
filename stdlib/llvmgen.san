@@ -50,7 +50,7 @@
 定义 声明运行时 () {
     设 s = "declare i8* @rt_awake(i8* noalias, i8* noalias, i8* noalias, i8* nocapture readonly)" ; s = 连接(s, 换行)
     s = 连接(s, "declare i8* @rt_list_new()"); s = 连接(s, 换行)
-    s = 连接(s, "declare void @rt_list_push_item(i8*, i8*)"); s = 连接(s, 换行)
+    s = 连接(s, "declare i8* @rt_list_push_item(i8*, i8*)"); s = 连接(s, 换行)
     s = 连接(s, "declare i32 @rt_list_len(i8*)"); s = 连接(s, 换行)
     s = 连接(s, "declare i8* @rt_list_get(i8*, i32)"); s = 连接(s, 换行)
     s = 连接(s, "declare i8* @rt_dict_new()"); s = 连接(s, 换行)
@@ -459,7 +459,9 @@
             设 elem = 取(args, i)
             设 e_r = 编译(elem, reg)
             s = 连接(s, 取(e_r, 0)); 设 ev = 取(e_r, 1); reg = 取(e_r, 2)
-            s = 连接(s, "  call void @rt_list_push_item(i8* ", lst_reg, ", i8* ", ev, ")", 换行)
+            设 tmp_r = 新寄存器(reg); 设 tmp_lst = 取(tmp_r, 0); reg = 取(tmp_r, 1)
+            s = 连接(s, "  ", tmp_lst, " = call i8* @rt_list_push_item(i8* ", lst_reg, ", i8* ", ev, ")", 换行)
+            lst_reg = tmp_lst
             i = 加(i, 1)
         }
         返回(列表(s, lst_reg, reg))
@@ -728,8 +730,7 @@
     ir = 连接(ir, "}", 换行)
     ir = 连接(ir, 换行)
 
-    // 列表/字典运行时暂用 runtime.ll（待调试后启用自举生成）
-    // ir = 连接(ir, 生成_列表操作())
+    ir = 连接(ir, 生成_列表操作())
 
     返回(ir)
 }

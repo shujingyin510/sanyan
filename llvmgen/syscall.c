@@ -11,7 +11,7 @@ void san_sys_write(int fd, const char *buf, int len) {
 }
 
 void *_rt_malloc(int size) {
-    return HeapAlloc(GetProcessHeap(), 0, (SIZE_T)size);
+    return HeapAlloc(GetProcessHeap(), HEAP_ZERO_MEMORY, (SIZE_T)size);
 }
 
 void _rt_free(void *ptr) {
