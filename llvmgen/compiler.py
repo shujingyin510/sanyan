@@ -204,6 +204,29 @@ from ops.registry import register as _register
 
 _register('container_ops_list_contains', _list_contains)
 
+# 合并上下文：用于控制流收敛（供 llvmgen.san handler 使用）
+_merge_label = ""
+
+
+def _set_merge_label(evaluator, args):
+    global _merge_label
+    _merge_label = evaluator.eval(args[0]) if args else ""
+    return TritValue(0)
+
+
+def _clear_merge_label(evaluator, args):
+    global _merge_label
+    _merge_label = ""
+    return TritValue(0)
+
+
+def _get_merge_label(*args):
+    return _merge_label
+
+
+_register('container_ops_set_merge_label', _set_merge_label)
+_register('container_ops_clear_merge_label', _clear_merge_label)
+
 
 def self_hosted_compile(source: str, module_name: str = 'main') -> str:
     """自举编译：sugar.san 解析 + llvmgen.san 生成 IR。零 Python codegen。"""
@@ -243,6 +266,11 @@ def self_hosted_compile(source: str, module_name: str = 'main') -> str:
     # 字典取所有键
     evaluator.commands['字典键列表'] = (['d'], [['container_ops_dict_keys', 'd']], {}, None)
     _register('container_ops_dict_keys', _dict_keys)
+    # 合并上下文控制
+    evaluator.commands['进入合并上下文'] = (['label'], [['container_ops_set_merge_label', 'label']], {}, None)
+    evaluator.commands['退出合并上下文'] = ([], [['container_ops_clear_merge_label']], {}, None)
+    evaluator.commands['取合并标签'] = ([], [['return', ['container_ops_get_merge_label']]], {}, None)
+    _register('container_ops_get_merge_label', _get_merge_label)
     _register('container_ops_list_get_safe', _list_get_safe)
 
     stdlib_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'stdlib')

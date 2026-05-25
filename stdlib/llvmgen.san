@@ -263,6 +263,8 @@
         设 p_val = 取(args, 0)
         设 v_r = 编译(p_val, reg)
         设 s = 取(v_r, 0); 设 vr = 取(v_r, 1); reg = 取(v_r, 2)
+        设 ml = 取合并标签()
+        设 has_ml = 大于(取长(ml), 0)
         设 lb_reg = 新寄存器(reg)
         设 r1 = 取(lb_reg, 0); 设 lbn = 取(lb_reg, 1); reg = lbn
         设 lb_reg = 新寄存器(reg)
@@ -271,14 +273,13 @@
         设 r3 = 取(lb_reg, 0); 设 lbn = 取(lb_reg, 1); reg = lbn
         设 lb_reg = 新寄存器(reg)
         设 r4 = 取(lb_reg, 0); 设 lbn = 取(lb_reg, 1); reg = lbn
-        // Labels use just the number, without %
         设 label_num = lbn
+        若 (has_ml) { 设 done_l = ml } 否则 { 设 done_l = 连接("done_", label_num) }
         s = 连接(s, "  ", r1, " = ptrtoint i8* ", vr, " to i64", 换行)
         s = 连接(s, "  ", r2, " = and i64 ", r1, ", 1", 换行)
         s = 连接(s, "  ", r3, " = icmp ne i64 ", r2, ", 0", 换行)
         s = 连接(s, "  br i1 ", r3, ", label %int_", label_num, ", label %str_", label_num, 换行)
         s = 连接(s, "int_", label_num, ":", 换行)
-        // unbox before printf
         设 ub_reg = 新寄存器(reg)
         设 ru1 = 取(ub_reg, 0); 设 lbn = 取(ub_reg, 1); reg = lbn
         设 ub_reg = 新寄存器(reg)
@@ -286,11 +287,13 @@
         s = 连接(s, "  ", ru1, " = ptrtoint i8* ", vr, " to i64", 换行)
         s = 连接(s, "  ", ru2, " = ashr i64 ", ru1, ", 1", 换行)
         s = 连接(s, "  call i32 (i8*, ...) @printf(i8* getelementptr inbounds ([4 x i8], [4 x i8]* @.fmt, i32 0, i32 0), i64 ", ru2, ")", 换行)
-        s = 连接(s, "  br label %done_", label_num, 换行)
+        s = 连接(s, "  br label %", done_l, 换行)
         s = 连接(s, "str_", label_num, ":", 换行)
         s = 连接(s, "  call void @rt_print_str(i8* ", vr, ")", 换行)
-        s = 连接(s, "  br label %done_", label_num, 换行)
-        s = 连接(s, "done_", label_num, ":", 换行)
+        s = 连接(s, "  br label %", done_l, 换行)
+        若 (非(has_ml)) {
+            s = 连接(s, done_l, ":", 换行)
+        }
         返回(列表(s, vr, reg))
     }
 
@@ -311,7 +314,9 @@
         设 merge_l = 连接("merge_", merge_num)
         s = 连接(s, "  br i1 ", i1v, ", label %", then_l, ", label %", else_l, 换行)
         s = 连接(s, then_l, ":", 换行)
+        进入合并上下文(merge_l)
         设 t_r = 编译(then_ast, reg); s = 连接(s, 取(t_r, 0)); reg = 取(t_r, 2)
+        退出合并上下文()
         s = 连接(s, else_l, ":", 换行)
         s = 连接(s, "  br label %", merge_l, 换行)
         s = 连接(s, merge_l, ":", 换行)
@@ -569,13 +574,22 @@
         s = 连接(s, body_l, ":", 换行)
         设 r = 新寄存器(reg); 设 elem = 取(r, 0); reg = 取(r, 1)
         s = 连接(s, "  ", elem, " = call i8* @rt_list_get(i8* ", lst_ptr, ", i32 ", i_val, ")", 换行)
-        设 r = 新寄存器(reg); 设 var_a = 取(r, 0); reg = 取(r, 1)
+        设 r = 新寄存器(reg);         设 var_a = 取(r, 0); reg = 取(r, 1)
         s = 连接(s, "  ", var_a, " = alloca i8*", 换行)
         s = 连接(s, "  store i8* ", elem, ", i8** ", var_a, 换行)
         存变量(alloca表, var_name, var_a)
+        // 设置合并上下文，body内的br会跳转到continue标签
+        设 cont_num = 加(reg, 3)
+        设 cont_l = 连接("forin_cont_", cont_num)
+        进入合并上下文(cont_l)
         设 b_r = 编译(body_ast, reg); s = 连接(s, 取(b_r, 0)); reg = 取(b_r, 2)
+        退出合并上下文()
+        // continue: 递增并跳回header
+        s = 连接(s, cont_l, ":", 换行)
+        设 r = 新寄存器(reg); 设 i_val2 = 取(r, 0); reg = 取(r, 1)
+        s = 连接(s, "  ", i_val2, " = load i32, i32* ", idx_a, 换行)
         设 r = 新寄存器(reg); 设 i_next = 取(r, 0); reg = 取(r, 1)
-        s = 连接(s, "  ", i_next, " = add i32 ", i_val, ", 1", 换行)
+        s = 连接(s, "  ", i_next, " = add i32 ", i_val2, ", 1", 换行)
         s = 连接(s, "  store i32 ", i_next, ", i32* ", idx_a, 换行)
         s = 连接(s, "  br label %", hdr_l, 换行)
         s = 连接(s, end_l, ":", 换行)
@@ -586,11 +600,15 @@
         设 body_ast = 取(args, 0)
         设 catch_info = 取(args, 1)
         设 catch_body = 取(catch_info, 2)
-        // 置 @g_error = null
         设 s = "  store i8* null, i8** @g_error"; s = 连接(s, 换行)
-        // 编译 try body
+        // 设置合并标签 -> try body内的br跳到check
+        设 r = 新寄存器(reg); reg = 取(r, 1)
+        设 check_num = 加(reg, 10)
+        设 check_l = 连接("try_check_", check_num)
+        进入合并上下文(check_l)
         设 b_r = 编译(body_ast, reg); s = 连接(s, 取(b_r, 0)); reg = 取(b_r, 2)
-        // 检查 @g_error
+        退出合并上下文()
+        s = 连接(s, check_l, ":", 换行)
         设 r = 新寄存器(reg); 设 err_ptr = 取(r, 0); reg = 取(r, 1)
         s = 连接(s, "  ", err_ptr, " = load i8*, i8** @g_error", 换行)
         设 r = 新寄存器(reg); 设 has_err = 取(r, 0); reg = 取(r, 1)
@@ -600,8 +618,10 @@
         设 cont_l = 连接("try_cont_", cont_num)
         s = 连接(s, "  br i1 ", has_err, ", label %", catch_l, ", label %", cont_l, 换行)
         s = 连接(s, catch_l, ":", 换行)
+        // catch body也使用合并上下文
+        进入合并上下文(cont_l)
         设 c_r = 编译(catch_body, reg); s = 连接(s, 取(c_r, 0)); reg = 取(c_r, 2)
-        s = 连接(s, "  br label %", cont_l, 换行)
+        退出合并上下文()
         s = 连接(s, cont_l, ":", 换行)
         返回(列表(s, "null", reg))
     }
