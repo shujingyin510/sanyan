@@ -88,6 +88,12 @@ def main():
                         continue
                     if line.startswith('declare ') and ('@rt_print_int' in line or '@rt_print_str' in line):
                         continue
+                    if line.startswith('declare ') and any(x in line for x in [
+                        '@rt_list_new', '@rt_list_push_item', '@rt_list_len', '@rt_list_get',
+                        '@rt_dict_new', '@rt_dict_set', '@rt_dict_get',
+                        '@rt_awake'
+                    ]):
+                        continue
                     if skip_depth > 0:
                         skip_depth += line.count('{') - line.count('}')
                         continue

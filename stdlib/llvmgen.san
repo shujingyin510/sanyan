@@ -571,18 +571,12 @@
         s = 连接(s, "  ", var_a, " = alloca i8*", 换行)
         s = 连接(s, "  store i8* ", elem, ", i8** ", var_a, 换行)
         存变量(alloca表, var_name, var_a)
-        // 设置合并上下文，body内的br会跳转到continue标签
-        设 cont_num = 加(reg, 3)
-        设 cont_l = 连接("forin_cont_", cont_num)
-        进入合并上下文(cont_l)
         设 b_r = 编译(body_ast, reg); s = 连接(s, 取(b_r, 0)); reg = 取(b_r, 2)
-        退出合并上下文()
-        // continue: 递增并跳回header
-        s = 连接(s, cont_l, ":", 换行)
-        设 r = 新寄存器(reg); 设 i_val2 = 取(r, 0); reg = 取(r, 1)
-        s = 连接(s, "  ", i_val2, " = load i32, i32* ", idx_a, 换行)
+        // 递增索引并跳回 header
+        设 r = 新寄存器(reg); 设 i_cur = 取(r, 0); reg = 取(r, 1)
+        s = 连接(s, "  ", i_cur, " = load i32, i32* ", idx_a, 换行)
         设 r = 新寄存器(reg); 设 i_next = 取(r, 0); reg = 取(r, 1)
-        s = 连接(s, "  ", i_next, " = add i32 ", i_val2, ", 1", 换行)
+        s = 连接(s, "  ", i_next, " = add i32 ", i_cur, ", 1", 换行)
         s = 连接(s, "  store i32 ", i_next, ", i32* ", idx_a, 换行)
         s = 连接(s, "  br label %", hdr_l, 换行)
         s = 连接(s, end_l, ":", 换行)
