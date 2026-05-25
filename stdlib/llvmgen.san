@@ -412,8 +412,10 @@
         设 pi = 0
         循环 (小于(pi, param_count)) {
             设 pn = 列表取(fn_params, pi)
+            // 参数名ASCII化（LLVM不支持中文参数名）
+            设 ascii_pn = 注册函数名(pn)
             若 (大于(pi, 0)) { fn_ir = 连接(fn_ir, ", ") }
-            fn_ir = 连接(fn_ir, "i8* %", pn, "_arg")
+            fn_ir = 连接(fn_ir, "i8* %", ascii_pn, "_arg")
             pi = 加(pi, 1)
         }
         fn_ir = 连接(fn_ir, ") {", 换行, "entry:", 换行)
@@ -421,10 +423,11 @@
         设 pi = 0
         循环 (小于(pi, param_count)) {
             设 pn = 列表取(fn_params, pi)
+            设 ascii_pn = 注册函数名(pn)
             设 r = 新寄存器(reg); 设 raw = 取(r, 0); reg = 取(r, 1)
             设 r = 新寄存器(reg); 设 val = 取(r, 0); reg = 取(r, 1)
             设 r = 新寄存器(reg); 设 a = 取(r, 0); reg = 取(r, 1)
-            fn_ir = 连接(fn_ir, "  ", raw, " = ptrtoint i8* %", pn, "_arg to i64", 换行)
+            fn_ir = 连接(fn_ir, "  ", raw, " = ptrtoint i8* %", ascii_pn, "_arg to i64", 换行)
             fn_ir = 连接(fn_ir, "  ", val, " = ashr i64 ", raw, ", 1", 换行)
             fn_ir = 连接(fn_ir, "  ", a, " = alloca i8*", 换行)
             // box the unboxed value: shl → or → inttoptr → store
@@ -463,6 +466,34 @@
         // 返回值已经boxed，直接ret
         s = 连接(s, "  ret i8* ", vr, 换行)
         返回(列表(s, vr, reg))
+    }
+
+    若 (字符串相等(op, "try")) {
+        设 body_ast = 取(args, 0)
+        设 catch_info = 取(args, 1)
+        设 catch_body = 取(catch_info, 2)
+        设 s = "  store i8* null, i8** @g_error"; s = 连接(s, 换行)
+        设 r = 新寄存器(reg); reg = 取(r, 1)
+        设 check_num = 加(reg, 10)
+        设 check_l = 连接("try_check_", check_num)
+        进入合并上下文(check_l)
+        设 b_r = 编译(body_ast, reg); 设 body_ir = 取(b_r, 0); s = 连接(s, body_ir); reg = 取(b_r, 2)
+        退出合并上下文()
+        s = 连接(s, check_l, ":", 换行)
+        设 r = 新寄存器(reg); 设 err_ptr = 取(r, 0); reg = 取(r, 1)
+        s = 连接(s, "  ", err_ptr, " = load i8*, i8** @g_error", 换行)
+        设 r = 新寄存器(reg); 设 has_err = 取(r, 0); reg = 取(r, 1)
+        s = 连接(s, "  ", has_err, " = icmp ne i8* ", err_ptr, ", null", 换行)
+        设 catch_num = 加(reg, 1); 设 cont_num = 加(reg, 2)
+        设 catch_l = 连接("catch_", catch_num)
+        设 cont_l = 连接("try_cont_", cont_num)
+        s = 连接(s, "  br i1 ", has_err, ", label %", catch_l, ", label %", cont_l, 换行)
+        s = 连接(s, catch_l, ":", 换行)
+        进入合并上下文(cont_l)
+        设 c_r = 编译(catch_body, reg); 设 catch_ir = 取(c_r, 0); s = 连接(s, catch_ir); reg = 取(c_r, 2)
+        退出合并上下文()
+        s = 连接(s, cont_l, ":", 换行)
+        返回(列表(s, "null", reg))
     }
 
     // 函数调用: op是函数名且在函数参数表中
@@ -708,36 +739,6 @@
         s = 连接(s, "  store i32 ", i_next, ", i32* ", idx_a, 换行)
         s = 连接(s, "  br label %", hdr_l, 换行)
         s = 连接(s, end_l, ":", 换行)
-        返回(列表(s, "null", reg))
-    }
-
-    若 (字符串相等(op, "try")) {
-        设 body_ast = 取(args, 0)
-        设 catch_info = 取(args, 1)
-        设 catch_body = 取(catch_info, 2)
-        设 s = "  store i8* null, i8** @g_error"; s = 连接(s, 换行)
-        // 设置合并标签 -> try body内的br跳到check
-        设 r = 新寄存器(reg); reg = 取(r, 1)
-        设 check_num = 加(reg, 10)
-        设 check_l = 连接("try_check_", check_num)
-        进入合并上下文(check_l)
-        设 b_r = 编译(body_ast, reg); s = 连接(s, 取(b_r, 0)); reg = 取(b_r, 2)
-        退出合并上下文()
-        s = 连接(s, check_l, ":", 换行)
-        设 r = 新寄存器(reg); 设 err_ptr = 取(r, 0); reg = 取(r, 1)
-        s = 连接(s, "  ", err_ptr, " = load i8*, i8** @g_error", 换行)
-        设 r = 新寄存器(reg); 设 has_err = 取(r, 0); reg = 取(r, 1)
-        s = 连接(s, "  ", has_err, " = icmp ne i8* ", err_ptr, ", null", 换行)
-        设 catch_num = 加(reg, 1); 设 cont_num = 加(reg, 2)
-        设 catch_l = 连接("catch_", catch_num)
-        设 cont_l = 连接("try_cont_", cont_num)
-        s = 连接(s, "  br i1 ", has_err, ", label %", catch_l, ", label %", cont_l, 换行)
-        s = 连接(s, catch_l, ":", 换行)
-        // catch body也使用合并上下文
-        进入合并上下文(cont_l)
-        设 c_r = 编译(catch_body, reg); s = 连接(s, 取(c_r, 0)); reg = 取(c_r, 2)
-        退出合并上下文()
-        s = 连接(s, cont_l, ":", 换行)
         返回(列表(s, "null", reg))
     }
 
