@@ -1,6 +1,10 @@
 /* syscall.c — Windows 原生层：I/O + 内存分配 + 运行时桩 */
 #include <windows.h>
 
+/* 全局寄存器计数器 */
+static long long _reg_id = 0;
+long long _next_reg_id(void) { return ++_reg_id; }
+
 void san_sys_write(int fd, const char *buf, int len) {
     HANDLE h;
     if (fd == 1) h = GetStdHandle(STD_OUTPUT_HANDLE);

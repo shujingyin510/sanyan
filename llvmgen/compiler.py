@@ -511,6 +511,45 @@ def self_hosted_compile(source: str, module_name: str = 'main') -> str:
     return ir_text
 
 
+def _fix_terminators(ir: str) -> str:
+    """确保 IR 中每个基本块都有终止指令 (ret/br/unreachable)。"""
+    lines = ir.split('\n')
+    result = []
+    in_block = False
+    has_term = True  # 初始为True,等第一个标签后开始检测
+    terminators = ('ret ', 'br ', 'unreachable', 'resume ', 'switch ', 'indirectbr ', 'callbr ')
+
+    for line in lines:
+        stripped = line.strip()
+        # 检测标签 = 新基本块 (无缩进，以:结尾，非注释非字符串)
+        is_label = (stripped and stripped.endswith(':') and 
+                   not stripped.startswith(';') and not stripped.startswith('"') and
+                   line[0] not in (' ', '\t') and not line.startswith('  '))
+
+        if is_label:
+            if in_block and not has_term:
+                result.append('  unreachable')
+            in_block = True
+            has_term = False
+
+        # } 结束函数
+        if stripped == '}':
+            if in_block and not has_term:
+                result.append('  unreachable')
+            in_block = False
+            has_term = True
+
+        # 检测终止指令
+        for t in terminators:
+            if t in stripped and not stripped.startswith(';') and not stripped.startswith('"'):
+                has_term = True
+                break
+
+        result.append(line)
+
+    return '\n'.join(result)
+
+
 def compile_module_test(module_name: str) -> str:
     """编译单个 .san 模块到 LLVM IR（测试用）。"""
     from evaluator import SanyanEvaluator
@@ -602,8 +641,9 @@ def compile_module_test(module_name: str) -> str:
     module_ast = ['do'] + [s for s in ast if not (isinstance(s, list) and s[0] == 'export')]
 
     evaluator.eval(['设置模块ID', 0])
-    evaluator._op_cache.clear()  # 编译前清空(防box/unbox旧缓存)
+    evaluator._op_cache.clear()
     ir = evaluator.eval(['编译顶层', module_ast])
+    ir = _fix_terminators(ir) if isinstance(ir, str) else ''
     return ir if isinstance(ir, str) else ''
 
 

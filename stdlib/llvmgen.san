@@ -14,6 +14,7 @@
     s = 连接(s, "declare void @_rt_free(i8*)"); s = 连接(s, 换行)
     s = 连接(s, "declare i8* @san_read_file(i8*, i32*)"); s = 连接(s, 换行)
     s = 连接(s, "declare void @san_write_file(i8*, i8*, i32)"); s = 连接(s, 换行)
+    s = 连接(s, "declare i64 @_next_reg_id()"); s = 连接(s, 换行)
     s = 连接(s, "@_rt_buf = global [22 x i8] zeroinitializer"); s = 连接(s, 换行)
     s = 连接(s, 声明运行时())
     s = 连接(s, "@g_error = external global i8*"); s = 连接(s, 换行)
@@ -173,6 +174,18 @@
             s = 连接(s, "  store i8* ", val_reg, ", i8** ", a, 换行)
         }
         返回(列表(s, val_reg, reg))
+    }
+
+    若 (字符串相等(op, "新寄存器ID")) {
+        设 r = 新寄存器(reg); 设 rx = 取(r, 0); reg = 取(r, 1)
+        设 s = 连接("  ", rx, " = call i64 @_next_reg_id()", 换行)
+        返回(列表(s, rx, reg))
+    }
+
+    若 (字符串相等(op, "新标签ID")) {
+        设 r = 新寄存器(reg); 设 rx = 取(r, 0); reg = 取(r, 1)
+        设 s = 连接("  ", rx, " = call i64 @_next_reg_id()", 换行)
+        返回(列表(s, rx, reg))
     }
 
     若 (字符串相等(op, "box")) {
@@ -615,8 +628,6 @@
         设 body_r = 编译(fn_body, reg)
         fn_ir = 连接(fn_ir, 取(body_r, 0))
         reg = 取(body_r, 2)
-        fn_ir = 连接(fn_ir, "dead_ret:", 换行)
-        fn_ir = 连接(fn_ir, "  ret i8* null", 换行)
         fn_ir = 连接(fn_ir, "}", 换行)
         // 存入函数库
         设 函数库列表 = 列表追加(函数库列表, fn_ir)
