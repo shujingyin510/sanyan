@@ -30,6 +30,7 @@
     s = 连接(s, 声明运行时())
     s = 连接(s, 换行)
     s = 连接(s, "@.fmt = private constant [4 x i8] c\"%d\\0a\\00\""); s = 连接(s, 换行)
+    s = 连接(s, "@g_error = external global i8*"); s = 连接(s, 换行)
     s = 连接(s, 换行)
     返回(s)
 }
@@ -578,6 +579,30 @@
         s = 连接(s, "  store i32 ", i_next, ", i32* ", idx_a, 换行)
         s = 连接(s, "  br label %", hdr_l, 换行)
         s = 连接(s, end_l, ":", 换行)
+        返回(列表(s, "null", reg))
+    }
+
+    若 (字符串相等(op, "try")) {
+        设 body_ast = 取(args, 0)
+        设 catch_info = 取(args, 1)
+        设 catch_body = 取(catch_info, 2)
+        // 置 @g_error = null
+        设 s = "  store i8* null, i8** @g_error"; s = 连接(s, 换行)
+        // 编译 try body
+        设 b_r = 编译(body_ast, reg); s = 连接(s, 取(b_r, 0)); reg = 取(b_r, 2)
+        // 检查 @g_error
+        设 r = 新寄存器(reg); 设 err_ptr = 取(r, 0); reg = 取(r, 1)
+        s = 连接(s, "  ", err_ptr, " = load i8*, i8** @g_error", 换行)
+        设 r = 新寄存器(reg); 设 has_err = 取(r, 0); reg = 取(r, 1)
+        s = 连接(s, "  ", has_err, " = icmp ne i8* ", err_ptr, ", null", 换行)
+        设 catch_num = 加(reg, 1); 设 cont_num = 加(reg, 2)
+        设 catch_l = 连接("catch_", catch_num)
+        设 cont_l = 连接("try_cont_", cont_num)
+        s = 连接(s, "  br i1 ", has_err, ", label %", catch_l, ", label %", cont_l, 换行)
+        s = 连接(s, catch_l, ":", 换行)
+        设 c_r = 编译(catch_body, reg); s = 连接(s, 取(c_r, 0)); reg = 取(c_r, 2)
+        s = 连接(s, "  br label %", cont_l, 换行)
+        s = 连接(s, cont_l, ":", 换行)
         返回(列表(s, "null", reg))
     }
 
