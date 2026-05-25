@@ -297,6 +297,42 @@ def _get_merge_label(*args):
 _register('container_ops_set_merge_label', _set_merge_label)
 _register('container_ops_clear_merge_label', _clear_merge_label)
 
+_label_counter = 0
+
+
+def _next_label(evaluator=None, args=None):
+    global _label_counter
+    _label_counter += 1
+    return _label_counter
+
+
+_register('container_ops_next_label', _next_label)
+
+_loop_stack_global = []
+
+
+def _loop_push(evaluator=None, args=None):
+    hdr = args[0] if args else ""
+    _loop_stack_global.append(hdr)
+    return 0
+
+
+def _loop_pop(evaluator=None, args=None):
+    if _loop_stack_global:
+        _loop_stack_global.pop()
+    return 0
+
+
+def _loop_top(evaluator=None, args=None):
+    if _loop_stack_global:
+        return _loop_stack_global[-1]
+    return ""
+
+
+_register('container_ops_loop_push', _loop_push)
+_register('container_ops_loop_pop', _loop_pop)
+_register('container_ops_loop_top', _loop_top)
+
 
 def self_hosted_compile(source: str, module_name: str = 'main') -> str:
     """自举编译：sugar.san 解析 + llvmgen.san 生成 IR。零 Python codegen。"""
@@ -362,6 +398,16 @@ def self_hosted_compile(source: str, module_name: str = 'main') -> str:
     evaluator.commands['取合并标签'] = ([], [['return', ['container_ops_get_merge_label']]], {}, None)
     _register('container_ops_get_merge_label', _get_merge_label)
     _register('container_ops_list_get_safe', _list_get_safe)
+
+    evaluator.commands['新标签ID'] = ([], [['return', ['container_ops_next_label']]], {}, None)
+    _register('container_ops_next_label', _next_label)
+
+    evaluator.commands['循环进栈'] = (['label'], [['container_ops_loop_push', 'label']], {}, None)
+    evaluator.commands['循环出栈'] = ([], [['container_ops_loop_pop']], {}, None)
+    evaluator.commands['循环栈顶'] = ([], [['return', ['container_ops_loop_top']]], {}, None)
+    _register('container_ops_loop_push', _loop_push)
+    _register('container_ops_loop_pop', _loop_pop)
+    _register('container_ops_loop_top', _loop_top)
 
     stdlib_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'stdlib')
 
@@ -448,6 +494,16 @@ def compile_module_test(module_name: str) -> str:
     evaluator.commands['退出合并上下文'] = ([], [['container_ops_clear_merge_label']], {}, None)
     evaluator.commands['取合并标签'] = ([], [['return', ['container_ops_get_merge_label']]], {}, None)
     _register('container_ops_get_merge_label', _get_merge_label)
+
+    evaluator.commands['新标签ID'] = ([], [['return', ['container_ops_next_label']]], {}, None)
+    _register('container_ops_next_label', _next_label)
+
+    evaluator.commands['循环进栈'] = (['label'], [['container_ops_loop_push', 'label']], {}, None)
+    evaluator.commands['循环出栈'] = ([], [['container_ops_loop_pop']], {}, None)
+    evaluator.commands['循环栈顶'] = ([], [['return', ['container_ops_loop_top']]], {}, None)
+    _register('container_ops_loop_push', _loop_push)
+    _register('container_ops_loop_pop', _loop_pop)
+    _register('container_ops_loop_top', _loop_top)
 
     stdlib_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'stdlib')
     # Load llvmgen.san

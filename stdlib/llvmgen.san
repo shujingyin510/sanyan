@@ -59,6 +59,11 @@
 设 字符串常量列表 = 新列表()   // list of global constant IR strings
 设 字符串计数器 = 0
 
+定义 新标签 (prefix) {
+    设 id = 新标签ID()
+    返回(连接(prefix, id))
+}
+
 定义 取字符串常量 (content) {
     设 existing = 查键(字符串常量表, content)
     若 (大于(取长(existing), 0)) {
@@ -360,10 +365,7 @@
         // alloca 存结果
         设 r = 新寄存器(reg); 设 result_a = 取(r, 0); reg = 取(r, 1)
         s = 连接(s, "  ", result_a, " = alloca i8*", 换行)
-        设 merge_num = reg; 设 then_num = 加(reg, 1); 设 else_num = 加(reg, 2)
-        reg = 加(reg, 3)   // 跳过标签编号，防止嵌套IF冲突
-        设 then_l = 连接("then_", then_num); 设 else_l = 连接("else_", else_num)
-        设 merge_l = 连接("merge_", merge_num)
+        设 then_l = 新标签("then"); 设 else_l = 新标签("else"); 设 merge_l = 新标签("merge")
         s = 连接(s, "  br i1 ", i1v, ", label %", then_l, ", label %", else_l, 换行)
         s = 连接(s, then_l, ":", 换行)
     设 t_r = 编译(then_ast, reg); 设 then_ir = 取(t_r, 0); s = 连接(s, then_ir)
@@ -392,8 +394,7 @@
 
     若 (字符串相等(op, "循环")) {
         设 cond_ast = 取(args, 0); 设 body_ast = 取(args, 1)
-        设 hdr_num = reg; 设 body_num = 加(reg, 1); 设 end_num = 加(reg, 2)
-        设 hdr_l = 连接("loop_hdr_", hdr_num); 设 body_l = 连接("loop_body_", body_num); 设 end_l = 连接("loop_end_", end_num)
+        设 hdr_l = 新标签("loop_hdr"); 设 body_l = 新标签("loop_body"); 设 end_l = 新标签("loop_end")
         设 s = 连接("  br label %", hdr_l, 换行)
         s = 连接(s, hdr_l, ":", 换行)
         设 cond_r = 编译(cond_ast, reg); s = 连接(s, 取(cond_r, 0)); 设 cv = 取(cond_r, 1); reg = 取(cond_r, 2)
@@ -402,7 +403,9 @@
         s = 连接(s, "  ", i1v, " = trunc i64 ", raw, " to i1", 换行)
         s = 连接(s, "  br i1 ", i1v, ", label %", body_l, ", label %", end_l, 换行)
         s = 连接(s, body_l, ":", 换行)
+        循环进栈(hdr_l)
         设 b_r = 编译(body_ast, reg); s = 连接(s, 取(b_r, 0)); reg = 取(b_r, 2)
+        循环出栈()
         s = 连接(s, "  br label %", hdr_l, 换行)
         s = 连接(s, end_l, ":", 换行)
         返回(列表(s, "null", reg))
@@ -410,9 +413,7 @@
 
     若 (字符串相等(op, "loop")) {
         设 cond_ast = 取(args, 0); 设 body_ast = 取(args, 1)
-        设 hdr_num = reg; 设 body_num = 加(reg, 1); 设 end_num = 加(reg, 2)
-        reg = 加(reg, 3)   // 跳过标签编号
-        设 hdr_l = 连接("loop_hdr_", hdr_num); 设 body_l = 连接("loop_body_", body_num); 设 end_l = 连接("loop_end_", end_num)
+        设 hdr_l = 新标签("loop_hdr"); 设 body_l = 新标签("loop_body"); 设 end_l = 新标签("loop_end")
         设 s = 连接("  br label %", hdr_l, 换行)
         s = 连接(s, hdr_l, ":", 换行)
         设 cond_r = 编译(cond_ast, reg); s = 连接(s, 取(cond_r, 0)); 设 cv = 取(cond_r, 1); reg = 取(cond_r, 2)
@@ -421,10 +422,23 @@
         s = 连接(s, "  ", i1v, " = trunc i64 ", raw, " to i1", 换行)
         s = 连接(s, "  br i1 ", i1v, ", label %", body_l, ", label %", end_l, 换行)
         s = 连接(s, body_l, ":", 换行)
+        循环进栈(hdr_l)
         设 b_r = 编译(body_ast, reg); s = 连接(s, 取(b_r, 0)); reg = 取(b_r, 2)
+        循环出栈()
         s = 连接(s, "  br label %", hdr_l, 换行)
         s = 连接(s, end_l, ":", 换行)
         返回(列表(s, "null", reg))
+    }
+
+    若 (字符串相等(op, "继续") 或 字符串相等(op, "continue")) {
+        设 hdr = 循环栈顶()
+        若 (大于(取长(hdr), 0)) {
+            设 s = 连接("  br label %", hdr, 换行)
+            设 dead_l = 新标签("cont_dead")
+            s = 连接(s, dead_l, ":", 换行)
+            返回(列表(s, "null", reg))
+        }
+        返回(列表("", "null", reg))
     }
 
     若 (字符串相等(op, "do")) {
@@ -753,10 +767,7 @@
         设 r = 新寄存器(reg); 设 idx_a = 取(r, 0); reg = 取(r, 1)
         s = 连接(s, "  ", idx_a, " = alloca i32", 换行)
         s = 连接(s, "  store i32 0, i32* ", idx_a, 换行)
-        设 hdr_num = reg; 设 body_num = 加(reg, 1); 设 end_num = 加(reg, 2)
-        设 hdr_l = 连接("forin_hdr_", hdr_num)
-        设 body_l = 连接("forin_body_", body_num)
-        设 end_l = 连接("forin_end_", end_num)
+        设 hdr_l = 新标签("forin_hdr"); 设 body_l = 新标签("forin_body"); 设 end_l = 新标签("forin_end")
         s = 连接(s, "  br label %", hdr_l, 换行)
         s = 连接(s, hdr_l, ":", 换行)
         设 r = 新寄存器(reg); 设 i_val = 取(r, 0); reg = 取(r, 1)
@@ -771,7 +782,9 @@
         s = 连接(s, "  ", var_a, " = alloca i8*", 换行)
         s = 连接(s, "  store i8* ", elem, ", i8** ", var_a, 换行)
         存变量(alloca表, var_name, var_a)
+        循环进栈(hdr_l)
         设 b_r = 编译(body_ast, reg); s = 连接(s, 取(b_r, 0)); reg = 取(b_r, 2)
+        循环出栈()
         // 递增索引并跳回 header
         设 r = 新寄存器(reg); 设 i_cur = 取(r, 0); reg = 取(r, 1)
         s = 连接(s, "  ", i_cur, " = load i32, i32* ", idx_a, 换行)
