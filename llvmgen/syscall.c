@@ -20,6 +20,8 @@ void _rt_free(void *ptr) {
 
 /* ── 文件 I/O ── */
 char *san_read_file(const char *path, int *out_len) {
+    // 支持字符串对象: 检查type=1
+    if (path && *(int *)path == 1) path += 8;
     HANDLE h = CreateFileA(path, GENERIC_READ, FILE_SHARE_READ,
                            NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
     if (h == INVALID_HANDLE_VALUE) return NULL;

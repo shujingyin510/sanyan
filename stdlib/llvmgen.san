@@ -452,6 +452,52 @@
         返回(列表(call_ir, result_reg, reg))
     }
 
+    // 外部C函数调用: san_read_file, san_write_file, san_argv, san_argc, _rt_malloc, _rt_free
+    设 is_extern = 假
+    若 (字符串相等(op, "san_read_file")) {
+        设 call_ir = ""
+        设 a1 = 取(args, 0)
+        设 r1 = 编译(a1, reg)
+        call_ir = 连接(call_ir, 取(r1, 0)); 设 av1 = 取(r1, 1); reg = 取(r1, 2)
+        设 r = 新寄存器(reg); 设 result_reg = 取(r, 0); reg = 取(r, 1)
+        call_ir = 连接(call_ir, "  ", result_reg, " = call i8* @san_read_file(i8* ", av1, ", i32* null)", 换行)
+        返回(列表(call_ir, result_reg, reg))
+    }
+    若 (字符串相等(op, "san_write_file")) {
+        设 call_ir = ""
+        设 a1 = 取(args, 0); 设 r1 = 编译(a1, reg)
+        call_ir = 连接(call_ir, 取(r1, 0)); 设 av1 = 取(r1, 1); reg = 取(r1, 2)
+        设 a2 = 取(args, 1); 设 r2 = 编译(a2, reg)
+        call_ir = 连接(call_ir, 取(r2, 0)); 设 av2 = 取(r2, 1); reg = 取(r2, 2)
+        设 a3 = 取(args, 2); 设 r3 = 编译(a3, reg)
+        call_ir = 连接(call_ir, 取(r3, 0)); 设 av3 = 取(r3, 1); reg = 取(r3, 2)
+        call_ir = 连接(call_ir, "  call void @san_write_file(i8* ", av1, ", i8* ", av2, ", i32 0)", 换行)
+        返回(列表(call_ir, "null", reg))
+    }
+    若 (字符串相等(op, "san_argv")) { is_extern = 真 }
+    若 (字符串相等(op, "san_argc")) { is_extern = 真 }
+    若 (字符串相等(op, "_rt_malloc")) { is_extern = 真 }
+    若 (字符串相等(op, "_rt_free")) { is_extern = 真 }
+    若 (is_extern) {
+        设 call_ir = ""
+        设 arg_regs = ""
+        设 arg_count = 列表取长(args)
+        设 ai = 0
+        循环 (小于(ai, arg_count)) {
+            设 a_val = 取(args, ai)
+            设 a_r = 编译(a_val, reg)
+            call_ir = 连接(call_ir, 取(a_r, 0))
+            设 av = 取(a_r, 1); reg = 取(a_r, 2)
+            若 (大于(ai, 0)) { arg_regs = 连接(arg_regs, ", ") }
+            // 外部函数参数类型取决于声明; 对所有i8*参数直接传值
+            arg_regs = 连接(arg_regs, "i8* ", av)
+            ai = 加(ai, 1)
+        }
+        设 r = 新寄存器(reg); 设 result_reg = 取(r, 0); reg = 取(r, 1)
+        call_ir = 连接(call_ir, "  ", result_reg, " = call i8* @", op, "(", arg_regs, ")", 换行)
+        返回(列表(call_ir, result_reg, reg))
+    }
+
     若 (字符串相等(op, "列表")) {
         设 s = ""
         设 r = 新寄存器(reg); 设 lst_reg = 取(r, 0); reg = 取(r, 1)
@@ -875,6 +921,13 @@
     ir = 连接(ir, "  %_li = bitcast i8* %_lp to i32*", 换行)
     ir = 连接(ir, "  %_l = load i32, i32* %_li", 换行)
     ir = 连接(ir, "  ret i32 %_l", 换行)
+    ir = 连接(ir, "}", 换行)
+    ir = 连接(ir, 换行)
+
+    // rt_str_as_cstr: 提取字符串原始数据指针(用于C函数)
+    ir = 连接(ir, "define i8* @rt_str_as_cstr(i8* %s) {", 换行)
+    ir = 连接(ir, "  %_dp = getelementptr i8, i8* %s, i32 8", 换行)
+    ir = 连接(ir, "  ret i8* %_dp", 换行)
     ir = 连接(ir, "}", 换行)
     ir = 连接(ir, 换行)
 
