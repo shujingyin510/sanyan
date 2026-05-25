@@ -35,11 +35,26 @@ def resolve_op_name(evaluator, op: str) -> str:
     return internal
 
 
+# 不可缓存的函数：有副作用，每次调用必须重新查找
+_NO_CACHE_OPS = frozenset({
+    '新寄存器', '新标签', '新槽',
+    'container_ops_next_reg', 'container_ops_next_label',
+})
+
+
 def dispatch_op(evaluator, internal: str, args: list):
     """从注册表查询并执行内置操作。"""
     from sandbox import check_op
 
     check_op(internal)
+    if internal in _NO_CACHE_OPS:
+        entry = get_op(internal)
+        if entry is not None:
+            method, extra = entry
+            if extra:
+                return method(evaluator, extra, args)
+            return method(evaluator, args)
+        return None
     if internal in evaluator._op_cache:
         method, extra = evaluator._op_cache[internal]
     else:
