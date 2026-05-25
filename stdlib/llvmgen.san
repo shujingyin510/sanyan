@@ -322,6 +322,78 @@
         返回(列表(s, bv, reg))
     }
 
+    若 (字符串相等(op, "且") 或 字符串相等(op, "and")) {
+        设 l_r = 编译(取(args, 0), reg)
+        设 s = 取(l_r, 0); 设 lv = 取(l_r, 1); reg = 取(l_r, 2)
+        设 r_r = 编译(取(args, 1), reg)
+        s = 连接(s, 取(r_r, 0)); 设 rv = 取(r_r, 1); reg = 取(r_r, 2)
+        设 ub = unbox(lv, reg); s = 连接(s, 取(ub, 0)); 设 la = 取(ub, 1); reg = 取(ub, 2)
+        设 ub = unbox(rv, reg); s = 连接(s, 取(ub, 0)); 设 ra = 取(ub, 1); reg = 取(ub, 2)
+        设 r = 新寄存器(reg); 设 b1 = 取(r, 0); reg = 取(r, 1)
+        设 r = 新寄存器(reg); 设 b2 = 取(r, 0); reg = 取(r, 1)
+        设 r = 新寄存器(reg); 设 ab = 取(r, 0); reg = 取(r, 1)
+        s = 连接(s, "  ", b1, " = icmp ne i64 ", la, ", 0", 换行)
+        s = 连接(s, "  ", b2, " = icmp ne i64 ", ra, ", 0", 换行)
+        s = 连接(s, "  ", ab, " = and i1 ", b1, ", ", b2, 换行)
+        设 r = 新寄存器(reg); 设 zx = 取(r, 0); reg = 取(r, 1)
+        s = 连接(s, "  ", zx, " = zext i1 ", ab, " to i64", 换行)
+        设 bb = box(zx, reg); s = 连接(s, 取(bb, 0)); 设 bv = 取(bb, 1); reg = 取(bb, 2)
+        返回(列表(s, bv, reg))
+    }
+
+    若 (字符串相等(op, "或") 或 字符串相等(op, "or")) {
+        设 l_r = 编译(取(args, 0), reg); 设 s = 取(l_r, 0); 设 lv = 取(l_r, 1); reg = 取(l_r, 2)
+        设 r_r = 编译(取(args, 1), reg); s = 连接(s, 取(r_r, 0)); 设 rv = 取(r_r, 1); reg = 取(r_r, 2)
+        设 ub = unbox(lv, reg); s = 连接(s, 取(ub, 0)); 设 la = 取(ub, 1); reg = 取(ub, 2)
+        设 ub = unbox(rv, reg); s = 连接(s, 取(ub, 0)); 设 ra = 取(ub, 1); reg = 取(ub, 2)
+        设 r = 新寄存器(reg); 设 b1 = 取(r, 0); reg = 取(r, 1)
+        设 r = 新寄存器(reg); 设 b2 = 取(r, 0); reg = 取(r, 1)
+        设 r = 新寄存器(reg); 设 ob = 取(r, 0); reg = 取(r, 1)
+        s = 连接(s, "  ", b1, " = icmp ne i64 ", la, ", 0", 换行)
+        s = 连接(s, "  ", b2, " = icmp ne i64 ", ra, ", 0", 换行)
+        s = 连接(s, "  ", ob, " = or i1 ", b1, ", ", b2, 换行)
+        设 r = 新寄存器(reg); 设 zx = 取(r, 0); reg = 取(r, 1)
+        s = 连接(s, "  ", zx, " = zext i1 ", ob, " to i64", 换行)
+        设 bb = box(zx, reg); s = 连接(s, 取(bb, 0)); 设 bv = 取(bb, 1); reg = 取(bb, 2)
+        返回(列表(s, bv, reg))
+    }
+
+    若 (字符串相等(op, "非") 或 字符串相等(op, "not")) {
+        设 v_r = 编译(取(args, 0), reg); 设 s = 取(v_r, 0); 设 vv = 取(v_r, 1); reg = 取(v_r, 2)
+        设 ub = unbox(vv, reg); s = 连接(s, 取(ub, 0)); 设 raw = 取(ub, 1); reg = 取(ub, 2)
+        设 r = 新寄存器(reg); 设 c = 取(r, 0); reg = 取(r, 1)
+        设 r = 新寄存器(reg); 设 zx = 取(r, 0); reg = 取(r, 1)
+        s = 连接(s, "  ", c, " = icmp eq i64 ", raw, ", 0", 换行)
+        s = 连接(s, "  ", zx, " = zext i1 ", c, " to i64", 换行)
+        设 bb = box(zx, reg); s = 连接(s, 取(bb, 0)); 设 bv = 取(bb, 1); reg = 取(bb, 2)
+        返回(列表(s, bv, reg))
+    }
+
+    若 (字符串相等(op, "大于等于") 或 字符串相等(op, "gte")) {
+        设 l_r = 编译(取(args, 0), reg); 设 s = 取(l_r, 0); 设 lv = 取(l_r, 1); reg = 取(l_r, 2)
+        设 r_r = 编译(取(args, 1), reg); s = 连接(s, 取(r_r, 0)); 设 rv = 取(r_r, 1); reg = 取(r_r, 2)
+        设 ub = unbox(lv, reg); s = 连接(s, 取(ub, 0)); 设 la = 取(ub, 1); reg = 取(ub, 2)
+        设 ub = unbox(rv, reg); s = 连接(s, 取(ub, 0)); 设 ra = 取(ub, 1); reg = 取(ub, 2)
+        设 r = 新寄存器(reg); 设 c = 取(r, 0); reg = 取(r, 1)
+        设 r = 新寄存器(reg); 设 zx = 取(r, 0); reg = 取(r, 1)
+        s = 连接(s, "  ", c, " = icmp sge i64 ", la, ", ", ra, 换行)
+        s = 连接(s, "  ", zx, " = zext i1 ", c, " to i64", 换行)
+        设 bb = box(zx, reg); s = 连接(s, 取(bb, 0)); 设 bv = 取(bb, 1); reg = 取(bb, 2)
+        返回(列表(s, bv, reg))
+    }
+
+    若 (字符串相等(op, "字符串相等") 或 字符串相等(op, "str_equals")) {
+        设 l_r = 编译(取(args, 0), reg); 设 s = 取(l_r, 0); 设 lv = 取(l_r, 1); reg = 取(l_r, 2)
+        设 r_r = 编译(取(args, 1), reg); s = 连接(s, 取(r_r, 0)); 设 rv = 取(r_r, 1); reg = 取(r_r, 2)
+        设 r = 新寄存器(reg); 设 eqv = 取(r, 0); reg = 取(r, 1)
+        s = 连接(s, "  ", eqv, " = call i32 @_rt_str_eq(i8* ")
+        s = 连接(s, lv, ", i8* ", rv, ")", 换行)
+        设 r = 新寄存器(reg); 设 zx = 取(r, 0); reg = 取(r, 1)
+        s = 连接(s, "  ", zx, " = zext i32 ", eqv, " to i64", 换行)
+        设 bb = box(zx, reg); s = 连接(s, 取(bb, 0)); 设 bv = 取(bb, 1); reg = 取(bb, 2)
+        返回(列表(s, bv, reg))
+    }
+
     若 (字符串相等(op, "print")) {
         设 p_val = 取(args, 0)
         设 v_r = 编译(p_val, reg)
@@ -668,7 +740,7 @@
         返回(列表(s, result, reg))
     }
 
-    若 (字符串相等(op, "取长") 或 字符串相等(op, "len")) {
+    若 (字符串相等(op, "取长") 或 字符串相等(op, "len") 或 字符串相等(op, "length")) {
         设 c_ast = 取(args, 0)
         设 c_r = 编译(c_ast, reg)
         设 s = 取(c_r, 0); 设 cv = 取(c_r, 1); reg = 取(c_r, 2)
@@ -711,7 +783,7 @@
         返回(列表(s, dv, reg))
     }
 
-    若 (字符串相等(op, "字典")) {
+    若 (字符串相等(op, "字典") 或 字符串相等(op, "dict")) {
         设 s = ""
         设 r = 新寄存器(reg); 设 d_reg = 取(r, 0); reg = 取(r, 1)
         s = 连接(s, "  ", d_reg, " = call i8* @rt_dict_new()", 换行)

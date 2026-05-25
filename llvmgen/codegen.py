@@ -1703,8 +1703,13 @@ def compile_top_level(ast_nodes: list, module_name: str = 'main', module_prefix:
 
 def _compile_in_context(ast_nodes: list, cg: CodegenContext) -> None:
     # 确保顶层是 do 块
-    if not (isinstance(ast_nodes, list) and len(ast_nodes) > 0 and ast_nodes[0] in ('做', 'do')):
-        ast_nodes = ['做'] + ast_nodes
+    if isinstance(ast_nodes, list) and len(ast_nodes) > 0:
+        first = ast_nodes[0]
+        if isinstance(first, str) and first not in ('做', 'do'):
+            # 单表达式: wrap 为 ['做', node] 防扁平化
+            ast_nodes = ['做', ast_nodes]
+        elif first not in ('做', 'do'):
+            ast_nodes = ['做'] + ast_nodes
     if isinstance(ast_nodes, list) and len(ast_nodes) > 0 and ast_nodes[0] in ('做', 'do'):
         ast_nodes = ast_nodes[1:]
 
