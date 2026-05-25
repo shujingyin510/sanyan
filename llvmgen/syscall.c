@@ -1,9 +1,24 @@
 /* syscall.c — Windows 原生层：I/O + 内存分配 + 运行时桩 */
 #include <windows.h>
 
-/* 全局寄存器计数器 */
+/* 全局寄存器计数器 + 字符串桩 */
 static long long _reg_id = 0;
 long long _next_reg_id(void) { return ++_reg_id; }
+
+/* 返回寄存器ID的字符串表示 (i8*) */
+char _reg_buf[32];
+char* _next_reg_str(void) {
+    long long id = ++_reg_id;
+    // 简单整数→字符串 (不依赖snprintf)
+    char* p = _reg_buf + 30;
+    *p-- = 0;
+    if (id == 0) { *p-- = '0'; }
+    while (id > 0) {
+        *p-- = '0' + (id % 10);
+        id /= 10;
+    }
+    return p + 1;
+}
 
 void san_sys_write(int fd, const char *buf, int len) {
     HANDLE h;

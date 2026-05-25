@@ -14,7 +14,7 @@
     s = 连接(s, "declare void @_rt_free(i8*)"); s = 连接(s, 换行)
     s = 连接(s, "declare i8* @san_read_file(i8*, i32*)"); s = 连接(s, 换行)
     s = 连接(s, "declare void @san_write_file(i8*, i8*, i32)"); s = 连接(s, 换行)
-    s = 连接(s, "declare i64 @_next_reg_id()"); s = 连接(s, 换行)
+    s = 连接(s, "declare i8* @_next_reg_str()"); s = 连接(s, 换行)
     s = 连接(s, "@_rt_buf = global [22 x i8] zeroinitializer"); s = 连接(s, 换行)
     s = 连接(s, 声明运行时())
     s = 连接(s, "@g_error = external global i8*"); s = 连接(s, 换行)
@@ -178,13 +178,13 @@
 
     若 (字符串相等(op, "新寄存器ID")) {
         设 r = 新寄存器(reg); 设 rx = 取(r, 0); reg = 取(r, 1)
-        设 s = 连接("  ", rx, " = call i64 @_next_reg_id()", 换行)
+        设 s = 连接("  ", rx, " = call i8* @_next_reg_str()", 换行)
         返回(列表(s, rx, reg))
     }
 
     若 (字符串相等(op, "新标签ID")) {
         设 r = 新寄存器(reg); 设 rx = 取(r, 0); reg = 取(r, 1)
-        设 s = 连接("  ", rx, " = call i64 @_next_reg_id()", 换行)
+        设 s = 连接("  ", rx, " = call i8* @_next_reg_str()", 换行)
         返回(列表(s, rx, reg))
     }
 
@@ -1511,6 +1511,11 @@
     ir = 连接(ir, 换行)
     // rt_str_to_list
     ir = 连接(ir, "define i8* @rt_str_to_list(i8* %a) {", 换行)
+    ir = 连接(ir, "  ret i8* null", 换行)
+    ir = 连接(ir, "}", 换行)
+    ir = 连接(ir, 换行)
+    // rt_int_to_str: 整数→字符串(返回常量桩)
+    ir = 连接(ir, "define i8* @rt_int_to_str(i8* %v) {", 换行)
     ir = 连接(ir, "  ret i8* null", 换行)
     ir = 连接(ir, "}", 换行)
     ir = 连接(ir, 换行)
