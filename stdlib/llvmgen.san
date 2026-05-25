@@ -367,8 +367,11 @@
         s = 连接(s, then_l, ":", 换行)
         设 t_r = 编译(then_ast, reg); 设 then_ir = 取(t_r, 0); s = 连接(s, then_ir)
         设 tv = 取(t_r, 1); 设 reg_then = 取(t_r, 2)
-        s = 连接(s, "  store i8* ", tv, ", i8** ", result_a, 换行)
-        s = 连接(s, "  br label %", merge_l, 换行)
+        设 then_end = 子串(then_ir, 减(取长(then_ir), 12), 12)
+        若 (非(字符串包含(then_end, "ret"))) {
+            s = 连接(s, "  store i8* ", tv, ", i8** ", result_a, 换行)
+            s = 连接(s, "  br label %", merge_l, 换行)
+        }
         s = 连接(s, else_l, ":", 换行)
         设 reg_else = reg_then
         若 (has_else) {
@@ -376,8 +379,10 @@
             设 e_r = 编译(else_ast, reg_then); 设 else_ir = 取(e_r, 0); s = 连接(s, else_ir)
             设 ev = 取(e_r, 1); reg_else = 取(e_r, 2)
             s = 连接(s, "  store i8* ", ev, ", i8** ", result_a, 换行)
+            s = 连接(s, "  br label %", merge_l, 换行)
+        } 否则 {
+            s = 连接(s, "  br label %", merge_l, 换行)
         }
-        s = 连接(s, "  br label %", merge_l, 换行)
         s = 连接(s, merge_l, ":", 换行)
         若 (大于(reg_then, reg_else)) { reg = reg_then } 否则 { reg = reg_else }
         设 r = 新寄存器(reg); 设 result_val = 取(r, 0); reg = 取(r, 1)
