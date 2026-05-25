@@ -149,9 +149,10 @@
 
 定义 不以终止指令结尾 (text) {
     设 last = 最后一行(text)
-    若 (等于(取长(last), 0)) { 返回(假) }
-    若 (前缀(last, "ret ")) { 返回(假) }
-    若 (前缀(last, "br ")) { 返回(假) }
+    若 (等于(取长(last), 0)) { 返回(真) }
+    若 (字符串包含(last, "ret")) { 返回(假) }
+    若 (字符串包含(last, "br label")) { 返回(假) }
+    若 (字符串包含(last, "br i1")) { 返回(假) }
     返回(真)
 }
 
@@ -365,13 +366,12 @@
         设 merge_l = 连接("merge_", merge_num)
         s = 连接(s, "  br i1 ", i1v, ", label %", then_l, ", label %", else_l, 换行)
         s = 连接(s, then_l, ":", 换行)
-        设 t_r = 编译(then_ast, reg); 设 then_ir = 取(t_r, 0); s = 连接(s, then_ir)
-        设 tv = 取(t_r, 1); 设 reg_then = 取(t_r, 2)
-        设 then_end = 子串(then_ir, 减(取长(then_ir), 12), 12)
-        若 (非(字符串包含(then_end, "ret"))) {
-            s = 连接(s, "  store i8* ", tv, ", i8** ", result_a, 换行)
-            s = 连接(s, "  br label %", merge_l, 换行)
-        }
+    设 t_r = 编译(then_ast, reg); 设 then_ir = 取(t_r, 0); s = 连接(s, then_ir)
+    设 tv = 取(t_r, 1); 设 reg_then = 取(t_r, 2)
+    若 (不以终止指令结尾(then_ir)) {
+        s = 连接(s, "  store i8* ", tv, ", i8** ", result_a, 换行)
+        s = 连接(s, "  br label %", merge_l, 换行)
+    }
         s = 连接(s, else_l, ":", 换行)
         设 reg_else = reg_then
         若 (has_else) {
