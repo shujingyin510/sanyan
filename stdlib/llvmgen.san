@@ -5,24 +5,6 @@
     返回(列表(连接("%", id), id))
 }
 
-定义 box (v, reg) {
-    设 r1 = 新寄存器ID()
-    设 r2 = 新寄存器ID()
-    设 r3 = 新寄存器ID()
-    设 s = 连接("  %", r1, " = shl i64 ", v, ", 1", 换行)
-    s = 连接(s, "  %", r2, " = or i64 %", r1, ", 1", 换行)
-    s = 连接(s, "  %", r3, " = inttoptr i64 %", r2, " to i8*", 换行)
-    返回(列表(s, 连接("%", r3), reg))
-}
-
-定义 unbox (p, reg) {
-    设 r1 = 新寄存器ID()
-    设 r2 = 新寄存器ID()
-    设 s = 连接("  %", r1, " = ptrtoint i8* ", p, " to i64", 换行)
-    s = 连接(s, "  %", r2, " = ashr i64 %", r1, ", 1", 换行)
-    返回(列表(s, 连接("%", r2), reg))
-}
-
 定义 header () {
     设 s = "; ModuleID = 'sanyan'"; s = 连接(s, 换行)
     s = 连接(s, "target triple = \"x86_64-pc-linux-gnu\""); s = 连接(s, 换行)

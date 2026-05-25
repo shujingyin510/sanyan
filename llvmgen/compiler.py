@@ -328,6 +328,38 @@ _register('container_ops_next_label', _next_label)
 _register('container_ops_next_reg', _next_reg)
 _register('container_ops_is_terminated', _is_terminated)
 
+
+def _box_py(evaluator, args):
+    """Python版box: 绕过evaluator的纯函数缓存问题"""
+    v_val = evaluator.eval(args[0]) if len(args) > 0 else "%0"
+    reg_val = evaluator.eval(args[1]) if len(args) > 1 else 0
+    v = str(v_val)
+    r1 = _next_reg()
+    r2 = _next_reg()
+    r3 = _next_reg()
+    s = f'  %{r1} = shl i64 {v}, 1\n'
+    s += f'  %{r2} = or i64 %{r1}, 1\n'
+    s += f'  %{r3} = inttoptr i64 %{r2} to i8*\n'
+    return [s, f'%{r3}', reg_val]
+
+
+def _unbox_py(evaluator, args):
+    """Python版unbox"""
+    p = evaluator.eval(args[0]) if len(args) > 0 else "null"
+    reg_val = evaluator.eval(args[1]) if len(args) > 1 else 0
+    r1 = _next_reg()
+    r2 = _next_reg()
+    s = f'  %{r1} = ptrtoint i8* {p} to i64\n'
+    s += f'  %{r2} = ashr i64 %{r1}, 1\n'
+    return [s, f'%{r2}', reg_val]
+
+
+_register('container_ops_box', _box_py)
+_register('container_ops_unbox', _unbox_py)
+_register('box', _box_py)
+_register('unbox', _unbox_py)
+
+
 _loop_stack_global = []
 
 
