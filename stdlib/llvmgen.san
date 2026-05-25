@@ -493,10 +493,10 @@
         设 cond_r = 编译(cond_ast, reg)
         设 s = 取(cond_r, 0); 设 cv = 取(cond_r, 1); reg = 取(cond_r, 2)
         设 ub = unbox(cv, reg); s = 连接(s, 取(ub, 0)); 设 raw = 取(ub, 1); reg = 取(ub, 2)
-        设 r = 新寄存器(reg); 设 i1v = 取(r, 0); reg = 取(r, 1)
+        设 i1v = 连接("%", 新寄存器ID())
         s = 连接(s, "  ", i1v, " = trunc i64 ", raw, " to i1", 换行)
         // alloca 存结果
-        设 r = 新寄存器(reg); 设 result_a = 取(r, 0); reg = 取(r, 1)
+        设 result_a = 连接("%", 新寄存器ID())
         s = 连接(s, "  ", result_a, " = alloca i8*", 换行)
         设 then_l = 新标签("then"); 设 else_l = 新标签("else"); 设 merge_l = 新标签("merge")
         s = 连接(s, "  br i1 ", i1v, ", label %", then_l, ", label %", else_l, 换行)
