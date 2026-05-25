@@ -1,26 +1,26 @@
 // llvmgen.san V4 — 寄存器线程化
 
 定义 新寄存器 (reg) {
-    设 next = 加(reg, 1)
-    返回(列表(连接("%", next), next))
+    设 id = 新寄存器ID()
+    返回(列表(连接("%", id), id))
 }
 
 定义 box (v, reg) {
-    设 r = 新寄存器(reg); 设 r1 = 取(r, 0); reg = 取(r, 1)
-    设 r = 新寄存器(reg); 设 r2 = 取(r, 0); reg = 取(r, 1)
-    设 r = 新寄存器(reg); 设 r3 = 取(r, 0); reg = 取(r, 1)
-    设 s = 连接("  ", r1, " = shl i64 ", v, ", 1", 换行)
-    s = 连接(s, "  ", r2, " = or i64 ", r1, ", 1", 换行)
-    s = 连接(s, "  ", r3, " = inttoptr i64 ", r2, " to i8*", 换行)
-    返回(列表(s, r3, reg))
+    设 r1 = 新寄存器ID()
+    设 r2 = 新寄存器ID()
+    设 r3 = 新寄存器ID()
+    设 s = 连接("  %", r1, " = shl i64 ", v, ", 1", 换行)
+    s = 连接(s, "  %", r2, " = or i64 %", r1, ", 1", 换行)
+    s = 连接(s, "  %", r3, " = inttoptr i64 %", r2, " to i8*", 换行)
+    返回(列表(s, 连接("%", r3), reg))
 }
 
 定义 unbox (p, reg) {
-    设 r = 新寄存器(reg); 设 r1 = 取(r, 0); reg = 取(r, 1)
-    设 r = 新寄存器(reg); 设 r2 = 取(r, 0); reg = 取(r, 1)
-    设 s = 连接("  ", r1, " = ptrtoint i8* ", p, " to i64", 换行)
-    s = 连接(s, "  ", r2, " = ashr i64 ", r1, ", 1", 换行)
-    返回(列表(s, r2, reg))
+    设 r1 = 新寄存器ID()
+    设 r2 = 新寄存器ID()
+    设 s = 连接("  %", r1, " = ptrtoint i8* ", p, " to i64", 换行)
+    s = 连接(s, "  %", r2, " = ashr i64 %", r1, ", 1", 换行)
+    返回(列表(s, 连接("%", r2), reg))
 }
 
 定义 header () {
@@ -394,6 +394,54 @@
         返回(列表(s, bv, reg))
     }
 
+    若 (字符串相等(op, "是列表") 或 字符串相等(op, "is_list")) {
+        设 v_r = 编译(取(args, 0), reg); 设 s = 取(v_r, 0); 设 vv = 取(v_r, 1); reg = 取(v_r, 2)
+        设 r = 新寄存器(reg); 设 tag = 取(r, 0); reg = 取(r, 1)
+        设 r = 新寄存器(reg); 设 t = 取(r, 0); reg = 取(r, 1)
+        设 r = 新寄存器(reg); 设 obj = 取(r, 0); reg = 取(r, 1)
+        设 r = 新寄存器(reg); 设 tp = 取(r, 0); reg = 取(r, 1)
+        设 r = 新寄存器(reg); 设 ty = 取(r, 0); reg = 取(r, 1)
+        设 r = 新寄存器(reg); 设 k = 取(r, 0); reg = 取(r, 1)
+        设 r = 新寄存器(reg); 设 r1 = 取(r, 0); reg = 取(r, 1)
+        设 r = 新寄存器(reg); 设 zx = 取(r, 0); reg = 取(r, 1)
+        s = 连接(s, "  ", tag, " = ptrtoint i8* ", vv, " to i64", 换行)
+        s = 连接(s, "  ", t, " = and i64 ", tag, ", 1", 换行)
+        s = 连接(s, "  ", obj, " = icmp eq i64 ", t, ", 0", 换行)
+        s = 连接(s, "  ", tp, " = bitcast i8* ", vv, " to i32*", 换行)
+        s = 连接(s, "  ", ty, " = load i32, i32* ", tp, 换行)
+        s = 连接(s, "  ", k, " = icmp eq i32 ", ty, ", 2", 换行)
+        s = 连接(s, "  ", r1, " = select i1 ", obj, ", i1 ", k, ", i1 0", 换行)
+        s = 连接(s, "  ", zx, " = zext i1 ", r1, " to i64", 换行)
+        设 bb = box(zx, reg); s = 连接(s, 取(bb, 0)); 设 bv = 取(bb, 1); reg = 取(bb, 2)
+        返回(列表(s, bv, reg))
+    }
+
+    若 (字符串相等(op, "是字符串") 或 字符串相等(op, "is_string")) {
+        设 v_r = 编译(取(args, 0), reg); 设 s = 取(v_r, 0); 设 vv = 取(v_r, 1); reg = 取(v_r, 2)
+        设 r = 新寄存器(reg); 设 tag = 取(r, 0); reg = 取(r, 1)
+        设 r = 新寄存器(reg); 设 t = 取(r, 0); reg = 取(r, 1)
+        设 r = 新寄存器(reg); 设 obj = 取(r, 0); reg = 取(r, 1)
+        设 r = 新寄存器(reg); 设 tp = 取(r, 0); reg = 取(r, 1)
+        设 r = 新寄存器(reg); 设 ty = 取(r, 0); reg = 取(r, 1)
+        设 r = 新寄存器(reg); 设 k = 取(r, 0); reg = 取(r, 1)
+        设 r = 新寄存器(reg); 设 r1 = 取(r, 0); reg = 取(r, 1)
+        设 r = 新寄存器(reg); 设 zx = 取(r, 0); reg = 取(r, 1)
+        s = 连接(s, "  ", tag, " = ptrtoint i8* ", vv, " to i64", 换行)
+        s = 连接(s, "  ", t, " = and i64 ", tag, ", 1", 换行)
+        s = 连接(s, "  ", obj, " = icmp eq i64 ", t, ", 0", 换行)
+        s = 连接(s, "  ", tp, " = bitcast i8* ", vv, " to i32*", 换行)
+        s = 连接(s, "  ", ty, " = load i32, i32* ", tp, 换行)
+        s = 连接(s, "  ", k, " = icmp eq i32 ", ty, ", 1", 换行)
+        s = 连接(s, "  ", r1, " = select i1 ", obj, ", i1 ", k, ", i1 0", 换行)
+        s = 连接(s, "  ", zx, " = zext i1 ", r1, " to i64", 换行)
+        设 bb = box(zx, reg); s = 连接(s, 取(bb, 0)); 设 bv = 取(bb, 1); reg = 取(bb, 2)
+        返回(列表(s, bv, reg))
+    }
+
+    若 (字符串相等(op, "跳出") 或 字符串相等(op, "break")) {
+        返回(列表("", "null", reg))
+    }
+
     若 (字符串相等(op, "print")) {
         设 p_val = 取(args, 0)
         设 v_r = 编译(p_val, reg)
@@ -520,7 +568,7 @@
          返回(列表(s, last, reg))
     }
 
-    若 (字符串相等(op, "fn")) {
+    若 (字符串相等(op, "fn") 或 字符串相等(op, "定义") 或 字符串相等(op, "define")) {
         设 fn_name = 取(args, 0)
         // ASCII函数名映射（LLVM不支持中文函数名）
        设 ascii_name = 注册函数名(fn_name)
@@ -621,92 +669,6 @@
         返回(列表(s, "null", reg))
     }
 
-    // 函数调用: op是函数名且在函数参数表中
-    设 ascii_op = 取函数名(op)
-    设 fn_arity = 查键(函数参数表, ascii_op)
-    若 (大于(取长(fn_arity), 0)) {
-        设 call_ir = ""
-        设 arg_regs = ""
-        设 arg_count = 列表取长(args)
-        设 ai = 0
-        循环 (小于(ai, arg_count)) {
-            设 a_val = 取(args, ai)
-            设 a_r = 编译(a_val, reg)
-            call_ir = 连接(call_ir, 取(a_r, 0))
-            设 av = 取(a_r, 1); reg = 取(a_r, 2)
-            若 (大于(ai, 0)) { arg_regs = 连接(arg_regs, ", ") }
-            arg_regs = 连接(arg_regs, "i8* ", av)
-            ai = 加(ai, 1)
-        }
-        设 r = 新寄存器(reg); 设 result_reg = 取(r, 0); reg = 取(r, 1)
-        call_ir = 连接(call_ir, "  ", result_reg, " = call i8* @", ascii_op, "(", arg_regs, ")", 换行)
-        返回(列表(call_ir, result_reg, reg))
-    }
-
-    // 外部C函数调用: san_read_file, san_write_file, san_argv, san_argc, _rt_malloc, _rt_free
-    设 is_extern = 假
-    若 (字符串相等(op, "san_read_file")) {
-        设 call_ir = ""
-        设 a1 = 取(args, 0)
-        设 r1 = 编译(a1, reg)
-        call_ir = 连接(call_ir, 取(r1, 0)); 设 av1 = 取(r1, 1); reg = 取(r1, 2)
-        设 r = 新寄存器(reg); 设 result_reg = 取(r, 0); reg = 取(r, 1)
-        call_ir = 连接(call_ir, "  ", result_reg, " = call i8* @san_read_file(i8* ", av1, ", i32* null)", 换行)
-        返回(列表(call_ir, result_reg, reg))
-    }
-    若 (字符串相等(op, "san_write_file")) {
-        设 call_ir = ""
-        设 a1 = 取(args, 0); 设 r1 = 编译(a1, reg)
-        call_ir = 连接(call_ir, 取(r1, 0)); 设 av1 = 取(r1, 1); reg = 取(r1, 2)
-        设 a2 = 取(args, 1); 设 r2 = 编译(a2, reg)
-        call_ir = 连接(call_ir, 取(r2, 0)); 设 av2 = 取(r2, 1); reg = 取(r2, 2)
-        设 a3 = 取(args, 2); 设 r3 = 编译(a3, reg)
-        call_ir = 连接(call_ir, 取(r3, 0)); 设 av3 = 取(r3, 1); reg = 取(r3, 2)
-        call_ir = 连接(call_ir, "  call void @san_write_file(i8* ", av1, ", i8* ", av2, ", i32 0)", 换行)
-        返回(列表(call_ir, "null", reg))
-    }
-    若 (字符串相等(op, "san_argv")) { is_extern = 真 }
-    若 (字符串相等(op, "san_argc")) { is_extern = 真 }
-    若 (字符串相等(op, "_rt_malloc")) { is_extern = 真 }
-    若 (字符串相等(op, "_rt_free")) { is_extern = 真 }
-    若 (is_extern) {
-        设 call_ir = ""
-        设 arg_regs = ""
-        设 arg_count = 列表取长(args)
-        设 ai = 0
-        循环 (小于(ai, arg_count)) {
-            设 a_val = 取(args, ai)
-            设 a_r = 编译(a_val, reg)
-            call_ir = 连接(call_ir, 取(a_r, 0))
-            设 av = 取(a_r, 1); reg = 取(a_r, 2)
-            若 (大于(ai, 0)) { arg_regs = 连接(arg_regs, ", ") }
-            arg_regs = 连接(arg_regs, "i8* ", av)
-            ai = 加(ai, 1)
-        }
-        设 r = 新寄存器(reg); 设 result_reg = 取(r, 0); reg = 取(r, 1)
-        call_ir = 连接(call_ir, "  ", result_reg, " = call i8* @", ascii_op, "(", arg_regs, ")", 换行)
-        返回(列表(call_ir, result_reg, reg))
-    }
-
-    // 通用函数调用 fallback: 任何未知标识符作为函数名
-    // 这包括已加载的SanYan函数(解析, 编译顶层等)和用户定义函数
-    设 call_ir = ""
-    设 arg_regs = ""
-    设 arg_count = 列表取长(args)
-    设 ai = 0
-    循环 (小于(ai, arg_count)) {
-        设 a_val = 取(args, ai)
-        设 a_r = 编译(a_val, reg)
-        call_ir = 连接(call_ir, 取(a_r, 0))
-        设 av = 取(a_r, 1); reg = 取(a_r, 2)
-        若 (大于(ai, 0)) { arg_regs = 连接(arg_regs, ", ") }
-        arg_regs = 连接(arg_regs, "i8* ", av)
-        ai = 加(ai, 1)
-    }
-    设 r = 新寄存器(reg); 设 result_reg = 取(r, 0); reg = 取(r, 1)
-    call_ir = 连接(call_ir, "  ", result_reg, " = call i8* @", ascii_op, "(", arg_regs, ")", 换行)
-    返回(列表(call_ir, result_reg, reg))
-
     若 (字符串相等(op, "列表") 或 字符串相等(op, "list")) {
         设 s = ""
         设 r = 新寄存器(reg); 设 lst_reg = 取(r, 0); reg = 取(r, 1)
@@ -757,7 +719,7 @@
         返回(列表(s, bp, reg))
     }
 
-    若 (字符串相等(op, "取键")) {
+    若 (字符串相等(op, "取键") 或 字符串相等(op, "get_key")) {
         设 dict_ast = 取(args, 0)
         设 key_ast = 取(args, 1)
         设 d_r = 编译(dict_ast, reg)
@@ -800,6 +762,49 @@
             i = 加(i, 2)
         }
         返回(列表(s, d_reg, reg))
+    }
+
+    若 (字符串相等(op, "切片") 或 字符串相等(op, "slice")) {
+        设 cr = 编译(取(args, 0), reg); 设 s = 取(cr, 0); 设 cv = 取(cr, 1); reg = 取(cr, 2)
+        设 ir = 编译(取(args, 1), reg); s = 连接(s, 取(ir, 0)); 设 iv = 取(ir, 1); reg = 取(ir, 2)
+        设 jr = 编译(取(args, 2), reg); s = 连接(s, 取(jr, 0)); 设 jv = 取(jr, 1); reg = 取(jr, 2)
+        设 r = 新寄存器(reg); 设 rx = 取(r, 0); reg = 取(r, 1)
+        s = 连接(s, "  ", rx, " = call i8* @rt_list_slice(i8* ", cv, ", i8* ", iv, ", i8* ", jv, ")", 换行)
+        返回(列表(s, rx, reg))
+    }
+
+    若 (字符串相等(op, "列表取长") 或 字符串相等(op, "list_len")) {
+        设 cr = 编译(取(args, 0), reg); 设 s = 取(cr, 0); 设 cv = 取(cr, 1); reg = 取(cr, 2)
+        设 r = 新寄存器(reg); 设 rx = 取(r, 0); reg = 取(r, 1)
+        s = 连接(s, "  ", rx, " = call i32 @rt_list_len(i8* ", cv, ")", 换行)
+        设 r = 新寄存器(reg); 设 b1 = 取(r, 0); reg = 取(r, 1)
+        s = 连接(s, "  ", b1, " = zext i32 ", rx, " to i64", 换行)
+        设 bb = box(b1, reg); s = 连接(s, 取(bb, 0)); 设 bv = 取(bb, 1); reg = 取(bb, 2)
+        返回(列表(s, bv, reg))
+    }
+
+    若 (字符串相等(op, "列表合") 或 字符串相等(op, "list_concat")) {
+        设 lr = 编译(取(args, 0), reg); 设 s = 取(lr, 0); 设 lv = 取(lr, 1); reg = 取(lr, 2)
+        设 rr = 编译(取(args, 1), reg); s = 连接(s, 取(rr, 0)); 设 rv = 取(rr, 1); reg = 取(rr, 2)
+        设 r = 新寄存器(reg); 设 rx = 取(r, 0); reg = 取(r, 1)
+        s = 连接(s, "  ", rx, " = call i8* @rt_list_concat(i8* ", lv, ", i8* ", rv, ")", 换行)
+        返回(列表(s, rx, reg))
+    }
+
+    若 (字符串相等(op, "子串") 或 字符串相等(op, "substring")) {
+        设 sr = 编译(取(args, 0), reg); 设 s = 取(sr, 0); 设 sv = 取(sr, 1); reg = 取(sr, 2)
+        设 ir = 编译(取(args, 1), reg); s = 连接(s, 取(ir, 0)); 设 iv = 取(ir, 1); reg = 取(ir, 2)
+        设 jr = 编译(取(args, 2), reg); s = 连接(s, 取(jr, 0)); 设 jv = 取(jr, 1); reg = 取(jr, 2)
+        设 r = 新寄存器(reg); 设 rx = 取(r, 0); reg = 取(r, 1)
+        s = 连接(s, "  ", rx, " = call i8* @rt_str_substr(i8* ", sv, ", i8* ", iv, ", i8* ", jv, ")", 换行)
+        返回(列表(s, rx, reg))
+    }
+
+    若 (字符串相等(op, "字列") 或 字符串相等(op, "str_to_list")) {
+        设 vr = 编译(取(args, 0), reg); 设 s = 取(vr, 0); 设 vv = 取(vr, 1); reg = 取(vr, 2)
+        设 r = 新寄存器(reg); 设 rx = 取(r, 0); reg = 取(r, 1)
+        s = 连接(s, "  ", rx, " = call i8* @rt_str_to_list(i8* ", vv, ")", 换行)
+        返回(列表(s, rx, reg))
     }
 
     若 (字符串相等(op, "连接") 或 字符串相等(op, "concat")) {
@@ -865,6 +870,91 @@
         s = 连接(s, end_l, ":", 换行)
         返回(列表(s, "null", reg))
     }
+
+    // 函数调用: op是函数名且在函数参数表中
+    设 ascii_op = 取函数名(op)
+    设 fn_arity = 查键(函数参数表, ascii_op)
+    若 (大于(取长(fn_arity), 0)) {
+        设 call_ir = ""
+        设 arg_regs = ""
+        设 arg_count = 列表取长(args)
+        设 ai = 0
+        循环 (小于(ai, arg_count)) {
+            设 a_val = 取(args, ai)
+            设 a_r = 编译(a_val, reg)
+            call_ir = 连接(call_ir, 取(a_r, 0))
+            设 av = 取(a_r, 1); reg = 取(a_r, 2)
+            若 (大于(ai, 0)) { arg_regs = 连接(arg_regs, ", ") }
+            arg_regs = 连接(arg_regs, "i8* ", av)
+            ai = 加(ai, 1)
+        }
+        设 r = 新寄存器(reg); 设 result_reg = 取(r, 0); reg = 取(r, 1)
+        call_ir = 连接(call_ir, "  ", result_reg, " = call i8* @", ascii_op, "(", arg_regs, ")", 换行)
+        返回(列表(call_ir, result_reg, reg))
+    }
+
+    // 外部C函数调用
+    设 is_extern = 假
+    若 (字符串相等(op, "san_read_file")) {
+        设 call_ir = ""
+        设 a1 = 取(args, 0)
+        设 r1 = 编译(a1, reg)
+        call_ir = 连接(call_ir, 取(r1, 0)); 设 av1 = 取(r1, 1); reg = 取(r1, 2)
+        设 r = 新寄存器(reg); 设 result_reg = 取(r, 0); reg = 取(r, 1)
+        call_ir = 连接(call_ir, "  ", result_reg, " = call i8* @san_read_file(i8* ", av1, ", i32* null)", 换行)
+        返回(列表(call_ir, result_reg, reg))
+    }
+    若 (字符串相等(op, "san_write_file")) {
+        设 call_ir = ""
+        设 a1 = 取(args, 0); 设 r1 = 编译(a1, reg)
+        call_ir = 连接(call_ir, 取(r1, 0)); 设 av1 = 取(r1, 1); reg = 取(r1, 2)
+        设 a2 = 取(args, 1); 设 r2 = 编译(a2, reg)
+        call_ir = 连接(call_ir, 取(r2, 0)); 设 av2 = 取(r2, 1); reg = 取(r2, 2)
+        设 a3 = 取(args, 2); 设 r3 = 编译(a3, reg)
+        call_ir = 连接(call_ir, 取(r3, 0)); 设 av3 = 取(r3, 1); reg = 取(r3, 2)
+        call_ir = 连接(call_ir, "  call void @san_write_file(i8* ", av1, ", i8* ", av2, ", i32 0)", 换行)
+        返回(列表(call_ir, "null", reg))
+    }
+    若 (字符串相等(op, "san_argv")) { is_extern = 真 }
+    若 (字符串相等(op, "san_argc")) { is_extern = 真 }
+    若 (字符串相等(op, "_rt_malloc")) { is_extern = 真 }
+    若 (字符串相等(op, "_rt_free")) { is_extern = 真 }
+    若 (is_extern) {
+        设 call_ir = ""
+        设 arg_regs = ""
+        设 arg_count = 列表取长(args)
+        设 ai = 0
+        循环 (小于(ai, arg_count)) {
+            设 a_val = 取(args, ai)
+            设 a_r = 编译(a_val, reg)
+            call_ir = 连接(call_ir, 取(a_r, 0))
+            设 av = 取(a_r, 1); reg = 取(a_r, 2)
+            若 (大于(ai, 0)) { arg_regs = 连接(arg_regs, ", ") }
+            arg_regs = 连接(arg_regs, "i8* ", av)
+            ai = 加(ai, 1)
+        }
+        设 r = 新寄存器(reg); 设 result_reg = 取(r, 0); reg = 取(r, 1)
+        call_ir = 连接(call_ir, "  ", result_reg, " = call i8* @", ascii_op, "(", arg_regs, ")", 换行)
+        返回(列表(call_ir, result_reg, reg))
+    }
+
+    // 通用函数调用 fallback
+    设 call_ir = ""
+    设 arg_regs = ""
+    设 arg_count = 列表取长(args)
+    设 ai = 0
+    循环 (小于(ai, arg_count)) {
+        设 a_val = 取(args, ai)
+        设 a_r = 编译(a_val, reg)
+        call_ir = 连接(call_ir, 取(a_r, 0))
+        设 av = 取(a_r, 1); reg = 取(a_r, 2)
+        若 (大于(ai, 0)) { arg_regs = 连接(arg_regs, ", ") }
+        arg_regs = 连接(arg_regs, "i8* ", av)
+        ai = 加(ai, 1)
+    }
+    设 r = 新寄存器(reg); 设 result_reg = 取(r, 0); reg = 取(r, 1)
+    call_ir = 连接(call_ir, "  ", result_reg, " = call i8* @", ascii_op, "(", arg_regs, ")", 换行)
+    返回(列表(call_ir, result_reg, reg))
 
     }
 
@@ -1404,6 +1494,24 @@
     设 字符串常量表 = 新字典()
     设 字符串常量列表 = 新列表()
     设 字符串计数器 = 0
+    // 预扫描: 注册所有函数名到函数参数表(解决前向引用)
+    若 (是列表(ast)) {
+        设 alen = 列表取长(ast)
+        设 ai = 0
+        循环 (小于(ai, alen)) {
+            设 stmt = 列表取(ast, ai)
+            若 (是列表(stmt)) {
+                设 op = 取(stmt, 0)
+                若 (字符串相等(op, "fn") 或 字符串相等(op, "定义") 或 字符串相等(op, "define")) {
+                    设 fn_name = 取(stmt, 1)
+                    设 plist = 取(stmt, 2)
+                    设 ascii = 注册函数名(fn_name)
+                    存变量(函数参数表, ascii, 列表取长(plist))
+                }
+            }
+            ai = 加(ai, 1)
+        }
+    }
     设 s = header()
     设 r = 编译(ast, reg)
     // 生成字符串常量定义

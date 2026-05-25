@@ -298,6 +298,7 @@ _register('container_ops_set_merge_label', _set_merge_label)
 _register('container_ops_clear_merge_label', _clear_merge_label)
 
 _label_counter = 0
+_reg_counter = 0
 
 
 def _next_label(evaluator=None, args=None):
@@ -306,18 +307,25 @@ def _next_label(evaluator=None, args=None):
     return _label_counter
 
 
+def _next_reg(evaluator=None, args=None):
+    global _reg_counter
+    _reg_counter += 1
+    return _reg_counter
+
+
 def _is_terminated(evaluator, args):
-    """检查 LLVM IR 文本是否以终止指令 (ret/br) 结尾"""
-    text = args[0] if args else ""
+    """检查 LLVM IR 文本是否以终止指令 (ret/br) 结尾。返回 TritValue(1)=已终止, TritValue(0)=未终止。"""
+    text = evaluator.eval(args[0]) if args else ""
     if not text:
         return TritValue(0)
-    last = text.rstrip().rsplit('\n', 1)[-1].strip()
+    last = str(text).rstrip().rsplit('\n', 1)[-1].strip()
     if last.startswith('ret') or last.startswith('br'):
         return TritValue(1)
     return TritValue(0)
 
 
 _register('container_ops_next_label', _next_label)
+_register('container_ops_next_reg', _next_reg)
 _register('container_ops_is_terminated', _is_terminated)
 
 _loop_stack_global = []
@@ -413,6 +421,9 @@ def self_hosted_compile(source: str, module_name: str = 'main') -> str:
 
     evaluator.commands['新标签ID'] = ([], [['return', ['container_ops_next_label']]], {}, None)
     _register('container_ops_next_label', _next_label)
+
+    evaluator.commands['新寄存器ID'] = ([], [['return', ['container_ops_next_reg']]], {}, None)
+    _register('container_ops_next_reg', _next_reg)
 
     evaluator.commands['循环进栈'] = (['label'], [['container_ops_loop_push', 'label']], {}, None)
     evaluator.commands['循环出栈'] = ([], [['container_ops_loop_pop']], {}, None)
@@ -512,6 +523,9 @@ def compile_module_test(module_name: str) -> str:
 
     evaluator.commands['新标签ID'] = ([], [['return', ['container_ops_next_label']]], {}, None)
     _register('container_ops_next_label', _next_label)
+
+    evaluator.commands['新寄存器ID'] = ([], [['return', ['container_ops_next_reg']]], {}, None)
+    _register('container_ops_next_reg', _next_reg)
 
     evaluator.commands['循环进栈'] = (['label'], [['container_ops_loop_push', 'label']], {}, None)
     evaluator.commands['循环出栈'] = ([], [['container_ops_loop_pop']], {}, None)
