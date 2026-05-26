@@ -712,9 +712,10 @@
         设 _c_fn_params = 列表取(_c_args, 1)
         设 _c_fn_body = 列表取(_c_args, 2)
         // 保存上下文 + 创建函数局部 _c_ce
-        设 _c_saved_alloca = _c_ce
+        设 _c_saved_alloca = comp_env
         设 _c_saved_reg = reg
-        _c_ce = 新字典()
+        comp_env = 新字典()
+        _c_ce = comp_env
         reg = 0
         // 函数头: define i8* @_c_name(...)
         设 _c_fn_ir = 连接(换行, "define i8* @", _c_ascii_name, "(")
@@ -749,8 +750,9 @@
         _c_fn_ir = 连接(_c_fn_ir, "}", 换行)
         // 存入函数库
         设 函数库列表 = 列表追加(函数库列表, _c_fn_ir)
-        // 恢复外层 _c_ce
-        _c_ce = _c_saved_alloca
+        // 恢复外层 comp_env 和参数 _c_ce
+        comp_env = _c_saved_alloca
+        _c_ce = comp_env
         reg = _c_saved_reg
         返回(列表("", "null", reg))
     }
