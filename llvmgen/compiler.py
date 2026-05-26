@@ -93,7 +93,7 @@ def compile_source(source: str, module_name: str = 'main') -> tuple[str, 'Codege
 
 def _dict_get_safe(evaluator, args):
     """安全取字典键：存在返回值，不存在返回空串。"""
-    d = args[0] if isinstance(args[0], dict) else evaluator.eval(args[0])
+    d = evaluator.eval(args[0])
     k = evaluator.eval(args[1])
     if isinstance(k, TritValue):
         k = k.to_int()
@@ -121,7 +121,7 @@ def _list_len(evaluator, args):
 
 def _dict_len(evaluator, args):
     """返回字典键数量。"""
-    d = args[0] if isinstance(args[0], dict) else evaluator.eval(args[0])
+    d = evaluator.eval(args[0])
     if isinstance(d, dict):
         return TritValue(len(d))
     return TritValue(0)
@@ -186,7 +186,7 @@ def _list_append(evaluator, args):
 
 def _dict_keys(evaluator, args):
     """返回字典所有键的列表。"""
-    d = args[0] if isinstance(args[0], dict) else evaluator.eval(args[0])
+    d = evaluator.eval(args[0])
     if isinstance(d, dict):
         return list(d.keys())
     return []
