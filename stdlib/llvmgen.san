@@ -1030,8 +1030,20 @@
         _c_s = 连接(_c_s, "  call void @rt_dict_set(i8* ", dv, ", i8* ", kv, ", i8* ", 取(_c_vr, 1), ")", 换行)
         返回(列表(_c_s, dv, reg))
     }
-    若 (字符串相等(_c_op, "列表取")) {
-        返回(列表("", "null", reg))
+    若 (字符串相等(_c_op, "列表取") 或 字符串相等(_c_op, "list_get")) {
+        设 _c_container_ast = 列表取(_c_args, 0)
+        设 _c_index_ast = 列表取(_c_args, 1)
+        设 _c_c_r = 编译(comp_env, _c_container_ast, reg)
+        设 _c_s = 取(_c_c_r, 0); 设 _c_cv = 取(_c_c_r, 1); reg = 取(_c_c_r, 2)
+        设 _c_i_r = 编译(comp_env, _c_index_ast, reg)
+        _c_s = 连接(_c_s, 取(_c_i_r, 0)); 设 _c_iv = 取(_c_i_r, 1); reg = 取(_c_i_r, 2)
+        设 _c_ub_raw = 新寄存器ID(); 设 _c_ub_val = 新寄存器ID()
+        _c_s = 连接(_c_s, "  %", _c_ub_raw, " = ptrtoint i8* ", _c_iv, " to i64", 换行)
+        _c_s = 连接(_c_s, "  %", _c_ub_val, " = ashr i64 %", _c_ub_raw, ", 1", 换行)
+        设 _c_idx32 = 连接("%", _c_ub_val)
+        设 _c_r = 新寄存器(reg); 设 _c_result = 取(_c_r, 0); reg = 取(_c_r, 1)
+        _c_s = 连接(_c_s, "  ", _c_result, " = call i8* @rt_list_get(i8* ", _c_cv, ", i64 ", _c_idx32, ")", 换行)
+        返回(列表(_c_s, _c_result, reg))
     }
     若 (字符串相等(_c_op, "列表追加")) {
         返回(列表("", "null", reg))
