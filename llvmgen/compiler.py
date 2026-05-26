@@ -645,7 +645,58 @@ def compile_module_test(module_name: str) -> str:
     ir = evaluator.eval(['编译顶层', module_ast])
     ir = _fix_terminators(ir) if isinstance(ir, str) else ''
     ir = _fix_missing_constants(ir) if isinstance(ir, str) else ''
+    ir = _fix_param_unbox(ir) if isinstance(ir, str) else ''
     return ir if isinstance(ir, str) else ''
+
+
+def _fix_param_unbox(ir_text: str) -> str:
+    """修复 fn handler 的参数 unbox/rebox 模式：直接 store 参数而非 ptrtoint+ashr+shl+or+inttoptr。
+    旧模式把 LSB=0 的堆对象指针变成 LSB=1 的 tagged int，导致后续 rt_list_get 拿到 null。"""
+    import re
+    lines = ir_text.split('\n')
+    # 第 1 遍：找到 ptrtoint param → ashr → alloca → shl → or → inttoptr → store 的 7 行模式
+    # 替换为：alloca → store param
+    result = []
+    i = 0
+    fixed = 0
+    while i < len(lines):
+        # 匹配 ptrtoint i8* %XXX_arg to i64
+        m1 = re.match(r'\s*(%\d+)\s*=\s*ptrtoint\s+i8\*\s+(%_\w+_arg)\s+to\s+i64\s*$', lines[i])
+        if m1 and i + 6 < len(lines):
+            raw = m1.group(1)      # %X
+            param = m1.group(2)    # %_arg
+            # 第 2 行：ashr i64 %raw, 1
+            m2 = re.match(r'\s*(%\d+)\s*=\s*ashr\s+i64\s+' + re.escape(raw) + r'\s*,\s*1\s*$', lines[i+1])
+            # 第 3 行：alloca i8*
+            m3 = re.match(r'\s*(%\d+)\s*=\s*alloca\s+i8\*\s*$', lines[i+2])
+            # 第 4 行：shl i64 %val, 1
+            # 第 5 行：or i64 %shl, 1
+            # 第 6 行：inttoptr i64 %or to i8*
+            # 第 7 行：store i8* %ptr, i8** %alloca
+            if m2 and m3:
+                val = m2.group(1)
+                alloca_reg = m3.group(1)
+                m4 = re.match(r'\s*(%\d+)\s*=\s*shl\s+i64\s+' + re.escape(val) + r'\s*,\s*1\s*$', lines[i+3])
+                if m4:
+                    shl = m4.group(1)
+                    m5 = re.match(r'\s*(%\d+)\s*=\s*or\s+i64\s+' + re.escape(shl) + r'\s*,\s*1\s*$', lines[i+4])
+                    if m5:
+                        orr = m5.group(1)
+                        m6 = re.match(r'\s*(%\d+)\s*=\s*inttoptr\s+i64\s+' + re.escape(orr) + r'\s+to\s+i8\*\s*$', lines[i+5])
+                        if m6:
+                            ptr = m6.group(1)
+                            indent = ' ' * (len(lines[i]) - len(lines[i].lstrip()))
+                            store_old = f'{indent}store i8* {ptr}, i8** {alloca_reg}'
+                            if lines[i+6].strip() == store_old.strip():
+                                # Replace 7 lines with 2
+                                result.append(f'{indent}{alloca_reg} = alloca i8*')
+                                result.append(f'{indent}store i8* {param}, i8** {alloca_reg}')
+                                i += 7
+                                fixed += 1
+                                continue
+        result.append(lines[i])
+        i += 1
+    return '\n'.join(result)
 
 
 def _fix_missing_constants(ir_text: str) -> str:
