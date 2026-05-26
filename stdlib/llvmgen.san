@@ -715,9 +715,9 @@
        设 _c_ascii_name = 注册函数名(_c_fn_name)
         设 _c_fn_params = 取(_c_args, 1)
         设 _c_fn_body = 取(_c_args, 2)
-        // 注入参数到共享 comp_env（不创建新dict，只保存/覆盖/恢复）
+        // 进栈 push 新层（保持单一 comp_env 对象）
         设 _c_saved_reg = reg
-        设 _c_saved_params = 新字典()
+        comp_env = 进栈(comp_env)
         reg = 0
         // 函数头: define i8* @_c_name(...)
         设 _c_fn_ir = 连接(换行, "define i8* @", _c_ascii_name, "(")
@@ -755,14 +755,8 @@
         _c_fn_ir = 连接(_c_fn_ir, "}", 换行)
         // 存入函数库
         设 函数库列表 = 列表追加(函数库列表, _c_fn_ir)
-        // 恢复外层参数值
-        设 _c_pi = 0
-        循环 (小于(_c_pi, _c_param_count)) {
-            设 _c_pn = 列表取(_c_fn_params, _c_pi)
-            设 _c_old = 查键(_c_saved_params, _c_pn)
-            存变量(comp_env, _c_pn, _c_old)
-            _c_pi = 加(_c_pi, 1)
-        }
+        // 出栈 pop 本层
+        comp_env = 出栈(comp_env)
         reg = _c_saved_reg
         返回(列表("", "null", reg))
     }
@@ -1891,7 +1885,8 @@
 
 定义 编译顶层 (ast) {
     设 reg = 0
-    设 comp_env = 新字典()
+    设 comp_env = 新列表()
+    comp_env = 进栈(comp_env)
     设 函数库列表 = 新列表()
     设 函数参数表 = 新字典()
     设 全局变量表 = 新字典()

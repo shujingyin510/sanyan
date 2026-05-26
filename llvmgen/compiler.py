@@ -92,11 +92,16 @@ def compile_source(source: str, module_name: str = 'main') -> tuple[str, 'Codege
 
 
 def _dict_get_safe(evaluator, args):
-    """安全取字典键：存在返回值，不存在返回空串。"""
+    """安全取字典键。支持 list-of-dicts 栈：从栈顶向下搜索。"""
     d = evaluator.eval(args[0])
     k = evaluator.eval(args[1])
     if isinstance(k, TritValue):
         k = k.to_int()
+    if isinstance(d, list):
+        for layer in reversed(d):
+            if isinstance(layer, dict) and k in layer:
+                return layer[k]
+        return ""
     if isinstance(d, dict) and k in d:
         return d[k]
     return ""
@@ -182,6 +187,22 @@ def _list_append(evaluator, args):
     if isinstance(lst, list):
         lst.append(item)
     return lst
+
+
+def _env_push(evaluator, args):
+    """进栈: comp_env 栈顶 push 新层。"""
+    d = args[0] if isinstance(args[0], list) else evaluator.eval(args[0])
+    if isinstance(d, list):
+        d.append({})
+    return d
+
+
+def _env_pop(evaluator, args):
+    """出栈: comp_env 栈顶 pop。"""
+    d = args[0] if isinstance(args[0], list) else evaluator.eval(args[0])
+    if isinstance(d, list) and len(d) > 0:
+        d.pop()
+    return d
 
 
 def _dict_keys(evaluator, args):
@@ -447,6 +468,10 @@ def self_hosted_compile(source: str, module_name: str = 'main') -> str:
     # 列表追加: lst.append(item)，返回列表本身
     evaluator.commands['列表追加'] = (['lst', 'item'], [['container_ops_list_append', 'lst', 'item']], {}, None)
     _register('container_ops_list_append', _list_append)
+    evaluator.commands['进栈'] = (['stack'], [['container_ops_env_push', 'stack']], {}, None)
+    evaluator.commands['出栈'] = (['stack'], [['container_ops_env_pop', 'stack']], {}, None)
+    _register('container_ops_env_push', _env_push)
+    _register('container_ops_env_pop', _env_pop)
     # 字典取所有键
     evaluator.commands['字典键列表'] = (['d'], [['container_ops_dict_keys', 'd']], {}, None)
     _register('container_ops_dict_keys', _dict_keys)
@@ -576,6 +601,8 @@ def compile_module_test(module_name: str) -> str:
     _register('container_ops_dict_len', _dict_len)
     _register('container_ops_list_get_safe', _list_get_safe)
     _register('container_ops_list_append', _list_append)
+    _register('container_ops_env_push', _env_push)
+    _register('container_ops_env_pop', _env_pop)
     _register('container_ops_dict_keys', _dict_keys)
     _register('container_ops_list_contains', _list_contains)
     _register('container_ops_str_bytelen', _str_bytelen)
@@ -591,6 +618,8 @@ def compile_module_test(module_name: str) -> str:
     evaluator.commands['字典取长'] = (['d'], [['container_ops_dict_len', 'd']], {}, None)
     evaluator.commands['列表取'] = (['lst', 'idx'], [['container_ops_list_get_safe', 'lst', 'idx']], {}, None)
     evaluator.commands['列表追加'] = (['lst', 'item'], [['container_ops_list_append', 'lst', 'item']], {}, None)
+    evaluator.commands['进栈'] = (['stack'], [['container_ops_env_push', 'stack']], {}, None)
+    evaluator.commands['出栈'] = (['stack'], [['container_ops_env_pop', 'stack']], {}, None)
     evaluator.commands['字典键列表'] = (['d'], [['container_ops_dict_keys', 'd']], {}, None)
     evaluator.commands['取字长'] = (['s'], [['container_ops_str_bytelen', 's']], {}, None)
     evaluator.commands['转义LLVM字符串'] = (['s'], [['container_ops_str_escape_llvm', 's']], {}, None)

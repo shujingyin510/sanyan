@@ -153,12 +153,17 @@ class ContainerOps:
         if len(args) != 3:
             raise SanyanSyntaxError('置键 需要字典、键和新值')
         d = evaluator.eval(args[0])
-        if not isinstance(d, dict):
-            raise SanyanTypeError('第一个参数必须是字典')
         key = evaluator.eval(args[1])
         if isinstance(key, TritValue):
             key = key.to_int()
         value = evaluator.eval(args[2])
+        if isinstance(d, list):
+            if len(d) > 0 and isinstance(d[-1], dict):
+                d[-1][key] = value
+                return d
+            raise SanyanTypeError('字典栈顶不是字典')
+        if not isinstance(d, dict):
+            raise SanyanTypeError('第一个参数必须是字典')
         d[key] = value
         return d
 
