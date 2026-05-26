@@ -729,25 +729,14 @@
             pi = 加(pi, 1)
         }
         fn_ir = 连接(fn_ir, ") {", 换行, "entry:", 换行)
-        // 参数 unbox 到 alloca
+        // 参数存储：直接 alloca + store（保留原始 tagged 指针，不 unbox）
         设 pi = 0
         循环 (小于(pi, param_count)) {
             设 pn = 列表取(fn_params, pi)
             设 ascii_pn = 注册函数名(pn)
-            设 r = 新寄存器(reg); 设 raw = 取(r, 0); reg = 取(r, 1)
-            设 r = 新寄存器(reg); 设 val = 取(r, 0); reg = 取(r, 1)
             设 r = 新寄存器(reg); 设 a = 取(r, 0); reg = 取(r, 1)
-            fn_ir = 连接(fn_ir, "  ", raw, " = ptrtoint i8* %", ascii_pn, "_arg to i64", 换行)
-            fn_ir = 连接(fn_ir, "  ", val, " = ashr i64 ", raw, ", 1", 换行)
             fn_ir = 连接(fn_ir, "  ", a, " = alloca i8*", 换行)
-            // box the unboxed value: shl → or → inttoptr → store
-            设 r = 新寄存器(reg); 设 b1 = 取(r, 0); reg = 取(r, 1)
-            设 r = 新寄存器(reg); 设 b2 = 取(r, 0); reg = 取(r, 1)
-            设 r = 新寄存器(reg); 设 bp = 取(r, 0); reg = 取(r, 1)
-            fn_ir = 连接(fn_ir, "  ", b1, " = shl i64 ", val, ", 1", 换行)
-            fn_ir = 连接(fn_ir, "  ", b2, " = or i64 ", b1, ", 1", 换行)
-            fn_ir = 连接(fn_ir, "  ", bp, " = inttoptr i64 ", b2, " to i8*", 换行)
-            fn_ir = 连接(fn_ir, "  store i8* ", bp, ", i8** ", a, 换行)
+            fn_ir = 连接(fn_ir, "  store i8* %", ascii_pn, "_arg, i8** ", a, 换行)
             存变量(alloca表, pn, a)
             pi = 加(pi, 1)
         }
