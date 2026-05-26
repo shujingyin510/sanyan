@@ -716,6 +716,43 @@ def _fix_rt_list_get_null_safe(ir_text: str) -> str:
     # _rt_str_eq: skip - has phi nodes, needs special handling
     # (null-safe skipped due to phi node complexity, handled by caller null checks)
     
+    # _rt_str_eq: completely replace with null-safe version
+    old_eq = 'define i32 @_rt_str_eq(i8* %a, i8* %b) {\nentry:\n  br label %loop\nloop:\n  %_ap = phi i8* [ %a, %entry ], [ %_a2, %next ]\n  %_bp = phi i8* [ %b, %entry ], [ %_b2, %next ]\n  %_ca = load i8, i8* %_ap\n  %_cb = load i8, i8* %_bp\n  %_ne = icmp ne i8 %_ca, %_cb\n  br i1 %_ne, label %neq, label %chk\nchk:\n  %_z = icmp eq i8 %_ca, 0\n  br i1 %_z, label %eq, label %next\nnext:\n  %_a2 = getelementptr inbounds i8, i8* %_ap, i32 1\n  %_b2 = getelementptr inbounds i8, i8* %_bp, i32 1\n  br label %loop\neq:\n  ret i32 1\nneq:\n  ret i32 0\n}'
+    new_eq = '''define i32 @_rt_str_eq(i8* %a, i8* %b) {
+  %_eq_na = icmp eq i8* %a, null
+  %_eq_nb = icmp eq i8* %b, null
+  %_eq_or = or i1 %_eq_na, %_eq_nb
+  br i1 %_eq_or, label %_eq_null, label %_eq_ok
+_eq_null:
+  %_eq_and = and i1 %_eq_na, %_eq_nb
+  br i1 %_eq_and, label %_eq_ret1, label %_eq_ret0
+_eq_ret1:
+  ret i32 1
+_eq_ret0:
+  ret i32 0
+_eq_ok:
+  br label %_eq_loop
+_eq_loop:
+  %_eq_ap = phi i8* [ %a, %_eq_ok ], [ %_eq_a2, %_eq_next ]
+  %_eq_bp = phi i8* [ %b, %_eq_ok ], [ %_eq_b2, %_eq_next ]
+  %_eq_ca = load i8, i8* %_eq_ap
+  %_eq_cb = load i8, i8* %_eq_bp
+  %_eq_ne = icmp ne i8 %_eq_ca, %_eq_cb
+  br i1 %_eq_ne, label %_eq_neq, label %_eq_chk
+_eq_chk:
+  %_eq_z = icmp eq i8 %_eq_ca, 0
+  br i1 %_eq_z, label %_eq_eq, label %_eq_next
+_eq_next:
+  %_eq_a2 = getelementptr inbounds i8, i8* %_eq_ap, i32 1
+  %_eq_b2 = getelementptr inbounds i8, i8* %_eq_bp, i32 1
+  br label %_eq_loop
+_eq_eq:
+  ret i32 1
+_eq_neq:
+  ret i32 0
+}'''
+    ir_text = ir_text.replace(old_eq, new_eq)
+    
     # rt_str_to_list: return empty list instead of null
     ir_text = ir_text.replace(
         'define i8* @rt_str_to_list(i8* %a) {\n  ret i8* null\n}',
