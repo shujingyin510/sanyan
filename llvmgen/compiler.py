@@ -680,71 +680,47 @@ def compile_module_test(module_name: str) -> str:
 
 
 def _fix_rt_list_get_null_safe(ir_text: str) -> str:
-    """把 rt_list_get, rt_list_len, rt_str_len, rt_dict_get 等定义为 null-safe 版本。"""
-    imports = [
-        # rt_list_get
-        ('''define i8* @rt_list_get(i8* %lst, i32 %idx) {
-  %_ip = getelementptr i8, i8* %lst, i32 16
-  %_ipp = bitcast i8* %_ip to i8**
-  %_ipi = getelementptr i8*, i8** %_ipp, i32 %idx
-  %_v = load i8*, i8** %_ipi
-  ret i8* %_v
-}''', '''define i8* @rt_list_get(i8* %lst, i32 %idx) {
-  %_rgn = icmp eq i8* %lst, null
-  br i1 %_rgn, label %_rg_null, label %_rg_ok
-_rg_null:
-  ret i8* null
-_rg_ok:
-  %_ip = getelementptr i8, i8* %lst, i32 16
-  %_ipp = bitcast i8* %_ip to i8**
-  %_ipi = getelementptr i8*, i8** %_ipp, i32 %idx
-  %_v = load i8*, i8** %_ipi
-  ret i8* %_v
-}'''),
-        # rt_list_len
-        ('''define i32 @rt_list_len(i8* %lst) {
-  %_lp = getelementptr i8, i8* %lst, i32 4
-  %_li = bitcast i8* %_lp to i32*
-  %_v = load i32, i32* %_li
-  ret i32 %_v
-}''', '''define i32 @rt_list_len(i8* %lst) {
-  %_rln = icmp eq i8* %lst, null
-  br i1 %_rln, label %_rl_null, label %_rl_ok
-_rl_null:
-  ret i32 0
-_rl_ok:
-  %_lp = getelementptr i8, i8* %lst, i32 4
-  %_li = bitcast i8* %_lp to i32*
-  %_v = load i32, i32* %_li
-  ret i32 %_v
-}'''),
-        # rt_dict_get
-        ('''define i8* @rt_dict_get(i8* %d, i8* %key) {
-  %_hp = getelementptr i8, i8* %d, i32 16
-  %_hpp = bitcast i8* %_hp to i8**
-  %_di = phi i32 [ 0, %entry ], [ %_dni, %_dloop ]
-  %_dmax = add i32 0, 256
-  %_dcmp = icmp slt i32 %_di, %_dmax
-  br i1 %_dcmp, label %_dloop, label %_dnull
-''', '''define i8* @rt_dict_get(i8* %d, i8* %key) {
-  %_rdn = icmp eq i8* %d, null
-  br i1 %_rdn, label %_rd_null, label %_rd_ok
-_rd_null:
-  ret i8* null
-_rd_ok:
-  %_hp = getelementptr i8, i8* %d, i32 16
-  %_hpp = bitcast i8* %_hp to i8**
-  %_di = phi i32 [ 0, %_rd_ok ], [ %_dni, %_dloop ]
-  %_dmax = add i32 0, 256
-  %_dcmp = icmp slt i32 %_di, %_dmax
-  br i1 %_dcmp, label %_dloop, label %_dnull
-'''),
-    ]
-    result = ir_text
-    for old, new in imports:
-        if old in result:
-            result = result.replace(old, new)
-    return result
+    """把常用运行时函数替换为 null-safe 版本。"""
+    import re
+    
+    # Insert null check after the entry: label for each function
+    
+    # rt_list_get(i8* %lst, i32 %idx) 
+    ir_text = re.sub(
+        r'(define i8\* @rt_list_get\(i8\* %lst, i32 %idx\) \{\nentry:\n)',
+        r'\1  %_ns_gln = icmp eq i8* %lst, null\n  br i1 %_ns_gln, label %_ns_gl_null, label %_ns_gl_ok\n_ns_gl_null:\n  ret i8* null\n_ns_gl_ok:\n',
+        ir_text)
+    
+    # rt_list_len(i8* %lst)
+    ir_text = re.sub(
+        r'(define i32 @rt_list_len\(i8\* %lst\) \{\nentry:\n)',
+        r'\1  %_ns_lln = icmp eq i8* %lst, null\n  br i1 %_ns_lln, label %_ns_ll_null, label %_ns_ll_ok\n_ns_ll_null:\n  ret i32 0\n_ns_ll_ok:\n',
+        ir_text)
+    
+    # rt_str_len(i8* %s)
+    ir_text = re.sub(
+        r'(define i32 @rt_str_len\(i8\* %s\) \{\nentry:\n)',
+        r'\1  %_ns_sln = icmp eq i8* %s, null\n  br i1 %_ns_sln, label %_ns_sl_null, label %_ns_sl_ok\n_ns_sl_null:\n  ret i32 0\n_ns_sl_ok:\n',
+        ir_text)
+    
+    # rt_list_push_item(i8* %lst, i8* %item)
+    ir_text = re.sub(
+        r'(define i8\* @rt_list_push_item\(i8\* %lst, i8\* %item\) \{\nentry:\n)',
+        r'\1  %_ns_pin = icmp eq i8* %lst, null\n  br i1 %_ns_pin, label %_ns_pi_null, label %_ns_pi_ok\n_ns_pi_null:\n  ret i8* null\n_ns_pi_ok:\n',
+        ir_text)
+    
+    # rt_str_find: null-safe
+    ir_text = re.sub(
+        r'(define i32 @rt_str_find\(i8\* %s, i8\* %sub\) \{\nentry:\n)',
+        r'\1  %_ns_sf0 = icmp eq i8* %s, null\n  br i1 %_ns_sf0, label %_ns_sf_null, label %_ns_sf_c1\n_ns_sf_null:\n  ret i32 -1\n_ns_sf_c1:\n  %_ns_sf1 = icmp eq i8* %sub, null\n  br i1 %_ns_sf1, label %_ns_sf_null, label %_ns_sf_ok\n_ns_sf_ok:\n',
+        ir_text)
+    
+    # rt_str_to_list: return empty list instead of null
+    ir_text = ir_text.replace(
+        'define i8* @rt_str_to_list(i8* %a) {\n  ret i8* null\n}',
+        'define i8* @rt_str_to_list(i8* %a) {\n  %_stl = call i8* @rt_list_new()\n  ret i8* %_stl\n}')
+    
+    return ir_text
 
 
 def _fix_param_unbox(ir_text: str) -> str:
@@ -801,7 +777,6 @@ def _fix_missing_constants(ir_text: str) -> str:
     """补发缺失的 @.str.N 字符串常量定义。"""
     import re
     lines = ir_text.split('\n')
-    # 收集已定义的和被引用的常量索引
     defs = set()
     refs = set()
     for line in lines:
@@ -814,11 +789,9 @@ def _fix_missing_constants(ir_text: str) -> str:
     missing = refs - defs
     if not missing:
         return ir_text
-    # 为缺失的常量生成占位定义（22 字节 c-string）
     extra = []
     for idx in sorted(missing):
         extra.append(f'@.str.{idx} = private constant [22 x i8] c"__sanyan_fixup_{idx:04d}__\\00"')
-    # 插到函数定义之前
     result = []
     for line in lines:
         result.append(line)
@@ -826,7 +799,6 @@ def _fix_missing_constants(ir_text: str) -> str:
             result.extend(extra)
             extra = []
     if extra:
-        # 没找到合适位置，追加到末尾
         result.extend(extra)
     return '\n'.join(result)
 
