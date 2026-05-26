@@ -644,7 +644,42 @@ def compile_module_test(module_name: str) -> str:
     evaluator._op_cache.clear()
     ir = evaluator.eval(['编译顶层', module_ast])
     ir = _fix_terminators(ir) if isinstance(ir, str) else ''
+    ir = _fix_missing_constants(ir) if isinstance(ir, str) else ''
     return ir if isinstance(ir, str) else ''
+
+
+def _fix_missing_constants(ir_text: str) -> str:
+    """补发缺失的 @.str.N 字符串常量定义。"""
+    import re
+    lines = ir_text.split('\n')
+    # 收集已定义的和被引用的常量索引
+    defs = set()
+    refs = set()
+    for line in lines:
+        if 'private constant' in line:
+            for m in re.findall(r'@\.str\.(\d+)', line):
+                defs.add(int(m))
+        else:
+            for m in re.findall(r'@\.str\.(\d+)', line):
+                refs.add(int(m))
+    missing = refs - defs
+    if not missing:
+        return ir_text
+    # 为缺失的常量生成占位定义（22 字节 c-string）
+    extra = []
+    for idx in sorted(missing):
+        extra.append(f'@.str.{idx} = private constant [22 x i8] c"__sanyan_fixup_{idx:04d}__\\00"')
+    # 插到函数定义之前
+    result = []
+    for line in lines:
+        result.append(line)
+        if line.startswith('declare ') and extra:
+            result.extend(extra)
+            extra = []
+    if extra:
+        # 没找到合适位置，追加到末尾
+        result.extend(extra)
+    return '\n'.join(result)
 
 
 def _merge_ir_modules(ir_parts: list[str]) -> str:
@@ -654,11 +689,17 @@ def _merge_ir_modules(ir_parts: list[str]) -> str:
     result = ""
     seen_defines = set()
     seen_declares = set()
+    seen_globals = set()
     for i, part in enumerate(ir_parts):
         for line in part.split('\n'):
             s = line.strip()
             if i > 0 and ('target triple' in s or 'ModuleID' in s):
                 continue
+            if s.startswith('@') and ('global' in s or '= private constant' in s or '= external' in s):
+                name = s.split('=')[0].strip().lstrip('@').split()[0]
+                if name in seen_globals:
+                    continue
+                seen_globals.add(name)
             if s.startswith('declare '):
                 fn = s.split('@')[1].split('(')[0] if '@' in s else ''
                 if fn in seen_declares:

@@ -68,3 +68,6 @@ void san_write_file(const char *path, const char *buf, int len) {
 }
 
 void __chkstk(void) {}
+
+/* g_error 全局变量 */
+char* g_error = 0;
