@@ -736,10 +736,7 @@
         循环 (小于(_c_pi, _c_param_count)) {
             设 _c_pn = 列表取(_c_fn_params, _c_pi)
             设 _c_ascii_pn = 注册函数名(_c_pn)
-            // 保存旧值（空串表示原不存在）
-            设 _c_old = 查键(comp_env, _c_pn)
-            存变量(_c_saved_params, _c_pn, _c_old)
-            // 注入新参数
+            // 注入参数到当前层
             设 _c_r = 新寄存器(reg); 设 _c_a = 取(_c_r, 0); reg = 取(_c_r, 1)
             _c_fn_ir = 连接(_c_fn_ir, "  ", _c_a, " = alloca i8*", 换行)
             _c_fn_ir = 连接(_c_fn_ir, "  store i8* %", _c_ascii_pn, "_arg, i8** ", _c_a, 换行)
