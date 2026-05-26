@@ -683,33 +683,33 @@ def _fix_rt_list_get_null_safe(ir_text: str) -> str:
     """把常用运行时函数替换为 null-safe 版本。"""
     import re
     
-    # rt_list_get(i8* %lst, i32 %idx) - no entry: label
+    # rt_list_get(i8* %lst, i32 %idx)
     ir_text = re.sub(
-        r'(define i8\* @rt_list_get\(i8\* %lst, i32 %idx\) \{\n)',
+        r'(define i8\* @rt_list_get\(i8\* %lst, i32 %idx\) \{\n)(?:entry:\n)?',
         r'\1  %_ns_gln = icmp eq i8* %lst, null\n  br i1 %_ns_gln, label %_ns_gl_null, label %_ns_gl_ok\n_ns_gl_null:\n  ret i8* null\n_ns_gl_ok:\n',
         ir_text)
     
     # rt_list_len(i8* %lst)
     ir_text = re.sub(
-        r'(define i32 @rt_list_len\(i8\* %lst\) \{\n)',
+        r'(define i32 @rt_list_len\(i8\* %lst\) \{\n)(?:entry:\n)?',
         r'\1  %_ns_lln = icmp eq i8* %lst, null\n  br i1 %_ns_lln, label %_ns_ll_null, label %_ns_ll_ok\n_ns_ll_null:\n  ret i32 0\n_ns_ll_ok:\n',
         ir_text)
     
     # rt_str_len(i8* %s)
     ir_text = re.sub(
-        r'(define i32 @rt_str_len\(i8\* %s\) \{\n)',
+        r'(define i32 @rt_str_len\(i8\* %s\) \{\n)(?:entry:\n)?',
         r'\1  %_ns_sln = icmp eq i8* %s, null\n  br i1 %_ns_sln, label %_ns_sl_null, label %_ns_sl_ok\n_ns_sl_null:\n  ret i32 0\n_ns_sl_ok:\n',
         ir_text)
     
-    # rt_list_push_item(i8* %lst, i8* %item)
+    # rt_list_push_item(i8* %lst, i8* %item) - consumes entry: label
     ir_text = re.sub(
-        r'(define i8\* @rt_list_push_item\(i8\* %lst, i8\* %item\) \{\n)',
+        r'(define i8\* @rt_list_push_item\(i8\* %lst, i8\* %item\) \{\n)(?:entry:\n)?',
         r'\1  %_ns_pin = icmp eq i8* %lst, null\n  br i1 %_ns_pin, label %_ns_pi_null, label %_ns_pi_ok\n_ns_pi_null:\n  ret i8* null\n_ns_pi_ok:\n',
         ir_text)
     
     # rt_str_find: null-safe
     ir_text = re.sub(
-        r'(define i32 @rt_str_find\(i8\* %s, i8\* %sub\) \{\n)',
+        r'(define i32 @rt_str_find\(i8\* %s, i8\* %sub\) \{\n)(?:entry:\n)?',
         r'\1  %_ns_sf0 = icmp eq i8* %s, null\n  br i1 %_ns_sf0, label %_ns_sf_null, label %_ns_sf_c1\n_ns_sf_null:\n  ret i32 -1\n_ns_sf_c1:\n  %_ns_sf1 = icmp eq i8* %sub, null\n  br i1 %_ns_sf1, label %_ns_sf_null, label %_ns_sf_ok\n_ns_sf_ok:\n',
         ir_text)
     
