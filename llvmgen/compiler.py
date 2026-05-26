@@ -646,7 +646,76 @@ def compile_module_test(module_name: str) -> str:
     ir = _fix_terminators(ir) if isinstance(ir, str) else ''
     ir = _fix_missing_constants(ir) if isinstance(ir, str) else ''
     ir = _fix_param_unbox(ir) if isinstance(ir, str) else ''
+    ir = _fix_rt_list_get_null_safe(ir) if isinstance(ir, str) else ''
     return ir if isinstance(ir, str) else ''
+
+
+def _fix_rt_list_get_null_safe(ir_text: str) -> str:
+    """把 rt_list_get, rt_list_len, rt_str_len, rt_dict_get 等定义为 null-safe 版本。"""
+    imports = [
+        # rt_list_get
+        ('''define i8* @rt_list_get(i8* %lst, i32 %idx) {
+  %_ip = getelementptr i8, i8* %lst, i32 16
+  %_ipp = bitcast i8* %_ip to i8**
+  %_ipi = getelementptr i8*, i8** %_ipp, i32 %idx
+  %_v = load i8*, i8** %_ipi
+  ret i8* %_v
+}''', '''define i8* @rt_list_get(i8* %lst, i32 %idx) {
+  %_rgn = icmp eq i8* %lst, null
+  br i1 %_rgn, label %_rg_null, label %_rg_ok
+_rg_null:
+  ret i8* null
+_rg_ok:
+  %_ip = getelementptr i8, i8* %lst, i32 16
+  %_ipp = bitcast i8* %_ip to i8**
+  %_ipi = getelementptr i8*, i8** %_ipp, i32 %idx
+  %_v = load i8*, i8** %_ipi
+  ret i8* %_v
+}'''),
+        # rt_list_len
+        ('''define i32 @rt_list_len(i8* %lst) {
+  %_lp = getelementptr i8, i8* %lst, i32 4
+  %_li = bitcast i8* %_lp to i32*
+  %_v = load i32, i32* %_li
+  ret i32 %_v
+}''', '''define i32 @rt_list_len(i8* %lst) {
+  %_rln = icmp eq i8* %lst, null
+  br i1 %_rln, label %_rl_null, label %_rl_ok
+_rl_null:
+  ret i32 0
+_rl_ok:
+  %_lp = getelementptr i8, i8* %lst, i32 4
+  %_li = bitcast i8* %_lp to i32*
+  %_v = load i32, i32* %_li
+  ret i32 %_v
+}'''),
+        # rt_dict_get
+        ('''define i8* @rt_dict_get(i8* %d, i8* %key) {
+  %_hp = getelementptr i8, i8* %d, i32 16
+  %_hpp = bitcast i8* %_hp to i8**
+  %_di = phi i32 [ 0, %entry ], [ %_dni, %_dloop ]
+  %_dmax = add i32 0, 256
+  %_dcmp = icmp slt i32 %_di, %_dmax
+  br i1 %_dcmp, label %_dloop, label %_dnull
+''', '''define i8* @rt_dict_get(i8* %d, i8* %key) {
+  %_rdn = icmp eq i8* %d, null
+  br i1 %_rdn, label %_rd_null, label %_rd_ok
+_rd_null:
+  ret i8* null
+_rd_ok:
+  %_hp = getelementptr i8, i8* %d, i32 16
+  %_hpp = bitcast i8* %_hp to i8**
+  %_di = phi i32 [ 0, %_rd_ok ], [ %_dni, %_dloop ]
+  %_dmax = add i32 0, 256
+  %_dcmp = icmp slt i32 %_di, %_dmax
+  br i1 %_dcmp, label %_dloop, label %_dnull
+'''),
+    ]
+    result = ir_text
+    for old, new in imports:
+        if old in result:
+            result = result.replace(old, new)
+    return result
 
 
 def _fix_param_unbox(ir_text: str) -> str:
