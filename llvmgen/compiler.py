@@ -778,6 +778,9 @@ _eq_neq:
         'define i8* @rt_str_substr(i8* %a, i8* %b, i8* %c) {\n  ret i8* %a\n}',
         'define i8* @rt_str_substr(i8* %a, i8* %b, i8* %c) {\n  %_ssn = icmp eq i8* %a, null\n  br i1 %_ssn, label %_ss_ret_ok, label %_ss_ret_a\n_ss_ret_ok:\n  %_ssr = call i8* @rt_str_new(i8* null, i32 0)\n  ret i8* %_ssr\n_ss_ret_a:\n  ret i8* %a\n}')
     
+    # Clean up orphaned entry: labels from patches
+    ir_text = re.sub(r'(?<=_ok:\n)entry:\n', r'', ir_text)
+    
     return ir_text
 
 
