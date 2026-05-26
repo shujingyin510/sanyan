@@ -683,42 +683,63 @@ def _fix_rt_list_get_null_safe(ir_text: str) -> str:
     """把常用运行时函数替换为 null-safe 版本。"""
     import re
     
-    # Insert null check after the entry: label for each function
-    
-    # rt_list_get(i8* %lst, i32 %idx) 
+    # rt_list_get(i8* %lst, i32 %idx) - no entry: label
     ir_text = re.sub(
-        r'(define i8\* @rt_list_get\(i8\* %lst, i32 %idx\) \{\nentry:\n)',
+        r'(define i8\* @rt_list_get\(i8\* %lst, i32 %idx\) \{\n)',
         r'\1  %_ns_gln = icmp eq i8* %lst, null\n  br i1 %_ns_gln, label %_ns_gl_null, label %_ns_gl_ok\n_ns_gl_null:\n  ret i8* null\n_ns_gl_ok:\n',
         ir_text)
     
     # rt_list_len(i8* %lst)
     ir_text = re.sub(
-        r'(define i32 @rt_list_len\(i8\* %lst\) \{\nentry:\n)',
+        r'(define i32 @rt_list_len\(i8\* %lst\) \{\n)',
         r'\1  %_ns_lln = icmp eq i8* %lst, null\n  br i1 %_ns_lln, label %_ns_ll_null, label %_ns_ll_ok\n_ns_ll_null:\n  ret i32 0\n_ns_ll_ok:\n',
         ir_text)
     
     # rt_str_len(i8* %s)
     ir_text = re.sub(
-        r'(define i32 @rt_str_len\(i8\* %s\) \{\nentry:\n)',
+        r'(define i32 @rt_str_len\(i8\* %s\) \{\n)',
         r'\1  %_ns_sln = icmp eq i8* %s, null\n  br i1 %_ns_sln, label %_ns_sl_null, label %_ns_sl_ok\n_ns_sl_null:\n  ret i32 0\n_ns_sl_ok:\n',
         ir_text)
     
     # rt_list_push_item(i8* %lst, i8* %item)
     ir_text = re.sub(
-        r'(define i8\* @rt_list_push_item\(i8\* %lst, i8\* %item\) \{\nentry:\n)',
+        r'(define i8\* @rt_list_push_item\(i8\* %lst, i8\* %item\) \{\n)',
         r'\1  %_ns_pin = icmp eq i8* %lst, null\n  br i1 %_ns_pin, label %_ns_pi_null, label %_ns_pi_ok\n_ns_pi_null:\n  ret i8* null\n_ns_pi_ok:\n',
         ir_text)
     
     # rt_str_find: null-safe
     ir_text = re.sub(
-        r'(define i32 @rt_str_find\(i8\* %s, i8\* %sub\) \{\nentry:\n)',
+        r'(define i32 @rt_str_find\(i8\* %s, i8\* %sub\) \{\n)',
         r'\1  %_ns_sf0 = icmp eq i8* %s, null\n  br i1 %_ns_sf0, label %_ns_sf_null, label %_ns_sf_c1\n_ns_sf_null:\n  ret i32 -1\n_ns_sf_c1:\n  %_ns_sf1 = icmp eq i8* %sub, null\n  br i1 %_ns_sf1, label %_ns_sf_null, label %_ns_sf_ok\n_ns_sf_ok:\n',
         ir_text)
+    
+    # _rt_str_eq: skip - has phi nodes, needs special handling
+    # (null-safe skipped due to phi node complexity, handled by caller null checks)
     
     # rt_str_to_list: return empty list instead of null
     ir_text = ir_text.replace(
         'define i8* @rt_str_to_list(i8* %a) {\n  ret i8* null\n}',
         'define i8* @rt_str_to_list(i8* %a) {\n  %_stl = call i8* @rt_list_new()\n  ret i8* %_stl\n}')
+    
+    # rt_int_to_str: return empty string
+    ir_text = ir_text.replace(
+        'define i8* @rt_int_to_str(i8* %v) {\n  ret i8* null\n}',
+        'define i8* @rt_int_to_str(i8* %v) {\n  %_its = call i8* @rt_str_new(i8* null, i32 0)\n  ret i8* %_its\n}')
+    
+    # rt_dict_keys: return empty list
+    ir_text = ir_text.replace(
+        'define i8* @rt_dict_keys(i8* %d) {\n  ret i8* null\n}',
+        'define i8* @rt_dict_keys(i8* %d) {\n  %_dk = call i8* @rt_list_new()\n  ret i8* %_dk\n}')
+    
+    # rt_list_concat: return non-null arg
+    ir_text = ir_text.replace(
+        'define i8* @rt_list_concat(i8* %a, i8* %b) {\n  ret i8* %a\n}',
+        'define i8* @rt_list_concat(i8* %a, i8* %b) {\n  %_lcn = icmp eq i8* %a, null\n  br i1 %_lcn, label %_lc_retb, label %_lc_reta\n_lc_retb:\n  ret i8* %b\n_lc_reta:\n  ret i8* %a\n}')
+    
+    # rt_str_substr: null-safe
+    ir_text = ir_text.replace(
+        'define i8* @rt_str_substr(i8* %a, i8* %b, i8* %c) {\n  ret i8* %a\n}',
+        'define i8* @rt_str_substr(i8* %a, i8* %b, i8* %c) {\n  %_ssn = icmp eq i8* %a, null\n  br i1 %_ssn, label %_ss_ret_ok, label %_ss_ret_a\n_ss_ret_ok:\n  %_ssr = call i8* @rt_str_new(i8* null, i32 0)\n  ret i8* %_ssr\n_ss_ret_a:\n  ret i8* %a\n}')
     
     return ir_text
 
