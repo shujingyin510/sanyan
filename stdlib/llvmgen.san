@@ -711,36 +711,38 @@
        设 _c_ascii_name = 注册函数名(_c_fn_name)
         设 _c_fn_params = 取(_c_args, 1)
         设 _c_fn_body = 取(_c_args, 2)
-        // 保存主函数上下文
-        设 _c_saved_alloca = comp_env
+        // 注入参数到共享 comp_env（不创建新dict，只保存/覆盖/恢复）
         设 _c_saved_reg = reg
-        comp_env = 新字典()
+        设 _c_saved_params = 新字典()
         reg = 0
-        // 函数头: define i8* @_c_name(i8* %p1, i8* %p2, ...)
+        // 函数头: define i8* @_c_name(...)
         设 _c_fn_ir = 连接(换行, "define i8* @", _c_ascii_name, "(")
         设 _c_param_count = 列表取长(_c_fn_params)
         设 _c_pi = 0
         循环 (小于(_c_pi, _c_param_count)) {
             设 _c_pn = 列表取(_c_fn_params, _c_pi)
-            // 参数名ASCII化（LLVM不支持中文参数名）
             设 _c_ascii_pn = 注册函数名(_c_pn)
             若 (大于(_c_pi, 0)) { _c_fn_ir = 连接(_c_fn_ir, ", ") }
             _c_fn_ir = 连接(_c_fn_ir, "i8* %", _c_ascii_pn, "_arg")
             _c_pi = 加(_c_pi, 1)
         }
         _c_fn_ir = 连接(_c_fn_ir, ") {", 换行, "entry:", 换行)
-        // 参数存储：直接 _c_alloca + store，不 unbox/rebox
+        // 保存外层参数值 → 注入新参数
         设 _c_pi = 0
         循环 (小于(_c_pi, _c_param_count)) {
             设 _c_pn = 列表取(_c_fn_params, _c_pi)
             设 _c_ascii_pn = 注册函数名(_c_pn)
+            // 保存旧值（空串表示原不存在）
+            设 _c_old = 查键(comp_env, _c_pn)
+            存变量(_c_saved_params, _c_pn, _c_old)
+            // 注入新参数
             设 _c_r = 新寄存器(reg); 设 _c_a = 取(_c_r, 0); reg = 取(_c_r, 1)
             _c_fn_ir = 连接(_c_fn_ir, "  ", _c_a, " = alloca i8*", 换行)
             _c_fn_ir = 连接(_c_fn_ir, "  store i8* %", _c_ascii_pn, "_arg, i8** ", _c_a, 换行)
             存变量(comp_env, _c_pn, _c_a)
             _c_pi = 加(_c_pi, 1)
         }
-        // 先注册函数名（递归调用需要）
+        // 先注册函数名
         存变量(函数参数表, _c_ascii_name, _c_param_count)
         // 编译函数体
         设 _c_body_r = 编译(comp_env, _c_fn_body, reg)
@@ -749,8 +751,14 @@
         _c_fn_ir = 连接(_c_fn_ir, "}", 换行)
         // 存入函数库
         设 函数库列表 = 列表追加(函数库列表, _c_fn_ir)
-        // 恢复主函数上下文
-        comp_env = _c_saved_alloca
+        // 恢复外层参数值
+        设 _c_pi = 0
+        循环 (小于(_c_pi, _c_param_count)) {
+            设 _c_pn = 列表取(_c_fn_params, _c_pi)
+            设 _c_old = 查键(_c_saved_params, _c_pn)
+            存变量(comp_env, _c_pn, _c_old)
+            _c_pi = 加(_c_pi, 1)
+        }
         reg = _c_saved_reg
         返回(列表("", "null", reg))
     }
