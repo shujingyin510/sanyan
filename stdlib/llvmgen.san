@@ -729,11 +729,7 @@
             pi = 加(pi, 1)
         }
         fn_ir = 连接(fn_ir, ") {", 换行, "entry:", 换行)
-        // 参数存储：直接 alloca + store，存入当前 alloca表
-        设 saved_alloca = alloca表
-        设 saved_reg = reg
-        alloca表 = 新字典()
-        reg = 0
+        // 参数存储：直接 alloca + store，不 unbox/rebox
         设 pi = 0
         循环 (小于(pi, param_count)) {
             设 pn = 列表取(fn_params, pi)
@@ -742,11 +738,6 @@
             fn_ir = 连接(fn_ir, "  ", a, " = alloca i8*", 换行)
             fn_ir = 连接(fn_ir, "  store i8* %", ascii_pn, "_arg, i8** ", a, 换行)
             存变量(alloca表, pn, a)
-            // 也存入 saved_alloca，确保动态作用域下可见
-            设 existing_in_outer = 查键(saved_alloca, pn)
-            若 (等于(取长(existing_in_outer), 0)) {
-                存变量(saved_alloca, pn, a)
-            }
             pi = 加(pi, 1)
         }
         // 先注册函数名（递归调用需要）
