@@ -252,8 +252,11 @@ def _dict_len(evaluator, args):
     return TritValue(0)
 
 
+_lg_count = 0
 def _list_get_safe(evaluator, args):
     """安全列表取值，索引越界返回空串。"""
+    global _lg_count
+    _lg_count += 1
     lst = evaluator.eval(args[0])
     idx = evaluator.eval(args[1])
     if isinstance(idx, TritValue):
