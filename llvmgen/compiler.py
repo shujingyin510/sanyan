@@ -13,6 +13,89 @@ if TYPE_CHECKING:
     from llvmgen.codegen import CodegenContext
 
 
+# ── opcode 分派表（用于 tag_op 命令，避免自举 IR 中的字符串比较） ──
+_OPCODE_MAP = {
+    '取': 1, 'get': 1, '列表取': 1, 'list_get': 1,
+    '列表取长': 2, 'list_len': 2,
+    'set': 3, '设': 3, '設': 3,
+    'if': 4, '若': 4,
+    '循环': 5, 'loop': 5,
+    'forin': 6,
+    'fn': 8, '定义': 8, 'define': 8,
+    '返回': 9, 'return': 9,
+    '跳出': 10, 'break': 10,
+    '继续': 11, 'continue': 11,
+    'do': 12,
+    '尝试': 13, 'try': 13,
+    '判断': 15, 'judge': 15,
+    '加': 16, 'add': 16,
+    '减': 17, 'sub': 17,
+    '乘': 18, 'mul': 18,
+    '除': 19, 'div': 19,
+    '小于': 20, 'lt': 20,
+    '大于': 21, 'gt': 21,
+    '等于': 22, 'eq': 22,
+    '且': 23, 'and': 23,
+    '或': 24, 'or': 24,
+    '非': 25, 'not': 25,
+    '大于等于': 26, 'gte': 26,
+    '字符串相等': 27, 'str_equals': 27,
+    '是列表': 28, 'is_list': 28,
+    '是字符串': 29, 'is_string': 29,
+    'print': 30,
+    '新寄存器ID': 31, '新标签ID': 32,
+    '列表': 33, 'list': 33,
+    '取键': 34, 'get_key': 34,
+    '置键': 35, '字典': 36, 'dict': 36,
+    '切片': 37, 'slice': 37,
+    '列表合': 38, 'list_concat': 38,
+    '子串': 39, 'substring': 39,
+    '字列': 40, 'str_to_list': 40,
+    '连接': 41, 'concat': 41,
+    '查键': 42, '存变量': 43,
+    '新列表': 44, '新字典': 45,
+    '取字长': 46, '列表追加': 47,
+    '进栈': 48, '出栈': 49,
+    '字典取长': 50, '字典键列表': 51,
+    '字符串包含': 52,
+    '查找': 53, '找': 53, 'find': 53,
+    '是数字': 54, 'is_number': 54,
+    '转数字': 55, 'to_number': 55,
+    '前缀': 56, 'startswith': 56,
+    '注册函数名': 57, '取函数名': 58,
+    '转义LLVM字符串': 59, '是终止指令': 60,
+    '循环进栈': 61, '循环出栈': 61, '循环加锁': 61,
+    '进入合并上下文': 62, '退出合并上下文': 63, '取合并标签': 64,
+    'san_read_file': 65, 'san_write_file': 66,
+    'san_argv': 67, 'san_argc': 68,
+    '_rt_malloc': 69, '_rt_free': 70,
+    '取长': 72, 'len': 72, 'length': 72,
+    '函数': 73, '模块调用': 74,
+    '置': 75, '读': 76, '查': 77, '对': 78,
+    'export': 79, '导出': 79,
+    '映射': 80, 'map': 80, '过滤': 81, 'filter': 81,
+    '归并': 82, 'reduce': 82,
+    '是字典': 83,
+}
+
+
+_tag_op_calls = 0
+
+def _tag_op(evaluator, args):
+    """Python 命令：AST 节点头部查字典得 opcode，避免字符串比较。"""
+    global _tag_op_calls
+    _tag_op_calls += 1
+    from ternary_core import TritValue
+    ast = evaluator.eval(args[0])
+    if not isinstance(ast, (list, tuple)) or len(ast) == 0:
+        return ast
+    head = ast[0]
+    if not isinstance(head, str):
+        return ast
+    opcode = _OPCODE_MAP.get(head, 0)
+    return [head, TritValue(opcode)] + list(ast[1:])
+
+
 def _parse_source(source: str) -> list:
     from ops.file_ops import _parse_with_sugar_san, clear_cache
     from evaluator import SanyanEvaluator
@@ -279,6 +362,7 @@ def _get_func_name(evaluator, args):
 
 
 from ops.registry import register as _register
+from ops.registry import get_op as _get_op
 
 # 非ASCII函数名映射 (Chinese → _mN_fnM)
 _func_name_map = {}
@@ -617,6 +701,10 @@ def compile_module_test(module_name: str) -> str:
     evaluator.commands['列表取长'] = (['lst'], [['container_ops_list_len', 'lst']], {}, None)
     evaluator.commands['字典取长'] = (['d'], [['container_ops_dict_len', 'd']], {}, None)
     evaluator.commands['列表取'] = (['lst', 'idx'], [['container_ops_list_get_safe', 'lst', 'idx']], {}, None)
+    # tag_op: Python 命令，AST 节点头部查字典得 opcode（避免自举 IR 中的字符串比较）
+    evaluator.commands['tag_op'] = (['ast'], [['container_ops_tag_op', 'ast']], {}, None)
+    _register('container_ops_tag_op', _tag_op)
+    assert _get_op('container_ops_tag_op') is not None, 'tag_op registration failed!'
     evaluator.commands['列表追加'] = (['lst', 'item'], [['container_ops_list_append', 'lst', 'item']], {}, None)
     evaluator.commands['进栈'] = (['stack'], [['container_ops_env_push', 'stack']], {}, None)
     evaluator.commands['出栈'] = (['stack'], [['container_ops_env_pop', 'stack']], {}, None)
@@ -717,42 +805,77 @@ def _fix_rt_list_get_null_safe(ir_text: str) -> str:
     # _rt_str_eq: skip - has phi nodes, needs special handling
     # (null-safe skipped due to phi node complexity, handled by caller null checks)
     
-    # _rt_str_eq: completely replace with null-safe version
-    old_eq = 'define i32 @_rt_str_eq(i8* %a, i8* %b) {\nentry:\n  br label %loop\nloop:\n  %_ap = phi i8* [ %a, %entry ], [ %_a2, %next ]\n  %_bp = phi i8* [ %b, %entry ], [ %_b2, %next ]\n  %_ca = load i8, i8* %_ap\n  %_cb = load i8, i8* %_bp\n  %_ne = icmp ne i8 %_ca, %_cb\n  br i1 %_ne, label %neq, label %chk\nchk:\n  %_z = icmp eq i8 %_ca, 0\n  br i1 %_z, label %eq, label %next\nnext:\n  %_a2 = getelementptr inbounds i8, i8* %_ap, i32 1\n  %_b2 = getelementptr inbounds i8, i8* %_bp, i32 1\n  br label %loop\neq:\n  ret i32 1\nneq:\n  ret i32 0\n}'
-    new_eq = '''define i32 @_rt_str_eq(i8* %a, i8* %b) {
-  %_eq_na = icmp eq i8* %a, null
-  %_eq_nb = icmp eq i8* %b, null
-  %_eq_or = or i1 %_eq_na, %_eq_nb
-  br i1 %_eq_or, label %_eq_null, label %_eq_ok
-_eq_null:
-  %_eq_and = and i1 %_eq_na, %_eq_nb
-  br i1 %_eq_and, label %_eq_ret1, label %_eq_ret0
-_eq_ret1:
-  ret i32 1
-_eq_ret0:
-  ret i32 0
-_eq_ok:
-  br label %_eq_loop
-_eq_loop:
-  %_eq_ap = phi i8* [ %a, %_eq_ok ], [ %_eq_a2, %_eq_next ]
-  %_eq_bp = phi i8* [ %b, %_eq_ok ], [ %_eq_b2, %_eq_next ]
-  %_eq_ca = load i8, i8* %_eq_ap
-  %_eq_cb = load i8, i8* %_eq_bp
-  %_eq_ne = icmp ne i8 %_eq_ca, %_eq_cb
-  br i1 %_eq_ne, label %_eq_neq, label %_eq_chk
-_eq_chk:
-  %_eq_z = icmp eq i8 %_eq_ca, 0
-  br i1 %_eq_z, label %_eq_eq, label %_eq_next
-_eq_next:
-  %_eq_a2 = getelementptr inbounds i8, i8* %_eq_ap, i32 1
-  %_eq_b2 = getelementptr inbounds i8, i8* %_eq_bp, i32 1
-  br label %_eq_loop
-_eq_eq:
-  ret i32 1
-_eq_neq:
-  ret i32 0
-}'''
-    ir_text = ir_text.replace(old_eq, new_eq)
+    # _rt_str_eq: null-safe version, compares data from offset 8 (not header)
+    # Use regex to find and replace ANY _rt_str_eq definition
+    import re as _re
+    
+    new_rt_str_eq = (
+        'define i32 @_rt_str_eq(i8* %a, i8* %b) {\n'
+        '  %_ns_a = icmp eq i8* %a, null\n'
+        '  %_ns_b = icmp eq i8* %b, null\n'
+        '  %_ns_or = or i1 %_ns_a, %_ns_b\n'
+        '  br i1 %_ns_or, label %_ns_null, label %_ns_ok\n'
+        '_ns_null:\n'
+        '  %_ns_and = and i1 %_ns_a, %_ns_b\n'
+        '  br i1 %_ns_and, label %_ns_ret1, label %_ns_ret0\n'
+        '_ns_ret1:\n'
+        '  ret i32 1\n'
+        '_ns_ret0:\n'
+        '  ret i32 0\n'
+        '_ns_ok:\n'
+        '  %_ns_la = getelementptr i8, i8* %a, i32 4\n'
+        '  %_ns_lai = bitcast i8* %_ns_la to i32*\n'
+        '  %_ns_lav = load i32, i32* %_ns_lai\n'
+        '  %_ns_lb = getelementptr i8, i8* %b, i32 4\n'
+        '  %_ns_lbi = bitcast i8* %_ns_lb to i32*\n'
+        '  %_ns_lbv = load i32, i32* %_ns_lbi\n'
+        '  %_ns_leq = icmp eq i32 %_ns_lav, %_ns_lbv\n'
+        '  br i1 %_ns_leq, label %_ns_cmp, label %_ns_ret0b\n'
+        '_ns_ret0b:\n'
+        '  ret i32 0\n'
+        '_ns_cmp:\n'
+        '  %_ns_da = getelementptr i8, i8* %a, i32 8\n'
+        '  %_ns_db = getelementptr i8, i8* %b, i32 8\n'
+        '  br label %_ns_loop\n'
+        '_ns_loop:\n'
+        '  %_ns_i = phi i32 [ 0, %_ns_cmp ], [ %_ns_in, %_ns_next ]\n'
+        '  %_ns_pa = getelementptr i8, i8* %_ns_da, i32 %_ns_i\n'
+        '  %_ns_pb = getelementptr i8, i8* %_ns_db, i32 %_ns_i\n'
+        '  %_ns_ca = load i8, i8* %_ns_pa\n'
+        '  %_ns_cb = load i8, i8* %_ns_pb\n'
+        '  %_ns_ne = icmp ne i8 %_ns_ca, %_ns_cb\n'
+        '  br i1 %_ns_ne, label %_ns_neq, label %_ns_chk\n'
+        '_ns_chk:\n'
+        '  %_ns_z = icmp eq i8 %_ns_ca, 0\n'
+        '  br i1 %_ns_z, label %_ns_eq, label %_ns_next\n'
+        '_ns_next:\n'
+        '  %_ns_in = add i32 %_ns_i, 1\n'
+        '  %_ns_lt = icmp slt i32 %_ns_in, %_ns_lav\n'
+        '  br i1 %_ns_lt, label %_ns_loop, label %_ns_eq\n'
+        '_ns_eq:\n'
+        '  ret i32 1\n'
+        '_ns_neq:\n'
+        '  ret i32 0\n'
+        '}'
+    )
+    
+    # Find ALL _rt_str_eq function definitions (skip string constants)
+    pattern = r'define i32 @_rt_str_eq\(i8\* %a, i8\* %b\) \{'
+    matches = list(_re.finditer(pattern, ir_text))
+    for m in reversed(matches[1:]):  # Skip first (string constant), process rest in reverse
+        start = m.start()
+        # Find matching closing brace
+        depth = 0
+        end = start
+        for i in range(m.end() - 1, len(ir_text)):
+            if ir_text[i] == '{':
+                depth += 1
+            elif ir_text[i] == '}':
+                depth -= 1
+                if depth == 0:
+                    end = i + 1
+                    break
+        ir_text = ir_text[:start] + new_rt_str_eq + ir_text[end:]
     
     # rt_str_to_list: return empty list instead of null
     ir_text = ir_text.replace(
