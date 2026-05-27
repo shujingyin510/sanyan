@@ -805,80 +805,8 @@ def _fix_rt_list_get_null_safe(ir_text: str) -> str:
         r'\1  %_ns_sf0 = icmp eq i8* %s, null\n  br i1 %_ns_sf0, label %_ns_sf_null, label %_ns_sf_c1\n_ns_sf_null:\n  ret i32 -1\n_ns_sf_c1:\n  %_ns_sf1 = icmp eq i8* %sub, null\n  br i1 %_ns_sf1, label %_ns_sf_null, label %_ns_sf_ok\n_ns_sf_ok:\n',
         ir_text)
     
-    # _rt_str_eq: skip - has phi nodes, needs special handling
-    # (null-safe skipped due to phi node complexity, handled by caller null checks)
-    
-    # _rt_str_eq: null-safe version, compares data from offset 8 (not header)
-    # Use regex to find and replace ANY _rt_str_eq definition
-    import re as _re
-    
-    new_rt_str_eq = (
-        'define i32 @_rt_str_eq(i8* %a, i8* %b) {\n'
-        '  %_ns_a = icmp eq i8* %a, null\n'
-        '  %_ns_b = icmp eq i8* %b, null\n'
-        '  %_ns_or = or i1 %_ns_a, %_ns_b\n'
-        '  br i1 %_ns_or, label %_ns_null, label %_ns_ok\n'
-        '_ns_null:\n'
-        '  %_ns_and = and i1 %_ns_a, %_ns_b\n'
-        '  br i1 %_ns_and, label %_ns_ret1, label %_ns_ret0\n'
-        '_ns_ret1:\n'
-        '  ret i32 1\n'
-        '_ns_ret0:\n'
-        '  ret i32 0\n'
-        '_ns_ok:\n'
-        '  %_ns_la = getelementptr i8, i8* %a, i32 4\n'
-        '  %_ns_lai = bitcast i8* %_ns_la to i32*\n'
-        '  %_ns_lav = load i32, i32* %_ns_lai\n'
-        '  %_ns_lb = getelementptr i8, i8* %b, i32 4\n'
-        '  %_ns_lbi = bitcast i8* %_ns_lb to i32*\n'
-        '  %_ns_lbv = load i32, i32* %_ns_lbi\n'
-        '  %_ns_leq = icmp eq i32 %_ns_lav, %_ns_lbv\n'
-        '  br i1 %_ns_leq, label %_ns_cmp, label %_ns_ret0b\n'
-        '_ns_ret0b:\n'
-        '  ret i32 0\n'
-        '_ns_cmp:\n'
-        '  %_ns_da = getelementptr i8, i8* %a, i32 8\n'
-        '  %_ns_db = getelementptr i8, i8* %b, i32 8\n'
-        '  br label %_ns_loop\n'
-        '_ns_loop:\n'
-        '  %_ns_i = phi i32 [ 0, %_ns_cmp ], [ %_ns_in, %_ns_next ]\n'
-        '  %_ns_pa = getelementptr i8, i8* %_ns_da, i32 %_ns_i\n'
-        '  %_ns_pb = getelementptr i8, i8* %_ns_db, i32 %_ns_i\n'
-        '  %_ns_ca = load i8, i8* %_ns_pa\n'
-        '  %_ns_cb = load i8, i8* %_ns_pb\n'
-        '  %_ns_ne = icmp ne i8 %_ns_ca, %_ns_cb\n'
-        '  br i1 %_ns_ne, label %_ns_neq, label %_ns_chk\n'
-        '_ns_chk:\n'
-        '  %_ns_z = icmp eq i8 %_ns_ca, 0\n'
-        '  br i1 %_ns_z, label %_ns_eq, label %_ns_next\n'
-        '_ns_next:\n'
-        '  %_ns_in = add i32 %_ns_i, 1\n'
-        '  %_ns_lt = icmp slt i32 %_ns_in, %_ns_lav\n'
-        '  br i1 %_ns_lt, label %_ns_loop, label %_ns_eq\n'
-        '_ns_eq:\n'
-        '  ret i32 1\n'
-        '_ns_neq:\n'
-        '  ret i32 0\n'
-        '}'
-    )
-    
-    # Find ALL _rt_str_eq function definitions (skip string constants)
-    pattern = r'define i32 @_rt_str_eq\(i8\* %a, i8\* %b\) \{'
-    matches = list(_re.finditer(pattern, ir_text))
-    for m in reversed(matches[1:]):  # Skip first (string constant), process rest in reverse
-        start = m.start()
-        # Find matching closing brace
-        depth = 0
-        end = start
-        for i in range(m.end() - 1, len(ir_text)):
-            if ir_text[i] == '{':
-                depth += 1
-            elif ir_text[i] == '}':
-                depth -= 1
-                if depth == 0:
-                    end = i + 1
-                    break
-        ir_text = ir_text[:start] + new_rt_str_eq + ir_text[end:]
+    # _rt_str_eq: 已由 llvmgen.san 生成_字典操作() 生成正确的 null-safe + 长度感知版本
+    # 无需后处理替换。详见 stdlib/llvmgen.san:1629
     
     # rt_str_to_list: return empty list instead of null
     ir_text = ir_text.replace(
