@@ -158,7 +158,7 @@
         设 _c_op = 取(ast, 0)
         设 _c_args = 切片(ast, 1)
 
-    若 (字符串相等(_c_op, "set")) {
+    若 (字符串相等(_c_op, "设") 或 字符串相等(_c_op, "set")) {
         设 _c_name = 列表取(_c_args, 0)
         设 _c_arg_val = 列表取(_c_args, 1)
         设 _c_val_r = 编译(_c_ce, _c_arg_val, reg)
@@ -578,7 +578,7 @@
         返回(列表("", "null", reg))
     }
 
-    若 (字符串相等(_c_op, "print")) {
+    若 (字符串相等(_c_op, "输出") 或 字符串相等(_c_op, "print")) {
         设 _c_p_val = 列表取(_c_args, 0)
         设 _c_v_r = 编译(_c_ce, _c_p_val, reg)
         设 _c_s = 列表取(_c_v_r, 0); 设 _c_vr = 列表取(_c_v_r, 1); reg = 列表取(_c_v_r, 2)
@@ -610,7 +610,7 @@
         返回(列表(_c_s, _c_vr, reg))
     }
 
-    若 (字符串相等(_c_op, "if")) {
+    若 (字符串相等(_c_op, "若") 或 字符串相等(_c_op, "if")) {
         设 _c_cond_ast = 列表取(_c_args, 0); 设 then_ast = 列表取(_c_args, 1)
         设 _c_has_else = 大于(表长(_c_args), 2)
         设 _c_cond_r = 编译(_c_ce, _c_cond_ast, reg)
@@ -696,7 +696,7 @@
         返回(列表("", "null", reg))
     }
 
-    若 (字符串相等(_c_op, "do")) {
+    若 (字符串相等(_c_op, "做") 或 字符串相等(_c_op, "do")) {
         设 _c_s = ""; 设 last = "null"
         遍历 stmt 在 _c_args {
             设 _c_r = 编译(_c_ce, stmt, reg)
@@ -705,7 +705,7 @@
          返回(列表(_c_s, last, reg))
     }
 
-若 (字符串相等(_c_op, "fn") 或 字符串相等(_c_op, "定义") 或 字符串相等(_c_op, "define")) {
+若 (字符串相等(_c_op, "定义") 或 字符串相等(_c_op, "fn") 或 字符串相等(_c_op, "define")) {
         设 _c_fn_name = 列表取(_c_args, 0)
         // ASCII函数名映射（LLVM不支持中文函数名）
        设 _c_ascii_name = 注册函数名(_c_fn_name)
@@ -757,7 +757,7 @@
         返回(列表("", "null", reg))
     }
 
-    若 (字符串相等(_c_op, "return")) {
+    若 (字符串相等(_c_op, "返回") 或 字符串相等(_c_op, "return")) {
         设 _c_ret_val = 列表取(_c_args, 0)
         设 _c_v_r = 编译(_c_ce, _c_ret_val, reg)
         设 _c_s = 列表取(_c_v_r, 0); 设 _c_vr = 列表取(_c_v_r, 1); reg = 列表取(_c_v_r, 2)
@@ -766,7 +766,7 @@
         返回(列表(_c_s, _c_vr, reg))
     }
 
-    若 (字符串相等(_c_op, "try")) {
+    若 (字符串相等(_c_op, "尝试") 或 字符串相等(_c_op, "try")) {
         设 _c_body_ast = 列表取(_c_args, 0)
         设 _c_catch_info = 列表取(_c_args, 1)
         设 _c_catch_body = 列表取(_c_catch_info, 2)

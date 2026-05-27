@@ -383,7 +383,7 @@ class VM:
                 self.stack.append(c)
 
             elif op == LIST_NEW:
-                n = self.stack.pop()
+                n = self.stack.pop() if self.stack and isinstance(self.stack[-1], int) else 0
                 if not isinstance(n, int):
                     n = int(n) if str(n).lstrip('-').replace('.', '').isdigit() else 0
                 lst: list = []
@@ -423,7 +423,7 @@ class VM:
 
             # ── 字典操作 ─────────────────────────────────────
             elif op == DICT:
-                n = self.stack.pop()
+                n = self.stack.pop() if self.stack and isinstance(self.stack[-1], int) else 0
                 if not isinstance(n, int):
                     n = int(n) if str(n).lstrip('-').replace('.', '').isdigit() else 0
                 d = {}
@@ -536,10 +536,10 @@ class VM:
     def from_bin(cls, path: str) -> 'VM':
         with open(path, 'rb') as f:
             data = f.read()
-        magic, ver, vc, sz = struct.unpack_from('<4sBBH', data, 0)
+        magic, ver, vc, sz = struct.unpack_from('<4sBBI', data, 0)
         if magic != b'SAN0':
             raise VMError(f'无效的字节码文件: magic={magic!r}')
-        pos = 8
+        pos = 10
         code = bytearray(data[pos : pos + sz])
         pos += sz
 

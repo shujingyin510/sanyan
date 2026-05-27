@@ -571,7 +571,7 @@ int vm_run(VM *vm) {
             break;
         }
         case LIST_NEW: {
-            int32_t n = to_int(pop(vm));
+            int32_t n = (vm->sp > 0 && is_int_val(vm->stack[vm->sp-1])) ? to_int(pop(vm)) : 0;
             rt_list_t *l = rt_list_new();
             int16_t base = vm->sp - n;
             for (int32_t i = 0; i < n; i++)
@@ -627,7 +627,7 @@ int vm_run(VM *vm) {
 
         /* ── 字典操作 ── */
         case DICT: {
-            int32_t n = to_int(pop(vm));
+            int32_t n = (vm->sp > 0 && is_int_val(vm->stack[vm->sp-1])) ? to_int(pop(vm)) : 0;
             rt_dict_t *d = rt_dict_new();
             for (int32_t i = 0; i < n; i++) {
                 void *val = pop(vm);
@@ -720,7 +720,7 @@ int vm_run(VM *vm) {
             FILE *f = fopen(path, "rb");
             if (!f) { push(vm, tag_i(0)); break; }
             uint8_t hdr[8];
-            if (fread(hdr, 1, 8, f) != 8 || memcmp(hdr, "SAN0", 4) != 0) {
+            if (fread(hdr, 1, 10, f) != 10 || memcmp(hdr, "SAN0", 4) != 0) {
                 fclose(f); push(vm, tag_i(0)); break;
             }
             uint32_t sz;
@@ -781,12 +781,12 @@ int vm_load(VM *vm, const char *path) {
     if (!fp) { perror(path); return 1; }
 
     uint8_t hdr[8];
-    if (fread(hdr, 1, 8, fp) != 8) { fprintf(stderr, "头部读取失败\n"); fclose(fp); return 1; }
+    if (fread(hdr, 1, 10, fp) != 10) { fprintf(stderr, "头部读取失败\n"); fclose(fp); return 1; }
     if (memcmp(hdr, "SAN0", 4) != 0) { fprintf(stderr, "非法固件格式\n"); fclose(fp); return 1; }
 
     uint8_t vc = hdr[5];
     uint32_t code_size;
-    memcpy(&code_size, hdr + 6, 2);
+    memcpy(&code_size, hdr + 6, 4);
 
     uint8_t *code = (uint8_t*)malloc(code_size);
     if (!code) { fprintf(stderr, "内存不足\n"); fclose(fp); return 1; }

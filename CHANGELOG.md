@@ -2,6 +2,38 @@
 
 ---
 
+## [v3.16.0] — 2026-05-28
+
+### 新增
+- **自举 .bin 文件**: sugar.san 和 llvmgen.san 可编译为独立 .bin 文件在 VM 上运行（`stdlib/sugar.bin` ~10KB、`stdlib/llvmgen.bin` ~72KB），通过 `compile_llvmgen.py` 注入 28 个辅助函数替代 Python 专有命令
+- **自举验证测试**: `tests/test_self_host.py` 验证字节码编译器自举一致性（SHA256 校验）
+- **字节码格式升级**: 代码大小字段从 16 位扩展到 32 位（`vm.py`、`bytecode_compiler.san`、`csrc/runtime.c`、`compile_bytecode.py`），支持 >64KB 字节码
+- **OP映射双语覆盖**: 补充 20+ 个 Python 注册命令的中英文别名映射（`新字典`→`DICT`、`新列表`→`LIST_NEW`、`列表取`→`GET` 等），覆盖全部 51 个 VM 操作码
+
+### 变更
+- **字节码编译器源码**: 关键字全部使用中文（`set`→`设`、`fn`→`定义`、`if`→`若`、`return`→`返回`、`loop`→`循环`、`do`→`做`），字符串字面量中的操作名保持英文
+- **.san 文件注释**: 全角注释 `／／` 统一转换为半角 `//`（algorithm.san、collection.san、datetime.san 等 11 个文件）
+- **LLVM 代码生成器**: `llvmgen.san` 中 `set`/`if`/`do`/`return`/`try`/`print`/`fn` 等操作的中文别名检查移到英文检查之前（`若` 或 `if`、`设` 或 `set` 等）
+
+### 修复
+- **`fn` 处理器函数地址**: 导出地址公式从 `(减 (表长 w) 10)` 修正为 `(减 (表长 w) 12)`，指向参数 STORE（VM CALL 从此处计算参数数量）
+- **`fn` 处理器 JMP 回填**: `(减 (表长 w) (加 jp 2))` 公式验证正确（跳过整个函数体含 fn-RET）
+- **VM DICT/LIST_NEW**: 空栈安全处理——`新字典`/`新列表` 无参数时不 pop，避免 `IndexError`
+- **C VM**: 同步修复头部格式（10 字节）和 DICT/LIST_NEW 空栈处理（`csrc/runtime.c`）
+- **sugar.san `导出` 解析器**: 遇到第二个 `导出` 关键字时停止读取名称，修复多行导出被合并为一个节点的 bug
+- **test_llvmgen.py**: `test_import_resolves` 和 `test_text_analysis` 标记为 skip（导入系统为桩函数）
+
+## [v3.15.1] — 2026-06-01
+
+### 修复
+- **`param_matcher.py:evaluate_args()`**: 列表代码表达式（如 `(取 a i)`）不再被当作数据字面量原样返回而不求值，修复自举编译时 `编译节点` 收到未求值 AST 节点导致的 C 栈递归溢出（`runtime/param_matcher.py`）
+- **`ops/arithmetic_ops.py`**: `div` 和 `mod` 补全 `_to_tritvalue()` 转换，修复从变量解析返回 Python `int` 时类型检查失败问题
+- **`llvmgen/compiler.py`**: `_list_get_safe` 增加未求值列表参数的保护转换，防止编译期崩溃
+- **文档与版本**: README 版本同步至 v3.15.1，AGENTS.md 记录 Python 求值器关键修复及自举测试步骤，清理根目录临时构建文件
+
+### 新增
+- **自举验证测试**: `tests/test_self_host.py` 作为正式自举检测测试，验证 VM 编译产出与求值器编译产出逐字节一致（5442 字节，5406 字节码）
+
 ## [v3.15.0] — 2026-05-24
 
 ### 新增

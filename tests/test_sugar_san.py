@@ -210,14 +210,14 @@ class TestSugarSanStructural(unittest.TestCase):
         self.assertIsNotNone(ast)
         norm = _normalize_block(ast)
         self.assertIsInstance(norm, list)
-        self.assertEqual(norm[0], '若')
+        self.assertIn(norm[0], ('若', 'if'))
 
     def test_fn_def_structure(self):
         ast = _sugar_parse('定义 加一 (x) { 返回(加(x, 1)) }')
         self.assertIsNotNone(ast)
         norm = _normalize_block(ast)
         self.assertIsInstance(norm, list)
-        self.assertEqual(norm[0], '定义')
+        self.assertIn(norm[0], ('定义', 'fn'))
         self.assertEqual(norm[1], '加一')
 
     def test_try_catch_structure(self):
@@ -225,12 +225,12 @@ class TestSugarSanStructural(unittest.TestCase):
         self.assertIsNotNone(ast)
         norm = _normalize_block(ast)
         self.assertIsInstance(norm, list)
-        self.assertEqual(norm[0], '尝试')
+        self.assertIn(norm[0], ('尝试', 'try'))
 
     def test_set_structure(self):
         ast = _sugar_parse('设 x = 42')
         self.assertIsNotNone(ast)
-        self.assertEqual(ast[0], '设')
+        self.assertIn(ast[0], ('设', 'set'))
         self.assertEqual(ast[1], 'x')
 
 

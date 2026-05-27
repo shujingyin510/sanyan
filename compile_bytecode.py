@@ -108,7 +108,7 @@ def main():
 
     data = compile_san(input_path, output_path)
     ver = data[4]
-    sz = data[6] | (data[7] << 8)
+    sz = data[6] | (data[7] << 8) | (data[8] << 16) | (data[9] << 24)
     print(f'  SAN0 v{ver}, {sz} 字节, 文件 {len(data)} 字节')
 
     if run_mode:

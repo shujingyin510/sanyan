@@ -905,6 +905,7 @@
             设 tok = 取当前(rest)
             若 (非(是列表(tok))) { 跳出 }
             若 (非(str_equals(取(tok, 0), "标识符"))) { 跳出 }
+            若 (str_equals(取(tok, 1), "导出")) { 跳出 }
             names = 列表合(names, 列表(取(tok, 1)))
             rest = 切片(rest, 1)
         }

@@ -1,8 +1,9 @@
 # AGENTS.md — 三言项目维护约定
 
-## 自举状态（2026-05）
+## 自举状态（2026-06）
 
-**完全自举已达成。** VM 编译产出 `stdlib/bytecode_compiler.bin` 与求值器编译产出逐字节相同（5442 字节，5406 字节码）。
+**完全自举已达成。** VM 编译产出 `stdlib/bytecode_compiler.bin` 与求值器编译产出逐字节相同（5692 字节）。
+新增 `tests/test_self_host.py` 作为正式自举检测测试。
 
 VM 关键修复：
 - `DICT_SET` 不 push 返回值（消除主栈泄漏源）
@@ -10,12 +11,60 @@ VM 关键修复：
 - `from_bin` 自动运行模块初始化代码
 - `_exec_frame` 正确隔离外层 vars
 - 新增 `DICT_KEYS`(0x32) 操作码
+- 字节码格式升级：代码大小从 16 位改为 32 位（支持 >64KB 字节码）
+- `DICT`/`LIST_NEW` 空栈安全处理（`新字典`/`新列表` 无参数时不 pop）
 
 编译器关键修复：
 - `(等于 (ord (子串 n 0 1)) 34)` 替代 `(str_equals ... "\"")`（tokenizer 不认 `\"` 转义）
 - `(set op "set")` 对非列表节点
 - `编译做体` 函数（DO 体循环编译）
-- OP映射 补全了中英文双语别名
+- OP映射 补全了中英文双语别名（约 50 个操作，覆盖全部 VM 操作码）
+- `fn` 处理器函数地址公式修正：`(减 (表长 w) 12)`，导出地址指向参数 STORE
+- sugar.san `导出` 解析器修复：遇到第二个 `导出` 关键字时停止读取
+- 字节码编译器源码关键字全部使用中文（`set`→`设`、`fn`→`定义`、`if`→`若` 等）
+
+Python 求值器关键修复：
+- `param_matcher.py`: `evaluate_args` 不再将列表代码表达式（如 `['取', 'a', 'i']`）当作数据字面量返回而不求值，修复自举编译时 `编译节点` 收到未求值 AST 节点导致的 C 栈溢出
+- `ops/arithmetic_ops.py`: `div` 和 `mod` 补全 `_to_tritvalue()` 转换，修复变量解析返回 Python `int` 时类型检查失败
+- `llvmgen/compiler.py`: `_list_get_safe` 增加未求值列表参数的保护转换
+
+## VM 独立运行（.bin 文件）
+
+| 部件 | .bin 路径 | 大小 | VM 加载 |
+|---|---|---|---|
+| 字节码编译器 | `stdlib/bytecode_compiler.bin` | ~5.7KB | ✅ |
+| sugar.san 解析器 | `stdlib/sugar.bin` | ~10KB | ✅ |
+| llvmgen.san LLVM 编译器 | `stdlib/llvmgen.bin` | ~72KB | ✅ |
+
+编译方法：
+```bash
+# 字节码编译器
+python -X utf8 -c "from compile_bytecode import compile_source; compile_source(open('stdlib/bytecode_compiler.san').read(), 'stdlib/bytecode_compiler.bin')"
+
+# sugar.san（通过 sugar.parser 解析 + 字节码编译器编译）
+python -X utf8 -c "
+from sugar.parser import parse_code
+from evaluator import SanyanEvaluator
+from ops.file_ops import clear_cache
+src = open('stdlib/sugar.san').read()
+ast, _ = parse_code(src)
+fixed = []
+for s in ast[1:]:
+    if isinstance(s, list) and s[0] == 'export':
+        for n in s[1:]:
+            if n != '导出': fixed.append(['export', n])
+    else: fixed.append(s)
+clear_cache()
+e = SanyanEvaluator(max_loop_steps=500000)
+compiler = e.eval(['import', 'stdlib/bytecode_compiler.san'])
+compiler.call(e, ['编译字节码', ['do']+fixed, 'stdlib/sugar.bin', {}])
+"
+
+# llvmgen.san（通过 compile_llvmgen.py 注入辅助函数后编译）
+python -X utf8 compile_llvmgen.py
+```
+
+注：llvmgen.san 的 LLVM IR 代码生成仍需 Python evaluator 执行（依赖 `compile_llvmgen.py` 注入的 28 个辅助函数）。
 
 ## 环境
 
@@ -83,8 +132,8 @@ python -X utf8 tests/test_sugar_san.py -v # sugar.san 测试 45 项
 python -X utf8 tests/test_llvmgen.py -v   # LLVM 代码生成测试 53 项
 python -X utf8 tests/test_dp_python.py -v # S 表达式解析测试 10 项
 python -X utf8 tests/test_llvm_native.py -v # LLVM 原生编译测试（需 C 编译器）
+python -X utf8 tests/test_self_host.py -v # 自举验证测试 1 项
 python -X utf8 tests/run_all.py           # 集成测试 41 项
-```
 
 全部通过才算成功：
 - test_core.py 52/52
@@ -98,6 +147,7 @@ python -X utf8 tests/run_all.py           # 集成测试 41 项
 - test_sugar_san.py 45/45
 - test_llvmgen.py 53/53
 - test_dp_python.py 10/10
+- test_self_host.py 1/1
 - test_llvm_native.py（需 C 编译器，否则 skip）
 - run_all.py 41/41
 

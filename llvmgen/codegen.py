@@ -110,7 +110,9 @@ _RUNTIME_FUNCS: dict[str, tuple] = {
     # 随机数 → i32（C 函数返回 int32_t）
     '随机数': ('rt_random_int', _I32, [_I32, _I32]),
     'randint': ('rt_random_int', _I32, [_I32, _I32]),
+    'random': ('rt_random_int', _I32, [_I32, _I32]),
     '随机态': ('rt_random_trit', _I32, []),
+    'random_state': ('rt_random_trit', _I32, []),
     '是数字': ('rt_is_number', _I32, [_I32]),
     'is_number': ('rt_is_number', _I32, [_I32]),
     '是字符串': ('rt_is_string', _I32, [_PTR]),

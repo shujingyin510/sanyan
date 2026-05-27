@@ -1,4 +1,4 @@
-# Sanyan v3.15.0
+# Sanyan v3.16.0
 
 [![VS Code Marketplace](https://img.shields.io/badge/VS%20Code-Marketplace-%23007ACC?logo=visualstudiocode)](https://marketplace.visualstudio.com/items?itemName=sanyan-lang.sanyan-language)
 [![CI](https://github.com/shujingyin510/sanyan/actions/workflows/ci.yml/badge.svg)](https://github.com/shujingyin510/sanyan/actions)
@@ -123,17 +123,61 @@ Register virtual devices, read/write sensors with ternary values. Perfect for sm
 
 ---
 
-## What's New in v3.14.0
+## Features
+
+### Language Core
 
 | Feature | Description |
 |---|---|
-| 🔄 **Full Self-Hosting VM** | VM-compiled `bytecode_compiler.bin` is byte-identical to the evaluator output (5442 bytes, 5406 bytecodes) |
-| 🛡️ **Stack Isolation** | CALL records `stack_base`, RET executes `del stack[base:]` — eliminates stack pollution from recursive CALL + JMP loops |
-| 📝 **Line Comments** | `//` and `／／` line comments supported in the S-expression lexer |
-| 🆕 **DICT_KEYS Opcode** | New 0x32 opcode returns dict keys as a list |
-| 🐛 **String Quote Detection Fix** | Uses `(ord (substr n 0 1))` instead of unreliable `str_equals "\""` |
+| **Ternary Logic** | Native `true`/`maybe`/`false` (Kleene strong logic), `maybe and maybe` = `maybe` |
+| **Ternary Arithmetic** | Balanced ternary add/sub/mul/div/mod/pow/digit, `TernaryALU` at bit level |
+| **Dual Syntax** | Sugar syntax (C-like) + S-expressions, shared evaluator, can be mixed |
+| **Native Language** | Keywords switchable to any natural language (CN/EN skins), fullwidth symbol support |
+| **Ternary Branch** | `judge (expr) { true → ..., maybe → ..., false → ... }` |
+| **Gradual Typing** | Return type annotation `-> type`, optional type `?type`, runtime auto-validation |
+| **Exception Handling** | `try { } catch (e) { }`, narrow exception catching |
+| **Higher-Order Functions** | `map`/`filter`/`reduce`/`sort`/`reverse`/`unique`/`sum`/`join` |
+| **Lambda** | `λ(x) { x * 2 }` or `function(x) { x * 2 }` |
+| **Module System** | `import("path")`, `export name1 name2`, nested package import |
+| **Line Comments** | `//` (halfwidth), `／／` (fullwidth), `#` — three comment syntaxes |
 
-See [CHANGELOG.md](CHANGELOG.md) for the full list.
+### Bytecode VM
+
+| Feature | Description |
+|---|---|
+| **51 Opcodes** | Full instruction set: arithmetic/comparison/logic/container/string/dict/control/IO |
+| **Self-Hosting** | `bytecode_compiler.san` compiles itself, VM output byte-identical to Python evaluator |
+| **32-bit Code Size** | Supports >64KB bytecode (old 16-bit limit was 64KB) |
+| **Standalone .bin** | sugar.bin (~10KB) and llvmgen.bin (~72KB) run independently on VM |
+| **C VM** | `csrc/runtime.c` pure C implementation, 52 instructions, no Python dependency |
+| **STM32 Firmware** | `sanyancc.py` cross-compile → `runtime_stm32.c`, Blue Pill hardware verified |
+
+### LLVM Code Generation
+
+| Feature | Description |
+|---|---|
+| **AST → LLVM IR** | `llvmgen/codegen.py` + `llvmgen/compiler.py`, ~1500 lines codegen |
+| **63-bit Integers** | Tagged pointer upgraded to i64, range ±4.6×10^18 |
+| **Float Support** | IEEE 754 double, `fadd`/`fmul`/`fdiv` inline, integer auto-promotion |
+| **Import Static Linking** | Compile-time recursive dependency compilation, `san_{mod}__{fn}` name mangling |
+| **try/catch** | `@g_error` LLVM visible global + manual stack unwinding |
+| **Arena Allocator** | 64KB init, auto-grow, pointer bump替代 malloc |
+| **Self-Hosted LLVM Compiler** | `llvmgen.san` compiled to .bin, via `compile_llvmgen.py` helper injection |
+
+### Standard Library & Tools
+
+| Feature | Description |
+|---|---|
+| **Standard Library** | `json.san` `http.san` `regex.san` `csv.san` `string.san` `list.san` `math.san` etc. |
+| **LSP Language Server** | Formatting/reference/rename/document symbols/folding/semantic completion/hover |
+| **DAP Debug Adapter** | VS Code breakpoint debugging protocol support |
+| **Source Formatter** | `sanfmt.py` — black/prettier style `.san` formatter |
+| **Profiling** | `--profile` flag + `:profile` REPL command |
+| **AST JSON Export** | `--ast-json` exports parsed AST |
+| **Package Manager** | `install("pkg")` / `list_packages()` / `load_package("pkg")` |
+| **IoT Abstraction** | `register_device`/`write`/`read`/`query`/`context` sensor/actuator operations |
+
+See [CHANGELOG.md](CHANGELOG.md) for the full version history.
 
 ---
 

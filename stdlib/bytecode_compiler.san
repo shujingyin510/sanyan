@@ -1,73 +1,74 @@
-(do
+(做
 // bytecode_compiler.san — 三言字节码编译器（自举版）
 // 将 S-表达式 AST 编译为 .bin 字节码
 // 架构：flat 处理器链 + (return w) 早期退出
 // 词法约定：// 和 ／／ 开头的行为注释，tokenizer 自动跳过
 //
-(set NOP 0)(set PUSH_I 1)(set ADD 2)(set SUB 3)(set MUL 4)(set DIV 5)(set MOD 6)(set LOAD 7)(set STORE 8)(set JMP 9)(set JZ 10)(set JNZ 11)(set CALL 12)(set RET 13)(set PRINT 14)(set IO_READ 15)(set IO_WRITE 16)(set EQ 17)(set NE 18)(set GT 19)(set LT 20)(set GTE 21)(set LTE 22)(set NOT_OP 23)(set WAIT 24)(set CONCAT 25)(set STRLEN 26)(set STRSUB 27)(set STREQ 28)(set DICT 29)(set DICT_GET 30)(set DICT_SET 31)(set DICT_HAS 32)(set IS_NUM 33)(set IS_STR 34)(set IS_LIST 35)(set SAME 36)(set GET 37)(set SET_ELEMENT 38)(set LIST_NEW 39)(set LIST_CONCAT 40)(set SLICE 41)(set LIST_LEN 42)(set READ_FILE 43)(set WRITE_FILE 44)(set PUSH_STR 45)(set IMPORT_OP 46)(set CALL_EXT 47)(set WRITE_BINARY 48)(set ORD 49)(set DICT_KEYS 50)(set HALT 255)
+(设 NOP 0)(设 PUSH_I 1)(设 ADD 2)(设 SUB 3)(设 MUL 4)(设 DIV 5)(设 MOD 6)(设 LOAD 7)(设 STORE 8)(设 JMP 9)(设 JZ 10)(设 JNZ 11)(设 CALL 12)(设 RET 13)(设 PRINT 14)(设 IO_READ 15)(设 IO_WRITE 16)(设 EQ 17)(设 NE 18)(设 GT 19)(设 LT 20)(设 GTE 21)(设 LTE 22)(设 NOT_OP 23)(设 WAIT 24)(设 CONCAT 25)(设 STRLEN 26)(设 STRSUB 27)(设 STREQ 28)(设 DICT 29)(设 DICT_GET 30)(设 DICT_SET 31)(设 DICT_HAS 32)(设 IS_NUM 33)(设 IS_STR 34)(设 IS_LIST 35)(设 SAME 36)(设 GET 37)(设 SET_ELEMENT 38)(设 LIST_NEW 39)(设 LIST_CONCAT 40)(设 SLICE 41)(设 LIST_LEN 42)(设 READ_FILE 43)(设 WRITE_FILE 44)(设 PUSH_STR 45)(设 IMPORT_OP 46)(设 CALL_EXT 47)(设 WRITE_BINARY 48)(设 ORD 49)(设 DICT_KEYS 50)(设 HALT 255)
 // ── OP映射：操作名 → 操作码编号（中英文双语别名）──
 // 注：IS_LIST 同时用于 is_list 和 is_dict（VM 对 list/dict 统一判断）
 //     字列 映射到 DICT_KEYS（返回键列表，之前错映射为 LIST_LEN）
-(set OP映射 (字典 "not" NOT_OP "加" ADD "add" ADD "减" SUB "sub" SUB "乘" MUL "mul" MUL "除" DIV "div" DIV "余" MOD "mod" MOD "取" GET "get" GET "置元素" SET_ELEMENT "set_element" SET_ELEMENT "表长" LIST_LEN "list_len" LIST_LEN "列表合" LIST_CONCAT "list_concat" LIST_CONCAT "切片" SLICE "slice" SLICE "大于" GT "gt" GT "小于" LT "lt" LT "大于等于" GTE "gte" GTE "小于等于" LTE "lte" LTE "等于" EQ "eq" EQ "不等于" NE "ne" NE "是数字" IS_NUM "is_number" IS_NUM "是字符串" IS_STR "is_string" IS_STR "是列表" IS_LIST "is_list" IS_LIST "是字典" IS_LIST "is_dict" IS_LIST "字列" DICT_KEYS "dict_keys" DICT_KEYS "取键" DICT_GET "dict_get" DICT_GET "置键" DICT_SET "dict_set" DICT_SET "含键" DICT_HAS "dict_has" DICT_HAS "concat" CONCAT "str_equals" STREQ "streq" STREQ "输出" PRINT "print" PRINT "列表" LIST_NEW "list" LIST_NEW "字典" DICT "dict" DICT "取长" STRLEN "strlen" STRLEN "子串" STRSUB "strsub" STRSUB "导入" IMPORT_OP "写二进制" WRITE_BINARY "写文件" WRITE_FILE "读文件" READ_FILE "字符码" ORD "ord" ORD))
+//     仅映射有 VM 操作码的操作（0x00-0x32）；其余通过 CALL 调用
+(设 OP映射 (字典 "非" NOT_OP "not" NOT_OP "加" ADD "add" ADD "减" SUB "sub" SUB "乘" MUL "mul" MUL "除" DIV "div" DIV "余" MOD "mod" MOD "取" GET "get" GET "置元素" SET_ELEMENT "set_element" SET_ELEMENT "表长" LIST_LEN "list_len" LIST_LEN "列表合" LIST_CONCAT "list_concat" LIST_CONCAT "切片" SLICE "slice" SLICE "大于" GT "gt" GT "小于" LT "lt" LT "大于等于" GTE "gte" GTE "小于等于" LTE "lte" LTE "等于" EQ "eq" EQ "不等于" NE "ne" NE "同" SAME "same" SAME "是数字" IS_NUM "is_number" IS_NUM "是字符串" IS_STR "is_string" IS_STR "是列表" IS_LIST "is_list" IS_LIST "是字典" IS_LIST "is_dict" IS_LIST "字列" DICT_KEYS "dict_keys" DICT_KEYS "取键" DICT_GET "dict_get" DICT_GET "置键" DICT_SET "dict_set" DICT_SET "含键" DICT_HAS "dict_has" DICT_HAS "包含" DICT_HAS "contains" DICT_HAS "连接" CONCAT "concat" CONCAT "字符串相等" STREQ "str_equals" STREQ "streq" STREQ "输出" PRINT "print" PRINT "列表" LIST_NEW "list" LIST_NEW "字典" DICT "dict" DICT "取长" STRLEN "strlen" STRLEN "length" STRLEN "len" STRLEN "子串" STRSUB "strsub" STRSUB "substring" STRSUB "字符码" ORD "ord" ORD "导入" IMPORT_OP "import" IMPORT_OP "模块调用" CALL_EXT "module_call" CALL_EXT "写二进制" WRITE_BINARY "write_binary" WRITE_BINARY "写文件" WRITE_FILE "write_file" WRITE_FILE "读文件" READ_FILE "read_file" READ_FILE))
 // ── 字节发射工具函数 ──
-(fn 发射字节 (w b) (list_concat w (list b)))
-(fn 发射i16 (w v) (do (set u (mod v 65536)) (list_concat w (list (mod u 256) (mod (div u 256) 256)))))
+(定义 发射字节 (w b) (list_concat w (list b)))
+(定义 发射i16 (w v) (做 (设 u (mod v 65536)) (list_concat w (list (mod u 256) (mod (div u 256) 256)))))
 // 注意：不能用 (mod v 4294967296)，2^32 在有符号 PUSH_I 中溢出为 0
-(fn 发射i32 (w v) (list_concat w (list (mod v 256) (mod (div v 256) 256) (mod (div v 65536) 256) (mod (div v 16777216) 256))))
-(fn 覆写i16 (w p v) (do (set u (mod v 65536)) (set_element w p (mod u 256)) (set_element w (add p 1) (mod (div u 256) 256)) w))
-(fn 全部数字 (s) (do (set i 0) (set l (取长 s)) (set r 1) (loop (小于 i l) (do (set c (ord (子串 s i 1))) (if (小于 c 48) (set r 0)) (if (大于 c 57) (set r 0)) (set i (加 i 1)))) r))
-(fn 文本转整数 (s) (do (set i 0) (set l (取长 s)) (set r 0) (loop (小于 i l) (do (set r (加 (乘 r 10) (减 (ord (子串 s i 1)) 48))) (set i (加 i 1)))) r))
-(fn 发射字符串 (w s) (do (set w (发射字节 w (取长 s))) (set i 0) (loop (小于 i (取长 s)) (do (set c (ord (子串 s i 1))) (set w (发射字节 w (余 c 256))) (set w (发射字节 w (余 (除 c 256) 256))) (set i (加 i 1)))) w))
+(定义 发射i32 (w v) (list_concat w (list (mod v 256) (mod (div v 256) 256) (mod (div v 65536) 256) (mod (div v 16777216) 256))))
+(定义 覆写i16 (w p v) (做 (设 u (mod v 65536)) (set_element w p (mod u 256)) (set_element w (add p 1) (mod (div u 256) 256)) w))
+(定义 全部数字 (s) (做 (设 i 0) (设 l (取长 s)) (设 r 1) (循环 (小于 i l) (做 (设 c (ord (子串 s i 1))) (若 (小于 c 48) (设 r 0)) (若 (大于 c 57) (设 r 0)) (设 i (加 i 1)))) r))
+(定义 文本转整数 (s) (做 (设 i 0) (设 l (取长 s)) (设 r 0) (循环 (小于 i l) (做 (设 r (加 (乘 r 10) (减 (ord (子串 s i 1)) 48))) (设 i (加 i 1)))) r))
+(定义 发射字符串 (w s) (做 (设 w (发射字节 w (取长 s))) (设 i 0) (循环 (小于 i (取长 s)) (做 (设 c (ord (子串 s i 1))) (设 w (发射字节 w (余 c 256))) (设 w (发射字节 w (余 (除 c 256) 256))) (设 i (加 i 1)))) w))
 // ── DO 体循环编译：遍历表达式列表，逐个调编译节点 ──
-(fn 编译做体 (a w c) (do (set i 0) (loop (小于 i (表长 a)) (do (set w (编译节点 (取 a i) w c)) (set i (加 i 1)))) w))
+(定义 编译做体 (a w c) (做 (设 i 0) (循环 (小于 i (表长 a)) (做 (设 w (编译节点 (取 a i) w c)) (设 i (加 i 1)))) w))
 // ── 主编译函数：flat 处理器链，每个处理器末尾 (return w) 早期退出 ──
 // 非列表节点 op 设为 "set"，确保内部 (set ...) 表达式被 SET handler 匹配
-(fn 编译节点 (n w c) (do
-(if (是列表 n) (set op (取 n 0)) (set op "set"))
-(if (是数字 n) (do (set w (发射字节 w PUSH_I)) (set w (发射i32 w n)) (return w)))
-(if (是字符串 n) (do
-(if (全部数字 n) (do (set w (发射字节 w PUSH_I)) (set w (发射i32 w (文本转整数 n))) (return w)))
+(定义 编译节点 (n w c) (做
+(若 (是列表 n) (设 op (取 n 0)) (设 op "set"))
+(若 (是数字 n) (做 (设 w (发射字节 w PUSH_I)) (设 w (发射i32 w n)) (返回 w)))
+(若 (是字符串 n) (做
+(若 (全部数字 n) (做 (设 w (发射字节 w PUSH_I)) (设 w (发射i32 w (文本转整数 n))) (返回 w)))
     // 引号检测：用 ord 检测 ASCII 34（双引号），不用 str_equals """
     // 因为 tokenizer 不认 " 转义，""" 被解析为 \ 和 " 两个字符
-(if (等于 (ord (子串 n 0 1)) 34) (do (set w (发射字节 w PUSH_STR)) (set w (发射字符串 w (子串 n 1 (减 (取长 n) 2)))) (return w)))
-(set vt (取键 c "变量表"))
-(if (含键 vt n) (do (set w (发射字节 w LOAD)) (set w (发射字节 w (取键 vt n))) (return w)))
-(set pt (取键 c "父变量表"))
-(if (是字典 pt) (if (含键 pt n) (do (set w (发射字节 w LOAD)) (set w (发射字节 w (取键 pt n))) (return w))))
-(set w (发射字节 w PUSH_STR)) (set w (发射字符串 w n)) (return w)))
-(if (是列表 n) (do
-(set op (取 n 0)) (set a (切片 n 1))
-(if (含键 OP映射 op) (do (set w (编译做体 a w c))
-(if (if (str_equals op "list") 1 (str_equals op "列表")) (do (set w (发射字节 w PUSH_I)) (set w (发射i32 w (表长 a)))))
-(if (if (str_equals op "dict") 1 (str_equals op "字典")) (do (set w (发射字节 w PUSH_I)) (set w (发射i32 w (除 (表长 a) 2)))))
-(set w (发射字节 w (取键 OP映射 op))) (return w)))
-(if (if (str_equals op "set") 1 (str_equals op "设")) (do
-(if (小于 (表长 a) 2) (return w)) (set nm (取 a 0)) (if (not (是字符串 nm)) (return w))
-(set vt (取键 c "变量表"))
-(if (含键 vt nm) (set idx (取键 vt nm)) (do (set idx (取键 c "变量计数")) (置键 vt nm idx) (置键 c "变量计数" (加 idx 1))))
-(set w (编译节点 (取 a 1) w c)) (set w (发射字节 w STORE)) (set w (发射字节 w idx)) (return w)))
-(if (if (str_equals op "do") 1 (str_equals op "做")) (return (编译做体 a w c)))
-(if (if (str_equals op "print") 1 (str_equals op "输出")) (do (if (大于 (表长 a) 0) (set w (编译节点 (取 a 0) w c))) (set w (发射字节 w PRINT)) (return w)))
-(if (if (str_equals op "if") 1 (str_equals op "若")) (return (编译若 n w c)))
-(if (if (str_equals op "loop") 1 (str_equals op "循环")) (return (编译循环 n w c)))
-    (if (if (str_equals op "fn") 1 (str_equals op "定义")) (do (if (小于 (表长 a) 2) (return w)) (set nm (取 a 0)) (set pr (取 a 1)) (set bd (取 a 2)) (set w (发射字节 w JMP)) (set jp (表长 w)) (set w (发射i16 w 0)) (set ft (取键 c "函数表")) (if (not (含键 ft nm)) (置键 ft nm (减 (表长 w) 8))) (set ov (取键 c "变量表")) (set oc (取键 c "变量计数")) (set nv (字典)) (set vc 0) (set kl (字列 ov)) (set k 0) (loop (小于 k (表长 kl)) (do (set ok (取 kl k)) (置键 nv ok (取键 ov ok)) (set k (加 k 1)))) (set vc oc) (if (是列表 pr) (do (set i 0) (loop (小于 i (表长 pr)) (do (set pn (取 pr i)) (if (not (含键 nv pn)) (do (set vc (加 vc 1)) (置键 nv pn (减 vc 1)))) (set i (加 i 1)))))) (set ii (减 (表长 pr) 1)) (loop (大于等于 ii 0) (do (set pn (取 pr ii)) (set pi (取键 nv pn)) (set w (发射字节 w STORE)) (set w (发射字节 w pi)) (set ii (减 ii 1)))) (置键 c "父变量表" ov) (置键 c "变量表" nv) (置键 c "变量计数" vc) (if (是列表 bd) (set w (编译节点 bd w c))) (set w (发射字节 w RET)) (set w (覆写i16 w jp (减 (表长 w) (加 jp 2)))) (置键 c "父变量表" 0) (置键 c "变量表" ov) (置键 c "变量计数" oc) (return w)))
-    (if (if (str_equals op "lambda") 1 (str_equals op "λ")) (do (set pr (取 a 0)) (set bd (取 a 1)) (set w (发射字节 w JMP)) (set jp (表长 w)) (set w (发射i16 w 0)) (set ft (取键 c "函数表")) (set an (concat "λ" (取长 ft))) (置键 ft an (减 (表长 w) 8)) (set ov (取键 c "变量表")) (set oc (取键 c "变量计数")) (set nv (字典)) (set vc 0) (set kl (字列 ov)) (set k 0) (loop (小于 k (表长 kl)) (do (set ok (取 kl k)) (置键 nv ok (取键 ov ok)) (set k (加 k 1)))) (set vc oc) (if (是列表 pr) (do (set i 0) (loop (小于 i (表长 pr)) (do (set pn (取 pr i)) (if (not (含键 nv pn)) (do (set vc (加 vc 1)) (置键 nv pn (减 vc 1)))) (set i (加 i 1)))))) (set ii (减 (表长 pr) 1)) (loop (大于等于 ii 0) (do (set pn (取 pr ii)) (set pi (取键 nv pn)) (set w (发射字节 w STORE)) (set w (发射字节 w pi)) (set ii (减 ii 1)))) (置键 c "父变量表" ov) (置键 c "变量表" nv) (置键 c "变量计数" vc) (if (是列表 bd) (set w (编译节点 bd w c))) (set w (发射字节 w RET)) (set w (覆写i16 w jp (减 (表长 w) (加 jp 2)))) (置键 c "父变量表" 0) (置键 c "变量表" ov) (置键 c "变量计数" oc) (return w)))
-(if (if (str_equals op "return") 1 (str_equals op "返回")) (do (if (大于 (表长 a) 0) (set w (编译节点 (取 a 0) w c))) (set w (发射字节 w RET)) (return w)))
-(if (if (str_equals op "export") 1 (str_equals op "导出")) (do (set el (取键 c "导出列表")) (set i 0) (loop (小于 i (表长 a)) (do (set el (列表合 el (列表 (取 a i)))) (set i (加 i 1)))) (置键 c "导出列表" el) (return w)))
-(if (if (str_equals op "模块调用") 1 (str_equals op "module_call")) (do (if (小于 (表长 a) 2) (return w)) (set w (编译节点 (取 a 0) w c)) (set w (发射字节 w IMPORT_OP)) (set w (编译节点 (取 a 1) w c)) (set j 2) (loop (小于 j (表长 a)) (do (set w (编译节点 (取 a j) w c)) (set j (加 j 1)))) (set w (发射字节 w PUSH_I)) (set w (发射i32 w (减 (表长 a) 2))) (set w (发射字节 w CALL_EXT)) (return w)))
-(set ft (取键 c "函数表"))
-(if (含键 ft op) (do (set i 0) (loop (小于 i (表长 a)) (do (set w (编译节点 (取 a i) w c)) (set i (加 i 1)))) (set w (发射字节 w CALL)) (set w (发射i16 w (取键 ft op))) (return w)))
-(do (set i 0) (loop (小于 i (表长 a)) (do (set w (编译节点 (取 a i) w c)) (set i (加 i 1)))) (set w (发射字节 w CALL)) (set ps (表长 w)) (set w (发射i16 w 0)) (set fx (取键 c "前向修复")) (set fx (列表合 fx (列表 (列表 op ps)))) (置键 c "前向修复" fx) (return w))))
+(若 (等于 (ord (子串 n 0 1)) 34) (做 (设 w (发射字节 w PUSH_STR)) (设 w (发射字符串 w (子串 n 1 (减 (取长 n) 2)))) (返回 w)))
+(设 vt (取键 c "变量表"))
+(若 (含键 vt n) (做 (设 w (发射字节 w LOAD)) (设 w (发射字节 w (取键 vt n))) (返回 w)))
+(设 pt (取键 c "父变量表"))
+(若 (是字典 pt) (若 (含键 pt n) (做 (设 w (发射字节 w LOAD)) (设 w (发射字节 w (取键 pt n))) (返回 w))))
+(设 w (发射字节 w PUSH_STR)) (设 w (发射字符串 w n)) (返回 w)))
+(若 (是列表 n) (做
+(设 op (取 n 0)) (设 a (切片 n 1))
+(若 (含键 OP映射 op) (做 (设 w (编译做体 a w c))
+(若 (若 (str_equals op "list") 1 (str_equals op "列表")) (做 (设 w (发射字节 w PUSH_I)) (设 w (发射i32 w (表长 a)))))
+(若 (若 (str_equals op "dict") 1 (str_equals op "字典")) (做 (设 w (发射字节 w PUSH_I)) (设 w (发射i32 w (除 (表长 a) 2)))))
+(设 w (发射字节 w (取键 OP映射 op))) (返回 w)))
+(若 (若 (str_equals op "set") 1 (str_equals op "设")) (做
+(若 (小于 (表长 a) 2) (返回 w)) (设 nm (取 a 0)) (若 (not (是字符串 nm)) (返回 w))
+(设 vt (取键 c "变量表"))
+(若 (含键 vt nm) (设 idx (取键 vt nm)) (做 (设 idx (取键 c "变量计数")) (置键 vt nm idx) (置键 c "变量计数" (加 idx 1))))
+(设 w (编译节点 (取 a 1) w c)) (设 w (发射字节 w STORE)) (设 w (发射字节 w idx)) (返回 w)))
+(若 (若 (str_equals op "do") 1 (str_equals op "做")) (返回 (编译做体 a w c)))
+(若 (若 (str_equals op "print") 1 (str_equals op "输出")) (做 (若 (大于 (表长 a) 0) (设 w (编译节点 (取 a 0) w c))) (设 w (发射字节 w PRINT)) (返回 w)))
+(若 (若 (str_equals op "if") 1 (str_equals op "若")) (返回 (编译若 n w c)))
+(若 (若 (str_equals op "loop") 1 (str_equals op "循环")) (返回 (编译循环 n w c)))
+    (若 (若 (str_equals op "fn") 1 (str_equals op "定义")) (做 (若 (小于 (表长 a) 2) (返回 w)) (设 nm (取 a 0)) (设 pr (取 a 1)) (设 bd (取 a 2)) (设 w (发射字节 w JMP)) (设 jp (表长 w)) (设 w (发射i16 w 0)) (设 ft (取键 c "函数表")) (若 (not (含键 ft nm)) (置键 ft nm (减 (表长 w) 8))) (设 ov (取键 c "变量表")) (设 oc (取键 c "变量计数")) (设 nv (字典)) (设 vc 0) (设 kl (字列 ov)) (设 k 0) (循环 (小于 k (表长 kl)) (做 (设 ok (取 kl k)) (置键 nv ok (取键 ov ok)) (设 k (加 k 1)))) (设 vc oc) (若 (是列表 pr) (做 (设 i 0) (循环 (小于 i (表长 pr)) (做 (设 pn (取 pr i)) (若 (not (含键 nv pn)) (做 (设 vc (加 vc 1)) (置键 nv pn (减 vc 1)))) (设 i (加 i 1)))))) (设 ii (减 (表长 pr) 1)) (循环 (大于等于 ii 0) (做 (设 pn (取 pr ii)) (设 pi (取键 nv pn)) (设 w (发射字节 w STORE)) (设 w (发射字节 w pi)) (设 ii (减 ii 1)))) (置键 c "父变量表" ov) (置键 c "变量表" nv) (置键 c "变量计数" vc) (若 (是列表 bd) (设 w (编译节点 bd w c))) (设 w (发射字节 w RET)) (设 w (覆写i16 w jp (减 (表长 w) (加 jp 2)))) (置键 c "父变量表" 0) (置键 c "变量表" ov) (置键 c "变量计数" oc) (返回 w)))
+    (若 (若 (str_equals op "lambda") 1 (str_equals op "λ")) (做 (设 pr (取 a 0)) (设 bd (取 a 1)) (设 w (发射字节 w JMP)) (设 jp (表长 w)) (设 w (发射i16 w 0)) (设 ft (取键 c "函数表")) (设 an (concat "λ" (取长 ft))) (置键 ft an (减 (表长 w) 8)) (设 ov (取键 c "变量表")) (设 oc (取键 c "变量计数")) (设 nv (字典)) (设 vc 0) (设 kl (字列 ov)) (设 k 0) (循环 (小于 k (表长 kl)) (做 (设 ok (取 kl k)) (置键 nv ok (取键 ov ok)) (设 k (加 k 1)))) (设 vc oc) (若 (是列表 pr) (做 (设 i 0) (循环 (小于 i (表长 pr)) (做 (设 pn (取 pr i)) (若 (not (含键 nv pn)) (做 (设 vc (加 vc 1)) (置键 nv pn (减 vc 1)))) (设 i (加 i 1)))))) (设 ii (减 (表长 pr) 1)) (循环 (大于等于 ii 0) (做 (设 pn (取 pr ii)) (设 pi (取键 nv pn)) (设 w (发射字节 w STORE)) (设 w (发射字节 w pi)) (设 ii (减 ii 1)))) (置键 c "父变量表" ov) (置键 c "变量表" nv) (置键 c "变量计数" vc) (若 (是列表 bd) (设 w (编译节点 bd w c))) (设 w (发射字节 w RET)) (设 w (覆写i16 w jp (减 (表长 w) (加 jp 2)))) (置键 c "父变量表" 0) (置键 c "变量表" ov) (置键 c "变量计数" oc) (返回 w)))
+(若 (若 (str_equals op "return") 1 (str_equals op "返回")) (做 (若 (大于 (表长 a) 0) (设 w (编译节点 (取 a 0) w c))) (设 w (发射字节 w RET)) (返回 w)))
+(若 (若 (str_equals op "export") 1 (str_equals op "导出")) (做 (设 el (取键 c "导出列表")) (设 i 0) (循环 (小于 i (表长 a)) (做 (设 el (列表合 el (列表 (取 a i)))) (设 i (加 i 1)))) (置键 c "导出列表" el) (返回 w)))
+(若 (若 (str_equals op "模块调用") 1 (str_equals op "module_call")) (做 (若 (小于 (表长 a) 2) (返回 w)) (设 w (编译节点 (取 a 0) w c)) (设 w (发射字节 w IMPORT_OP)) (设 w (编译节点 (取 a 1) w c)) (设 j 2) (循环 (小于 j (表长 a)) (做 (设 w (编译节点 (取 a j) w c)) (设 j (加 j 1)))) (设 w (发射字节 w PUSH_I)) (设 w (发射i32 w (减 (表长 a) 2))) (设 w (发射字节 w CALL_EXT)) (返回 w)))
+(设 ft (取键 c "函数表"))
+(若 (含键 ft op) (做 (设 i 0) (循环 (小于 i (表长 a)) (做 (设 w (编译节点 (取 a i) w c)) (设 i (加 i 1)))) (设 w (发射字节 w CALL)) (设 w (发射i16 w (取键 ft op))) (返回 w)))
+(做 (设 i 0) (循环 (小于 i (表长 a)) (做 (设 w (编译节点 (取 a i) w c)) (设 i (加 i 1)))) (设 w (发射字节 w CALL)) (设 ps (表长 w)) (设 w (发射i16 w 0)) (设 fx (取键 c "前向修复")) (设 fx (列表合 fx (列表 (列表 op ps)))) (置键 c "前向修复" fx) (返回 w))))
   // 函数末尾兜底返回 w
 w))
 // ── 编译若：if/else 分支编译 ──
-(fn 编译若 (n w c) (do (set a (切片 n 1)) (set cd (取 a 0)) (set th (取 a 1)) (set he (大于 (表长 a) 2)) (set w (编译节点 cd w c)) (if (not he) (do (set jz (表长 w)) (set w (发射字节 w JZ)) (set w (发射i16 w 0)) (set ts (表长 w)) (set w (编译节点 th w c)) (set sk (减 (表长 w) (加 jz 3))) (set w (覆写i16 w (加 jz 1) sk)) w) (do (set el (取 a 2)) (set fo (表长 (取键 c "前向修复"))) (set tb (列表)) (set tb (编译节点 th tb c)) (set fm (表长 (取键 c "前向修复"))) (set eb (列表)) (set eb (编译节点 el eb c)) (set jz (表长 w)) (set w (发射字节 w JZ)) (set w (发射i16 w (加 (表长 tb) 3))) (set to (表长 w)) (set w (列表合 w tb)) (set fx (取键 c "前向修复")) (set kj fo) (loop (小于 kj fm) (do (set it (取 fx kj)) (置元素 it 1 (加 (取 it 1) to)) (set kj (加 kj 1)))) (set eo (表长 w)) (set w (发射字节 w JMP)) (set w (发射i16 w (表长 eb))) (set w (列表合 w eb)) (set kj fm) (loop (小于 kj (表长 fx)) (do (set it (取 fx kj)) (置元素 it 1 (加 (取 it 1) eo)) (set kj (加 kj 1)))) w))))
+(定义 编译若 (n w c) (做 (设 a (切片 n 1)) (设 cd (取 a 0)) (设 th (取 a 1)) (设 he (大于 (表长 a) 2)) (设 w (编译节点 cd w c)) (若 (not he) (做 (设 jz (表长 w)) (设 w (发射字节 w JZ)) (设 w (发射i16 w 0)) (设 ts (表长 w)) (设 w (编译节点 th w c)) (设 sk (减 (表长 w) (加 jz 3))) (设 w (覆写i16 w (加 jz 1) sk)) w) (做 (设 el (取 a 2)) (设 fo (表长 (取键 c "前向修复"))) (设 tb (列表)) (设 tb (编译节点 th tb c)) (设 fm (表长 (取键 c "前向修复"))) (设 eb (列表)) (设 eb (编译节点 el eb c)) (设 jz (表长 w)) (设 w (发射字节 w JZ)) (设 w (发射i16 w (加 (表长 tb) 3))) (设 to (表长 w)) (设 w (列表合 w tb)) (设 fx (取键 c "前向修复")) (设 kj fo) (循环 (小于 kj fm) (做 (设 it (取 fx kj)) (置元素 it 1 (加 (取 it 1) to)) (设 kj (加 kj 1)))) (设 eo (表长 w)) (设 w (发射字节 w JMP)) (设 w (发射i16 w (表长 eb))) (设 w (列表合 w eb)) (设 kj fm) (循环 (小于 kj (表长 fx)) (做 (设 it (取 fx kj)) (置元素 it 1 (加 (取 it 1) eo)) (设 kj (加 kj 1)))) w))))
 // ── 编译循环：loop 循环编译 ──
-(fn 编译循环 (n w c) (do (set a (切片 n 1)) (set cd (取 a 0)) (set bd (取 a 1)) (set ls (表长 w)) (set w (编译节点 cd w c)) (set jz (表长 w)) (set w (发射字节 w JZ)) (set w (发射i16 w 0)) (set w (编译节点 bd w c)) (set jp (表长 w)) (set w (发射字节 w JMP)) (set w (发射i16 w (减 ls (加 jp 3)))) (set sk (减 (表长 w) (加 jz 3))) (set w (覆写i16 w (加 jz 1) sk)) w))
+(定义 编译循环 (n w c) (做 (设 a (切片 n 1)) (设 cd (取 a 0)) (设 bd (取 a 1)) (设 ls (表长 w)) (设 w (编译节点 cd w c)) (设 jz (表长 w)) (设 w (发射字节 w JZ)) (设 w (发射i16 w 0)) (设 w (编译节点 bd w c)) (设 jp (表长 w)) (设 w (发射字节 w JMP)) (设 w (发射i16 w (减 ls (加 jp 3)))) (设 sk (减 (表长 w) (加 jz 3))) (设 w (覆写i16 w (加 jz 1) sk)) w))
 // ── 回填函数地址：遍历前向引用列表，用函数表地址覆写 CALL 操作数 ──
-(fn 回填函数地址 (w c) (do (set fx (取键 c "前向修复")) (set ft (取键 c "函数表")) (set i 0) (loop (小于 i (表长 fx)) (do (set it (取 fx i)) (set fn (取 it 0)) (set fp (取 it 1)) (if (含键 ft fn) (set w (覆写i16 w fp (取键 ft fn)))) (set i (加 i 1)))) w))
+(定义 回填函数地址 (w c) (做 (设 fx (取键 c "前向修复")) (设 ft (取键 c "函数表")) (设 i 0) (循环 (小于 i (表长 fx)) (做 (设 it (取 fx i)) (设 定义 (取 it 0)) (设 fp (取 it 1)) (若 (含键 ft 定义) (设 w (覆写i16 w fp (取键 ft 定义)))) (设 i (加 i 1)))) w))
 // ── 顶层入口：编译字节码，构建上下文、写出 .bin 文件 ──
-(fn 编译字节码 (ast op ex) (do (set c (字典 "变量表" (if (是字典 ex) ex (字典)) "函数表" (字典) "导出列表" (if (是字典 ex) (if (含键 ex "__exports__") (取键 ex "__exports__") (列表)) (列表)) "前向修复" (列表) "父变量表" 0 "变量计数" 0)) (set w (列表)) (set w (列表合 w (列表 83 65 78 48))) (set w (发射字节 w 1)) (set w (发射字节 w (取键 c "变量计数"))) (set sp (表长 w)) (set w (发射i16 w 0)) (set w (编译节点 ast w c)) (set w (回填函数地址 w c)) (set cs (减 (表长 w) 8)) (set w (覆写i16 w sp cs)) (set vc (取键 c "变量计数")) (置元素 w 5 (余 vc 256)) (set el (取键 c "导出列表")) (set ft (取键 c "函数表")) (set w (发射i16 w (表长 el))) (set i 0) (loop (小于 i (表长 el)) (do (set nm (取 el i)) (if (含键 ft nm) (do (set ad (取键 ft nm)) (set w (发射i16 w (取长 nm))) (set j 0) (loop (小于 j (取长 nm)) (do (set ch (ord (子串 nm j 1))) (set w (发射字节 w (余 ch 256))) (set w (发射字节 w (余 (除 ch 256) 256))) (set j (加 j 1)))) (set w (发射i16 w ad)))) (set i (加 i 1)))) (写二进制 op w) (列表 真 cs vc)))
+(定义 编译字节码 (ast op ex) (做 (设 c (字典 "变量表" (若 (是字典 ex) ex (字典)) "函数表" (字典) "导出列表" (若 (是字典 ex) (若 (含键 ex "__exports__") (取键 ex "__exports__") (列表)) (列表)) "前向修复" (列表) "父变量表" 0 "变量计数" 0)) (设 w (列表)) (设 w (列表合 w (列表 83 65 78 48))) (设 w (发射字节 w 1)) (设 w (发射字节 w (取键 c "变量计数"))) (设 sp (表长 w)) (设 w (发射i16 w 0)) (设 w (编译节点 ast w c)) (设 w (回填函数地址 w c)) (设 cs (减 (表长 w) 8)) (设 w (覆写i16 w sp cs)) (设 vc (取键 c "变量计数")) (置元素 w 5 (余 vc 256)) (设 el (取键 c "导出列表")) (设 ft (取键 c "函数表")) (设 w (发射i16 w (表长 el))) (设 i 0) (循环 (小于 i (表长 el)) (做 (设 nm (取 el i)) (若 (含键 ft nm) (做 (设 ad (取键 ft nm)) (设 w (发射i16 w (取长 nm))) (设 j 0) (循环 (小于 j (取长 nm)) (做 (设 ch (ord (子串 nm j 1))) (设 w (发射字节 w (余 ch 256))) (设 w (发射字节 w (余 (除 ch 256) 256))) (设 j (加 j 1)))) (设 w (发射i16 w ad)))) (设 i (加 i 1)))) (写二进制 op w) (列表 真 cs vc)))
 // ── 导出公共接口 ──
-(export 编译字节码 编译节点)
+(导出 编译字节码 编译节点)
 )

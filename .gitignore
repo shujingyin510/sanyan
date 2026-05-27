@@ -206,6 +206,8 @@ NUL
 # Compiled bytecode files (except stdlib)
 *.bin
 !stdlib/bytecode_compiler.bin
+!stdlib/sugar.bin
+!stdlib/llvmgen.bin
 # Build outputs
 build/*.bin
 # Test build outputs

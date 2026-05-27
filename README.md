@@ -1,4 +1,4 @@
-# 三言 Sanyan v3.15.0
+# 三言 Sanyan v3.16.0
 
 [![VS Code Marketplace](https://img.shields.io/badge/VS%20Code-Marketplace-%23007ACC?logo=visualstudiocode)](https://marketplace.visualstudio.com/items?itemName=sanyan-lang.sanyan-language)
 [![CI](https://github.com/shujingyin510/sanyan/actions/workflows/ci.yml/badge.svg)](https://github.com/shujingyin510/sanyan/actions)
@@ -290,89 +290,59 @@ tests/
 | `定义 f (x) { 返回(x+1) }` | `（定义 f （x） （返回 （+ x 1）））` |
 | `若 (x > 0) { … } 否则 { … }` | `（若 （大于 x 0） … …）` |
 
-## 新增特性速览（v3.15.0）
+## 功能特性
+
+### 语言核心
 
 | 特性 | 说明 |
 |---|---|
-| 🏷️ **渐进类型系统** | 返回类型标注 `-> 类型`，可选类型 `?类型`，运行期自动校验 |
-| 🔢 **LLVM 63 位整数** | tagged pointer 升 i64，值域 ±4.6×10^18，内联 add/shl/mul |
-| 📐 **LLVM 浮点支持** | IEEE 754 double，`fadd`/`fmul`/`fdiv` 内联，整数自动提升 |
-| 📦 **LLVM import 静态链接** | 编译期递归编译依赖，`san_{mod}__{fn}` 名字修饰，llvmlite 合并 IR |
-| ⚡ **LLVM try/catch 重写** | 消除 opaque 函数调用，`@g_error` LLVM 可见全局 + 手动栈展开 |
-| 🧵 **Arena 字符串分配器** | 64KB 初始化，auto-grow，搬指针替代 malloc |
-| 📚 **标准库新增 4 个** | `json.san` `http.san` `regex.san` `csv.san` |
-| 🔧 **C VM 全指令对齐** | CALL/比较/算术/CONCAT/DICT 全修复，与 Python VM 字节码兼容 |
-| 📝 **四案例论证文档** | `circuit_sim` `data_cleaning` `health_check` `npc_decision` + `why-ternary.md` |
+| **三态逻辑** | 原生 `真`/`可能`/`假`（Kleene 强逻辑），`可能 且 可能` = `可能` |
+| **三进制算术** | 平衡三进制加/减/乘/除/余/幂/取位，`TernaryALU` 从位运算层三值 |
+| **双语法** | 糖语法（类 C）+ S 表达式，共享求值器，可混用 |
+| **母语编程** | 关键字可切换为任何自然语言（中/英皮肤），全角符号兼容 |
+| **三态分支 `判`** | `判 (表达式) { 真 → ..., 可能 → ..., 假 → ... }` |
+| **渐进类型** | 返回类型标注 `-> 类型`，可选类型 `?类型`，运行期自动校验 |
+| **异常处理** | `尝试 { } 捕获 (e) { }`，窄异常捕获 |
+| **高阶函数** | `映射`/`过滤`/`归并`/`排序`/`反转`/`去重`/`求和`/`合并` |
+| **Lambda** | `λ(x) { x * 2 }` 或 `函数(x) { x * 2 }` |
+| **模块系统** | `导入("path")`、`导出 name1 name2`、嵌套包导入 |
+| **行注释** | `//`（半角）、`／／`（全角）、`#` 三种注释语法 |
 
-## 新增特性速览（v3.14.0）
-
-| 特性 | 说明 |
-|---|---|
-| 🔄 **字节码 VM 完全自举** | VM 编译 `stdlib/bytecode_compiler.bin` 与求值器产出逐字节相同（5442 字节，5406 字节码） |
-| 🛡️ **CALL/RET 栈隔离** | `stack_base` 记录 + `del stack[base:]` 清理，消除递归 CALL + JMP 循环的栈污染 |
-| 🔧 **DICT_SET 副作用优化** | 不再推回修改后的 dict，消除 fn handler 作用域复制循环的栈泄漏 |
-| 📝 **行注释支持** | `//`（半角）和 `／／`（全角）行注释，tokenizer 自动跳过 |
-| 🆕 **DICT_KEYS 操作码** | 新增 0x32 操作码，`字列` 正确返回字典键列表 |
-| 🐛 **字符串引号检测修复** | 用 `(ord (子串 n 0 1))` 替代转义不可靠的 `str_equals "\""` |
-| 🐛 **发射i32 溢出修复** | 直接拆 4 字节，不用 `(mod v 2^32)` 防止有符号溢出 |
-| 📝 **编译器注释化** | `bytecode_compiler.san` 73 行可读格式，`//` 注释覆盖全函数 |
-
-## 新增特性速览（v3.13.0）
+### 字节码 VM
 
 | 特性 | 说明 |
 |---|---|
-| 🧩 **求值器模块拆分** | `evaluator.py` 从 315 行降至 176 行，拆出 `eval_helpers.py`、`debug_eval.py` |
-| 🧩 **命令模块重构** | `commands.py` 从 200 行降至 105 行，拆出 `tail_call.py`、`param_matcher.py` |
-| 🧩 **统一错误处理** | `ops/_error_handler.py` — `handle_op_errors` 装饰器，参数验证工具函数 |
-| 📝 **类型标注增强** | `evaluator.py`/`runtime.py`/`values.py` 核心模块补充完整 TypeHint |
-| 📚 **标准库扩充** | 新增 `stdlib/algorithm.san`（排序/质数/算法）、`stdlib/collection.san`（栈/队列/集合）、`stdlib/validate.san`（邮箱/IP/身份证验证） |
-| 📝 **实用示例** | 新增 `examples/student_grade.san`（成绩管理）、`examples/sales_analysis.san`（销售分析）、`examples/file_batch_process.san`（批量文件处理） |
+| **51 操作码** | 完整指令集：算术/比较/逻辑/容器/字符串/字典/控制流/IO |
+| **自举** | `bytecode_compiler.san` 编译自身，VM 产出与 Python 求值器逐字节一致 |
+| **32 位代码大小** | 支持 >64KB 字节码（旧版 16 位限制 64KB） |
+| **独立 .bin** | sugar.bin（~10KB）和 llvmgen.bin（~72KB）可在 VM 上独立运行 |
+| **C VM** | `csrc/runtime.c` 纯 C 实现，52 指令，不依赖 Python |
+| **STM32 固件** | `sanyancc.py` 交叉编译 → `runtime_stm32.c`，Blue Pill 硬件验证 |
 
-## 新增特性速览（v3.12.0）
-
-| 特性 | 说明 |
-|---|---|
-| 🧠 **LLVM 代码生成器** | AST → LLVM IR 编译（~1393 行 codegen），链接 C 运行时生成原生可执行文件 |
-| 🔧 **运行时库完善** | `runtime.c` 新增统一字符串访问层 (`_cstr()`)，修复 `rt_str_t*` / `const char*` 格式不兼容 |
-| 📡 **自举解析管线** | `_parse_source()` 新增 Python S 表达式解析器回退，支持 `_bootstrap.san` 完整编译 |
-| 📝 **LLVM 功能文档** | `docs/llvm.md` — 编译管线、运行时库 API、Tagged Value 机制、dp.c 测试套件 |
-
-## 新增特性速览（v3.11.0）
+### LLVM 代码生成
 
 | 特性 | 说明 |
 |---|---|
-| 🔨 **交叉编译工具链** | `sanyancc.py` 将 `.san` 源码编译为平坦字节码，`runtime.c` / `runtime_stm32.c` 解释执行 |
-| 🖥️ **STM32 固件** | `examples/stm32-blinky/` — 完整 VM + GPIO(LED) + SysTick + UART，已在 Blue Pill 硬件运行 |
-| 🧮 **纯三进制算术** | 全部 7 种运算（加/减/乘/除/余/幂/取位）统一走 `TernaryALU`，无 Python `math` 后备 |
-| 📦 **嵌套包导入** | `导入("a.b.c")` 自动查找 `stdlib/a/b/c.san` → `stdlib/a/b/c/package.san` |
-| 🔧 **Runtime 组合模式重构** | `ScopeManager`/`IoTManager`/`DebugManager`/`ProfileManager` 提取到 `runtime_components.py` |
+| **AST → LLVM IR** | `llvmgen/codegen.py` + `llvmgen/compiler.py`，~1500 行 codegen |
+| **63 位整数** | tagged pointer 升 i64，值域 ±4.6×10^18 |
+| **浮点支持** | IEEE 754 double，`fadd`/`fmul`/`fdiv` 内联，整数自动提升 |
+| **import 静态链接** | 编译期递归编译依赖，`san_{mod}__{fn}` 名字修饰 |
+| **try/catch** | `@g_error` LLVM 可见全局 + 手动栈展开 |
+| **Arena 分配器** | 64KB 初始化，auto-grow，搬指针替代 malloc |
+| **自举 LLVM 编译器** | `llvmgen.san` 编译为 .bin，通过 `compile_llvmgen.py` 注入辅助函数 |
 
-## 新增特性速览（v3.10.0）
-
-| 特性 | 说明 |
-|---|---|
-| 🧩 **类型标注** | `定义 f(x: 数字, y: 字符串) { ... }` — 参数类型标注，运行时自动校验 |
-| 🔍 **LSP 语言服务器增强** | 新增格式化、引用查找、重命名、文档符号、折叠范围、语义补全、hover 文档注释 |
-| 🎨 **源码格式化器** | `sanfmt.py` — 类 black/prettier 的 `.san` 格式化器，保留注释 |
-| 🐛 **表达式断点调试** | `:step` / `:break` / `:watch` / `:continue` — REPL 交互式调试 |
-| ⏱ **性能剖析** | `--profile` 标志 + `:profile` — 追踪每个操作的调用次数和耗时 |
-| 📝 **AST JSON 导出** | `--ast-json` — 将解析后的 AST 导出为 JSON |
-| 📌 **源码位置追踪** | 错误消息携带行号列号：`第3行第5列: 未定义的符号: x` |
-| 🎯 **DAP 调试适配器** | `dap_server.py` — VS Code 断点调试协议支持 |
-
-## 新增特性速览（v3.8.0）
+### 标准库与工具
 
 | 特性 | 说明 |
 |---|---|
-| 🧩 **语法解析器拆分为包** | `sugar.py` → `sugar/` 包（lexer + Pratt parser + error reporter） |
-| 🚪 **模块导出** | `导出 name1 name2` 控制模块对外可见的符号 |
-| 📟 **设备注册表** | `注册设备 名称 为 mock` / `注册设备 名称 为 file("path")` |
-| 📦 **包管理器** | `安装("包名")` / `包列表()` / `加载包("包名")` |
-| 🔢 **三进制定点数** | `BT.from_float()` 将浮点转为平衡三进制定点表示 |
-| 🌐 **全角引号** | 支持 `「」`、`『』`、`""` 等六种字符串定界符 |
-| 💬 **`#` 行注释** | 新增 `#` 注释语法，与 `//` 等价 |
-| 🔗 **S 表达式中文别名** | `(读取 人体)`、`(写入 灯 亮)`、`(查询 灯)` |
-| λ **希腊字母 Lambda** | `λ(x) { x * 2 }` 等价于 `函数(x) { x * 2 }` |
+| **标准库** | `json.san` `http.san` `regex.san` `csv.san` `string.san` `list.san` `math.san` 等 |
+| **LSP 语言服务器** | 格式化/引用查找/重命名/文档符号/折叠/语义补全/hover |
+| **DAP 调试适配器** | VS Code 断点调试协议支持 |
+| **源码格式化器** | `sanfmt.py` — 类 black/prettier |
+| **性能剖析** | `--profile` 标志 + `:profile` REPL 命令 |
+| **AST JSON 导出** | `--ast-json` 导出解析后的 AST |
+| **包管理器** | `安装("包名")` / `包列表()` / `加载包("包名")` |
+| **IoT 抽象** | `注册设备`/`置`/`读`/`查`/`对` 传感器/执行器操作 |
 
 ## 三进制算术（模拟实现）
 
@@ -409,6 +379,7 @@ sanyan/
 ├── ast_json.py              # AST JSON 导出
 ├── commands.py              # 自定义命令调用
 ├── compile_bytecode.py      # .san → .bin 编译器
+├── compile_llvmgen.py       # llvmgen.san 辅助函数注入 + .bin 编译
 ├── dap_server.py            # DAP 调试适配器
 ├── debug_eval.py            # 调试辅助模块
 ├── doc_sync.py              # 文档同步检查
@@ -492,7 +463,12 @@ sanyan/
 │   └── runtime.c
 ├── stdlib/                   # 标准库
 │   ├── bytecode_compiler.san # 自举编译器
+│   ├── bytecode_compiler.bin # 编译器 .bin（VM 可直接加载）
 │   ├── sugar.san             # 糖语法解析器
+│   ├── sugar.bin             # 解析器 .bin（VM 独立运行）
+│   ├── llvmgen.san           # LLVM 代码生成器
+│   ├── llvmgen.bin           # LLVM 编译器 .bin
+│   ├── combined.san          # sugar + llvmgen 合并版
 │   ├── json.san              # JSON 解析/序列化
 │   ├── http.san              # HTTP 客户端
 │   ├── regex.san             # 正则表达式
