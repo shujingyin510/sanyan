@@ -21,7 +21,10 @@ def evaluate_args(evaluator, params: list, args: list, param_types: dict) -> lis
     evaluated = []
     for param, arg_node in zip(params, args):
         if isinstance(arg_node, list):
-            value = arg_node
+            if len(arg_node) > 0 and isinstance(arg_node[0], str):
+                value = evaluator.eval(arg_node)
+            else:
+                value = arg_node
         elif (
             isinstance(arg_node, str)
             and not arg_node.isdigit()

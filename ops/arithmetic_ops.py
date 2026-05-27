@@ -118,8 +118,8 @@ class ArithmeticOps:
         elif op == 'div':
             if len(args) != 2:
                 raise SanyanSyntaxError('除 需要两个参数')
-            a = evaluator.eval(args[0])
-            b = evaluator.eval(args[1])
+            a = _to_tritvalue(evaluator.eval(args[0]))
+            b = _to_tritvalue(evaluator.eval(args[1]))
             if not isinstance(a, TritValue) or not isinstance(b, TritValue):
                 raise SanyanTypeError('除 的参数必须为数字')
             a_trits, b_trits = a.value, b.value
@@ -147,8 +147,8 @@ class ArithmeticOps:
         elif op == 'mod':
             if len(args) != 2:
                 raise SanyanSyntaxError('余 需要两个参数')
-            a = evaluator.eval(args[0])
-            b = evaluator.eval(args[1])
+            a = _to_tritvalue(evaluator.eval(args[0]))
+            b = _to_tritvalue(evaluator.eval(args[1]))
             if not isinstance(a, TritValue) or not isinstance(b, TritValue):
                 raise SanyanTypeError('余 的参数必须为数字')
             a_trits, b_trits = a.value, b.value
