@@ -674,7 +674,8 @@ def compile_module_test(module_name: str) -> str:
     ir = evaluator.eval(['编译顶层', module_ast])
     ir = _fix_terminators(ir) if isinstance(ir, str) else ''
     ir = _fix_missing_constants(ir) if isinstance(ir, str) else ''
-    ir = _fix_param_unbox(ir) if isinstance(ir, str) else ''
+    # _fix_param_unbox 会导致 comp_env 中的 alloca 寄存器与 IR 不一致——暂时跳过
+    # ir = _fix_param_unbox(ir) if isinstance(ir, str) else ''
     ir = _fix_rt_list_get_null_safe(ir) if isinstance(ir, str) else ''
     return ir if isinstance(ir, str) else ''
 
