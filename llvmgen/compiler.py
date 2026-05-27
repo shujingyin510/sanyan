@@ -175,7 +175,7 @@ def _list_get_safe(evaluator, args):
     idx = evaluator.eval(args[1])
     if isinstance(idx, TritValue):
         idx = idx.to_int()
-    if isinstance(lst, (list, tuple)) and 0 <= idx < len(lst):
+    if isinstance(lst, (list, tuple)) and isinstance(idx, int) and 0 <= idx < len(lst):
         return lst[idx]
     return ""
 
