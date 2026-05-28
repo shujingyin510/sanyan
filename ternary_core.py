@@ -239,6 +239,7 @@ class TritValue:
             cached = cls._SMALL_INT_CACHE.get(value)
             if cached is not None:
                 return cached
+
         def _hashable(v):
             if isinstance(v, list):
                 return tuple(_hashable(x) for x in v)

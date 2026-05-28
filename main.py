@@ -69,6 +69,7 @@ def main():
             skin_mgr = SkinManager('chinese')
             ast = SugarConverter.convert(code, skin_mgr)
             from llvmgen.codegen import compile_top_level
+
             cg = compile_top_level(ast)
             ir_text = str(cg.module)
 
@@ -85,6 +86,7 @@ def main():
 
             # llvmlite → asm
             from llvmlite import binding as llvm_binding
+
             llvm_binding.initialize_all_targets()
             llvm_binding.initialize_native_asmprinter()
 
@@ -101,14 +103,28 @@ def main():
             if 'GCC_PATH' in os.environ:
                 env['PATH'] = os.environ['GCC_PATH'] + os.pathsep + env.get('PATH', '')
             sc_o = os.path.join('build', 'syscall.o')
-            subprocess.run([gcc, '-c', 'llvmgen/syscall.c', '-o', sc_o, '-std=c99', '-O2', '-nostartfiles'],
-                   check=True, env=env)
-            subprocess.run([gcc, '-c', asm_path, '-o', asm_path.replace('.s', '.o')],
-                   check=True, env=env)
-            subprocess.run([gcc, asm_path.replace('.s', '.o'), sc_o, '-o', out_exe,
-                     '-nostartfiles', '-e', 'main', '-lkernel32', '-lgcc',
-                     '-fno-stack-check', '-fno-stack-protector'],
-                    check=True, env=env)
+            subprocess.run(
+                [gcc, '-c', 'llvmgen/syscall.c', '-o', sc_o, '-std=c99', '-O2', '-nostartfiles'], check=True, env=env
+            )
+            subprocess.run([gcc, '-c', asm_path, '-o', asm_path.replace('.s', '.o')], check=True, env=env)
+            subprocess.run(
+                [
+                    gcc,
+                    asm_path.replace('.s', '.o'),
+                    sc_o,
+                    '-o',
+                    out_exe,
+                    '-nostartfiles',
+                    '-e',
+                    'main',
+                    '-lkernel32',
+                    '-lgcc',
+                    '-fno-stack-check',
+                    '-fno-stack-protector',
+                ],
+                check=True,
+                env=env,
+            )
             print(f'[pycc] EXE → {out_exe}')
 
             result = subprocess.run([out_exe], capture_output=True, text=True)
@@ -136,6 +152,7 @@ def main():
 
             # llvmlite → asm
             from llvmlite import binding as llvm_binding
+
             llvm_binding.initialize_all_targets()
             llvm_binding.initialize_native_asmprinter()
 
@@ -155,14 +172,28 @@ def main():
             if 'GCC_PATH' in os.environ:
                 env['PATH'] = os.environ['GCC_PATH'] + os.pathsep + env.get('PATH', '')
             sc_o = os.path.join('build', 'syscall.o')
-            subprocess.run([gcc, '-c', 'llvmgen/syscall.c', '-o', sc_o, '-std=c99', '-O2', '-nostartfiles'],
-                   check=True, env=env)
-            subprocess.run([gcc, '-c', asm_path, '-o', asm_path.replace('.s', '.o')],
-                   check=True, env=env)
-            subprocess.run([gcc, asm_path.replace('.s', '.o'), sc_o, '-o', out_exe,
-                     '-nostartfiles', '-e', 'main', '-lkernel32', '-lgcc',
-                     '-fno-stack-check', '-fno-stack-protector'],
-                   check=True, env=env)
+            subprocess.run(
+                [gcc, '-c', 'llvmgen/syscall.c', '-o', sc_o, '-std=c99', '-O2', '-nostartfiles'], check=True, env=env
+            )
+            subprocess.run([gcc, '-c', asm_path, '-o', asm_path.replace('.s', '.o')], check=True, env=env)
+            subprocess.run(
+                [
+                    gcc,
+                    asm_path.replace('.s', '.o'),
+                    sc_o,
+                    '-o',
+                    out_exe,
+                    '-nostartfiles',
+                    '-e',
+                    'main',
+                    '-lkernel32',
+                    '-lgcc',
+                    '-fno-stack-check',
+                    '-fno-stack-protector',
+                ],
+                check=True,
+                env=env,
+            )
             print(f'[san] EXE → {out_exe}')
 
             result = subprocess.run([out_exe], capture_output=True, text=True)

@@ -8,13 +8,58 @@ import tempfile
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import unittest
-from vm import VM, VMError, NOP, PUSH_I, ADD, SUB, MUL, DIV, MOD, LOAD, STORE, \
-    JMP, JZ, JNZ, CALL, RET, PRINT, EQ, NE, GT, LT, GTE, LTE, NOT, \
-    CONCAT, STRLEN, STRSUB, STREQ, ORD, PUSH_STR, \
-    DICT, DICT_GET, DICT_SET, DICT_HAS, DICT_KEYS, \
-    IS_NUM, IS_STR, IS_LIST, SAME, GET, SET_ELEMENT, \
-    LIST_NEW, LIST_CONCAT, SLICE, LIST_LEN, \
-    READ_FILE, WRITE_FILE, WRITE_BINARY, HALT, JMP32
+from vm import (
+    VM,
+    VMError,
+    NOP,
+    PUSH_I,
+    ADD,
+    SUB,
+    MUL,
+    DIV,
+    MOD,
+    LOAD,
+    STORE,
+    JMP,
+    JZ,
+    JNZ,
+    CALL,
+    RET,
+    PRINT,
+    EQ,
+    NE,
+    GT,
+    LT,
+    GTE,
+    LTE,
+    NOT,
+    CONCAT,
+    STRLEN,
+    STRSUB,
+    STREQ,
+    ORD,
+    PUSH_STR,
+    DICT,
+    DICT_GET,
+    DICT_SET,
+    DICT_HAS,
+    DICT_KEYS,
+    IS_NUM,
+    IS_STR,
+    IS_LIST,
+    SAME,
+    GET,
+    SET_ELEMENT,
+    LIST_NEW,
+    LIST_CONCAT,
+    SLICE,
+    LIST_LEN,
+    READ_FILE,
+    WRITE_FILE,
+    WRITE_BINARY,
+    HALT,
+    JMP32,
+)
 
 
 def _make_vm(code_bytes, vars_count=256):
@@ -175,8 +220,7 @@ class TestVariableOps(unittest.TestCase):
         self.assertEqual(vm.stack, [0])
 
     def test_store_multiple(self):
-        code = _push_i(10) + [STORE, 0] + _push_i(20) + [STORE, 1] + \
-               [LOAD, 0] + [LOAD, 1] + _halt()
+        code = _push_i(10) + [STORE, 0] + _push_i(20) + [STORE, 1] + [LOAD, 0] + [LOAD, 1] + _halt()
         vm = _make_vm(code)
         vm.run()
         self.assertEqual(vm.stack, [10, 20])
@@ -257,11 +301,15 @@ class TestControlFlow(unittest.TestCase):
         # [19]    JNZ (1B opcode + 2B offset) → after reading: pc=22
         # We want to jump to [7]. offset = 7 - 22 = -15
         code = (
-            _push_i(3) + [STORE, 0] +
-            [LOAD, 0] + _push_i(1) + [SUB] + [STORE, 0] +
-            [LOAD, 0] +
-            [JZ if False else JNZ, 0xF1, 0xFF] +  # -15 as i16 LE
-            _halt()
+            _push_i(3)
+            + [STORE, 0]
+            + [LOAD, 0]
+            + _push_i(1)
+            + [SUB]
+            + [STORE, 0]
+            + [LOAD, 0]
+            + [JZ if False else JNZ, 0xF1, 0xFF]  # -15 as i16 LE
+            + _halt()
         )
         vm = _make_vm(code)
         vm.run()

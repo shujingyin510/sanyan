@@ -36,10 +36,15 @@ def resolve_op_name(evaluator, op: str) -> str:
 
 
 # 不可缓存的函数：有副作用，每次调用必须重新查找
-_NO_CACHE_OPS = frozenset({
-    '新寄存器', '新标签', '新槽',
-    'container_ops_next_reg', 'container_ops_next_label',
-})
+_NO_CACHE_OPS = frozenset(
+    {
+        '新寄存器',
+        '新标签',
+        '新槽',
+        'container_ops_next_reg',
+        'container_ops_next_label',
+    }
+)
 
 
 def dispatch_op(evaluator, internal: str, args: list):

@@ -15,77 +15,150 @@ if TYPE_CHECKING:
 
 # ── opcode 分派表（用于 tag_op 命令，避免自举 IR 中的字符串比较） ──
 _OPCODE_MAP = {
-    '取': 1, 'get': 1, '列表取': 1, 'list_get': 1,
-    '列表取长': 2, 'list_len': 2,
-    'set': 3, '设': 3, '設': 3,
-    'if': 4, '若': 4,
-    '循环': 5, 'loop': 5,
+    '取': 1,
+    'get': 1,
+    '列表取': 1,
+    'list_get': 1,
+    '列表取长': 2,
+    'list_len': 2,
+    'set': 3,
+    '设': 3,
+    '設': 3,
+    'if': 4,
+    '若': 4,
+    '循环': 5,
+    'loop': 5,
     'forin': 6,
-    'fn': 8, '定义': 8, 'define': 8,
-    '返回': 9, 'return': 9,
-    '跳出': 10, 'break': 10,
-    '继续': 11, 'continue': 11,
-    'do': 12, '做': 12,
-    '尝试': 13, 'try': 13,
-    '判断': 15, 'judge': 15,
-    '加': 16, 'add': 16,
-    '减': 17, 'sub': 17,
-    '乘': 18, 'mul': 18,
-    '除': 19, 'div': 19,
-    '小于': 20, 'lt': 20,
-    '大于': 21, 'gt': 21,
-    '等于': 22, 'eq': 22,
-    '且': 23, 'and': 23,
-    '或': 24, 'or': 24,
-    '非': 25, 'not': 25,
-    '大于等于': 26, 'gte': 26,
-    '字符串相等': 27, 'str_equals': 27,
-    '是列表': 28, 'is_list': 28,
-    '是字符串': 29, 'is_string': 29,
-    'print': 30, '输出': 30,
-    '新寄存器ID': 31, '新标签ID': 32,
-    '列表': 33, 'list': 33,
-    '取键': 34, 'get_key': 34,
-    '置键': 35, '字典': 36, 'dict': 36,
-    '切片': 37, 'slice': 37,
-    '列表合': 38, 'list_concat': 38,
-    '子串': 39, 'substring': 39,
-    '字列': 40, 'str_to_list': 40,
-    '连接': 41, 'concat': 41,
-    '查键': 42, '存变量': 43,
-    '新列表': 44, '新字典': 45,
-    '取字长': 46, '列表追加': 47,
-    '进栈': 48, '出栈': 49,
-    '字典取长': 50, '字典键列表': 51,
+    'fn': 8,
+    '定义': 8,
+    'define': 8,
+    '返回': 9,
+    'return': 9,
+    '跳出': 10,
+    'break': 10,
+    '继续': 11,
+    'continue': 11,
+    'do': 12,
+    '做': 12,
+    '尝试': 13,
+    'try': 13,
+    '判断': 15,
+    'judge': 15,
+    '加': 16,
+    'add': 16,
+    '减': 17,
+    'sub': 17,
+    '乘': 18,
+    'mul': 18,
+    '除': 19,
+    'div': 19,
+    '小于': 20,
+    'lt': 20,
+    '大于': 21,
+    'gt': 21,
+    '等于': 22,
+    'eq': 22,
+    '且': 23,
+    'and': 23,
+    '或': 24,
+    'or': 24,
+    '非': 25,
+    'not': 25,
+    '大于等于': 26,
+    'gte': 26,
+    '字符串相等': 27,
+    'str_equals': 27,
+    '是列表': 28,
+    'is_list': 28,
+    '是字符串': 29,
+    'is_string': 29,
+    'print': 30,
+    '输出': 30,
+    '新寄存器ID': 31,
+    '新标签ID': 32,
+    '列表': 33,
+    'list': 33,
+    '取键': 34,
+    'get_key': 34,
+    '置键': 35,
+    '字典': 36,
+    'dict': 36,
+    '切片': 37,
+    'slice': 37,
+    '列表合': 38,
+    'list_concat': 38,
+    '子串': 39,
+    'substring': 39,
+    '字列': 40,
+    'str_to_list': 40,
+    '连接': 41,
+    'concat': 41,
+    '查键': 42,
+    '存变量': 43,
+    '新列表': 44,
+    '新字典': 45,
+    '取字长': 46,
+    '列表追加': 47,
+    '进栈': 48,
+    '出栈': 49,
+    '字典取长': 50,
+    '字典键列表': 51,
     '字符串包含': 52,
-    '查找': 53, '找': 53, 'find': 53,
-    '是数字': 54, 'is_number': 54,
-    '转数字': 55, 'to_number': 55,
-    '前缀': 56, 'startswith': 56,
-    '注册函数名': 57, '取函数名': 58,
-    '转义LLVM字符串': 59, '是终止指令': 60,
-    '循环进栈': 61, '循环出栈': 61, '循环加锁': 61,
-    '进入合并上下文': 62, '退出合并上下文': 63, '取合并标签': 64,
-    'san_read_file': 65, 'san_write_file': 66,
-    'san_argv': 67, 'san_argc': 68,
-    '_rt_malloc': 69, '_rt_free': 70,
-    '取长': 72, 'len': 72, 'length': 72,
-    '函数': 73, '模块调用': 74,
-    '置': 75, '读': 76, '查': 77, '对': 78,
-    'export': 79, '导出': 79,
-    '映射': 80, 'map': 80, '过滤': 81, 'filter': 81,
-    '归并': 82, 'reduce': 82,
+    '查找': 53,
+    '找': 53,
+    'find': 53,
+    '是数字': 54,
+    'is_number': 54,
+    '转数字': 55,
+    'to_number': 55,
+    '前缀': 56,
+    'startswith': 56,
+    '注册函数名': 57,
+    '取函数名': 58,
+    '转义LLVM字符串': 59,
+    '是终止指令': 60,
+    '循环进栈': 61,
+    '循环出栈': 61,
+    '循环加锁': 61,
+    '进入合并上下文': 62,
+    '退出合并上下文': 63,
+    '取合并标签': 64,
+    'san_read_file': 65,
+    'san_write_file': 66,
+    'san_argv': 67,
+    'san_argc': 68,
+    '_rt_malloc': 69,
+    '_rt_free': 70,
+    '取长': 72,
+    'len': 72,
+    'length': 72,
+    '函数': 73,
+    '模块调用': 74,
+    '置': 75,
+    '读': 76,
+    '查': 77,
+    '对': 78,
+    'export': 79,
+    '导出': 79,
+    '映射': 80,
+    'map': 80,
+    '过滤': 81,
+    'filter': 81,
+    '归并': 82,
+    'reduce': 82,
     '是字典': 83,
 }
 
 
 _tag_op_calls = 0
 
+
 def _tag_op(evaluator, args):
     """Python 命令：AST 节点头部查字典得 opcode，避免字符串比较。"""
     global _tag_op_calls
     _tag_op_calls += 1
     from ternary_core import TritValue
+
     ast = evaluator.eval(args[0])
     if not isinstance(ast, (list, tuple)) or len(ast) == 0:
         return ast
@@ -184,10 +257,10 @@ def _dict_get_safe(evaluator, args):
         for layer in reversed(d):
             if isinstance(layer, dict) and k in layer:
                 return layer[k]
-        return ""
+        return ''
     if isinstance(d, dict) and k in d:
         return d[k]
-    return ""
+    return ''
 
 
 def _list_contains(evaluator, args):
@@ -224,7 +297,7 @@ def _list_get_safe(evaluator, args):
     if isinstance(lst, (list, tuple)) and isinstance(idx, int) and 0 <= idx < len(lst):
         val = lst[idx]
         return val
-    return ""
+    return ''
 
 
 def _list_contains(evaluator, args):
@@ -253,6 +326,8 @@ def _dict_len(evaluator, args):
 
 
 _lg_count = 0
+
+
 def _list_get_safe(evaluator, args):
     """安全列表取值，索引越界返回空串。"""
     global _lg_count
@@ -265,7 +340,7 @@ def _list_get_safe(evaluator, args):
         idx = idx.to_int()
     if isinstance(lst, (list, tuple)) and isinstance(idx, int) and 0 <= idx < len(lst):
         return lst[idx]
-    return ""
+    return ''
 
 
 def _list_append(evaluator, args):
@@ -327,7 +402,7 @@ def _escape_llvm_str(evaluator, args):
         s = s.replace('\r', '\\0D')
         s = s.replace('\t', '\\09')
         return s
-    return ""
+    return ''
 
 
 def _str_endswith(evaluator, args):
@@ -382,21 +457,22 @@ def _set_module_id(evaluator, args):
     _func_name_counter = [0]
     return TritValue(0)
 
+
 _register('container_ops_list_contains', _list_contains)
 
 # 合并上下文：用于控制流收敛（供 llvmgen.san handler 使用）
-_merge_label = ""
+_merge_label = ''
 
 
 def _set_merge_label(evaluator, args):
     global _merge_label
-    _merge_label = evaluator.eval(args[0]) if args else ""
+    _merge_label = evaluator.eval(args[0]) if args else ''
     return TritValue(0)
 
 
 def _clear_merge_label(evaluator, args):
     global _merge_label
-    _merge_label = ""
+    _merge_label = ''
     return TritValue(0)
 
 
@@ -425,7 +501,7 @@ def _next_reg(evaluator=None, args=None):
 
 def _is_terminated(evaluator, args):
     """检查 LLVM IR 文本是否以终止指令 (ret/br) 结尾。返回 TritValue(1)=已终止, TritValue(-1)=未终止。"""
-    sym = args[0] if args else ""
+    sym = args[0] if args else ''
     text = evaluator.get_var(sym) if isinstance(sym, str) else str(sym)
     if not text:
         return TritValue(-1)  # 空文本→未终止,非(未终止)=真→需要emit br
@@ -442,7 +518,7 @@ _register('container_ops_is_terminated', _is_terminated)
 
 def _box_py(evaluator, args):
     """Python版box: 绕过evaluator的纯函数缓存问题"""
-    v_val = evaluator.eval(args[0]) if len(args) > 0 else "%0"
+    v_val = evaluator.eval(args[0]) if len(args) > 0 else '%0'
     reg_val = evaluator.eval(args[1]) if len(args) > 1 else 0
     v = str(v_val)
     r1 = _next_reg()
@@ -456,7 +532,7 @@ def _box_py(evaluator, args):
 
 def _unbox_py(evaluator, args):
     """Python版unbox"""
-    p = evaluator.eval(args[0]) if len(args) > 0 else "null"
+    p = evaluator.eval(args[0]) if len(args) > 0 else 'null'
     reg_val = evaluator.eval(args[1]) if len(args) > 1 else 0
     r1 = _next_reg()
     r2 = _next_reg()
@@ -475,7 +551,7 @@ _loop_stack_global = []
 
 
 def _loop_push(evaluator=None, args=None):
-    hdr = args[0] if args else ""
+    hdr = args[0] if args else ''
     _loop_stack_global.append(hdr)
     return 0
 
@@ -489,7 +565,7 @@ def _loop_pop(evaluator=None, args=None):
 def _loop_top(evaluator=None, args=None):
     if _loop_stack_global:
         return _loop_stack_global[-1]
-    return ""
+    return ''
 
 
 _register('container_ops_loop_push', _loop_push)
@@ -508,6 +584,7 @@ def self_hosted_compile(source: str, module_name: str = 'main') -> str:
     evaluator = SanyanEvaluator(skin_manager=SkinManager('chinese'))
     # 强制覆盖 box/unbox 派发 + 清所有缓存
     from ops.registry import _OP_DISPATCH
+
     _OP_DISPATCH['box'] = (_box_py, None)
     _OP_DISPATCH['unbox'] = (_unbox_py, None)
     evaluator._op_cache.clear()
@@ -636,9 +713,14 @@ def _fix_terminators(ir: str) -> str:
     for line in lines:
         stripped = line.strip()
         # 检测标签 = 新基本块 (无缩进，以:结尾，非注释非字符串)
-        is_label = (stripped and stripped.endswith(':') and 
-                   not stripped.startswith(';') and not stripped.startswith('"') and
-                   line[0] not in (' ', '\t') and not line.startswith('  '))
+        is_label = (
+            stripped
+            and stripped.endswith(':')
+            and not stripped.startswith(';')
+            and not stripped.startswith('"')
+            and line[0] not in (' ', '\t')
+            and not line.startswith('  ')
+        )
 
         if is_label:
             if in_block and not has_term:
@@ -676,6 +758,7 @@ def compile_module_test(module_name: str) -> str:
     evaluator = SanyanEvaluator(skin_manager=SkinManager('chinese'))
     # 强制覆盖 box/unbox 派发 + 清所有缓存
     from ops.registry import _OP_DISPATCH
+
     _OP_DISPATCH['box'] = (_box_py, None)
     _OP_DISPATCH['unbox'] = (_unbox_py, None)
     evaluator._op_cache.clear()
@@ -776,68 +859,78 @@ def compile_module_test(module_name: str) -> str:
 def _fix_rt_list_get_null_safe(ir_text: str) -> str:
     """把常用运行时函数替换为 null-safe 版本。"""
     import re
-    
+
     # rt_list_get(i8* %lst, i32 %idx)
     ir_text = re.sub(
         r'(define i8\* @rt_list_get\(i8\* %lst, i32 %idx\) \{\n)(?:entry:\n)?',
         r'\1  %_ns_gln = icmp eq i8* %lst, null\n  br i1 %_ns_gln, label %_ns_gl_null, label %_ns_gl_ok\n_ns_gl_null:\n  ret i8* null\n_ns_gl_ok:\n',
-        ir_text)
-    
+        ir_text,
+    )
+
     # rt_list_len(i8* %lst)
     ir_text = re.sub(
         r'(define i32 @rt_list_len\(i8\* %lst\) \{\n)(?:entry:\n)?',
         r'\1  %_ns_lln = icmp eq i8* %lst, null\n  br i1 %_ns_lln, label %_ns_ll_null, label %_ns_ll_ok\n_ns_ll_null:\n  ret i32 0\n_ns_ll_ok:\n',
-        ir_text)
-    
+        ir_text,
+    )
+
     # rt_str_len(i8* %s)
     ir_text = re.sub(
         r'(define i32 @rt_str_len\(i8\* %s\) \{\n)(?:entry:\n)?',
         r'\1  %_ns_sln = icmp eq i8* %s, null\n  br i1 %_ns_sln, label %_ns_sl_null, label %_ns_sl_ok\n_ns_sl_null:\n  ret i32 0\n_ns_sl_ok:\n',
-        ir_text)
-    
+        ir_text,
+    )
+
     # rt_list_push_item(i8* %lst, i8* %item) - consumes entry: label
     ir_text = re.sub(
         r'(define i8\* @rt_list_push_item\(i8\* %lst, i8\* %item\) \{\n)(?:entry:\n)?',
         r'\1  %_ns_pin = icmp eq i8* %lst, null\n  br i1 %_ns_pin, label %_ns_pi_null, label %_ns_pi_ok\n_ns_pi_null:\n  ret i8* null\n_ns_pi_ok:\n',
-        ir_text)
-    
+        ir_text,
+    )
+
     # rt_str_find: null-safe
     ir_text = re.sub(
         r'(define i32 @rt_str_find\(i8\* %s, i8\* %sub\) \{\n)(?:entry:\n)?',
         r'\1  %_ns_sf0 = icmp eq i8* %s, null\n  br i1 %_ns_sf0, label %_ns_sf_null, label %_ns_sf_c1\n_ns_sf_null:\n  ret i32 -1\n_ns_sf_c1:\n  %_ns_sf1 = icmp eq i8* %sub, null\n  br i1 %_ns_sf1, label %_ns_sf_null, label %_ns_sf_ok\n_ns_sf_ok:\n',
-        ir_text)
-    
+        ir_text,
+    )
+
     # _rt_str_eq: 已由 llvmgen.san 生成_字典操作() 生成正确的 null-safe + 长度感知版本
     # 无需后处理替换。详见 stdlib/llvmgen.san:1629
-    
+
     # rt_str_to_list: return empty list instead of null
     ir_text = ir_text.replace(
         'define i8* @rt_str_to_list(i8* %a) {\n  ret i8* null\n}',
-        'define i8* @rt_str_to_list(i8* %a) {\n  %_stl = call i8* @rt_list_new()\n  ret i8* %_stl\n}')
-    
+        'define i8* @rt_str_to_list(i8* %a) {\n  %_stl = call i8* @rt_list_new()\n  ret i8* %_stl\n}',
+    )
+
     # rt_int_to_str: return empty string
     ir_text = ir_text.replace(
         'define i8* @rt_int_to_str(i8* %v) {\n  ret i8* null\n}',
-        'define i8* @rt_int_to_str(i8* %v) {\n  %_its = call i8* @rt_str_new(i8* null, i32 0)\n  ret i8* %_its\n}')
-    
+        'define i8* @rt_int_to_str(i8* %v) {\n  %_its = call i8* @rt_str_new(i8* null, i32 0)\n  ret i8* %_its\n}',
+    )
+
     # rt_dict_keys: return empty list
     ir_text = ir_text.replace(
         'define i8* @rt_dict_keys(i8* %d) {\n  ret i8* null\n}',
-        'define i8* @rt_dict_keys(i8* %d) {\n  %_dk = call i8* @rt_list_new()\n  ret i8* %_dk\n}')
-    
+        'define i8* @rt_dict_keys(i8* %d) {\n  %_dk = call i8* @rt_list_new()\n  ret i8* %_dk\n}',
+    )
+
     # rt_list_concat: return non-null arg
     ir_text = ir_text.replace(
         'define i8* @rt_list_concat(i8* %a, i8* %b) {\n  ret i8* %a\n}',
-        'define i8* @rt_list_concat(i8* %a, i8* %b) {\n  %_lcn = icmp eq i8* %a, null\n  br i1 %_lcn, label %_lc_retb, label %_lc_reta\n_lc_retb:\n  ret i8* %b\n_lc_reta:\n  ret i8* %a\n}')
-    
+        'define i8* @rt_list_concat(i8* %a, i8* %b) {\n  %_lcn = icmp eq i8* %a, null\n  br i1 %_lcn, label %_lc_retb, label %_lc_reta\n_lc_retb:\n  ret i8* %b\n_lc_reta:\n  ret i8* %a\n}',
+    )
+
     # rt_str_substr: null-safe
     ir_text = ir_text.replace(
         'define i8* @rt_str_substr(i8* %a, i8* %b, i8* %c) {\n  ret i8* %a\n}',
-        'define i8* @rt_str_substr(i8* %a, i8* %b, i8* %c) {\n  %_ssn = icmp eq i8* %a, null\n  br i1 %_ssn, label %_ss_ret_ok, label %_ss_ret_a\n_ss_ret_ok:\n  %_ssr = call i8* @rt_str_new(i8* null, i32 0)\n  ret i8* %_ssr\n_ss_ret_a:\n  ret i8* %a\n}')
-    
+        'define i8* @rt_str_substr(i8* %a, i8* %b, i8* %c) {\n  %_ssn = icmp eq i8* %a, null\n  br i1 %_ssn, label %_ss_ret_ok, label %_ss_ret_a\n_ss_ret_ok:\n  %_ssr = call i8* @rt_str_new(i8* null, i32 0)\n  ret i8* %_ssr\n_ss_ret_a:\n  ret i8* %a\n}',
+    )
+
     # Clean up orphaned entry: labels from patches
     ir_text = re.sub(r'(?<=_ok:\n)entry:\n', r'', ir_text)
-    
+
     return ir_text
 
 
@@ -845,6 +938,7 @@ def _fix_param_unbox(ir_text: str) -> str:
     """修复 fn handler 的参数 unbox/rebox 模式：直接 store 参数而非 ptrtoint+ashr+shl+or+inttoptr。
     旧模式把 LSB=0 的堆对象指针变成 LSB=1 的 tagged int，导致后续 rt_list_get 拿到 null。"""
     import re
+
     lines = ir_text.split('\n')
     # 第 1 遍：找到 ptrtoint param → ashr → alloca → shl → or → inttoptr → store 的 7 行模式
     # 替换为：alloca → store param
@@ -855,12 +949,12 @@ def _fix_param_unbox(ir_text: str) -> str:
         # 匹配 ptrtoint i8* %XXX_arg to i64
         m1 = re.match(r'\s*(%\d+)\s*=\s*ptrtoint\s+i8\*\s+(%_\w+_arg)\s+to\s+i64\s*$', lines[i])
         if m1 and i + 6 < len(lines):
-            raw = m1.group(1)      # %X
-            param = m1.group(2)    # %_arg
+            raw = m1.group(1)  # %X
+            param = m1.group(2)  # %_arg
             # 第 2 行：ashr i64 %raw, 1
-            m2 = re.match(r'\s*(%\d+)\s*=\s*ashr\s+i64\s+' + re.escape(raw) + r'\s*,\s*1\s*$', lines[i+1])
+            m2 = re.match(r'\s*(%\d+)\s*=\s*ashr\s+i64\s+' + re.escape(raw) + r'\s*,\s*1\s*$', lines[i + 1])
             # 第 3 行：alloca i8*
-            m3 = re.match(r'\s*(%\d+)\s*=\s*alloca\s+i8\*\s*$', lines[i+2])
+            m3 = re.match(r'\s*(%\d+)\s*=\s*alloca\s+i8\*\s*$', lines[i + 2])
             # 第 4 行：shl i64 %val, 1
             # 第 5 行：or i64 %shl, 1
             # 第 6 行：inttoptr i64 %or to i8*
@@ -868,18 +962,20 @@ def _fix_param_unbox(ir_text: str) -> str:
             if m2 and m3:
                 val = m2.group(1)
                 alloca_reg = m3.group(1)
-                m4 = re.match(r'\s*(%\d+)\s*=\s*shl\s+i64\s+' + re.escape(val) + r'\s*,\s*1\s*$', lines[i+3])
+                m4 = re.match(r'\s*(%\d+)\s*=\s*shl\s+i64\s+' + re.escape(val) + r'\s*,\s*1\s*$', lines[i + 3])
                 if m4:
                     shl = m4.group(1)
-                    m5 = re.match(r'\s*(%\d+)\s*=\s*or\s+i64\s+' + re.escape(shl) + r'\s*,\s*1\s*$', lines[i+4])
+                    m5 = re.match(r'\s*(%\d+)\s*=\s*or\s+i64\s+' + re.escape(shl) + r'\s*,\s*1\s*$', lines[i + 4])
                     if m5:
                         orr = m5.group(1)
-                        m6 = re.match(r'\s*(%\d+)\s*=\s*inttoptr\s+i64\s+' + re.escape(orr) + r'\s+to\s+i8\*\s*$', lines[i+5])
+                        m6 = re.match(
+                            r'\s*(%\d+)\s*=\s*inttoptr\s+i64\s+' + re.escape(orr) + r'\s+to\s+i8\*\s*$', lines[i + 5]
+                        )
                         if m6:
                             ptr = m6.group(1)
                             indent = ' ' * (len(lines[i]) - len(lines[i].lstrip()))
                             store_old = f'{indent}store i8* {ptr}, i8** {alloca_reg}'
-                            if lines[i+6].strip() == store_old.strip():
+                            if lines[i + 6].strip() == store_old.strip():
                                 # Replace 7 lines with 2
                                 result.append(f'{indent}{alloca_reg} = alloca i8*')
                                 result.append(f'{indent}store i8* {param}, i8** {alloca_reg}')
@@ -894,6 +990,7 @@ def _fix_param_unbox(ir_text: str) -> str:
 def _fix_missing_constants(ir_text: str) -> str:
     """补发缺失的 @.str.N 字符串常量定义。"""
     import re
+
     lines = ir_text.split('\n')
     defs = set()
     refs = set()
@@ -924,8 +1021,8 @@ def _fix_missing_constants(ir_text: str) -> str:
 def _merge_ir_modules(ir_parts: list[str]) -> str:
     """合并多个LLVM IR模块，去重define/declare。"""
     if not ir_parts:
-        return ""
-    result = ""
+        return ''
+    result = ''
     seen_defines = set()
     seen_declares = set()
     seen_globals = set()
