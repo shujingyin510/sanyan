@@ -14,7 +14,19 @@ class ControlOps:
         if len(args) < 2:
             raise SanyanSyntaxError('if 需要条件和真分支')
         cond = evaluator.eval(args[0])
-        if BT.to_int(cond.value) == 1:
+        if isinstance(cond, TritValue):
+            cond_bool = BT.to_int(cond.value) == 1
+        elif isinstance(cond, int):
+            cond_bool = cond != 0
+        elif isinstance(cond, str):
+            cond_bool = len(cond) > 0
+        elif isinstance(cond, list):
+            cond_bool = len(cond) > 0
+        elif cond is None:
+            cond_bool = False
+        else:
+            cond_bool = True
+        if cond_bool:
             return evaluator.eval(args[1])
         elif len(args) >= 3:
             return evaluator.eval(args[2])
