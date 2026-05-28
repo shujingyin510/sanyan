@@ -32,7 +32,7 @@ jobs:
         with:
           python-version: ${{ matrix.python-version }}
       - run: python -m pip install --upgrade pip
-      - run: pip install llvmlite
+      - run: pip install .[dev]
       - run: python -X utf8 tests/test_core.py -v
       - run: python -X utf8 tests/test_commands.py -v
       - run: python -X utf8 tests/test_parser.py

@@ -15,7 +15,28 @@ authors = [
 dependencies = []
 
 [project.optional-dependencies]
+# ── 核心语言层 ──
+core = []  # 纯 Python，无外部依赖
+
+# ── 扩展功能层 ──
+sugar = []  # 糖语法解析器，仅依赖 values.SrcNode（内含于 core）
+vm = []     # 字节码 VM，零依赖（内含于 core）
+llvmgen = ["llvmlite>=0.40.0"]  # LLVM 代码生成器
+
+# ── IDE 支持层 ──
+lsp = []  # LSP/DAP 协议层独立，分析层延迟加载 sugar/core
+
+# ── 独立工具 ──
+tools = []  # 格式化器/交叉编译器/doc_sync，全部零依赖
+
+# ── 完整版（默认安装所有功能）──
+all = [
+    "sanyan[llvmgen]",
+]
+
+# ── 开发工具 ──
 dev = [
+    "sanyan[all]",
     "pytest>=7.0",
     "coverage>=6.0",
     "ruff>=0.1.0",
@@ -26,7 +47,7 @@ dev = [
 sanyan = "main:main"
 
 [tool.setuptools]
-packages = ["ops", "sugar", "lsp", "llvmgen"]
+packages = ["sanyan", "ops", "sugar", "lsp", "llvmgen"]
 py-modules = []  # 由 setup.py 动态发现
 
 [tool.ruff]
