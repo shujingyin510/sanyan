@@ -88,6 +88,7 @@ typedef enum {
     WRITE_BIN = 0x30,
     ORD      = 0x31,
     DICT_KEYS = 0x32,
+    JMP32    = 0x33,
     HALT     = 0xFF,
 } Opcode;
 
@@ -398,6 +399,11 @@ int vm_run(VM *vm) {
         /* ── 控制流 ── */
         case JMP: {
             int16_t off = rd_i16(vm->code, &vm->pc);
+            vm->pc += off;
+            break;
+        }
+        case JMP32: {
+            int32_t off = rd_i32(vm->code, &vm->pc);
             vm->pc += off;
             break;
         }
@@ -713,18 +719,19 @@ int vm_run(VM *vm) {
             break;
         }
 
-        /* ── 模块操作 ── */
+        /* ── 模块导入：加载 .bin 文件并执行初始化代码 ── */
         case IMPORT: {
             const char *path = rt_str_c(pop(vm));
             if (_mod_cnt >= MOD_MAX) { push(vm, tag_i(0)); break; }
             FILE *f = fopen(path, "rb");
             if (!f) { push(vm, tag_i(0)); break; }
-            uint8_t hdr[8];
+            /* 读取 10 字节头部：SAN0(4) + ver(1) + var_cnt(1) + code_size(4) */
+            uint8_t hdr[10];
             if (fread(hdr, 1, 10, f) != 10 || memcmp(hdr, "SAN0", 4) != 0) {
                 fclose(f); push(vm, tag_i(0)); break;
             }
             uint32_t sz;
-            memcpy(&sz, hdr + 6, 2);
+            memcpy(&sz, hdr + 6, 4);  /* 32 位代码大小 */
             uint8_t *code = (uint8_t*)malloc(sz);
             if (!code) { fclose(f); push(vm, tag_i(0)); break; }
             if (fread(code, 1, sz, f) != sz) {
@@ -775,18 +782,20 @@ int vm_run(VM *vm) {
     return 0;
 }
 
-/* ── 加载固件 ── */
+/* ── 加载 .bin 文件到 VM ──
+ * 格式：SAN0(4) + ver(1) + var_count(1) + code_size(4) + bytecode[...] + export_table
+ */
 int vm_load(VM *vm, const char *path) {
     FILE *fp = fopen(path, "rb");
     if (!fp) { perror(path); return 1; }
 
-    uint8_t hdr[8];
+    uint8_t hdr[10];
     if (fread(hdr, 1, 10, fp) != 10) { fprintf(stderr, "头部读取失败\n"); fclose(fp); return 1; }
     if (memcmp(hdr, "SAN0", 4) != 0) { fprintf(stderr, "非法固件格式\n"); fclose(fp); return 1; }
 
     uint8_t vc = hdr[5];
     uint32_t code_size;
-    memcpy(&code_size, hdr + 6, 4);
+    memcpy(&code_size, hdr + 6, 4);  /* 32 位代码大小 */
 
     uint8_t *code = (uint8_t*)malloc(code_size);
     if (!code) { fprintf(stderr, "内存不足\n"); fclose(fp); return 1; }

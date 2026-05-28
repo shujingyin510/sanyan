@@ -64,6 +64,7 @@ CALL_EXT = 0x2F
 WRITE_BINARY = 0x30
 ORD = 0x31
 DICT_KEYS = 0x32
+JMP32 = 0x33
 HALT = 0xFF
 
 OP_NAMES = {v: k for k, v in vars().items() if isinstance(v, int) and k.isupper()}
@@ -202,6 +203,10 @@ class VM:
 
             elif op == JMP:
                 off = self._read_i16()
+                self.pc += off
+
+            elif op == JMP32:
+                off = self._read_i32()
                 self.pc += off
 
             elif op == JZ:

@@ -55,8 +55,6 @@ def main():
 
         if use_pycc and not profiling:
             # ── Python 原生编译路径：SugarConverter 解析 + Python codegen 生成 IR → 原生可执行文件 ──
-            from sugar import SugarConverter
-            from skin import SkinManager
             import tempfile, subprocess
 
             skin_mgr = SkinManager('chinese')
