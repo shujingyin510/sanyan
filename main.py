@@ -99,14 +99,14 @@ def main():
 
             # GCC → exe
             gcc = os.environ.get('GCC', 'gcc')
-            env = os.environ.copy()
+            gcc_env = os.environ.copy()
             if 'GCC_PATH' in os.environ:
-                env['PATH'] = os.environ['GCC_PATH'] + os.pathsep + env.get('PATH', '')
+                gcc_env['PATH'] = os.environ['GCC_PATH'] + os.pathsep + gcc_env.get('PATH', '')
             sc_o = os.path.join('build', 'syscall.o')
             subprocess.run(
-                [gcc, '-c', 'llvmgen/syscall.c', '-o', sc_o, '-std=c99', '-O2', '-nostartfiles'], check=True, env=env
+                [gcc, '-c', 'llvmgen/syscall.c', '-o', sc_o, '-std=c99', '-O2', '-nostartfiles'], check=True, env=gcc_env
             )
-            subprocess.run([gcc, '-c', asm_path, '-o', asm_path.replace('.s', '.o')], check=True, env=env)
+            subprocess.run([gcc, '-c', asm_path, '-o', asm_path.replace('.s', '.o')], check=True, env=gcc_env)
             subprocess.run(
                 [
                     gcc,
@@ -123,7 +123,7 @@ def main():
                     '-fno-stack-protector',
                 ],
                 check=True,
-                env=env,
+                env=gcc_env,
             )
             print(f'[pycc] EXE → {out_exe}')
 
@@ -168,14 +168,14 @@ def main():
 
             # GCC → exe (零 stdio: -nostartfiles -e main -lkernel32)
             gcc = os.environ.get('GCC', 'gcc')
-            env = os.environ.copy()
+            gcc_env = os.environ.copy()
             if 'GCC_PATH' in os.environ:
-                env['PATH'] = os.environ['GCC_PATH'] + os.pathsep + env.get('PATH', '')
+                gcc_env['PATH'] = os.environ['GCC_PATH'] + os.pathsep + gcc_env.get('PATH', '')
             sc_o = os.path.join('build', 'syscall.o')
             subprocess.run(
-                [gcc, '-c', 'llvmgen/syscall.c', '-o', sc_o, '-std=c99', '-O2', '-nostartfiles'], check=True, env=env
+                [gcc, '-c', 'llvmgen/syscall.c', '-o', sc_o, '-std=c99', '-O2', '-nostartfiles'], check=True, env=gcc_env
             )
-            subprocess.run([gcc, '-c', asm_path, '-o', asm_path.replace('.s', '.o')], check=True, env=env)
+            subprocess.run([gcc, '-c', asm_path, '-o', asm_path.replace('.s', '.o')], check=True, env=gcc_env)
             subprocess.run(
                 [
                     gcc,
@@ -192,7 +192,7 @@ def main():
                     '-fno-stack-protector',
                 ],
                 check=True,
-                env=env,
+                env=gcc_env,
             )
             print(f'[san] EXE → {out_exe}')
 
@@ -223,7 +223,7 @@ def main():
             sys.exit(0)
 
         skin_mgr = SkinManager('chinese')
-        env = SanyanEvaluator(skin_manager=skin_mgr)
+        env: SanyanEvaluator = SanyanEvaluator(skin_manager=skin_mgr)
         if profiling:
             env.profile_start()
 

@@ -78,6 +78,7 @@ exclude = [
 module = [
     "sugar.*",
     "lsp.*",
+    "llvmgen.*",
 ]
 ignore_errors = true
 

@@ -1,5 +1,7 @@
 """容器操作：列表、数组、字典、通用索引、映射/过滤/归并"""
 
+from typing import Any
+
 from ternary_core import TritValue, ArrayValue
 from values import FunctionValue, ModuleValue, call_function
 from values import SanyanSyntaxError, SanyanTypeError, SanyanValueError, SanyanKeyError, to_num
@@ -77,6 +79,7 @@ class ContainerOps:
             raise SanyanSyntaxError('取 需要容器和索引')
         container = evaluator.eval(args[0])
         raw_index = evaluator.eval(args[1])
+        index: Any
         if isinstance(raw_index, str):
             index = raw_index
         elif isinstance(raw_index, TritValue):
