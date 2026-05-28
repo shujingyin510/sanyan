@@ -50,7 +50,7 @@ _NO_CACHE_OPS = frozenset(
 
 def dispatch_op(evaluator, internal: str, args: list):
     """从注册表查询并执行内置操作。
-    
+
     支持缓存加速，对有副作用的操作每次重新查找。
     """
     _check_op(internal)
@@ -107,7 +107,7 @@ def handle_dot_access(evaluator, op: str, args: list):
 
 def handle_variable_call(evaluator, op: str, args: list):
     """处理变量调用：自定义函数、模块调用、容器索引、变量值。
-    
+
     根据变量类型分派不同调用方式。
     """
     if not evaluator.has_var(op):
@@ -136,7 +136,7 @@ def handle_variable_call(evaluator, op: str, args: list):
 
 def apply(evaluator, op: str, args: list) -> Any:
     """主分派入口：依次尝试注册表 → 点号访问 → 变量调用 → 自定义命令。
-    
+
     按优先级查找并执行操作，返回执行结果。
     """
     from commands import Commands
