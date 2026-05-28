@@ -278,13 +278,13 @@
 
 // 检查并去除字符串字面量的引号
 设 去掉引号 = 函数(s) {
-    设 len = 取长(s)
-    若 (len < 2) { 返回(假) }
+    设 s_len = 取长(s)
+    若 (s_len < 2) { 返回(假) }
     设 first = 子串(s, 0, 1)
-    设 last = 子串(s, len - 1, 1)
-    若 (且(str_equals(first, "\""), str_equals(last, "\""))) { 返回(子串(s, 1, len - 2)) }
-    若 (且(str_equals(first, "「"), str_equals(last, "」"))) { 返回(子串(s, 1, len - 2)) }
-    若 (且(str_equals(first, "『"), str_equals(last, "』"))) { 返回(子串(s, 1, len - 2)) }
+    设 last = 子串(s, s_len - 1, 1)
+    若 (且(str_equals(first, "\""), str_equals(last, "\""))) { 返回(子串(s, 1, s_len - 2)) }
+    若 (且(str_equals(first, "「"), str_equals(last, "」"))) { 返回(子串(s, 1, s_len - 2)) }
+    若 (且(str_equals(first, "『"), str_equals(last, "』"))) { 返回(子串(s, 1, s_len - 2)) }
     返回(假)
 }
 

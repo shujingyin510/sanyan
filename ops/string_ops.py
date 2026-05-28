@@ -1,8 +1,8 @@
 """字符串相关操作"""
 
-from ternary_core import TritValue
+from ternary_core import TritValue, ArrayValue
 from values import SanyanSyntaxError, SanyanTypeError
-from ops.registry import register
+from ops.registry import register, register_alias
 
 
 class StringOps:
@@ -30,6 +30,12 @@ class StringOps:
         val = evaluator.eval(args[0])
         if isinstance(val, str):
             return TritValue(len(val))
+        if isinstance(val, list):
+            return TritValue(len(val))
+        if isinstance(val, dict):
+            return TritValue(len(val))
+        if isinstance(val, ArrayValue):
+            return TritValue(val.length)
         if isinstance(val, TritValue):
             return TritValue(len(str(val.to_int())))
         return TritValue(len(str(val)))
@@ -171,3 +177,5 @@ register('upper', StringOps.string_upper)
 register('lower', StringOps.string_lower)
 register('startswith', StringOps.string_startswith)
 register('endswith', StringOps.string_endswith)
+register_alias('len', 'length')
+register_alias('substr', 'substring')
