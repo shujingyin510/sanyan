@@ -9,11 +9,19 @@
 - **自举验证测试**: `tests/test_self_host.py` 验证字节码编译器自举一致性（SHA256 校验）
 - **字节码格式升级**: 代码大小字段从 16 位扩展到 32 位（`vm.py`、`bytecode_compiler.san`、`csrc/runtime.c`、`compile_bytecode.py`），支持 >64KB 字节码
 - **OP映射双语覆盖**: 补充 20+ 个 Python 注册命令的中英文别名映射（`新字典`→`DICT`、`新列表`→`LIST_NEW`、`列表取`→`GET` 等），覆盖全部 51 个 VM 操作码
+- **JMP32 操作码 (0x33)**: 新增 32 位跳转指令，函数定义/lambda 的前向跳转改用 JMP32，支持 >64KB 字节码（`vm.py`、`csrc/runtime.c`、`llvmgen/runtime.c`、`bytecode_compiler.san`）
+- **VM 单元测试**: `tests/test_vm.py` 新增 73 项直接字节码测试，覆盖全部操作码（栈操作/算术/比较/控制流/字符串/类型检查/列表/字典/函数调用/IO）
+- **模块化发行配置**: `pyproject.toml` 新增 extras 依赖分组（core/sugar/vm/llvmgen/lsp/tools/dev），支持按需安装（`pip install sanyan[core]`）
+- **sanyan 包命名空间**: 新增 `sanyan/__init__.py` 作为包入口
 
 ### 变更
 - **字节码编译器源码**: 关键字全部使用中文（`set`→`设`、`fn`→`定义`、`if`→`若`、`return`→`返回`、`loop`→`循环`、`do`→`做`），字符串字面量中的操作名保持英文
 - **.san 文件注释**: 全角注释 `／／` 统一转换为半角 `//`（algorithm.san、collection.san、datetime.san 等 11 个文件）
 - **LLVM 代码生成器**: `llvmgen.san` 中 `set`/`if`/`do`/`return`/`try`/`print`/`fn` 等操作的中文别名检查移到英文检查之前（`若` 或 `if`、`设` 或 `set` 等）
+- **异常体系统一**: `ops/registry.py` 使用 `SanyanKeyError`，`preprocess.py` 使用 `SanyanValueError`，`compile_bytecode.py` 使用 `SanyanSyntaxError`/`SanyanRuntimeError`
+- **魔法数字提取**: `ops/file_ops.py` 提取 `BOOTSTRAP_MAX_LOOP`/`SUGAR_MODULE_MAX_LOOP`/`TEMP_ENV_MAX_LOOP`，`ops/system_ops.py` 提取 `EXEC_TIMEOUT`，`ops/net_ops.py` 提取 `HTTP_TIMEOUT`，`ops/package_ops.py` 提取 `DOWNLOAD_TIMEOUT`/`INDEX_TIMEOUT`/`INDEX_CACHE_TTL`
+- **异常处理精确化**: `ops/system_ops.py` `except Exception` → `except (OSError, ValueError)`，`ops/net_ops.py` → `except (_error.URLError, _error.HTTPError, ValueError, OSError)`
+- **CI 统一安装**: 测试 job 改用 `pip install .[dev]`，添加 `test_self_host.py` 和 `test_vm.py`
 
 ### 修复
 - **`fn` 处理器函数地址**: 导出地址公式从 `(减 (表长 w) 10)` 修正为 `(减 (表长 w) 12)`，指向参数 STORE（VM CALL 从此处计算参数数量）
@@ -22,6 +30,12 @@
 - **C VM**: 同步修复头部格式（10 字节）和 DICT/LIST_NEW 空栈处理（`csrc/runtime.c`）
 - **sugar.san `导出` 解析器**: 遇到第二个 `导出` 关键字时停止读取名称，修复多行导出被合并为一个节点的 bug
 - **test_llvmgen.py**: `test_import_resolves` 和 `test_text_analysis` 标记为 skip（导入系统为桩函数）
+- **main.py UnboundLocalError**: 删除 `use_pycc`/`use_san` 分支中重复的 `from skin import SkinManager` 和 `from sugar import SugarConverter` 导入，消除 Python 变量遮蔽
+- **--ast-json 路径**: `main.py` 中 `from ast_json import` 改为内联实现，修复模块缺失崩溃
+- **ops/concurrent_ops.py**: 并发执行异常不再静默吞掉，改为抛出 `SanyanRuntimeError`
+- **pyproject.toml**: 添加 `llvmgen` 到 `packages` 列表
+- **README.md**: 修复 CI badge URL（`ci.yml` → `test.yml`），删除结构树中不存在的 `VERSION.py`、`ast_json.py`、`_error_handler.py`、`_util.py`
+- **ops/type_ops.py**: 删除与 `time_ops.py` 重复的 `time_now` 和 `sleep_op`
 
 ## [v3.15.1] — 2026-06-01
 

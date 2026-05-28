@@ -69,6 +69,29 @@ python main.py examples/greenhouse.san
 python main.py examples/sensor_pipeline_simple.san
 ```
 
+### 模块化安装
+
+三言支持按需安装，避免拉取不需要的依赖：
+
+```bash
+pip install sanyan           # 完整版（所有功能）
+pip install sanyan[core]     # 核心语言（解释器 + 标准库）
+pip install sanyan[sugar]    # 糖语法解析器
+pip install sanyan[vm]       # 字节码 VM
+pip install sanyan[llvmgen]  # LLVM 编译器（需要 llvmlite）
+pip install sanyan[lsp]      # IDE 支持（LSP + DAP）
+pip install sanyan[tools]    # 独立工具（格式化器/交叉编译器）
+pip install sanyan[dev]      # 开发依赖（pytest/ruff/mypy）
+```
+
+| 用户场景 | 推荐安装 |
+|----------|----------|
+| 仅运行 .bin 字节码 | `pip install sanyan-vm` |
+| 交互式编程 | `pip install sanyan-core` |
+| 完整 IDE 体验 | `pip install sanyan` |
+| 嵌入式开发 | `pip install sanyan-core sanyan-llvmgen` |
+| 仅代码格式化 | `pip install sanyan-tools` |
+
 ## 杀手级示例：智能温室控制系统
 
 以下代码模拟了一个温室环境，光线和人体传感器返回三态信号（充足/不足/不稳，有人/无人/不确定），温度传感器返回连续值。系统根据三态决策控制灯光、窗帘、风扇和加热器，并在传感器冲突时执行优先级处理。
@@ -375,6 +398,8 @@ sanyan/
 ├── CONTRIBUTING.md
 ├── README.md
 ├── README_EN.md
+├── sanyan/                   # 包命名空间（模块化入口）
+│   └── __init__.py
 ├── commands.py              # 自定义命令调用
 ├── compile_bytecode.py      # .san → .bin 编译器
 ├── compile_llvmgen.py       # llvmgen.san 辅助函数注入 + .bin 编译
