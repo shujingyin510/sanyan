@@ -13,6 +13,51 @@ from ternary_core import TritValue
 from skin import SkinManager
 
 
+def _compile_ir_to_exe(ir_text: str, suffix: str, gcc_env: dict | None = None) -> str:
+    """将 LLVM IR 文本编译为原生可执行文件，返回 exe 路径。"""
+    import subprocess
+
+    out_name = 'sanyan_out'
+    out_exe = os.path.join('build', out_name + f'_{suffix}.exe')
+    os.makedirs('build', exist_ok=True)
+    ir_path = os.path.join('build', out_name + f'_{suffix}.ll')
+    asm_path = os.path.join('build', out_name + f'_{suffix}.s')
+
+    with open(ir_path, 'w', encoding='utf-8') as f:
+        f.write(ir_text)
+    print(f'[{suffix}] LLVM IR → {ir_path} ({len(ir_text)} bytes)')
+
+    from llvmlite import binding as llvm_binding
+
+    llvm_binding.initialize_all_targets()
+    llvm_binding.initialize_native_asmprinter()
+    target = llvm_binding.Target.from_default_triple()
+    tm = target.create_target_machine(reloc='static', codemodel='large')
+    asm = tm.emit_assembly(llvm_binding.parse_assembly(ir_text))
+    with open(asm_path, 'w') as f:
+        f.write(asm)
+    print(f'[{suffix}] ASM → {asm_path}')
+
+    if gcc_env is None:
+        gcc_env = os.environ.copy()
+    gcc = os.environ.get('GCC', 'gcc')
+    if 'GCC_PATH' in os.environ:
+        gcc_env['PATH'] = os.environ['GCC_PATH'] + os.pathsep + gcc_env.get('PATH', '')
+    sc_o = os.path.join('build', 'syscall.o')
+    subprocess.run(
+        [gcc, '-c', 'llvmgen/syscall.c', '-o', sc_o, '-std=c99', '-O2', '-nostartfiles'],
+        check=True, env=gcc_env,
+    )
+    subprocess.run([gcc, '-c', asm_path, '-o', asm_path.replace('.s', '.o')], check=True, env=gcc_env)
+    subprocess.run([
+        gcc, asm_path.replace('.s', '.o'), sc_o, '-o', out_exe,
+        '-nostartfiles', '-e', 'main', '-lkernel32', '-lgcc',
+        '-fno-stack-check', '-fno-stack-protector',
+    ], check=True, env=gcc_env)
+    print(f'[{suffix}] EXE → {out_exe}')
+    return out_exe
+
+
 def main():
     args = sys.argv[1:]
 
@@ -64,71 +109,12 @@ def main():
 
         if use_pycc and not profiling:
             # ── Python 原生编译路径：SugarConverter 解析 + Python codegen 生成 IR → 原生可执行文件 ──
-            import subprocess
-
             skin_mgr = SkinManager('chinese')
             ast = SugarConverter.convert(code, skin_mgr)
             from llvmgen.codegen import compile_top_level
 
             cg = compile_top_level(ast)
-            ir_text = str(cg.module)
-
-            out_name = os.path.splitext(os.path.basename(filepath))[0]
-            out_exe = os.path.join('build', out_name + '_pycc.exe')
-
-            os.makedirs('build', exist_ok=True)
-            ir_path = os.path.join('build', out_name + '_pycc.ll')
-            asm_path = os.path.join('build', out_name + '_pycc.s')
-
-            with open(ir_path, 'w', encoding='utf-8') as f:
-                f.write(ir_text)
-            print(f'[pycc] LLVM IR → {ir_path} ({len(ir_text)} bytes)')
-
-            # llvmlite → asm
-            from llvmlite import binding as llvm_binding
-
-            llvm_binding.initialize_all_targets()
-            llvm_binding.initialize_native_asmprinter()
-
-            target = llvm_binding.Target.from_default_triple()
-            tm = target.create_target_machine(reloc='static', codemodel='large')
-            asm = tm.emit_assembly(llvm_binding.parse_assembly(ir_text))
-            with open(asm_path, 'w') as f:
-                f.write(asm)
-            print(f'[pycc] ASM → {asm_path}')
-
-            # GCC → exe
-            gcc = os.environ.get('GCC', 'gcc')
-            gcc_env = os.environ.copy()
-            if 'GCC_PATH' in os.environ:
-                gcc_env['PATH'] = os.environ['GCC_PATH'] + os.pathsep + gcc_env.get('PATH', '')
-            sc_o = os.path.join('build', 'syscall.o')
-            subprocess.run(
-                [gcc, '-c', 'llvmgen/syscall.c', '-o', sc_o, '-std=c99', '-O2', '-nostartfiles'],
-                check=True,
-                env=gcc_env,
-            )
-            subprocess.run([gcc, '-c', asm_path, '-o', asm_path.replace('.s', '.o')], check=True, env=gcc_env)
-            subprocess.run(
-                [
-                    gcc,
-                    asm_path.replace('.s', '.o'),
-                    sc_o,
-                    '-o',
-                    out_exe,
-                    '-nostartfiles',
-                    '-e',
-                    'main',
-                    '-lkernel32',
-                    '-lgcc',
-                    '-fno-stack-check',
-                    '-fno-stack-protector',
-                ],
-                check=True,
-                env=gcc_env,
-            )
-            print(f'[pycc] EXE → {out_exe}')
-
+            out_exe = _compile_ir_to_exe(str(cg.module), 'pycc')
             result = subprocess.run([out_exe], capture_output=True, text=True)
             print(result.stdout, end='')
             if result.stderr:
@@ -138,68 +124,9 @@ def main():
         if use_san and not profiling:
             # ── 自举编译路径：sugar.san 解析 + llvmgen.san 生成 IR → 原生可执行文件 ──
             from llvmgen.compiler import self_hosted_compile
-            import subprocess
 
             ir_text = self_hosted_compile(code)
-            out_name = os.path.splitext(os.path.basename(filepath))[0]
-            out_exe = os.path.join('build', out_name + '_san.exe')
-
-            os.makedirs('build', exist_ok=True)
-            ir_path = os.path.join('build', out_name + '_san.ll')
-            asm_path = os.path.join('build', out_name + '_san.s')
-
-            with open(ir_path, 'w', encoding='utf-8') as f:
-                f.write(ir_text)
-            print(f'[san] LLVM IR → {ir_path}')
-
-            # llvmlite → asm
-            from llvmlite import binding as llvm_binding
-
-            llvm_binding.initialize_all_targets()
-            llvm_binding.initialize_native_asmprinter()
-
-            # runtime.ll 已完全为空（所有运行时已迁移到 llvmgen.san）
-            combined_ir = ir_text
-
-            target = llvm_binding.Target.from_default_triple()
-            tm = target.create_target_machine(reloc='static', codemodel='large')
-            asm = tm.emit_assembly(llvm_binding.parse_assembly(combined_ir))
-            with open(asm_path, 'w') as f:
-                f.write(asm)
-            print(f'[san] ASM → {asm_path}')
-
-            # GCC → exe (零 stdio: -nostartfiles -e main -lkernel32)
-            gcc = os.environ.get('GCC', 'gcc')
-            gcc_env = os.environ.copy()
-            if 'GCC_PATH' in os.environ:
-                gcc_env['PATH'] = os.environ['GCC_PATH'] + os.pathsep + gcc_env.get('PATH', '')
-            sc_o = os.path.join('build', 'syscall.o')
-            subprocess.run(
-                [gcc, '-c', 'llvmgen/syscall.c', '-o', sc_o, '-std=c99', '-O2', '-nostartfiles'],
-                check=True,
-                env=gcc_env,
-            )
-            subprocess.run([gcc, '-c', asm_path, '-o', asm_path.replace('.s', '.o')], check=True, env=gcc_env)
-            subprocess.run(
-                [
-                    gcc,
-                    asm_path.replace('.s', '.o'),
-                    sc_o,
-                    '-o',
-                    out_exe,
-                    '-nostartfiles',
-                    '-e',
-                    'main',
-                    '-lkernel32',
-                    '-lgcc',
-                    '-fno-stack-check',
-                    '-fno-stack-protector',
-                ],
-                check=True,
-                env=gcc_env,
-            )
-            print(f'[san] EXE → {out_exe}')
-
+            out_exe = _compile_ir_to_exe(ir_text, 'san')
             result = subprocess.run([out_exe], capture_output=True, text=True)
             print(result.stdout, end='')
             if result.stderr:
