@@ -19,6 +19,11 @@ PACKAGE_ALLOWLIST: set[str] = {
 _installed_cache: dict[str, bool] = {}
 _index_cache = None  # (timestamp, index_data)
 
+# 超时和缓存常量
+DOWNLOAD_TIMEOUT = 30
+INDEX_TIMEOUT = 10
+INDEX_CACHE_TTL = 300  # 5 分钟
+
 
 def _resolve_package_path(name: str) -> str:
     """解析包路径：packages/name/package.san"""
@@ -171,7 +176,7 @@ class PackageOps:
 
         try:
             print(f"正在下载包 '{name}'...")
-            with urllib.request.urlopen(url, timeout=30) as resp:
+            with urllib.request.urlopen(url, timeout=DOWNLOAD_TIMEOUT) as resp:
                 data = resp.read()
         except (urllib.error.URLError, IOError, OSError) as e:
             raise SanyanIOError(f'下载包失败: {e}')
@@ -215,13 +220,13 @@ class PackageOps:
                 pass
         # 远程索引（缓存 5 分钟）
         now = time.time()
-        if _index_cache is not None and now - _index_cache[0] < 300:
+        if _index_cache is not None and now - _index_cache[0] < INDEX_CACHE_TTL:
             index = _index_cache[1]
         else:
             import urllib.request
 
             try:
-                with urllib.request.urlopen(PACKAGE_INDEX_URL, timeout=10) as resp:
+                with urllib.request.urlopen(PACKAGE_INDEX_URL, timeout=INDEX_TIMEOUT) as resp:
                     index = json.loads(resp.read().decode('utf-8'))
                 _index_cache = (now, index)
             except (urllib.error.URLError, IOError, OSError, json.JSONDecodeError):

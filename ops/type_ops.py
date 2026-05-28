@@ -1,27 +1,11 @@
-"""类型判断、时间、等待操作"""
+"""类型判断操作"""
 
-import time
 from ternary_core import TritValue
-from values import SanyanSyntaxError, SanyanTypeError, SanyanRuntimeError
+from values import SanyanSyntaxError, SanyanTypeError
 from ops.registry import register
 
 
 class TypeOps:
-    @staticmethod
-    def time_now(evaluator, args):
-        return TritValue(int(time.time()))
-
-    @staticmethod
-    def sleep_op(evaluator, args):
-        if len(args) != 1:
-            raise SanyanSyntaxError('等待 需要一个参数（秒数）')
-        sec = evaluator.eval(args[0]).to_int()
-        try:
-            time.sleep(sec)
-        except KeyboardInterrupt:
-            raise SanyanRuntimeError('等待被用户中断（Ctrl+C）')
-        return TritValue(0)
-
     @staticmethod
     def is_number(evaluator, args):
         if len(args) != 1:
@@ -105,8 +89,6 @@ class TypeOps:
 
 
 # 注册类型操作
-register('time', TypeOps.time_now)
-register('sleep', TypeOps.sleep_op)
 register('is_number', TypeOps.is_number)
 register('is_string', TypeOps.is_string)
 register('is_list', TypeOps.is_list)

@@ -7,6 +7,8 @@ from ternary_core import TritValue
 from values import SanyanRuntimeError, SanyanSyntaxError
 from ops.registry import register, register_alias
 
+EXEC_TIMEOUT = 30
+
 
 def op_exec(evaluator, args):
     """执行(命令) — 执行系统命令并返回输出"""
@@ -14,14 +16,14 @@ def op_exec(evaluator, args):
         raise SanyanSyntaxError('执行 需要一个命令字符串')
     cmd = args[0] if isinstance(args[0], str) else str(evaluator.eval(args[0]))
     try:
-        result = subprocess.run(cmd, shell=True, capture_output=True, text=True, timeout=30)
+        result = subprocess.run(cmd, shell=True, capture_output=True, text=True, timeout=EXEC_TIMEOUT)
         out = result.stdout
         if result.returncode != 0:
             out += result.stderr
         return out
     except subprocess.TimeoutExpired:
         raise SanyanRuntimeError('命令执行超时')
-    except Exception as e:
+    except (OSError, ValueError) as e:
         raise SanyanRuntimeError(f'命令执行失败: {e}')
 
 
@@ -55,7 +57,7 @@ def op_listdir(evaluator, args):
         path = args[0] if isinstance(args[0], str) else str(evaluator.eval(args[0]))
     try:
         return os.listdir(path)
-    except Exception as e:
+    except OSError as e:
         raise SanyanRuntimeError(f'列出目录失败: {e}')
 
 

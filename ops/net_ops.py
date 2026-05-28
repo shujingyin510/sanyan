@@ -2,6 +2,7 @@
 
 try:
     import urllib.request as _request
+    import urllib.error as _error
 
     _HAS_NET = True
 except ImportError:
@@ -9,6 +10,8 @@ except ImportError:
 
 from values import SanyanRuntimeError
 from ops.registry import register, register_alias
+
+HTTP_TIMEOUT = 10
 
 
 def _ensure_net():
@@ -23,9 +26,9 @@ def http_get(evaluator, args):
         raise SanyanRuntimeError('http读 需要一个 URL 参数')
     url = args[0] if isinstance(args[0], str) else str(evaluator.eval(args[0]))
     try:
-        resp = _request.urlopen(url, timeout=10)
+        resp = _request.urlopen(url, timeout=HTTP_TIMEOUT)
         return resp.read().decode('utf-8', errors='replace')
-    except Exception as e:
+    except (_error.URLError, _error.HTTPError, ValueError, OSError) as e:
         raise SanyanRuntimeError(f'HTTP GET 失败: {e}')
 
 
@@ -42,9 +45,9 @@ def http_post(evaluator, args):
     try:
         body = data.encode('utf-8')
         req = _request.Request(url, data=body, method='POST')
-        resp = _request.urlopen(req, timeout=10)
+        resp = _request.urlopen(req, timeout=HTTP_TIMEOUT)
         return resp.read().decode('utf-8', errors='replace')
-    except Exception as e:
+    except (_error.URLError, _error.HTTPError, ValueError, OSError) as e:
         raise SanyanRuntimeError(f'HTTP POST 失败: {e}')
 
 

@@ -13,6 +13,11 @@ _module_cache: dict = {}
 _import_stack: set = set()
 _sugar_parser_module = None
 
+# 最大循环步数
+BOOTSTRAP_MAX_LOOP = 50000
+SUGAR_MODULE_MAX_LOOP = 100000
+TEMP_ENV_MAX_LOOP = 50000
+
 
 def clear_cache():
     """清理模块缓存，用于测试隔离。"""
@@ -87,7 +92,7 @@ def _load_sugar_parser(evaluator):
     except SyntaxError:
         return None
 
-    bootstrap_env = SanyanEvaluator(skin_manager=skin_mgr, max_loop_steps=50000)
+    bootstrap_env = SanyanEvaluator(skin_manager=skin_mgr, max_loop_steps=BOOTSTRAP_MAX_LOOP)
     try:
         bootstrap_env.eval(bootstrap_ast)
     except Exception:
@@ -117,7 +122,7 @@ def _load_sugar_parser(evaluator):
         return None
 
     # Phase 3: 评估 sugar.san AST
-    module_env = SanyanEvaluator(skin_manager=skin_mgr, max_loop_steps=100000)
+    module_env = SanyanEvaluator(skin_manager=skin_mgr, max_loop_steps=SUGAR_MODULE_MAX_LOOP)
     try:
         module_env.eval(sugar_ast)
     except Exception:
@@ -136,7 +141,7 @@ def _parse_with_sugar_san(code, evaluator):
     try:
         from evaluator import SanyanEvaluator
 
-        temp_env = SanyanEvaluator(skin_manager=evaluator.skin_manager, max_loop_steps=50000)
+        temp_env = SanyanEvaluator(skin_manager=evaluator.skin_manager, max_loop_steps=TEMP_ENV_MAX_LOOP)
         result = parser.call(temp_env, ['解析', code])
         if isinstance(result, TritValue):
             iv = result.to_int()
