@@ -19,7 +19,7 @@ from ternary_core import TritValue, ArrayValue
 from sandbox import check_op as _check_op, check_func as _check_func
 
 
-def resolve_op_name(evaluator, op: str) -> str:
+def resolve_op_name(evaluator: Any, op: str) -> str:
     """解析操作名为内部标识符（皮肤映射 + 缓存）。"""
     cached = evaluator._name_cache.get(op)
     if isinstance(cached, str):
@@ -48,7 +48,7 @@ _NO_CACHE_OPS = frozenset(
 )
 
 
-def dispatch_op(evaluator, internal: str, args: list):
+def dispatch_op(evaluator: Any, internal: str, args: list) -> Any:
     """从注册表查询并执行内置操作。
 
     支持缓存加速，对有副作用的操作每次重新查找。
@@ -76,7 +76,7 @@ def dispatch_op(evaluator, internal: str, args: list):
     return method(evaluator, args)
 
 
-def handle_dot_access(evaluator, op: str, args: list):
+def handle_dot_access(evaluator: Any, op: str, args: list) -> Any:
     """处理点号访问: module.func, dict.key, list[idx]"""
     if not isinstance(op, str) or '.' not in op:
         return None
@@ -105,7 +105,7 @@ def handle_dot_access(evaluator, op: str, args: list):
     return None
 
 
-def handle_variable_call(evaluator, op: str, args: list):
+def handle_variable_call(evaluator: Any, op: str, args: list) -> Any:
     """处理变量调用：自定义函数、模块调用、容器索引、变量值。
 
     根据变量类型分派不同调用方式。
@@ -134,7 +134,7 @@ def handle_variable_call(evaluator, op: str, args: list):
     raise SanyanTypeError(f"变量 '{op}' 的值不可调用或索引")
 
 
-def apply(evaluator, op: str, args: list) -> Any:
+def apply(evaluator: Any, op: str, args: list) -> Any:
     """主分派入口：依次尝试注册表 → 点号访问 → 变量调用 → 自定义命令。
 
     按优先级查找并执行操作，返回执行结果。
