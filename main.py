@@ -104,7 +104,9 @@ def main():
                 gcc_env['PATH'] = os.environ['GCC_PATH'] + os.pathsep + gcc_env.get('PATH', '')
             sc_o = os.path.join('build', 'syscall.o')
             subprocess.run(
-                [gcc, '-c', 'llvmgen/syscall.c', '-o', sc_o, '-std=c99', '-O2', '-nostartfiles'], check=True, env=gcc_env
+                [gcc, '-c', 'llvmgen/syscall.c', '-o', sc_o, '-std=c99', '-O2', '-nostartfiles'],
+                check=True,
+                env=gcc_env,
             )
             subprocess.run([gcc, '-c', asm_path, '-o', asm_path.replace('.s', '.o')], check=True, env=gcc_env)
             subprocess.run(
@@ -173,7 +175,9 @@ def main():
                 gcc_env['PATH'] = os.environ['GCC_PATH'] + os.pathsep + gcc_env.get('PATH', '')
             sc_o = os.path.join('build', 'syscall.o')
             subprocess.run(
-                [gcc, '-c', 'llvmgen/syscall.c', '-o', sc_o, '-std=c99', '-O2', '-nostartfiles'], check=True, env=gcc_env
+                [gcc, '-c', 'llvmgen/syscall.c', '-o', sc_o, '-std=c99', '-O2', '-nostartfiles'],
+                check=True,
+                env=gcc_env,
             )
             subprocess.run([gcc, '-c', asm_path, '-o', asm_path.replace('.s', '.o')], check=True, env=gcc_env)
             subprocess.run(
