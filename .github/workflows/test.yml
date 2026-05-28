@@ -45,5 +45,6 @@ jobs:
       - run: python -X utf8 tests/test_llvmgen.py -v
       - run: python -X utf8 tests/test_dp_python.py -v
       - run: python -X utf8 tests/test_self_host.py -v
+      - run: python -X utf8 tests/test_vm.py -v
       - run: python -X utf8 tests/run_all.py
       - run: python -X utf8 doc_sync.py
