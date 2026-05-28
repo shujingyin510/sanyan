@@ -117,7 +117,7 @@ gh run watch
 
 ## 测试
 
-每次代码修改后必须运行全部测试（10 套）：
+每次代码修改后必须运行全部测试（14 套）：
 
 ```bash
 python -X utf8 tests/test_core.py -v      # 运行时核心单测 52 项
@@ -133,7 +133,9 @@ python -X utf8 tests/test_llvmgen.py -v   # LLVM 代码生成测试 53 项
 python -X utf8 tests/test_dp_python.py -v # S 表达式解析测试 10 项
 python -X utf8 tests/test_llvm_native.py -v # LLVM 原生编译测试（需 C 编译器）
 python -X utf8 tests/test_self_host.py -v # 自举验证测试 1 项
-python -X utf8 tests/run_all.py           # 集成测试 41 项
+python -X utf8 tests/test_vm.py -v        # VM 字节码测试 73 项
+python -X utf8 tests/test_c_vm.py -v      # C VM 测试 1 项（需 gcc）
+python -X utf8 tests/run_all.py           # 集成测试 43 项
 
 全部通过才算成功：
 - test_core.py 52/52
@@ -148,8 +150,10 @@ python -X utf8 tests/run_all.py           # 集成测试 41 项
 - test_llvmgen.py 53/53
 - test_dp_python.py 10/10
 - test_self_host.py 1/1
+- test_vm.py 73/73
+- test_c_vm.py 1/1（需 C 编译器）
 - test_llvm_native.py（需 C 编译器，否则 skip）
-- run_all.py 41/41
+- run_all.py 43/43
 
 Python 文档同步：首次或每次代码修改后建议运行：
 ```bash

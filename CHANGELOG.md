@@ -2,6 +2,28 @@
 
 ---
 
+## [v3.17.0] — 2026-06-02
+
+### 新增
+- **C VM 单元测试**: `csrc/test_runtime.c` 61 项测试，覆盖标记指针/字符串/列表/字典/算术/比较/变量/控制流/函数调用/嵌套调用，`tests/test_c_vm.py` Python 包装器自动编译运行
+- **BUILTIN_OPS 自动生成**: `runtime.py` 中 `BUILTIN_OPS` 从硬编码 Set (~170项) 改为从 `language/*.json` 自动生成 (235项)，消除手工维护同步风险
+- **架构文档**: `ARCHITECTURE.md` 系统概览、核心模块、数据流、设计决策
+- **贡献指南**: `CONTRIBUTING.md` 开发环境、代码规范、项目结构、添加操作指南
+- **核心模块 docstring**: `evaluator.py`、`values.py`、`ops/dispatcher.py`、`runtime_components.py` 添加模块级和公共方法中文文档字符串
+
+### 变更
+- **性能优化**: `evaluator._apply` 移除冗余 `resolve_op_name` 调用（`dispatcher.apply` 内部已调用）；`ops/dispatcher.py` 中 `sandbox` 模块从函数内 import 提升为模块级导入
+- **ops/string_ops.py**: `string_length` 支持 `list`/`dict`/`ArrayValue` 类型；注册 `len`→`length`、`substr`→`substring` 别名
+- **sugar/lexer.py**: `FULLWIDTH_MAP` 添加 `【`→`[`、`】`→`]` 全角方括号映射
+- **stdlib/eval.san**: `去掉引号` 函数变量名 `len`→`s_len` 避免与操作名冲突
+- **ops/system_ops.py**: `subprocess.run` 添加 `errors='replace'`，处理 `None` stderr
+- **ops/comparison_ops.py**: `eq`/`ne` 支持非数值类型（字符串）比较
+
+### 修复
+- **test.san 测试框架**: `执行(函数体)` → `函数体()` 修复函数调用；添加 `否则` 分支；使用可变字典替代标量变量跨函数调用持久化；新增 `断言错误` 函数
+- **5 个预存在集成测试**: `test_container.san`/`test_stress.san`（取长支持列表）、`test_eval.san`/`test_parse_se.san`（len/substr 别名）、`test_fullwidth.san`（全角方括号）全部修复
+- **集成测试**: 从 25/43 提升至 43/43 通过
+
 ## [v3.16.0] — 2026-05-28
 
 ### 新增

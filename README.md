@@ -1,4 +1,4 @@
-# 三言 Sanyan v3.16.0
+# 三言 Sanyan v3.17.0
 
 [![VS Code Marketplace](https://img.shields.io/badge/VS%20Code-Marketplace-%23007ACC?logo=visualstudiocode)](https://marketplace.visualstudio.com/items?itemName=sanyan-lang.sanyan-language)
 [![CI](https://github.com/shujingyin510/sanyan/actions/workflows/test.yml/badge.svg)](https://github.com/shujingyin510/sanyan/actions)
@@ -335,11 +335,12 @@ tests/
 
 | 特性 | 说明 |
 |---|---|
-| **51 操作码** | 完整指令集：算术/比较/逻辑/容器/字符串/字典/控制流/IO |
+| **52 操作码** | 完整指令集：算术/比较/逻辑/容器/字符串/字典/控制流/IO |
 | **自举** | `bytecode_compiler.san` 编译自身，VM 产出与 Python 求值器逐字节一致 |
 | **32 位代码大小** | 支持 >64KB 字节码（旧版 16 位限制 64KB） |
 | **独立 .bin** | sugar.bin（~10KB）和 llvmgen.bin（~72KB）可在 VM 上独立运行 |
 | **C VM** | `csrc/runtime.c` 纯 C 实现，52 指令，不依赖 Python |
+| **C VM 测试** | `csrc/test_runtime.c` 61 项单元测试，覆盖全部指令集 |
 | **STM32 固件** | `sanyancc.py` 交叉编译 → `runtime_stm32.c`，Blue Pill 硬件验证 |
 
 ### LLVM 代码生成
@@ -393,7 +394,7 @@ tests/
 
 ```text
 sanyan/
-├── AGENTS.md
+├── ARCHITECTURE.md
 ├── CHANGELOG.md
 ├── CONTRIBUTING.md
 ├── README.md
@@ -437,7 +438,7 @@ sanyan/
 │   ├── codegen.py           # AST → LLVM IR
 │   ├── compiler.py          # 编译入口
 │   └── runtime.c            # C 运行时库
-├── ops/                     # 内置操作实现（28 模块）
+├── ops/                     # 内置操作实现（30 模块）
 │   ├── __init__.py
 │   ├── arithmetic_ops.py    # 算术运算
 │   ├── comparison_ops.py    # 比较运算
@@ -481,7 +482,8 @@ sanyan/
 │   ├── keywords.py
 │   └── protocol.py
 ├── csrc/                     # C 语言 VM（52 指令完整版）
-│   └── runtime.c
+│   ├── runtime.c             # VM 实现（840 行）
+│   └── test_runtime.c        # VM 单元测试（61 项）
 ├── stdlib/                   # 标准库
 │   ├── bytecode_compiler.san # 自举编译器
 │   ├── bytecode_compiler.bin # 编译器 .bin（VM 可直接加载）
@@ -558,8 +560,12 @@ sanyan/
 - [x] LLVM 代码生成器 + C 运行时库（v3.12.0）
 - [x] LLVM 原生编译（AOT，LLVM → 汇编 → 可执行文件）
 - [x] C 字节码 VM（52 指令完整版）
+- [x] C VM 单元测试（61 项，覆盖全部指令集）
 - [x] 浮点支持 + 整数自动提升
 - [x] import 静态链接
+- [x] BUILTIN_OPS 自动生成（从 language/*.json 同步）
+- [x] 核心模块 docstring 注释
+- [x] 架构文档 ARCHITECTURE.md + 贡献指南 CONTRIBUTING.md
 - [ ] GPIO 真实硬件控制
 - [ ] Web IDE
 - [ ] 标准库扩展（更多自举模块）
@@ -596,6 +602,7 @@ sanyan/
 - **性能**：基于 Python 的树遍历解释器，高频循环场景性能有限。可使用 PyPy 运行获得 5-10 倍加速。
 - **无标准输入流**：`输入()` 仅支持交互式输入，不支持管道重定向。
 - **模块路径**：`导入("a.b.c")` 自动查找 `stdlib/a/b/c.san` → `stdlib/a/b/c/package.san`，支持嵌套包导入。
+- **大文件**：部分核心文件超过 500 行（`llvmgen/codegen.py` 1822 行、`sugar/parser.py` 672 行），尚未拆分。
 
 ## 三进制实现说明
 

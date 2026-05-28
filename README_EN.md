@@ -1,4 +1,4 @@
-# Sanyan v3.16.0
+# Sanyan v3.17.0
 
 [![VS Code Marketplace](https://img.shields.io/badge/VS%20Code-Marketplace-%23007ACC?logo=visualstudiocode)](https://marketplace.visualstudio.com/items?itemName=sanyan-lang.sanyan-language)
 [![CI](https://github.com/shujingyin510/sanyan/actions/workflows/ci.yml/badge.svg)](https://github.com/shujingyin510/sanyan/actions)
@@ -145,11 +145,12 @@ Register virtual devices, read/write sensors with ternary values. Perfect for sm
 
 | Feature | Description |
 |---|---|
-| **51 Opcodes** | Full instruction set: arithmetic/comparison/logic/container/string/dict/control/IO |
+| **52 Opcodes** | Full instruction set: arithmetic/comparison/logic/container/string/dict/control/IO |
 | **Self-Hosting** | `bytecode_compiler.san` compiles itself, VM output byte-identical to Python evaluator |
 | **32-bit Code Size** | Supports >64KB bytecode (old 16-bit limit was 64KB) |
 | **Standalone .bin** | sugar.bin (~10KB) and llvmgen.bin (~72KB) run independently on VM |
 | **C VM** | `csrc/runtime.c` pure C implementation, 52 instructions, no Python dependency |
+| **C VM Tests** | `csrc/test_runtime.c` 61 unit tests covering all instructions |
 | **STM32 Firmware** | `sanyancc.py` cross-compile → `runtime_stm32.c`, Blue Pill hardware verified |
 
 ### LLVM Code Generation
@@ -209,15 +210,18 @@ sanyan/
 ├── main.py                  # Entry point / REPL
 ├── runtime.py               # Runtime environment
 ├── sugar/                   # C-like sugar → S-expression converter
-├── ops/                     # Built-in operations (28 modules)
+├── ops/                     # Built-in operations (30 modules)
 ├── llvmgen/                 # LLVM code generator
 ├── lsp/                     # Language server protocol
+├── csrc/                    # C VM (52 instructions, 61 unit tests)
 ├── stdlib/                  # Standard library
-├── tests/                   # 41 integration tests + unit tests
+├── tests/                   # 43 integration tests + 500+ unit tests
 ├── examples/                # Example programs
 ├── docs/                    # Manual, syntax guide, LLVM docs
 ├── benchmark/               # Performance benchmarks
 ├── packages/                # Package manager cache
+├── ARCHITECTURE.md          # Architecture documentation
+├── CONTRIBUTING.md          # Contribution guide
 └── sanyan-vscode/           # VS Code extension
 ```
 
@@ -233,6 +237,10 @@ sanyan/
 - [x] Full-width symbol compatibility
 - [x] LLVM native code generation
 - [x] Bytecode VM + full self-hosting
+- [x] C VM unit tests (61 tests)
+- [x] Auto-generated BUILTIN_OPS from language JSON
+- [x] Core module docstrings
+- [x] Architecture docs + contribution guide
 - [ ] GPIO hardware control
 - [ ] Web IDE
 - [ ] Expanded standard library
