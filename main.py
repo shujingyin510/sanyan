@@ -47,14 +47,28 @@ def _compile_ir_to_exe(ir_text: str, suffix: str, gcc_env: dict | None = None) -
     sc_o = os.path.join('build', 'syscall.o')
     subprocess.run(
         [gcc, '-c', 'llvmgen/syscall.c', '-o', sc_o, '-std=c99', '-O2', '-nostartfiles'],
-        check=True, env=gcc_env,
+        check=True,
+        env=gcc_env,
     )
     subprocess.run([gcc, '-c', asm_path, '-o', asm_path.replace('.s', '.o')], check=True, env=gcc_env)
-    subprocess.run([
-        gcc, asm_path.replace('.s', '.o'), sc_o, '-o', out_exe,
-        '-nostartfiles', '-e', 'main', '-lkernel32', '-lgcc',
-        '-fno-stack-check', '-fno-stack-protector',
-    ], check=True, env=gcc_env)
+    subprocess.run(
+        [
+            gcc,
+            asm_path.replace('.s', '.o'),
+            sc_o,
+            '-o',
+            out_exe,
+            '-nostartfiles',
+            '-e',
+            'main',
+            '-lkernel32',
+            '-lgcc',
+            '-fno-stack-check',
+            '-fno-stack-protector',
+        ],
+        check=True,
+        env=gcc_env,
+    )
     print(f'[{suffix}] EXE → {out_exe}')
     return out_exe
 
