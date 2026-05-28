@@ -2,6 +2,7 @@
 
 import sys
 import os
+import subprocess
 from repl import demo, repl
 import tomllib
 
