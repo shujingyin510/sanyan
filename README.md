@@ -1,7 +1,7 @@
 # 三言 Sanyan v3.16.0
 
 [![VS Code Marketplace](https://img.shields.io/badge/VS%20Code-Marketplace-%23007ACC?logo=visualstudiocode)](https://marketplace.visualstudio.com/items?itemName=sanyan-lang.sanyan-language)
-[![CI](https://github.com/shujingyin510/sanyan/actions/workflows/ci.yml/badge.svg)](https://github.com/shujingyin510/sanyan/actions)
+[![CI](https://github.com/shujingyin510/sanyan/actions/workflows/test.yml/badge.svg)](https://github.com/shujingyin510/sanyan/actions)
 
 > **处理真实世界的三值编程语言。** 传感器会失灵，用户会犹豫，网络会波动——真实世界从来不是非黑即白的。
 
@@ -375,8 +375,6 @@ sanyan/
 ├── CONTRIBUTING.md
 ├── README.md
 ├── README_EN.md
-├── VERSION.py
-├── ast_json.py              # AST JSON 导出
 ├── commands.py              # 自定义命令调用
 ├── compile_bytecode.py      # .san → .bin 编译器
 ├── compile_llvmgen.py       # llvmgen.san 辅助函数注入 + .bin 编译
@@ -416,7 +414,6 @@ sanyan/
 │   └── runtime.c            # C 运行时库
 ├── ops/                     # 内置操作实现（28 模块）
 │   ├── __init__.py
-│   ├── _error_handler.py    # 统一错误处理装饰器
 │   ├── _util.py
 │   ├── arithmetic_ops.py    # 算术运算
 │   ├── comparison_ops.py    # 比较运算

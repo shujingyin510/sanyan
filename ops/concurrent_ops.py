@@ -14,8 +14,10 @@ class _ConcurrentContext:
 def _spawn_thread(evaluator, fn_node, results, idx):
     try:
         results[idx] = evaluator.eval(fn_node)
-    except Exception:
-        results[idx] = TritValue(0)
+    except SanyanRuntimeError:
+        raise
+    except Exception as e:
+        raise SanyanRuntimeError(f'并发执行错误: {e}') from e
 
 
 def concurrent_run(evaluator, args):

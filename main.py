@@ -23,12 +23,21 @@ def main():
             print('错误: --ast-json 需要文件路径')
             sys.exit(1)
         filepath = args[idx + 1]
-        from ast_json import ast_from_file, ast_to_json
-
-        ast = ast_from_file(filepath)
+        from lexer import tokenize
+        from parser import parse
         import json
 
-        print(json.dumps(ast_to_json(ast), ensure_ascii=False, indent=2))
+        with open(filepath, 'r', encoding='utf-8') as f:
+            code = f.read()
+        tokens = tokenize(code)
+        ast = parse(tokens)
+
+        def _ast_to_json(node):
+            if isinstance(node, list):
+                return [_ast_to_json(n) for n in node]
+            return node
+
+        print(json.dumps(_ast_to_json(ast), ensure_ascii=False, indent=2))
         sys.exit(0)
 
     # --profile 标志
@@ -55,7 +64,7 @@ def main():
 
         if use_pycc and not profiling:
             # ── Python 原生编译路径：SugarConverter 解析 + Python codegen 生成 IR → 原生可执行文件 ──
-            import tempfile, subprocess
+            import subprocess
 
             skin_mgr = SkinManager('chinese')
             ast = SugarConverter.convert(code, skin_mgr)
@@ -87,23 +96,22 @@ def main():
             print(f'[pycc] ASM → {asm_path}')
 
             # GCC → exe
-            import subprocess as sp
             gcc = os.environ.get('GCC', 'gcc')
             env = os.environ.copy()
             if 'GCC_PATH' in os.environ:
                 env['PATH'] = os.environ['GCC_PATH'] + os.pathsep + env.get('PATH', '')
             sc_o = os.path.join('build', 'syscall.o')
-            sp.run([gcc, '-c', 'llvmgen/syscall.c', '-o', sc_o, '-std=c99', '-O2', '-nostartfiles'],
+            subprocess.run([gcc, '-c', 'llvmgen/syscall.c', '-o', sc_o, '-std=c99', '-O2', '-nostartfiles'],
                    check=True, env=env)
-            sp.run([gcc, '-c', asm_path, '-o', asm_path.replace('.s', '.o')],
+            subprocess.run([gcc, '-c', asm_path, '-o', asm_path.replace('.s', '.o')],
                    check=True, env=env)
-            sp.run([gcc, asm_path.replace('.s', '.o'), sc_o, '-o', out_exe,
+            subprocess.run([gcc, asm_path.replace('.s', '.o'), sc_o, '-o', out_exe,
                      '-nostartfiles', '-e', 'main', '-lkernel32', '-lgcc',
                      '-fno-stack-check', '-fno-stack-protector'],
                     check=True, env=env)
             print(f'[pycc] EXE → {out_exe}')
 
-            result = sp.run([out_exe], capture_output=True, text=True)
+            result = subprocess.run([out_exe], capture_output=True, text=True)
             print(result.stdout, end='')
             if result.stderr:
                 print(result.stderr, end='', file=sys.stderr)
@@ -112,7 +120,7 @@ def main():
         if use_san and not profiling:
             # ── 自举编译路径：sugar.san 解析 + llvmgen.san 生成 IR → 原生可执行文件 ──
             from llvmgen.compiler import self_hosted_compile
-            import tempfile, subprocess
+            import subprocess
 
             ir_text = self_hosted_compile(code)
             out_name = os.path.splitext(os.path.basename(filepath))[0]
@@ -142,23 +150,22 @@ def main():
             print(f'[san] ASM → {asm_path}')
 
             # GCC → exe (零 stdio: -nostartfiles -e main -lkernel32)
-            import subprocess as sp
             gcc = os.environ.get('GCC', 'gcc')
             env = os.environ.copy()
             if 'GCC_PATH' in os.environ:
                 env['PATH'] = os.environ['GCC_PATH'] + os.pathsep + env.get('PATH', '')
             sc_o = os.path.join('build', 'syscall.o')
-            sp.run([gcc, '-c', 'llvmgen/syscall.c', '-o', sc_o, '-std=c99', '-O2', '-nostartfiles'],
+            subprocess.run([gcc, '-c', 'llvmgen/syscall.c', '-o', sc_o, '-std=c99', '-O2', '-nostartfiles'],
                    check=True, env=env)
-            sp.run([gcc, '-c', asm_path, '-o', asm_path.replace('.s', '.o')],
+            subprocess.run([gcc, '-c', asm_path, '-o', asm_path.replace('.s', '.o')],
                    check=True, env=env)
-            sp.run([gcc, asm_path.replace('.s', '.o'), sc_o, '-o', out_exe,
+            subprocess.run([gcc, asm_path.replace('.s', '.o'), sc_o, '-o', out_exe,
                      '-nostartfiles', '-e', 'main', '-lkernel32', '-lgcc',
                      '-fno-stack-check', '-fno-stack-protector'],
                    check=True, env=env)
             print(f'[san] EXE → {out_exe}')
 
-            result = sp.run([out_exe], capture_output=True, text=True)
+            result = subprocess.run([out_exe], capture_output=True, text=True)
             print(result.stdout, end='')
             if result.stderr:
                 print(result.stderr, end='', file=sys.stderr)

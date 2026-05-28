@@ -26,7 +26,7 @@ dev = [
 sanyan = "main:main"
 
 [tool.setuptools]
-packages = ["ops", "sugar", "lsp"]
+packages = ["ops", "sugar", "lsp", "llvmgen"]
 py-modules = []  # 由 setup.py 动态发现
 
 [tool.ruff]
