@@ -16,10 +16,10 @@ def op_exec(evaluator, args):
         raise SanyanSyntaxError('执行 需要一个命令字符串')
     cmd = args[0] if isinstance(args[0], str) else str(evaluator.eval(args[0]))
     try:
-        result = subprocess.run(cmd, shell=True, capture_output=True, text=True, timeout=EXEC_TIMEOUT)
-        out = result.stdout
+        result = subprocess.run(cmd, shell=True, capture_output=True, text=True, errors='replace', timeout=EXEC_TIMEOUT)
+        out = result.stdout or ''
         if result.returncode != 0:
-            out += result.stderr
+            out += result.stderr or ''
         return out
     except subprocess.TimeoutExpired:
         raise SanyanRuntimeError('命令执行超时')

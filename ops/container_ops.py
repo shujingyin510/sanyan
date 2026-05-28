@@ -138,8 +138,13 @@ class ContainerOps:
 
     @staticmethod
     def dict_get(evaluator, args):
+        if len(args) == 1:
+            d = evaluator.eval(args[0])
+            if not isinstance(d, dict):
+                raise SanyanTypeError('第一个参数必须是字典')
+            return list(d.keys())
         if len(args) != 2:
-            raise SanyanSyntaxError('取键 需要字典和键')
+            raise SanyanSyntaxError('取键 需要1个(取所有键)或2个(取指定键)参数')
         d = evaluator.eval(args[0])
         if not isinstance(d, dict):
             raise SanyanTypeError('第一个参数必须是字典')

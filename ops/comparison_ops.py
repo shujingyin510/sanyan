@@ -27,28 +27,34 @@ class ComparisonOps:
                     return float(v) if '.' in v else int(v)
                 except (ValueError, TypeError):
                     pass
-            raise SanyanTypeError(f"无法将 '{v}' 转换为数值用于比较")
+            return None
 
         a = to_num(a_val)
         b = to_num(b_val)
-        truth = False
-        if op == 'eq':
-            truth = a == b
-        elif op == 'gt':
-            truth = a > b
-        elif op == 'lt':
-            truth = a < b
-        elif op == 'ne':
-            truth = a != b
-        elif op == 'gte':
-            truth = a >= b
-        elif op == 'lte':
-            truth = a <= b
-        elif op == 'ngt':
-            truth = a <= b
-        elif op == 'nlt':
-            truth = a >= b
-        return TritValue(1 if truth else -1)
+        if a is not None and b is not None:
+            truth = False
+            if op == 'eq':
+                truth = a == b
+            elif op == 'gt':
+                truth = a > b
+            elif op == 'lt':
+                truth = a < b
+            elif op == 'ne':
+                truth = a != b
+            elif op == 'gte':
+                truth = a >= b
+            elif op == 'lte':
+                truth = a <= b
+            elif op == 'ngt':
+                truth = a <= b
+            elif op == 'nlt':
+                truth = a >= b
+            return TritValue(1 if truth else -1)
+
+        if op in ('eq', 'ne'):
+            result = (a_val == b_val) if op == 'eq' else (a_val != b_val)
+            return TritValue(1 if result else -1)
+        raise SanyanTypeError(f"无法将 '{a_val if a is None else b_val}' 转换为数值用于比较")
 
     @staticmethod
     def equals_op(evaluator, args):
