@@ -1,4 +1,8 @@
-"""运行时组件：作用域管理、IoT 设备管理、调试管理、性能分析"""
+"""运行时组件：作用域管理、IoT 设备管理、调试管理、性能分析。
+
+提供 ScopeManager（变量作用域栈）、IoTManager（传感器/执行器）、
+DebugManager（断点调试）、ProfileManager（性能追踪）。
+"""
 
 from __future__ import annotations
 from typing import Optional, Dict, List, Any
@@ -21,34 +25,41 @@ class ScopeManager:
         self._scopes[-1] = value
 
     def get_var(self, name: str) -> Any:
+        """从内向外查找变量值，未定义时抛出异常。"""
         for scope in reversed(self._scopes):
             if name in scope:
                 return scope[name]
         raise SanyanNameError(f'未定义的符号: {name}')
 
     def has_var(self, name: str) -> bool:
+        """检查变量是否在任意作用域中定义。"""
         for scope in reversed(self._scopes):
             if name in scope:
                 return True
         return False
 
     def set_var(self, name: str, value: Any) -> None:
+        """在当前作用域设置变量值。"""
         self._scopes[-1][name] = value
 
     def push_scope(self):
+        """创建新的作用域层。"""
         self._scopes.append({})
 
     def pop_scope(self):
+        """移除当前作用域层（保留全局作用域）。"""
         if len(self._scopes) > 1:
             self._scopes.pop()
 
     def all_scoped_vars(self) -> Dict[str, Any]:
+        """合并所有作用域的变量字典（调试/补全用）。"""
         result: Dict[str, Any] = {}
         for scope in self._scopes:
             result.update(scope)
         return result
 
     def depth(self) -> int:
+        """返回当前作用域栈深度。"""
         return len(self._scopes)
 
 
@@ -87,19 +98,24 @@ class DebugManager:
         self.call_stack: List[Any] = []
 
     def break_add(self, name: str) -> None:
+        """添加断点（操作名或内部标识符）。"""
         self._break_ops.add(name)
         self.debug_mode = True
 
     def break_remove(self, name: str) -> None:
+        """移除断点。"""
         self._break_ops.discard(name)
 
     def watch_add(self, name: str) -> None:
+        """添加监视变量。"""
         self._watched_vars.add(name)
 
     def watch_remove(self, name: str) -> None:
+        """移除监视变量。"""
         self._watched_vars.discard(name)
 
     def should_break(self, internal: str, op: str) -> bool:
+        """判断当前操作是否应触发断点。"""
         return self.debug_mode and (self._break_all or op in self._break_ops or internal in self._break_ops)
 
 
@@ -111,20 +127,24 @@ class ProfileManager:
         self._profile: Dict[str, dict] = {}
 
     def start(self) -> None:
+        """开始性能分析，清空之前的数据。"""
         self._profiling = True
         self._profile = {}
 
     def stop(self) -> dict:
+        """停止性能分析，返回分析结果副本。"""
         self._profiling = False
         return dict(self._profile)
 
     def record(self, name: str, dt: float) -> None:
+        """记录一次操作的耗时。"""
         if name not in self._profile:
             self._profile[name] = {'count': 0, 'time': 0.0}
         self._profile[name]['count'] += 1
         self._profile[name]['time'] += dt
 
     def report(self) -> str:
+        """生成性能分析报告。"""
         if not self._profile:
             return '(无性能数据)'
         lines = ['\n=== 性能追踪 ===', f'{"操作":<16} {"调用次数":<10} {"总耗时(ms)":<12} {"平均(ms)":<10}']

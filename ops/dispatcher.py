@@ -1,6 +1,6 @@
-"""操作分派器：统一的操作名解析、注册表查询、点号/变量分派
+"""操作分派器：统一的操作名解析、注册表查询、点号/变量分派。
 
-从 evaluator.py 提取的分派逻辑，降低 evaluator 复杂度。
+负责将用户操作名映射到内部实现，按优先级尝试内置操作、点号访问、变量调用。
 所有函数接受 evaluator 实例作为第一个参数，操作注册表等共享状态。
 """
 
@@ -48,7 +48,10 @@ _NO_CACHE_OPS = frozenset(
 
 
 def dispatch_op(evaluator, internal: str, args: list):
-    """从注册表查询并执行内置操作。"""
+    """从注册表查询并执行内置操作。
+    
+    支持缓存加速，对有副作用的操作每次重新查找。
+    """
     from sandbox import check_op
 
     check_op(internal)
@@ -104,7 +107,10 @@ def handle_dot_access(evaluator, op: str, args: list):
 
 
 def handle_variable_call(evaluator, op: str, args: list):
-    """处理变量调用: 自定义函数、模块调用、容器索引、变量值。"""
+    """处理变量调用：自定义函数、模块调用、容器索引、变量值。
+    
+    根据变量类型分派不同调用方式。
+    """
     from sandbox import check_func
 
     if not evaluator.has_var(op):
@@ -132,7 +138,10 @@ def handle_variable_call(evaluator, op: str, args: list):
 
 
 def apply(evaluator, op: str, args: list) -> Any:
-    """主分派入口：依次尝试注册表 → 点号访问 → 变量调用 → 自定义命令"""
+    """主分派入口：依次尝试注册表 → 点号访问 → 变量调用 → 自定义命令。
+    
+    按优先级查找并执行操作，返回执行结果。
+    """
     from sandbox import check_func
     from commands import Commands
 

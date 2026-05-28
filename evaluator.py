@@ -51,6 +51,8 @@ _init_ops()
 
 
 class SanyanEvaluator(SanyanRuntime):
+    """三言求值器核心类，组合运行环境、内置操作、自定义命令。"""
+
     def __init__(
         self,
         max_loop_steps: Optional[int] = None,
@@ -69,6 +71,7 @@ class SanyanEvaluator(SanyanRuntime):
         self._name_cache_max: int = 5000
 
     def eval(self, node: Any) -> Any:
+        """求值 AST 节点，返回三言值。"""
         if isinstance(node, (TritValue, ArrayValue, FunctionValue, ModuleValue)):
             return node
         if isinstance(node, dict):
@@ -86,6 +89,7 @@ class SanyanEvaluator(SanyanRuntime):
         return node
 
     def _eval_list(self, node: list) -> Any:
+        """求值列表形式的表达式（函数调用、操作等）。"""
         if len(node) == 0:
             return None
         # 单元素列表：仅数值/字符串字面量直接求值，其他走 op 分派
@@ -149,6 +153,7 @@ class SanyanEvaluator(SanyanRuntime):
         return ''
 
     def _apply(self, op: str, args: list) -> TritValue:
+        """执行操作：解析操作名、分派、性能分析。"""
         from ops.dispatcher import resolve_op_name, apply
 
         internal = resolve_op_name(self, op)

@@ -1,4 +1,4 @@
-"""三言中的值类型和异常"""
+"""三言值系统：定义 TritValue、FunctionValue、ModuleValue 等核心类型及异常体系。"""
 
 from __future__ import annotations
 from typing import Any, Callable, Dict, List, Optional, Set, Union
@@ -122,6 +122,8 @@ def check_type(value: Any, expected_type: str, param_name: str = '') -> None:
 
 
 class FunctionValue:
+    """三言函数值，包含参数、闭包、类型注解。"""
+
     __slots__ = ('params', 'body', 'evaluator', 'closure_vars', 'param_types', 'return_type')
 
     def __init__(
@@ -196,6 +198,8 @@ def call_function(evaluator: Any, func: Union[str, FunctionValue], args: List[An
 
 
 class ModuleValue:
+    """三言模块值，封装变量、命令、导出列表。"""
+
     __slots__ = ('vars', 'commands', 'exports')
 
     def __init__(
