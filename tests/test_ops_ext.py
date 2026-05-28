@@ -175,6 +175,36 @@ class TestNetOps(unittest.TestCase):
         except Exception:
             self.skipTest('需要网络连接')
 
+    def test_ssrf_block_localhost(self):
+        """SSRF 防护：禁止访问 localhost"""
+        from values import SanyanRuntimeError
+        with self.assertRaises(SanyanRuntimeError):
+            self.env.eval(['http读', '"http://localhost:8080/"'])
+
+    def test_ssrf_block_private_ip(self):
+        """SSRF 防护：禁止访问私有 IP"""
+        from values import SanyanRuntimeError
+        with self.assertRaises(SanyanRuntimeError):
+            self.env.eval(['http读', '"http://192.168.1.1/"'])
+
+    def test_ssrf_block_loopback(self):
+        """SSRF 防护：禁止访问 127.0.0.1"""
+        from values import SanyanRuntimeError
+        with self.assertRaises(SanyanRuntimeError):
+            self.env.eval(['http读', '"http://127.0.0.1/"'])
+
+    def test_ssrf_block_file_scheme(self):
+        """SSRF 防护：禁止 file:// 协议"""
+        from values import SanyanRuntimeError
+        with self.assertRaises(SanyanRuntimeError):
+            self.env.eval(['http读', '"file:///etc/passwd"'])
+
+    def test_ssrf_block_10_network(self):
+        """SSRF 防护：禁止访问 10.0.0.0/8"""
+        from values import SanyanRuntimeError
+        with self.assertRaises(SanyanRuntimeError):
+            self.env.eval(['http读', '"http://10.0.0.1/"'])
+
 
 class TestSandboxOps(unittest.TestCase):
     def setUp(self):

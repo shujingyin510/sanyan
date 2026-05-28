@@ -1,4 +1,7 @@
-"""网络操作：HTTP 请求"""
+"""网络操作：HTTP 请求（含 SSRF 防护）"""
+
+import ipaddress
+import urllib.parse
 
 try:
     import urllib.request as _request
@@ -13,6 +16,37 @@ from ops.registry import register, register_alias
 
 HTTP_TIMEOUT = 10
 
+# SSRF 防护：禁止访问的私有/保留 IP 范围
+_PRIVATE_NETS = [
+    ipaddress.ip_network('127.0.0.0/8'),
+    ipaddress.ip_network('10.0.0.0/8'),
+    ipaddress.ip_network('172.16.0.0/12'),
+    ipaddress.ip_network('192.168.0.0/16'),
+    ipaddress.ip_network('169.254.0.0/16'),
+    ipaddress.ip_network('::1/128'),
+    ipaddress.ip_network('fc00::/7'),
+    ipaddress.ip_network('fe80::/10'),
+]
+
+
+def _validate_url(url: str) -> None:
+    """SSRF 防护：校验 URL 合法性，禁止访问私有/保留地址。"""
+    parsed = urllib.parse.urlparse(url)
+    if parsed.scheme not in ('http', 'https'):
+        raise SanyanRuntimeError(f'不允许的 URL 协议: {parsed.scheme}（仅支持 http/https）')
+    hostname = parsed.hostname
+    if not hostname:
+        raise SanyanRuntimeError('URL 缺少主机名')
+    if hostname in ('localhost', '0.0.0.0'):
+        raise SanyanRuntimeError('禁止访问 localhost')
+    try:
+        addr = ipaddress.ip_address(hostname)
+        for net in _PRIVATE_NETS:
+            if addr in net:
+                raise SanyanRuntimeError(f'禁止访问私有/保留地址: {hostname}')
+    except ValueError:
+        pass  # 非 IP 地址（域名），允许通过
+
 
 def _ensure_net():
     if not _HAS_NET:
@@ -25,6 +59,7 @@ def http_get(evaluator, args):
     if not args:
         raise SanyanRuntimeError('http读 需要一个 URL 参数')
     url = args[0] if isinstance(args[0], str) else str(evaluator.eval(args[0]))
+    _validate_url(url)
     try:
         resp = _request.urlopen(url, timeout=HTTP_TIMEOUT)
         return resp.read().decode('utf-8', errors='replace')
@@ -38,6 +73,7 @@ def http_post(evaluator, args):
     if len(args) < 1:
         raise SanyanRuntimeError('http写 需要 URL 参数')
     url = args[0] if isinstance(args[0], str) else str(evaluator.eval(args[0]))
+    _validate_url(url)
     data = ''
     if len(args) > 1:
         data_arg = evaluator.eval(args[1])
