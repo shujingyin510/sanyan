@@ -25,7 +25,6 @@ from vm import (
     JNZ,
     CALL,
     RET,
-    PRINT,
     EQ,
     NE,
     GT,
@@ -56,7 +55,6 @@ from vm import (
     LIST_LEN,
     READ_FILE,
     WRITE_FILE,
-    WRITE_BINARY,
     HALT,
     JMP32,
 )

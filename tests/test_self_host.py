@@ -52,7 +52,7 @@ class TestSelfHost(unittest.TestCase):
             '输出与参考文件不一致',
         )
         sha256 = hashlib.sha256(output).hexdigest()
-        self.assertEqual(sha256, REFERENCE_SHA256, f'SHA256 不匹配')
+        self.assertEqual(sha256, REFERENCE_SHA256, 'SHA256 不匹配')
 
     def tearDown(self):
         if os.path.exists(OUTPUT_BIN):

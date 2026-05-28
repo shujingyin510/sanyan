@@ -7,6 +7,8 @@ import sys
 from typing import TYPE_CHECKING, Any, cast
 
 from llvmgen.codegen import compile_top_level
+from ops.registry import get_op as _get_op
+from ops.registry import register as _register
 from ternary_core import TritValue
 
 if TYPE_CHECKING:
@@ -440,9 +442,6 @@ def _get_func_name(evaluator, args):
         return _func_name_map.get(name, name)
     return name
 
-
-from ops.registry import register as _register
-from ops.registry import get_op as _get_op
 
 # 非ASCII函数名映射 (Chinese → _mN_fnM)
 _func_name_map = {}

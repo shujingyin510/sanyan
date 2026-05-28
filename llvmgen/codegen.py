@@ -251,7 +251,6 @@ _RUNTIME_FUNCS: dict[str, tuple] = {
     'set_element': ('rt_list_set', ir.VoidType(), [_PTR, _I32, _PTR]),
     '置元素': ('rt_list_set', ir.VoidType(), [_PTR, _I32, _PTR]),
     # 数学补充
-    'pow': ('rt_math_pow', _I32, [_I32, _I32]),
     '幂': ('rt_math_pow', _I32, [_I32, _I32]),
 }  # yapf: disable
 
@@ -1309,11 +1308,6 @@ def _compile_node_inner(node, cg: CodegenContext) -> ir.Value | None:
         if not isinstance(name, str):
             raise SyntaxError(f'变量名必须是字符串: {name}')
         val = _compile_node_inner(args[1], cg)
-        is_int_val = (
-            isinstance(args[1], (int, float))
-            or (isinstance(args[1], list) and len(args[1]) > 0 and args[1][0] in _ARITH_OPS)
-            or (isinstance(args[1], str) and _to_int(args[1]) is not None)
-        )
         if isinstance(val, RawValue):
             cg._get_alloca(name, is_int=True)
             cg.set_var_raw(name, val.ll_val)

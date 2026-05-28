@@ -13,9 +13,4 @@
 
 from __future__ import annotations
 
-try:
-    from pyproject.toml import VERSION
-except Exception:
-    pass
-
 __version__ = '3.16.0'
