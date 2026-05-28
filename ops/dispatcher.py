@@ -16,6 +16,7 @@ from values import (
     SanyanAttributeError,
 )
 from ternary_core import TritValue, ArrayValue
+from sandbox import check_op as _check_op, check_func as _check_func
 
 
 def resolve_op_name(evaluator, op: str) -> str:
@@ -52,9 +53,7 @@ def dispatch_op(evaluator, internal: str, args: list):
     
     支持缓存加速，对有副作用的操作每次重新查找。
     """
-    from sandbox import check_op
-
-    check_op(internal)
+    _check_op(internal)
     if internal in _NO_CACHE_OPS:
         entry = get_op(internal)
         if entry is not None:
@@ -111,13 +110,11 @@ def handle_variable_call(evaluator, op: str, args: list):
     
     根据变量类型分派不同调用方式。
     """
-    from sandbox import check_func
-
     if not evaluator.has_var(op):
         return None
     val = evaluator.get_var(op)
     if isinstance(val, FunctionValue):
-        check_func(op)
+        _check_func(op)
         evaluated_args = [evaluator.eval(a) for a in args]
         return val.call(evaluator, evaluated_args)
     if isinstance(val, ModuleValue):
@@ -142,7 +139,6 @@ def apply(evaluator, op: str, args: list) -> Any:
     
     按优先级查找并执行操作，返回执行结果。
     """
-    from sandbox import check_func
     from commands import Commands
 
     internal = resolve_op_name(evaluator, op)
@@ -159,5 +155,5 @@ def apply(evaluator, op: str, args: list) -> Any:
     if result is not None:
         return result
 
-    check_func(op)
+    _check_func(op)
     return Commands.call(evaluator, op, args)

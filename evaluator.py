@@ -154,10 +154,9 @@ class SanyanEvaluator(SanyanRuntime):
 
     def _apply(self, op: str, args: list) -> TritValue:
         """执行操作：解析操作名、分派、性能分析。"""
-        from ops.dispatcher import resolve_op_name, apply
+        from ops.dispatcher import apply
 
-        internal = resolve_op_name(self, op)
-        self._debug_before(internal, op, args)
+        self._debug_before(op, op, args)
         if self._profiling:
             t0 = time.perf_counter()
         try:
@@ -165,12 +164,11 @@ class SanyanEvaluator(SanyanRuntime):
         finally:
             if self._profiling:
                 dt = time.perf_counter() - t0
-                name = internal or op
-                if name not in self._profile:
-                    self._profile[name] = {'count': 0, 'time': 0.0}
-                self._profile[name]['count'] += 1
-                self._profile[name]['time'] += dt
-            self._debug_after(internal, op, args)
+                if op not in self._profile:
+                    self._profile[op] = {'count': 0, 'time': 0.0}
+                self._profile[op]['count'] += 1
+                self._profile[op]['time'] += dt
+            self._debug_after(op, op, args)
 
     def _debug_before(self, internal: str, op: str, args: list) -> None:
         """操作执行前的调试检查（委派给 debug_eval）"""
