@@ -2,6 +2,7 @@
 
 import os
 from typing import Optional
+from values import SanyanValueError
 
 
 def _resolve_include_path(raw_path: str, base_dir: Optional[str] = None) -> str:
@@ -27,7 +28,7 @@ def _resolve_include_path(raw_path: str, base_dir: Optional[str] = None) -> str:
     # 允许 ../ 相对路径
     abspath = os.path.abspath(os.path.join(project_root, normalized))
     if not abspath.startswith(os.path.abspath(project_root)):
-        raise ValueError(f'#include 路径越界: {raw_path} -> {abspath}')
+        raise SanyanValueError(f'#include 路径越界: {raw_path} -> {abspath}')
     return abspath
 
 
@@ -71,7 +72,7 @@ def preprocess_includes(
                     processed.append(f'／／ #include {path} ({e})')
                     continue
                 if abspath in _seen:
-                    raise ValueError(f'检测到循环 #include: {path}')
+                    raise SanyanValueError(f'检测到循环 #include: {path}')
                 if os.path.exists(abspath):
                     try:
                         with open(abspath, 'r', encoding='utf-8') as f:

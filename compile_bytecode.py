@@ -15,6 +15,9 @@ from parser import parse
 from evaluator import SanyanEvaluator
 from sugar.parser import parse_code as sugar_parse
 from ops.file_ops import clear_cache
+from values import SanyanSyntaxError, SanyanRuntimeError
+
+COMPILER_MAX_LOOP = 100000
 
 
 def compile_source(source: str, output_path: str, vars_table: dict | None = None) -> list:
@@ -46,7 +49,7 @@ def compile_source(source: str, output_path: str, vars_table: dict | None = None
         tokens = tokenize(wrapped)
         ast = parse(tokens)
         if ast is None:
-            raise SyntaxError('解析失败')
+            raise SanyanSyntaxError('解析失败')
 
     # 将 __exports__ 导出名添加到 AST
     if export_names and isinstance(ast, list) and len(ast) > 0 and isinstance(ast[0], str):
@@ -54,11 +57,11 @@ def compile_source(source: str, output_path: str, vars_table: dict | None = None
             ast.append(['export', name])
 
     # 加载编译器
-    e = SanyanEvaluator(max_loop_steps=100000)
+    e = SanyanEvaluator(max_loop_steps=COMPILER_MAX_LOOP)
     clear_cache()
     compiler = e.eval(['import', 'stdlib/bytecode_compiler.san'])
     if compiler is None:
-        raise RuntimeError('加载 bytecode_compiler.san 失败')
+        raise SanyanRuntimeError('加载 bytecode_compiler.san 失败')
 
     result = compiler.call(e, ['编译字节码', ast, output_path, vars_table])
     return result  # type: ignore[no-any-return]
@@ -74,6 +77,8 @@ def compile_san(source_path: str, output_path: str | None = None) -> bytes:
 
     result = compile_source(source, output_path)
     success, size, vars_count = result
+    if not success:
+        raise SanyanRuntimeError(f'编译 {source_path} 失败')
     print(f'✓ 编译 {source_path} → {output_path}: {size} 字节, {vars_count} 变量')
 
     with open(output_path, 'rb') as f:

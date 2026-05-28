@@ -5,6 +5,7 @@ evaluator.py 通过 get_op() 查询此表，不再维护自有的 _OP_DISPATCH�
 
 from __future__ import annotations
 from typing import Callable, Any
+from values import SanyanKeyError
 
 _OP_DISPATCH: dict[str, tuple[Callable, Any]] = {}
 
@@ -24,7 +25,7 @@ def register(name: str, func: Callable, extra: Any = False) -> None:
 def register_alias(alias: str, target: str) -> None:
     """为已注册的操作创建一个别名。"""
     if target not in _OP_DISPATCH:
-        raise KeyError(f"别名目标 '{target}' 尚未注册")
+        raise SanyanKeyError(f"别名目标 '{target}' 尚未注册")
     _OP_DISPATCH[alias] = _OP_DISPATCH[target]
 
 
