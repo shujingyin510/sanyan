@@ -401,46 +401,6 @@ class CodegenContext:
             self._scope[pname] = alloca
         return func
 
-        fnty = ir.FunctionType(_PTR, [_PTR] * len(param_names))
-        func = ir.Function(self.module, fnty, name=name)
-        func.attributes.add('alwaysinline')
-        for i, pname in enumerate(param_names):
-            func.args[i].name = pname
-        self._funcs[name] = func
-        self._current_func = func
-        self._scope = {}
-        entry = func.append_basic_block(name='entry')
-        self._builder = ir.IRBuilder(entry)
-        self._entry_block = entry
-        for i, pname in enumerate(param_names):
-            alloca = self._builder.alloca(_PTR, name=pname)
-            self._builder.store(func.args[i], alloca)
-            self._scope[pname] = alloca
-        return func
-        self._builder = ir.IRBuilder(entry)
-        self._entry_block = entry
-        for i, pname in enumerate(param_names):
-            alloca = self._builder.alloca(_PTR, name=pname)
-            self._builder.store(func.args[i], alloca)
-            self._scope[pname] = alloca
-        return func
-
-        fnty = ir.FunctionType(_PTR, [_PTR] * len(param_names))
-        func = ir.Function(self.module, fnty, name=name)
-        for i, pname in enumerate(param_names):
-            func.args[i].name = pname
-        self._funcs[name] = func
-        self._current_func = func
-        self._scope = {}
-        entry = func.append_basic_block(name='entry')
-        self._builder = ir.IRBuilder(entry)
-        self._entry_block = entry
-        for i, pname in enumerate(param_names):
-            alloca = self._builder.alloca(_PTR, name=pname)
-            self._builder.store(func.args[i], alloca)
-            self._scope[pname] = alloca
-        return func
-
     def end_function(self):
         """结束当前函数（如果未显式返回则补 ret null）。"""
         if not self.builder.block.is_terminated:

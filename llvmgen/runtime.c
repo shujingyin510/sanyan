@@ -181,19 +181,143 @@ void *rt_regex_search(void *p, void *t){ (void)p; (void)t; return _rt_make(""); 
 void *rt_regex_findall(void *p, void *t){ (void)p; (void)t; return _rt_make(""); }
 void *rt_regex_replace(void *p, void *r, void *t){ (void)p; (void)r; (void)t; return _rt_make(""); }
 void *rt_regex_split(void *p, void *t){ (void)p; (void)t; return _rt_make(""); }
-void *rt_str_reverse(void *s)        { return _rt_make(_cstr(s)); }
+void *rt_str_reverse(void *s) {
+    const char *cs = _cstr(s);
+    int32_t len = (int32_t)strlen(cs);
+    char *buf = (char*)malloc(len + 1);
+    for (int32_t i = 0; i < len; i++) buf[i] = cs[len - 1 - i];
+    buf[len] = '\0';
+    void *result = _rt_make(buf);
+    free(buf);
+    return result;
+}
 int32_t rt_str_startswith(void *s, void *pre) { return strncmp(_cstr(s), _cstr(pre), strlen(_cstr(pre))) == 0; }
-int32_t rt_str_endswith(void *s, void *suf)   { const char *cs=_cstr(s),*csu=_cstr(suf); int32_t l=(int32_t)strlen(cs),ls=(int32_t)strlen(csu); return l>=ls && strcmp(cs+l-ls,csu)==0; }
-void *rt_str_replace(void *s, void *o, void *n){ (void)s;(void)o;(void)n; return _rt_make(""); }
-void *rt_str_trim(void *s)            { return _rt_make(_cstr(s)); }
-void *rt_str_upper(void *s)           { return _rt_make(_cstr(s)); }
-void *rt_str_lower(void *s)           { return _rt_make(_cstr(s)); }
-void *rt_str_join(void *sep, void *lst){ (void)sep;(void)lst; return _rt_make(""); }
-void *rt_list_sort(void *lst)         { (void)lst; return _rt_make(""); }
-int32_t rt_list_sum(void *lst)        { (void)lst; return 0; }
-int32_t rt_list_count(void *lst, void *v){ (void)lst;(void)v; return 0; }
-void *rt_list_unique(void *lst)       { (void)lst; return _rt_make(""); }
-void rt_list_set(void *lst, int32_t i, void *v) { (void)lst; (void)i; (void)v; }
+int32_t rt_str_endswith(void *s, void *suf) {
+    const char *cs = _cstr(s), *csu = _cstr(suf);
+    int32_t l = (int32_t)strlen(cs), lu = (int32_t)strlen(csu);
+    return l >= lu && strncmp(cs + l - lu, csu, lu) == 0;
+}
+void *rt_str_replace(void *s, void *o, void *n) {
+    const char *cs = _cstr(s), *co = _cstr(o), *cn = _cstr(n);
+    int32_t sl = (int32_t)strlen(cs), ol = (int32_t)strlen(co), nl = (int32_t)strlen(cn);
+    /* worst case: every char is a match */
+    int32_t max_len = sl * nl / (ol > 0 ? ol : 1) + sl + 1;
+    char *buf = (char*)malloc(max_len);
+    int32_t bi = 0, si = 0;
+    while (si < sl) {
+        if (ol > 0 && si + ol <= sl && strncmp(cs + si, co, ol) == 0) {
+            memcpy(buf + bi, cn, nl); bi += nl; si += ol;
+        } else {
+            buf[bi++] = cs[si++];
+        }
+    }
+    buf[bi] = '\0';
+    void *result = _rt_make(buf);
+    free(buf);
+    return result;
+}
+void *rt_str_trim(void *s) {
+    const char *cs = _cstr(s);
+    while (*cs == ' ' || *cs == '\t' || *cs == '\n' || *cs == '\r') cs++;
+    int32_t len = (int32_t)strlen(cs);
+    while (len > 0 && (cs[len-1] == ' ' || cs[len-1] == '\t' || cs[len-1] == '\n' || cs[len-1] == '\r')) len--;
+    char *buf = (char*)malloc(len + 1);
+    memcpy(buf, cs, len); buf[len] = '\0';
+    void *result = _rt_make(buf);
+    free(buf);
+    return result;
+}
+void *rt_str_upper(void *s) {
+    const char *cs = _cstr(s);
+    int32_t len = (int32_t)strlen(cs);
+    char *buf = (char*)malloc(len + 1);
+    for (int32_t i = 0; i < len; i++) buf[i] = (cs[i] >= 'a' && cs[i] <= 'z') ? cs[i] - 32 : cs[i];
+    buf[len] = '\0';
+    void *result = _rt_make(buf);
+    free(buf);
+    return result;
+}
+void *rt_str_lower(void *s) {
+    const char *cs = _cstr(s);
+    int32_t len = (int32_t)strlen(cs);
+    char *buf = (char*)malloc(len + 1);
+    for (int32_t i = 0; i < len; i++) buf[i] = (cs[i] >= 'A' && cs[i] <= 'Z') ? cs[i] + 32 : cs[i];
+    buf[len] = '\0';
+    void *result = _rt_make(buf);
+    free(buf);
+    return result;
+}
+void *rt_str_join(void *sep, void *lst) {
+    const char *csep = _cstr(sep);
+    rt_list_t *l = (rt_list_t*)lst;
+    if (!l || l->len == 0) return _rt_make("");
+    int32_t sep_len = (int32_t)strlen(csep);
+    /* calculate total length */
+    int32_t total = 0;
+    for (int32_t i = 0; i < l->len; i++) total += (int32_t)strlen(_cstr(l->items[i])) + sep_len;
+    char *buf = (char*)malloc(total + 1);
+    int32_t pos = 0;
+    for (int32_t i = 0; i < l->len; i++) {
+        if (i > 0) { memcpy(buf + pos, csep, sep_len); pos += sep_len; }
+        const char *item = _cstr(l->items[i]);
+        int32_t il = (int32_t)strlen(item);
+        memcpy(buf + pos, item, il); pos += il;
+    }
+    buf[pos] = '\0';
+    void *result = _rt_make(buf);
+    free(buf);
+    return result;
+}
+void *rt_list_sort(void *lst) {
+    rt_list_t *l = (rt_list_t*)lst;
+    if (!l || l->len <= 1) return lst;
+    /* simple insertion sort for int lists */
+    rt_list_t *result = rt_list_new();
+    for (int32_t i = 0; i < l->len; i++) rt_list_push(result, l->items[i]);
+    for (int32_t i = 1; i < result->len; i++) {
+        void *key = result->items[i];
+        int32_t j = i - 1;
+        while (j >= 0 && (intptr_t)result->items[j] > (intptr_t)key) {
+            result->items[j + 1] = result->items[j];
+            j--;
+        }
+        result->items[j + 1] = key;
+    }
+    return result;
+}
+int32_t rt_list_sum(void *lst) {
+    rt_list_t *l = (rt_list_t*)lst;
+    if (!l) return 0;
+    int32_t sum = 0;
+    for (int32_t i = 0; i < l->len; i++) sum += (int32_t)(intptr_t)l->items[i];
+    return sum;
+}
+int32_t rt_list_count(void *lst, void *v) {
+    rt_list_t *l = (rt_list_t*)lst;
+    if (!l) return 0;
+    int32_t count = 0;
+    for (int32_t i = 0; i < l->len; i++) {
+        if ((intptr_t)l->items[i] == (intptr_t)v) count++;
+    }
+    return count;
+}
+void *rt_list_unique(void *lst) {
+    rt_list_t *l = (rt_list_t*)lst;
+    if (!l) return lst;
+    rt_list_t *result = rt_list_new();
+    for (int32_t i = 0; i < l->len; i++) {
+        int found = 0;
+        for (int32_t j = 0; j < result->len; j++) {
+            if ((intptr_t)result->items[j] == (intptr_t)l->items[i]) { found = 1; break; }
+        }
+        if (!found) rt_list_push(result, l->items[i]);
+    }
+    return result;
+}
+void rt_list_set(void *lst, int32_t i, void *v) {
+    rt_list_t *l = (rt_list_t*)lst;
+    if (l && i >= 0 && i < l->len) l->items[i] = v;
+}
 int32_t rt_math_pow(int32_t b, int32_t e) { int32_t r=1; while(e-->0) r*=b; return r; }
 int32_t rt_math_sqrt(int32_t v)           { int32_t r=0; while(r*r<=v) r++; return r-1; }
 int32_t rt_math_abs(int32_t v)            { return v < 0 ? -v : v; }
