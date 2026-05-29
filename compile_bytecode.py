@@ -28,28 +28,57 @@ def compile_source(source: str, output_path: str, vars_table: dict | None = None
     # 将 __exports__ 从变量表中分离（避免被当作变量引用）
     export_names = vars_table.pop('__exports__', []) if isinstance(vars_table, dict) else []
 
-    # 先试 sugar 语法解析
+    # 解析源码为 AST
+    # 先尝试 sugar 解析器，失败则回退到 S-表达式解析器
+    ast = None
+    sugar_ast = None
+    
+    # 1. 尝试 sugar 解析器
     try:
-        ast, errors = sugar_parse(source)
-        if ast and not any(e for e in errors if '语法' in e.lower() or 'syntax' in e.lower()):
-            if isinstance(ast, list) and len(ast) > 0 and ast[0] == 'do':
-                sugar_ast = ast
+        sugar_result, errors = sugar_parse(source)
+        has_syntax_err = any(
+            isinstance(e, str) and '行' in e and ('：' in e or ':' in e)
+            for e in errors
+        )
+        if sugar_result and not has_syntax_err:
+            if isinstance(sugar_result, list) and len(sugar_result) > 0 and sugar_result[0] == 'do':
+                sugar_ast = sugar_result
             else:
-                sugar_ast = ['do', ast]
-        else:
-            sugar_ast = None
-    except SyntaxError:
-        sugar_ast = None
+                sugar_ast = ['do', sugar_result]
+    except (SyntaxError, Exception):
+        pass
+    
+    # 2. 如果 sugar 解析失败，尝试 S-表达式解析器
+    if not sugar_ast:
+        try:
+            tokens = tokenize(source)
+            s_expr_ast = parse(tokens)
+            if s_expr_ast is not None:
+                if isinstance(s_expr_ast, list) and len(s_expr_ast) > 0 and s_expr_ast[0] == '做':
+                    # S-表达式用 (做 ...) 作为顶层包装
+                    sugar_ast = ['do'] + s_expr_ast[1:]
+                elif isinstance(s_expr_ast, list):
+                    sugar_ast = ['do'] + s_expr_ast
+                else:
+                    sugar_ast = ['do', s_expr_ast]
+        except Exception:
+            pass
 
-    if sugar_ast:
-        ast = sugar_ast
-    else:
-        # S-表达式降级
-        wrapped = '(do\n' + source + '\n)'
-        tokens = tokenize(wrapped)
-        ast = parse(tokens)
-        if ast is None:
-            raise SanyanSyntaxError('解析失败')
+    if not sugar_ast:
+        raise SanyanSyntaxError('解析失败，请检查语法（支持 sugar 和 S-表达式两种语法）')
+
+    ast = sugar_ast
+    # 自动提取 sugar AST 中的 (export ...) / (导出 ...) 节点
+    if not export_names:
+        fixed = []
+        for s in ast[1:]:
+            if isinstance(s, list) and s[0] == 'export':
+                for n in s[1:]:
+                    if n != '导出':
+                        export_names.append(n)
+            else:
+                fixed.append(s)
+        ast = ['do'] + fixed
 
     # 将 __exports__ 导出名添加到 AST
     if export_names and isinstance(ast, list) and len(ast) > 0 and isinstance(ast[0], str):

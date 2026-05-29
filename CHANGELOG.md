@@ -2,6 +2,29 @@
 
 ---
 
+## [v3.18.0] — 2026-06-03
+
+### 新增
+- **C VM 与 Python VM 三值逻辑统一**: Python VM（`vm.py`）所有布尔返回指令统一为三值逻辑（1=真，-1=假），与 C VM（`csrc/runtime.c`）和 Python 求值器行为一致
+- **编译管线双解析器支持**: `compile_bytecode.py` 先尝试 sugar 解析器，失败则回退到 S-表达式解析器，支持两种语法的 .san 文件
+
+### 变更
+- **Python VM 比较指令**: EQ/NE/GT/LT/GTE/LTE 返回值从 `1/0` 改为 `1/-1`
+- **Python VM NOT 指令**: 正数返回 `-1`，否则返回 `1`
+- **Python VM OR/AND 指令**: 用 `>0` 判断真值
+- **Python VM 类型检查指令**: IS_NUM/IS_STR/IS_LIST/SAME 返回 `1` 或 `-1`
+- **Python VM 字符串比较指令**: STREQ/STR_STARTSWITH/STR_CONTAINS 返回 `1` 或 `-1`
+- **Python VM 字典指令**: DICT_HAS 返回 `1` 或 `-1`
+- **Python VM 跳转指令**: JZ/JNZ 用 `>0` 判断真值
+- **自举编译器参考文件**: `stdlib/bytecode_compiler.bin` 更新为新编译版本（6298 字节）
+- **自举测试 SHA256**: `tests/test_self_host.py` 更新参考哈希
+
+### 修复
+- **自举编译器 C VM 兼容性**: 自举编译器生成的字节码现在可在 C VM 上正确执行
+- **编译管线解析器**: `compile_bytecode.py` 支持 S-表达式语法的 .san 文件（如 `bytecode_compiler.san`）
+
+---
+
 ## [v3.17.0] — 2026-06-02
 
 ### 新增

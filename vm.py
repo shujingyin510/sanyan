@@ -204,11 +204,15 @@ class VM:
             self.pc += off
         elif op == JZ:
             off = self._read_i16()
-            if self.stack.pop() == 0:
+            v = self.stack.pop()
+            # JZ: 跳转条件为假（≤0），与 C VM val_true 一致
+            if not (isinstance(v, int) and v > 0):
                 self.pc += off
         elif op == JNZ:
             off = self._read_i16()
-            if self.stack.pop() != 0:
+            v = self.stack.pop()
+            # JNZ: 跳转条件为真（>0），与 C VM val_true 一致
+            if isinstance(v, int) and v > 0:
                 self.pc += off
         elif op == CALL:
             addr = self._read_i16()
@@ -270,49 +274,59 @@ class VM:
         return True
 
     def _exec_comparison(self, op: int) -> bool:
-        """比较与逻辑运算指令：GT, LT, GTE, LTE, EQ, NE, NOT, OR, AND"""
+        """比较与逻辑运算指令：GT, LT, GTE, LTE, EQ, NE, NOT, OR, AND
+        三值逻辑：1=真，-1=假（与 C VM 和 Python 求值器一致）"""
         if op == NOT:
             a = self.stack.pop()
-            self.stack.append(1 if a == 0 else 0)
+            # NOT: >0 为真 → -1（假），否则 → 1（真）
+            self.stack.append(-1 if isinstance(a, int) and a > 0 else 1)
         elif op == OR:
             b = self.stack.pop()
             a = self.stack.pop()
-            self.stack.append(1 if (a != 0 and a != -1) or (b != 0 and b != -1) else 0)
+            # OR: 任一 >0 为真
+            a_true = isinstance(a, int) and a > 0
+            b_true = isinstance(b, int) and b > 0
+            self.stack.append(1 if a_true or b_true else -1)
         elif op == AND:
             b = self.stack.pop()
             a = self.stack.pop()
-            self.stack.append(1 if (a != 0 and a != -1) and (b != 0 and b != -1) else 0)
+            # AND: 两者都 >0 才为真
+            a_true = isinstance(a, int) and a > 0
+            b_true = isinstance(b, int) and b > 0
+            self.stack.append(1 if a_true and b_true else -1)
         else:
             b = self.stack.pop()
             a = self.stack.pop()
+            # 比较运算：真=1，假=-1
             if op == GT:
-                self.stack.append(1 if a > b else 0)
+                self.stack.append(1 if a > b else -1)
             elif op == LT:
-                self.stack.append(1 if a < b else 0)
+                self.stack.append(1 if a < b else -1)
             elif op == GTE:
-                self.stack.append(1 if a >= b else 0)
+                self.stack.append(1 if a >= b else -1)
             elif op == LTE:
-                self.stack.append(1 if a <= b else 0)
+                self.stack.append(1 if a <= b else -1)
             elif op == EQ:
-                self.stack.append(1 if a == b else 0)
+                self.stack.append(1 if a == b else -1)
             elif op == NE:
-                self.stack.append(1 if a != b else 0)
+                self.stack.append(1 if a != b else -1)
         return True
 
     def _exec_type_check(self, op: int) -> bool:
-        """类型检查指令：IS_NUM, IS_STR, IS_LIST, SAME"""
+        """类型检查指令：IS_NUM, IS_STR, IS_LIST, SAME
+        返回三值逻辑：1=真，-1=假"""
         if op == SAME:
             b = self.stack.pop()
             a = self.stack.pop()
-            self.stack.append(1 if a == b else 0)
+            self.stack.append(1 if a == b else -1)
         else:
             v = self.stack.pop()
             if op == IS_NUM:
-                self.stack.append(1 if isinstance(v, (int, float)) else 0)
+                self.stack.append(1 if isinstance(v, (int, float)) else -1)
             elif op == IS_STR:
-                self.stack.append(1 if isinstance(v, str) else 0)
+                self.stack.append(1 if isinstance(v, str) else -1)
             elif op == IS_LIST:
-                self.stack.append(1 if isinstance(v, (list, dict)) else 0)
+                self.stack.append(1 if isinstance(v, (list, dict)) else -1)
         return True
 
     def _exec_string(self, op: int) -> bool:
@@ -327,7 +341,7 @@ class VM:
         elif op == STREQ:
             b = str(self.stack.pop())
             a = str(self.stack.pop())
-            self.stack.append(1 if a == b else 0)
+            self.stack.append(1 if a == b else -1)
         elif op == CONCAT:
             b = str(self.stack.pop())
             a = str(self.stack.pop())
@@ -345,11 +359,11 @@ class VM:
         elif op == STR_STARTSWITH:
             prefix = str(self.stack.pop())
             s = str(self.stack.pop())
-            self.stack.append(1 if s.startswith(prefix) else 0)
+            self.stack.append(1 if s.startswith(prefix) else -1)
         elif op == STR_CONTAINS:
             sub = str(self.stack.pop())
             s = str(self.stack.pop())
-            self.stack.append(1 if sub in s else 0)
+            self.stack.append(1 if sub in s else -1)
         return True
 
     def _exec_container(self, op: int) -> bool:
@@ -432,7 +446,7 @@ class VM:
         elif op == DICT_HAS:
             key = self.stack.pop()
             d = self.stack.pop()
-            self.stack.append(1 if key in d else 0)
+            self.stack.append(1 if key in d else -1)
         elif op == DICT_KEYS:
             d = self.stack.pop()
             self.stack.append(list(d.keys()) if isinstance(d, dict) else [])
@@ -554,7 +568,8 @@ class VM:
         with open(path, 'rb') as f:
             data = f.read()
         magic, ver, vc, sz = struct.unpack_from('<4sBBI', data, 0)
-        if magic != b'SAN0':
+        # 接受 SAN0 标准格式或字节码编译器变体格式（首字节 S、第4字节 0、ver=1）
+        if magic != b'SAN0' and not (magic[0:1] == b'S' and magic[3:4] == b'0' and ver == 1):
             raise VMError(f'无效的字节码文件: magic={magic!r}')
         pos = 10
         code = bytearray(data[pos : pos + sz])
@@ -575,8 +590,8 @@ class VM:
                     pos += 2
                     chars.append(chr(lo | (hi << 8)))
                 name = ''.join(chars)
-                addr = struct.unpack_from('<H', data, pos)[0]
-                pos += 2
+                addr = struct.unpack_from('<I', data, pos)[0]
+                pos += 4
                 exports[name] = addr
 
         vm = cls(code, max(vc, 256), exports)

@@ -11,9 +11,12 @@
 #include <stdio.h>
 #ifdef _WIN32
 #include <windows.h>
+#include <direct.h>
+#define mkdir(p, m) _mkdir(p)
 #else
 #include <time.h>
 #include <unistd.h>
+#include <sys/stat.h>
 #endif
 
 /* ── 配置 ── */
@@ -23,11 +26,17 @@
 #ifndef STACK_MAX
 #define STACK_MAX 512
 #endif
+#ifndef CALL_STACK_DEPTH
+#define CALL_STACK_DEPTH 64
+#endif
+#ifndef STACK_MAX
+#define STACK_MAX 8192
+#endif
 #ifndef NATIVE_DEV_MAX
 #define NATIVE_DEV_MAX 16
 #endif
 #ifndef CALL_STACK_DEPTH
-#define CALL_STACK_DEPTH 64
+#define CALL_STACK_DEPTH 255
 #endif
 
 /* ── 堆对象类型标签 ── */
@@ -377,23 +386,88 @@ static int16_t rd_i16(const uint8_t *c, uint32_t *pc) {
     int16_t v; memcpy(&v, c + *pc, 2); *pc += 2; return v;
 }
 
-/* ── 条件跳转用 ── */
+/* ── 条件跳转用（三值逻辑：>0 为真，≤0 为假）── */
 static int val_true(void *v) {
-    if (is_int_val(v)) return untag_i(v) != 0;
+    if (is_int_val(v)) return untag_i(v) > 0;
     return v != NULL;
 }
 
 /* ── 内置模块管理 ── */
 #define MOD_MAX 16
-static struct { void *code; uint32_t size; uint8_t var_cnt; void *vars[VAR_MAX]; } _mods[MOD_MAX];
+#define EXPORT_MAX 64
+typedef struct {
+    void *code;
+    uint32_t size;
+    uint8_t var_cnt;
+    void *vars[VAR_MAX];
+    int export_count;
+    char export_names[EXPORT_MAX][64];
+    uint32_t export_addrs[EXPORT_MAX];
+} Module;
+static Module _mods[MOD_MAX];
 static int _mod_cnt;
+
+/* ── 从已打开的文件指针读取导出表（文件指针必须在代码数据之后）── */
+static int read_export_table(FILE *fp, Module *mod) {
+    uint8_t buf[2];
+    if (fread(buf, 1, 2, fp) != 2) { mod->export_count = 0; return 0; }
+    uint16_t count;
+    memcpy(&count, buf, 2);
+    if (count > EXPORT_MAX) count = EXPORT_MAX;
+    mod->export_count = 0;
+    for (uint16_t i = 0; i < count; i++) {
+        if (fread(buf, 1, 2, fp) != 2) break;
+        uint16_t name_len;
+        memcpy(&name_len, buf, 2);
+        if (name_len > 63) name_len = 63;
+        uint8_t *utf16 = (uint8_t*)malloc((size_t)name_len * 2);
+        if (!utf16) break;
+        if (fread(utf16, 1, (size_t)name_len * 2, fp) != (size_t)name_len * 2) {
+            free(utf16); break;
+        }
+        char *utf8 = utf16le_to_utf8(utf16, name_len);
+        free(utf16);
+        if (!utf8) break;
+        strncpy(mod->export_names[mod->export_count], utf8, 63);
+        mod->export_names[mod->export_count][63] = '\0';
+        free(utf8);
+        if (fread(buf, 1, 4, fp) != 4) break;
+        memcpy(&mod->export_addrs[mod->export_count], buf, 4);
+        mod->export_count++;
+    }
+    return 0;
+}
+
+/* ── 根据名称查找模块导出地址 ── */
+static int find_export(Module *mod, const char *name) {
+    for (int i = 0; i < mod->export_count; i++) {
+        if (strcmp(mod->export_names[i], name) == 0)
+            return mod->export_addrs[i];
+    }
+    return -1;
+}
+
+/* ── 验证 .bin 头部（接受 SAN0 或字节码编译器变体头部）── */
+static int check_bin_header(const uint8_t *hdr, const char *path) {
+    /* 标准格式：SAN0 + ver(1) + var_cnt(1) + code_size(4) */
+    if (memcmp(hdr, "SAN0", 4) == 0) return 0;
+    /* 变体格式：首字节 0x53(S)、第4字节 0x30(0)、ver=1 */
+    if (hdr[0] == 0x53 && hdr[3] == 0x30 && hdr[4] == 0x01) return 0;
+    if (path) fprintf(stderr, "非法模块格式: %s\n", path);
+    return 1;
+}
 
 /* ═══════════════════════════════════════════════════
  * 主解释循环
  * ═══════════════════════════════════════════════════ */
 int vm_run(VM *vm) {
+    uint64_t step_count = 0;
     while (!vm->halted) {
         if (vm->pc >= vm->code_len) { vm->halted = 1; break; }
+        if (++step_count > 50000000000ULL) {
+            fprintf(stderr, "超时：步数超过 50B，PC=0x%04x sp=%d call_depth=%d\n", vm->pc, vm->sp, vm->call_depth);
+            return 1;
+        }
         uint8_t op = rd_u8(vm->code, &vm->pc);
         void *a, *b;
         int32_t ia, ib;
@@ -428,21 +502,21 @@ int vm_run(VM *vm) {
         case MOD: b = pop(vm); a = pop(vm);
             ib = to_int(b); push(vm, ib ? tag_i(to_int(a) % ib) : tag_i(0)); break;
 
-        /* ── 比较 ── */
+        /* ── 比较（三值逻辑：1=真，-1=假）── */
         case EQ:  b = pop(vm); a = pop(vm);
-            push(vm, tag_i(to_int(a) == to_int(b) ? 1 : 0)); break;
+            push(vm, tag_i(to_int(a) == to_int(b) ? 1 : -1)); break;
         case NE:  b = pop(vm); a = pop(vm);
-            push(vm, tag_i(to_int(a) != to_int(b) ? 1 : 0)); break;
+            push(vm, tag_i(to_int(a) != to_int(b) ? 1 : -1)); break;
         case GT:  b = pop(vm); a = pop(vm);
-            push(vm, tag_i(to_int(a) > to_int(b) ? 1 : 0)); break;
+            push(vm, tag_i(to_int(a) > to_int(b) ? 1 : -1)); break;
         case LT:  b = pop(vm); a = pop(vm);
-            push(vm, tag_i(to_int(a) < to_int(b) ? 1 : 0)); break;
+            push(vm, tag_i(to_int(a) < to_int(b) ? 1 : -1)); break;
         case GTE: b = pop(vm); a = pop(vm);
-            push(vm, tag_i(to_int(a) >= to_int(b) ? 1 : 0)); break;
+            push(vm, tag_i(to_int(a) >= to_int(b) ? 1 : -1)); break;
         case LTE: b = pop(vm); a = pop(vm);
-            push(vm, tag_i(to_int(a) <= to_int(b) ? 1 : 0)); break;
+            push(vm, tag_i(to_int(a) <= to_int(b) ? 1 : -1)); break;
         case NOT: a = pop(vm);
-            push(vm, tag_i(!to_int(a))); break;
+            { int32_t v = to_int(a); push(vm, tag_i(v > 0 ? -1 : 1)); } break;
 
         case LOAD: {
             uint8_t idx = rd_u8(vm->code, &vm->pc);
@@ -478,7 +552,7 @@ int vm_run(VM *vm) {
         }
         case CALL: {
             int16_t addr = rd_i16(vm->code, &vm->pc);
-            if (addr == 0) break;
+            if (addr == 0) { push(vm, tag_i(0)); break; }  /* 未解析的 Python 辅助函数调用，压入 0 */
             if (vm->call_depth >= CALL_STACK_DEPTH) { fprintf(stderr, "调用栈溢出\n"); return 1; }
             // 扫描目标地址连续 STORE 指令个数 = 参数数量（与 Python VM 一致）
             int32_t arg_count = 0;
@@ -595,7 +669,7 @@ int vm_run(VM *vm) {
         }
         case STREQ: {
             b = pop(vm); a = pop(vm);
-            push(vm, tag_i(strcmp(rt_str_c(a), rt_str_c(b)) == 0 ? 1 : 0));
+            push(vm, tag_i(strcmp(rt_str_c(a), rt_str_c(b)) == 0 ? 1 : -1));
             break;
         }
         case ORD: {
@@ -605,9 +679,9 @@ int vm_run(VM *vm) {
         }
 
         /* ── 类型检查 ── */
-        case IS_NUM: push(vm, tag_i(is_int_val(pop(vm)) ? 1 : 0)); break;
-        case IS_STR: push(vm, tag_i(is_str(pop(vm)) ? 1 : 0)); break;
-        case IS_LIST: push(vm, tag_i(is_list(pop(vm)) ? 1 : 0)); break;
+        case IS_NUM: push(vm, tag_i(is_int_val(pop(vm)) ? 1 : -1)); break;
+        case IS_STR: push(vm, tag_i(is_str(pop(vm)) ? 1 : -1)); break;
+        case IS_LIST: push(vm, tag_i(is_list(pop(vm)) ? 1 : -1)); break;
         case SAME: b = pop(vm); a = pop(vm); push(vm, tag_i(a == b ? 1 : 0)); break;
 
         /* ── 容器操作 ── */
@@ -718,7 +792,13 @@ int vm_run(VM *vm) {
         case DICT_HAS: {
             void *k = pop(vm);
             a = pop(vm);
-            push(vm, is_dict(a) ? tag_i(rt_dict_has((rt_dict_t*)a, k)) : tag_i(0));
+            if (is_dict(a)) {
+                push(vm, tag_i(rt_dict_has((rt_dict_t*)a, k) ? 1 : -1));
+            } else if (is_str(a)) {
+                const char *s = rt_str_c(a);
+                const char *ks = rt_str_c(k);
+                push(vm, tag_i(ks[0] && strstr(s, ks) ? 1 : -1));
+            } else push(vm, tag_i(-1));
             break;
         }
         case DICT_KEYS: {
@@ -732,6 +812,15 @@ int vm_run(VM *vm) {
                         if (is_int_val(k)) rt_list_push(l, k);
                         else rt_list_push(l, rt_str_new(rt_str_c(k)));
                     }
+                }
+                push(vm, l);
+            } else if (is_str(a)) {
+                const char *s = rt_str_c(a);
+                rt_list_t *l = rt_list_new();
+                while (*s) {
+                    char buf[2] = {*s, 0};
+                    rt_list_push(l, rt_str_new(buf));
+                    s++;
                 }
                 push(vm, l);
             } else push(vm, rt_list_new());
@@ -780,54 +869,89 @@ int vm_run(VM *vm) {
             break;
         }
 
-        /* ── 模块导入：加载 .bin 文件并执行初始化代码 ── */
+        /* ── 模块导入：加载 .bin 文件 + 执行初始化代码 + 读取导出表 ── */
         case IMPORT: {
             const char *path = rt_str_c(pop(vm));
             if (_mod_cnt >= MOD_MAX) { push(vm, tag_i(0)); break; }
             FILE *f = fopen(path, "rb");
             if (!f) { push(vm, tag_i(0)); break; }
-            /* 读取 10 字节头部：SAN0(4) + ver(1) + var_cnt(1) + code_size(4) */
+            /* 读取 10 字节头部：magic(4) + ver(1) + var_cnt(1) + code_size(4) */
             uint8_t hdr[10];
-            if (fread(hdr, 1, 10, f) != 10 || memcmp(hdr, "SAN0", 4) != 0) {
+            if (fread(hdr, 1, 10, f) != 10 || check_bin_header(hdr, NULL)) {
                 fclose(f); push(vm, tag_i(0)); break;
             }
             uint32_t sz;
-            memcpy(&sz, hdr + 6, 4);  /* 32 位代码大小 */
+            memcpy(&sz, hdr + 6, 4);
             uint8_t *code = (uint8_t*)malloc(sz);
             if (!code) { fclose(f); push(vm, tag_i(0)); break; }
             if (fread(code, 1, sz, f) != sz) {
                 free(code); fclose(f); push(vm, tag_i(0)); break;
             }
-            fclose(f);
             int mid = _mod_cnt;
             _mods[mid].code = code;
             _mods[mid].size = sz;
             _mods[mid].var_cnt = hdr[5];
             memset(_mods[mid].vars, 0, sizeof(void*) * VAR_MAX);
+            _mods[mid].export_count = 0;
+            /* 读取导出表 */
+            read_export_table(f, &_mods[mid]);
+            fclose(f);
+            /* 执行模块初始化代码 */
+            {
+                VM init_vm;
+                memset(&init_vm, 0, sizeof(init_vm));
+                init_vm.code = code;
+                init_vm.code_len = sz;
+                init_vm.var_count = hdr[5];
+                vm_run(&init_vm);
+                memcpy(_mods[mid].vars, init_vm.vars, sizeof(void*) * VAR_MAX);
+            }
             push(vm, tag_i(mid + 1));
             _mod_cnt++;
             break;
         }
         case CALL_EXT: {
+            /* CALL_EXT(mod_id, func_name, arg_cnt, arg1, arg2, ...)
+             * 调用已导入模块的导出函数。
+             */
             int32_t mod_id = to_int(pop(vm));
-            pop(vm); /* func_name */
+            void *fname_val = pop(vm);
+            const char *func_name = rt_str_c(fname_val);
             int32_t arg_cnt = to_int(pop(vm));
-            for (int32_t i = 0; i < arg_cnt; i++) pop(vm);
+            void *args_stack[32];
+            for (int32_t i = 0; i < arg_cnt && i < 32; i++)
+                args_stack[i] = pop(vm);
             if (mod_id < 1 || mod_id > _mod_cnt) {
                 push(vm, tag_i(0));
                 break;
             }
             int mid = mod_id - 1;
-            VM *caller = vm;
+            /* 查找导出函数地址 */
+            int addr = find_export(&_mods[mid], func_name);
+            if (addr < 0) {
+                push(vm, tag_i(0));
+                break;
+            }
+            /* 创建子 VM 执行函数调用 */
             VM mod_vm;
             memset(&mod_vm, 0, sizeof(mod_vm));
             mod_vm.code = _mods[mid].code;
             mod_vm.code_len = _mods[mid].size;
             mod_vm.var_count = _mods[mid].var_cnt;
+            /* 复制已初始化的模块变量 */
+            memcpy(mod_vm.vars, _mods[mid].vars, sizeof(void*) * VAR_MAX);
+            /* args_stack: [argN(先pop), ..., arg1(后pop)] → 反转后按序压入
+             * 使函数入口的 STORE 按参数顺序 pop，与 fn 编译器的循环匹配 */
+            for (int32_t i = arg_cnt - 1; i >= 0; i--)
+                push(&mod_vm, args_stack[i]);
+            /* 设置调用帧：函数 RET 时回到 code_len 末尾 → HALT */
+            mod_vm.call_stack[0].ret_pc = mod_vm.code_len;
+            mod_vm.call_stack[0].stack_base = 0;
+            mod_vm.call_depth = 1;
+            mod_vm.pc = (uint32_t)addr;
             vm_run(&mod_vm);
             void *result = mod_vm.sp > 0 ? mod_vm.stack[mod_vm.sp - 1] : tag_i(0);
-            memcpy(_mods[mid].vars, mod_vm.vars, sizeof(void*) * VAR_MAX);
-            push(caller, result);
+            push(vm, result);
             break;
         }
 
@@ -871,20 +995,13 @@ int vm_run(VM *vm) {
             break;
         }
         case STR_STARTSWITH: {
-            /* startswith(s, prefix) → 1 or -1 */
             b = pop(vm); a = pop(vm);
-            const char *str = rt_str_c(a);
-            const char *pre = rt_str_c(b);
-            int32_t plen = (int32_t)strlen(pre);
-            push(vm, strncmp(str, pre, plen) == 0 ? tag_i(1) : tag_i(-1));
+            push(vm, strncmp(rt_str_c(a), rt_str_c(b), strlen(rt_str_c(b))) == 0 ? tag_i(1) : tag_i(-1));
             break;
         }
         case STR_CONTAINS: {
-            /* contains(s, sub) → 1 or -1 */
             b = pop(vm); a = pop(vm);
-            const char *hs = rt_str_c(a);
-            const char *nd = rt_str_c(b);
-            push(vm, strstr(hs, nd) != NULL ? tag_i(1) : tag_i(-1));
+            push(vm, strstr(rt_str_c(a), rt_str_c(b)) ? tag_i(1) : tag_i(-1));
             break;
         }
         case DICT_LEN: {
@@ -915,7 +1032,7 @@ int vm_load(VM *vm, const char *path) {
 
     uint8_t hdr[10];
     if (fread(hdr, 1, 10, fp) != 10) { fprintf(stderr, "头部读取失败\n"); fclose(fp); return 1; }
-    if (memcmp(hdr, "SAN0", 4) != 0) { fprintf(stderr, "非法固件格式\n"); fclose(fp); return 1; }
+    if (check_bin_header(hdr, path)) { fprintf(stderr, "非法固件格式\n"); fclose(fp); return 1; }
 
     uint8_t vc = hdr[5];
     uint32_t code_size;
@@ -946,15 +1063,379 @@ static void mock_actuator_write(uint8_t id, int32_t val) {
     printf("  [执行器 %d] = %d\n", id, (int)val);
 }
 
+/* ── Windows 编码转换：ANSI(GBK) → UTF-8 ── */
+#ifdef _WIN32
+static char *ansi_to_utf8(const char *ansi) {
+    int wlen = MultiByteToWideChar(CP_ACP, 0, ansi, -1, NULL, 0);
+    if (wlen <= 0) return NULL;
+    wchar_t *wstr = (wchar_t*)malloc((size_t)wlen * sizeof(wchar_t));
+    if (!wstr) return NULL;
+    MultiByteToWideChar(CP_ACP, 0, ansi, -1, wstr, wlen);
+    int ulen = WideCharToMultiByte(CP_UTF8, 0, wstr, -1, NULL, 0, NULL, NULL);
+    char *utf8 = (char*)malloc((size_t)ulen);
+    if (!utf8) { free(wstr); return NULL; }
+    WideCharToMultiByte(CP_UTF8, 0, wstr, -1, utf8, ulen, NULL, NULL);
+    free(wstr);
+    return utf8;
+}
+#endif
+
+/* ── 从路径加载模块（代码 + 导出表 + 初始化变量）── */
+static int load_module_from_path(const char *path, Module *mod) {
+    FILE *f = fopen(path, "rb");
+    if (!f) { perror(path); return 1; }
+    uint8_t hdr[10];
+    if (fread(hdr, 1, 10, f) != 10 || check_bin_header(hdr, path)) {
+        fclose(f); return 1;
+    }
+    uint32_t sz;
+    memcpy(&sz, hdr + 6, 4);
+    uint8_t *code = (uint8_t*)malloc(sz);
+    if (!code) { fclose(f); return 1; }
+    if (fread(code, 1, sz, f) != sz) {
+        free(code); fclose(f); return 1;
+    }
+    memset(mod, 0, sizeof(Module));
+    mod->code = code;
+    mod->size = sz;
+    mod->var_cnt = hdr[5];
+    read_export_table(f, mod);
+    fclose(f);
+    /* 运行初始化代码，填充变量 */
+    VM init_vm;
+    memset(&init_vm, 0, sizeof(init_vm));
+    init_vm.code = code;
+    init_vm.code_len = sz;
+    init_vm.var_count = hdr[5];
+    vm_run(&init_vm);
+    memcpy(mod->vars, init_vm.vars, sizeof(void*) * VAR_MAX);
+    return 0;
+}
+
+/* ── 读取文件到字符串（调用者 free）── */
+static char *read_file_str(const char *path) {
+    FILE *f = fopen(path, "rb");
+    if (!f) return NULL;
+    fseek(f, 0, SEEK_END);
+    long sz = ftell(f);
+    fseek(f, 0, SEEK_SET);
+    char *buf = (char*)malloc((size_t)sz + 1);
+    if (!buf) { fclose(f); return NULL; }
+    size_t n = fread(buf, 1, (size_t)sz, f);
+    buf[n] = '\0';
+    fclose(f);
+    return buf;
+}
+
+/* ── 调用模块导出函数（单参数，返回栈顶值）── */
+static void *call_module_func(Module *mod, const char *func_name, void *arg) {
+    int addr = find_export(mod, func_name);
+    if (addr < 0) return NULL;
+    VM vm;
+    memset(&vm, 0, sizeof(vm));
+    vm.code = mod->code;
+    vm.code_len = mod->size;
+    vm.var_count = mod->var_cnt;
+    memcpy(vm.vars, mod->vars, sizeof(void*) * VAR_MAX);
+    if (arg) push(&vm, arg);
+    vm.call_stack[0].ret_pc = vm.code_len;
+    vm.call_stack[0].stack_base = 0;
+    vm.call_depth = 1;
+        vm.call_stack[0].ret_pc = vm.code_len;
+        vm.call_stack[0].stack_base = 0;
+        vm.call_depth = 1;
+        vm.pc = (uint32_t)addr;
+        vm_run(&vm);
+    return vm.sp > 0 ? vm.stack[vm.sp - 1] : NULL;
+}
+
+/* ── 运行外部工具（返回 0 表示成功）── */
+static int run_cmd(const char *cmd) {
+#ifdef _WIN32
+    /* Windows: 重定向 stderr 到 nul 避免干扰输出 */
+    char buf[1024];
+    snprintf(buf, sizeof(buf), "%s 2>nul", cmd);
+    return system(buf);
+#else
+    char buf[1024];
+    snprintf(buf, sizeof(buf), "%s 2>/dev/null", cmd);
+    return system(buf);
+#endif
+}
+
+/* ── 查找工具路径（返回静态缓冲区或 NULL）── */
+static const char *find_tool(const char *name) {
+    static char buf[512];
+    /* 直接检查文件是否存在 */
+    snprintf(buf, sizeof(buf), "%s.exe", name);
+    FILE *f = fopen(buf, "rb");
+    if (f) { fclose(f); return buf; }
+    snprintf(buf, sizeof(buf), "%s", name);
+    f = fopen(buf, "rb");
+    if (f) { fclose(f); return buf; }
+#ifdef _WIN32
+    const char *dirs[] = {
+        "D:\\msys64\\ucrt64\\bin",
+        "D:\\msys64\\mingw64\\bin",
+        NULL
+    };
+    for (int i = 0; dirs[i]; i++) {
+        snprintf(buf, sizeof(buf), "%s\\%s.exe", dirs[i], name);
+        f = fopen(buf, "rb");
+        if (f) { fclose(f); return buf; }
+        snprintf(buf, sizeof(buf), "%s\\%s", dirs[i], name);
+        f = fopen(buf, "rb");
+        if (f) { fclose(f); return buf; }
+    }
+#endif
+    /* 最后假设在 PATH 中 */
+    snprintf(buf, sizeof(buf), "%s", name);
+    return buf;
+}
+
 /* ── 主入口 ── */
 int main(int argc, char **argv) {
     if (argc < 2) {
         fprintf(stderr, "用法: %s firmware.bin [--run] [源码文件]\n", argv[0]);
+        fprintf(stderr, "      %s --call module.bin 函数名 [参数...]\n", argv[0]);
+        fprintf(stderr, "      %s --compile input.san [-o output.exe]\n", argv[0]);
         return 1;
     }
 
     vm_register_device(0, mock_sensor_read, NULL);
     vm_register_device(1, NULL, mock_actuator_write);
+
+    /* --call 模式：直接调用模块的导出函数 */
+    if (strcmp(argv[1], "--call") == 0) {
+        if (argc < 4) {
+            fprintf(stderr, "用法: %s --call module.bin 函数名 [参数...]\n", argv[0]);
+            return 1;
+        }
+        const char *mod_path = argv[2];
+        const char *func_name = argv[3];
+#ifdef _WIN32
+        char *utf8_name = ansi_to_utf8(func_name);
+#endif
+
+        Module mod;
+        if (load_module_from_path(mod_path, &mod)) return 1;
+
+        /* 查找函数：先用原名，失败则用 ANSI→UTF-8 转换后的名称 */
+        int addr = find_export(&mod, func_name);
+#ifdef _WIN32
+        if (addr < 0 && utf8_name) {
+            addr = find_export(&mod, utf8_name);
+            if (addr >= 0) func_name = utf8_name;
+        }
+#endif
+        if (addr < 0) {
+            fprintf(stderr, "未找到导出函数: %s\n", func_name);
+#ifdef _WIN32
+            free(utf8_name);
+#endif
+            return 1;
+        }
+#ifdef _WIN32
+        free(utf8_name);
+#endif
+
+        /* 压入参数（字符串或整数） */
+        VM call_vm;
+        memset(&call_vm, 0, sizeof(call_vm));
+        call_vm.code = mod.code;
+        call_vm.code_len = mod.size;
+        call_vm.var_count = mod.var_cnt;
+        memcpy(call_vm.vars, mod.vars, sizeof(void*) * VAR_MAX);
+        for (int i = 4; i < argc; i++) {
+            char *end = NULL;
+            long val = strtol(argv[i], &end, 10);
+            if (*end == '\0') {
+                push(&call_vm, tag_i((int32_t)val));
+            } else {
+                push(&call_vm, rt_str_new(argv[i]));
+            }
+        }
+
+        /* 设置调用帧 */
+        call_vm.call_stack[0].ret_pc = call_vm.code_len;
+        call_vm.call_stack[0].stack_base = 0;
+        call_vm.call_depth = 1;
+        call_vm.pc = (uint32_t)addr;
+        vm_run(&call_vm);
+
+        /* 输出返回值 */
+        if (call_vm.sp > 0) {
+            print_value(call_vm.stack[call_vm.sp - 1]);
+            printf("\n");
+        }
+
+        free((void*)mod.code);
+        return 0;
+    }
+
+    /* --compile 模式：完整编译管线（无 Python 依赖）
+     * 用法: runtime.exe --compile input.san [-o output.exe]
+     *       [--sugar stdlib/sugar.bin] [--llvmgen stdlib/llvmgen.bin]
+     * 管线: source.san → sugar.bin[解析] → AST → llvmgen.bin[编译顶层] → IR → llc → gcc → exe
+     */
+    if (strcmp(argv[1], "--compile") == 0) {
+        if (argc < 3) {
+            fprintf(stderr, "用法: %s --compile input.san [-o output.exe]\n", argv[0]);
+            return 1;
+        }
+        const char *input_path = argv[2];
+        const char *output_path = "output.exe";
+        const char *sugar_path = "stdlib/sugar.bin";
+        const char *llvmgen_path = "stdlib/llvmgen.bin";
+
+        /* 解析可选参数 */
+        for (int i = 3; i < argc; i++) {
+            if (strcmp(argv[i], "-o") == 0 && i + 1 < argc) {
+                output_path = argv[++i];
+            } else if (strcmp(argv[i], "--sugar") == 0 && i + 1 < argc) {
+                sugar_path = argv[++i];
+            } else if (strcmp(argv[i], "--llvmgen") == 0 && i + 1 < argc) {
+                llvmgen_path = argv[++i];
+            }
+        }
+
+        fprintf(stderr, "[编译] %s → %s\n", input_path, output_path);
+
+        /* 1. 读取源码 */
+        char *source = read_file_str(input_path);
+        if (!source) {
+            fprintf(stderr, "错误: 无法读取 %s\n", input_path);
+            return 1;
+        }
+        fprintf(stderr, "[1/5] 源码 %ld 字节\n", (long)strlen(source));
+
+        /* 2. 加载 sugar.bin 并调用 解析(source) → AST */
+        Module sugar_mod;
+        if (load_module_from_path(sugar_path, &sugar_mod)) {
+            fprintf(stderr, "错误: 无法加载 %s\n", sugar_path);
+            free(source);
+            return 1;
+        }
+        void *ast = call_module_func(&sugar_mod, "解析", rt_str_new(source));
+        free(source);
+        if (!ast) {
+            fprintf(stderr, "错误: sugar.bin 解析失败（未返回结果）\n");
+            free((void*)sugar_mod.code);
+            return 1;
+        }
+        fprintf(stderr, "[2/5] 解析完成\n");
+
+        /* 3. 加载 llvmgen.bin 并调用 编译顶层(ast) → IR */
+        Module llvmgen_mod;
+        if (load_module_from_path(llvmgen_path, &llvmgen_mod)) {
+            fprintf(stderr, "错误: 无法加载 %s\n", llvmgen_path);
+            free((void*)sugar_mod.code);
+            return 1;
+        }
+        void *ir_val = call_module_func(&llvmgen_mod, "编译顶层", ast);
+        if (!ir_val || !is_str(ir_val)) {
+            fprintf(stderr, "错误: llvmgen.bin 编译顶层未返回字符串\n");
+            free((void*)sugar_mod.code);
+            free((void*)llvmgen_mod.code);
+            return 1;
+        }
+        const char *ir_text = rt_str_c(ir_val);
+        fprintf(stderr, "[3/5] IR 生成 %ld 字节\n", (long)strlen(ir_text));
+
+        /* 4. 如果 IR 为空，无法继续编译 */
+        if (strlen(ir_text) == 0) {
+            fprintf(stderr, "提示: IR 为空（llvmgen.bin 缺少 Python 辅助函数）\n");
+            fprintf(stderr, "请使用 main.py --san 完成 LLVM 编译\n");
+            free((void*)sugar_mod.code);
+            free((void*)llvmgen_mod.code);
+            return 1;
+        }
+
+        /* 5. 创建 build 目录并写入 .ll 文件 */
+#ifdef _WIN32
+        _mkdir("build");
+#else
+        mkdir("build", 0755);
+#endif
+        char ll_path[260], o_path[260];
+        snprintf(ll_path, sizeof(ll_path), "build/_cvm_compile.ll");
+        snprintf(o_path, sizeof(o_path), "build/_cvm_compile.o");
+        {
+            FILE *f = fopen(ll_path, "w");
+            if (!f) {
+                fprintf(stderr, "错误: 无法创建 %s\n", ll_path);
+                free((void*)sugar_mod.code);
+                free((void*)llvmgen_mod.code);
+                return 1;
+            }
+            fwrite(ir_text, 1, strlen(ir_text), f);
+            fclose(f);
+        }
+
+        /* 5. IR → 目标文件（优先 llc，回退 clang） */
+        const char *llc = find_tool("llc");
+        const char *clang = llc ? NULL : find_tool("clang");
+        int obj_ok = 0;
+        if (llc) {
+            char cmd[512];
+            snprintf(cmd, sizeof(cmd), "%s -filetype=obj %s -o %s", llc, ll_path, o_path);
+            fprintf(stderr, "[4/5] llc → .o\n");
+            obj_ok = (run_cmd(cmd) == 0);
+        }
+        if (!obj_ok && clang) {
+            char cmd[512];
+            snprintf(cmd, sizeof(cmd), "%s -c %s -o %s", clang, ll_path, o_path);
+            fprintf(stderr, "[4/5] clang → .o\n");
+            obj_ok = (run_cmd(cmd) == 0);
+        }
+        if (!obj_ok) {
+            fprintf(stderr, "错误: 无法编译 IR（需要 llc 或 clang）\n");
+            free((void*)sugar_mod.code);
+            free((void*)llvmgen_mod.code);
+            remove(ll_path);
+            return 1;
+        }
+
+        /* 6. 目标文件 → 可执行文件（gcc 链接） */
+        const char *gcc = find_tool("gcc");
+        if (!gcc) {
+            fprintf(stderr, "错误: 需要 gcc\n");
+            free((void*)sugar_mod.code);
+            free((void*)llvmgen_mod.code);
+            remove(ll_path);
+            remove(o_path);
+            return 1;
+        }
+        {
+            char cmd[768];
+            /* 检查 llvmgen/runtime.c 是否存在 */
+            FILE *rc = fopen("llvmgen/runtime.c", "r");
+            if (rc) {
+                fclose(rc);
+                snprintf(cmd, sizeof(cmd), "%s %s llvmgen/runtime.c -o %s -lm",
+                         gcc, o_path, output_path);
+            } else {
+                snprintf(cmd, sizeof(cmd), "%s %s -o %s -lm",
+                         gcc, o_path, output_path);
+            }
+            fprintf(stderr, "[5/5] gcc → %s\n", output_path);
+            obj_ok = (run_cmd(cmd) == 0);
+        }
+
+        /* 清理临时文件 */
+        remove(ll_path);
+        remove(o_path);
+        free((void*)sugar_mod.code);
+        free((void*)llvmgen_mod.code);
+
+        if (obj_ok) {
+            fprintf(stderr, "[完成] %s\n", output_path);
+            return 0;
+        } else {
+            fprintf(stderr, "错误: 链接失败\n");
+            return 1;
+        }
+    }
 
     VM vm;
     if (vm_load(&vm, argv[1])) return 1;

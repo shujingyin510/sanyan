@@ -160,7 +160,7 @@ class TestComparison(unittest.TestCase):
     def test_eq_false(self):
         vm = _make_vm(_push_i(5) + _push_i(3) + [EQ] + _halt())
         vm.run()
-        self.assertEqual(vm.stack, [0])
+        self.assertEqual(vm.stack, [-1])  # 三值逻辑：假=-1
 
     def test_ne(self):
         vm = _make_vm(_push_i(5) + _push_i(3) + [NE] + _halt())
@@ -175,7 +175,7 @@ class TestComparison(unittest.TestCase):
     def test_gt_false(self):
         vm = _make_vm(_push_i(3) + _push_i(5) + [GT] + _halt())
         vm.run()
-        self.assertEqual(vm.stack, [0])
+        self.assertEqual(vm.stack, [-1])  # 三值逻辑：假=-1
 
     def test_lt(self):
         vm = _make_vm(_push_i(3) + _push_i(5) + [LT] + _halt())
@@ -200,7 +200,7 @@ class TestComparison(unittest.TestCase):
     def test_not_nonzero(self):
         vm = _make_vm(_push_i(42) + [NOT] + _halt())
         vm.run()
-        self.assertEqual(vm.stack, [0])
+        self.assertEqual(vm.stack, [-1])  # 三值逻辑：NOT >0 = -1
 
 
 class TestVariableOps(unittest.TestCase):
@@ -367,7 +367,7 @@ class TestStringOps(unittest.TestCase):
         code += [STREQ] + _halt()
         vm = _make_vm(code)
         vm.run()
-        self.assertEqual(vm.stack, [0])
+        self.assertEqual(vm.stack, [-1])  # 三值逻辑：假=-1
 
     def test_ord(self):
         code = [PUSH_STR, 1, ord('A') & 0xFF, 0] + [ORD] + _halt()
@@ -387,7 +387,7 @@ class TestTypeCheck(unittest.TestCase):
         code += [IS_NUM] + _halt()
         vm = _make_vm(code)
         vm.run()
-        self.assertEqual(vm.stack, [0])
+        self.assertEqual(vm.stack, [-1])  # 三值逻辑：假=-1
 
     def test_is_str(self):
         code = [PUSH_STR, 1, ord('x') & 0xFF, 0] + [IS_STR] + _halt()
@@ -398,7 +398,7 @@ class TestTypeCheck(unittest.TestCase):
     def test_is_str_number(self):
         vm = _make_vm(_push_i(42) + [IS_STR] + _halt())
         vm.run()
-        self.assertEqual(vm.stack, [0])
+        self.assertEqual(vm.stack, [-1])  # 三值逻辑：假=-1
 
     def test_is_list_on_list(self):
         vm = _make_vm(_push_i(0) + [LIST_NEW] + [IS_LIST] + _halt())
@@ -408,7 +408,7 @@ class TestTypeCheck(unittest.TestCase):
     def test_is_list_on_int(self):
         vm = _make_vm(_push_i(42) + [IS_LIST] + _halt())
         vm.run()
-        self.assertEqual(vm.stack, [0])
+        self.assertEqual(vm.stack, [-1])  # 三值逻辑：假=-1
 
     def test_same(self):
         vm = _make_vm(_push_i(42) + _push_i(42) + [SAME] + _halt())
@@ -418,7 +418,7 @@ class TestTypeCheck(unittest.TestCase):
     def test_same_different(self):
         vm = _make_vm(_push_i(42) + _push_i(43) + [SAME] + _halt())
         vm.run()
-        self.assertEqual(vm.stack, [0])
+        self.assertEqual(vm.stack, [-1])  # 三值逻辑：假=-1
 
 
 class TestListOps(unittest.TestCase):
@@ -521,7 +521,7 @@ class TestDictOps(unittest.TestCase):
         code += [PUSH_STR, 1, ord('z') & 0xFF, 0] + [DICT_HAS] + _halt()
         vm = _make_vm(code)
         vm.run()
-        self.assertEqual(vm.stack, [0])
+        self.assertEqual(vm.stack, [-1])  # 三值逻辑：假=-1
 
     def test_dict_keys(self):
         code = [PUSH_STR, 1, ord('x') & 0xFF, 0] + _push_i(99) + _push_i(1) + [DICT]

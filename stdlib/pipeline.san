@@ -1,0 +1,19 @@
+// pipeline.san — 无 Python 依赖的编译管线
+// 用法: python -X utf8 main.py stdlib/pipeline.san <source.san> <output.ll>
+// 编译为 .bin 后：csrc/runtime.exe stdlib/pipeline.bin <source.san>
+
+// 读取源码
+设 source_file = 输入()
+设 source = 读文件(source_file)
+
+// 解析源码 → AST
+设 sugar = 导入("stdlib/sugar.san")
+设 ast = sugar.解析(source)
+
+// 编译 AST → LLVM IR
+设 llvmgen = 导入("stdlib/llvmgen.san")
+设 ir = llvmgen.编译顶层(ast)
+
+// 写入 IR 文件
+写文件("build/output.ll", ir)
+输出(ir)
