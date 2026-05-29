@@ -1,11 +1,11 @@
 """糖语法转换器：类 C 语法 -> S-表达式 AST
 
-拆分为 lexer + parser + errors 模块。
+拆分为 tokenizer + ast_nodes + parser + errors 模块。
 """
 
 from __future__ import annotations
 from sugar.parser import parse_code
-from sugar.lexer import tokenize
+from sugar.tokenizer import tokenize
 
 _last_comments: list[str] = []
 

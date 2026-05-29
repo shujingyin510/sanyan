@@ -9,6 +9,7 @@
 
 from __future__ import annotations
 import struct
+from typing import Callable
 
 # ═══════════════════════════════════════════════════════════════
 # 指令集（与 sanyancc.py / runtime_stm32.c 一致）
@@ -565,7 +566,7 @@ class VM:
 # 将每个操作码映射到 VM 实例的对应执行方法。
 # 使用 dict.get() 查找，未知操作码静默跳过（向后兼容）。
 # ═══════════════════════════════════════════════════════════════
-_DISPATCH: dict[int, callable] = {
+_DISPATCH: dict[int, 'Callable'] = {
     # 控制流
     RET:     VM._exec_control_flow,
     JMP:     VM._exec_control_flow,

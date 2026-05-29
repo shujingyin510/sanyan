@@ -1,9 +1,12 @@
 """求值辅助模块：从 evaluator.py 提取的符号解析和字面量处理方法"""
 
 from __future__ import annotations
-from typing import Any, Optional
+from typing import Any, Optional, TYPE_CHECKING
 from ternary_core import TritValue
 from values import SanyanNameError, SanyanSyntaxError, SanyanTypeError
+
+if TYPE_CHECKING:
+    from evaluator import SanyanEvaluator
 
 
 def parse_string_literal(s: str) -> str:
@@ -71,7 +74,7 @@ def is_valid_identifier(s: str) -> bool:
     return True
 
 
-def resolve_identifier(evaluator, node: str) -> Any:
+def resolve_identifier(evaluator: SanyanEvaluator, node: str) -> Any:
     """解析标识符：字典点号访问 → 符号求值 → 中文字符串降级"""
     if '.' in node:
         parts = node.split('.', 1)
@@ -88,7 +91,7 @@ def resolve_identifier(evaluator, node: str) -> Any:
         raise
 
 
-def eval_str(evaluator, node: str) -> Any:
+def eval_str(evaluator: SanyanEvaluator, node: str) -> Any:
     """求值字符串节点"""
     if len(node) >= 2 and node[0] in ('"', '\u201c', '\u2018', "'"):
         return parse_string_literal(node[1:-1])
@@ -113,7 +116,7 @@ def eval_str(evaluator, node: str) -> Any:
     return node
 
 
-def eval_symbol(evaluator, symbol: str) -> Any:
+def eval_symbol(evaluator: SanyanEvaluator, symbol: str) -> Any:
     """求值符号：变量 → 字面量 → 三态词 → IoT 设备 → 上下文对象"""
     if evaluator.has_var(symbol):
         return evaluator.get_var(symbol)
@@ -135,7 +138,7 @@ def eval_symbol(evaluator, symbol: str) -> Any:
     raise SanyanNameError(f'未定义的符号: {symbol}')
 
 
-def _eval_dot_symbol(evaluator, symbol: str) -> Any:
+def _eval_dot_symbol(evaluator: SanyanEvaluator, symbol: str) -> Any:
     """解析 对象.属性 形式的 IoT 设备访问"""
     obj, attr = symbol.split('.')
     if obj in evaluator.actuators:
@@ -149,7 +152,7 @@ def _eval_dot_symbol(evaluator, symbol: str) -> Any:
     raise SanyanNameError(f'未定义的设备: {obj}')
 
 
-def _eval_context_symbol(evaluator, symbol: str) -> Any:
+def _eval_context_symbol(evaluator: SanyanEvaluator, symbol: str) -> Any:
     """在 对 作用域内解析符号为 IoT 设备操作"""
     obj = evaluator.context_object
     if obj in evaluator.actuators:

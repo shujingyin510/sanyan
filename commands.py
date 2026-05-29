@@ -1,18 +1,22 @@
 """自定义命令：定义与调用"""
 
-from typing import Any
+from __future__ import annotations
+from typing import Any, TYPE_CHECKING
 from values import SanyanError, SanyanSyntaxError, check_type
 from ternary_core import TritValue
 from ops.registry import register
 from tail_call import detect_tail_call, run_tail_call, run_normal, is_tail_call
 from param_matcher import match_params, evaluate_args, resolve_command, format_args
 
+if TYPE_CHECKING:
+    from evaluator import SanyanEvaluator
+
 
 class Commands:
     """自定义命令：定义、调用、类型检查、尾递归优化"""
 
     @staticmethod
-    def define(evaluator, args: list) -> TritValue:
+    def define(evaluator: SanyanEvaluator, args: list) -> TritValue:
         if len(args) < 3:
             raise SanyanSyntaxError('定义 需要名称、参数列表和体')
         cmd_name = args[0]
@@ -45,7 +49,7 @@ class Commands:
         return format_args(args)
 
     @staticmethod
-    def call(evaluator, op: str, args: list) -> Any:
+    def call(evaluator: SanyanEvaluator, op: str, args: list) -> Any:
         evaluator.call_depth += 1
         if evaluator.call_depth > evaluator.max_call_depth:
             evaluator.call_depth -= 1
@@ -73,7 +77,7 @@ class Commands:
             evaluator.call_depth -= 1
 
     @staticmethod
-    def _print_call_stack(evaluator, current_op: str, current_args: list) -> None:
+    def _print_call_stack(evaluator: SanyanEvaluator, current_op: str, current_args: list) -> None:
         """打印调用栈"""
         print('\n=== 调用栈 ===')
         # 打印当前调用

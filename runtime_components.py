@@ -42,11 +42,11 @@ class ScopeManager:
         """在当前作用域设置变量值。"""
         self._scopes[-1][name] = value
 
-    def push_scope(self):
+    def push_scope(self) -> None:
         """创建新的作用域层。"""
         self._scopes.append({})
 
-    def pop_scope(self):
+    def pop_scope(self) -> None:
         """移除当前作用域层（保留全局作用域）。"""
         if len(self._scopes) > 1:
             self._scopes.pop()
