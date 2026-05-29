@@ -146,10 +146,51 @@ static void rt_list_push(rt_list_t *l, void *v) {
     l->items[l->len++] = v;
 }
 
-/* ── 字典（支持 int 和 string 键，动态扩容）─────── */
+/* ── 字典（哈希表：开放寻址 + 线性探测，O(1) 查找）─────── */
 #define DICT_INIT_CAP 16
+#define DICT_LOAD_FACTOR 70  /* 负载因子阈值（百分比），超过时触发 rehash */
 typedef struct { void *k; void *v; } rt_entry_t;
 typedef struct { OBJ_HDR; int32_t n; int32_t cap; rt_entry_t *entries; } rt_dict_t;
+
+/* 键哈希函数：整数用 FNV-1a 混合，字符串用 djb2 */
+static uint32_t hash_key(void *k) {
+    if (is_int_val(k)) {
+        uint32_t h = (uint32_t)untag_i(k);
+        h = ((h >> 16) ^ h) * 0x45d9f3b;
+        h = ((h >> 16) ^ h) * 0x45d9f3b;
+        return (h >> 16) ^ h;
+    }
+    const char *s = rt_str_c(k);
+    uint32_t h = 5381;
+    while (*s) h = ((h << 5) + h) + (unsigned char)*s++;
+    return h;
+}
+
+/* 比较两个键是否相等（处理 int 和 string）*/
+static int key_eq(void *a, void *b) {
+    if (is_int_val(a) && is_int_val(b)) return untag_i(a) == untag_i(b);
+    if (!is_int_val(a) && !is_int_val(b) && a && b)
+        return strcmp(((rt_str_t*)a)->data, ((rt_str_t*)b)->data) == 0;
+    return a == b;
+}
+
+/* 哈希表扩容：重新哈希所有条目到 2 倍容量 */
+static void rt_dict_rehash(rt_dict_t *d) {
+    int32_t old_cap = d->cap;
+    rt_entry_t *old = d->entries;
+    d->cap = old_cap * 2;
+    d->entries = (rt_entry_t*)calloc((size_t)d->cap, sizeof(rt_entry_t));
+    for (int32_t i = 0; i < old_cap; i++) {
+        if (old[i].k != NULL) {
+            uint32_t h = hash_key(old[i].k);
+            uint32_t idx = h & ((uint32_t)d->cap - 1);
+            while (d->entries[idx].k != NULL)
+                idx = (idx + 1) & ((uint32_t)d->cap - 1);
+            d->entries[idx] = old[i];
+        }
+    }
+    free(old);
+}
 
 static rt_dict_t *rt_dict_new(void) {
     rt_dict_t *d = (rt_dict_t*)calloc(1, sizeof(rt_dict_t));
@@ -161,32 +202,39 @@ static rt_dict_t *rt_dict_new(void) {
     return d;
 }
 
-/* 比较两个键是否相等（处理 int 和 string）*/
-static int key_eq(void *a, void *b) {
-    if (is_int_val(a) && is_int_val(b)) return untag_i(a) == untag_i(b);
-    if (!is_int_val(a) && !is_int_val(b) && a && b)
-        return strcmp(((rt_str_t*)a)->data, ((rt_str_t*)b)->data) == 0;
-    return a == b;
-}
-
+/* 哈希查找：线性探测，返回槽位索引或 -1 */
 static int rt_dict_find(rt_dict_t *d, void *k) {
-    if (!d) return -1;
-    for (int32_t i = 0; i < d->n; i++)
-        if (key_eq(d->entries[i].k, k)) return i;
+    if (!d || d->cap == 0) return -1;
+    uint32_t h = hash_key(k);
+    uint32_t cap = (uint32_t)d->cap;
+    uint32_t idx = h & (cap - 1);
+    for (uint32_t i = 0; i < cap; i++) {
+        uint32_t pos = (idx + i) & (cap - 1);
+        if (d->entries[pos].k == NULL) return -1;
+        if (key_eq(d->entries[pos].k, k)) return (int)pos;
+    }
     return -1;
 }
 
 static void rt_dict_set(rt_dict_t *d, void *k, void *v) {
     if (!d) return;
-    int i = rt_dict_find(d, k);
-    if (i >= 0) { d->entries[i].v = v; return; }
-    if (d->n >= d->cap) {
-        d->cap *= 2;
-        d->entries = (rt_entry_t*)realloc(d->entries, (size_t)d->cap * sizeof(rt_entry_t));
+    if (d->n >= (d->cap * DICT_LOAD_FACTOR) / 100)
+        rt_dict_rehash(d);
+    uint32_t h = hash_key(k);
+    uint32_t idx = h & ((uint32_t)d->cap - 1);
+    for (uint32_t i = 0; i < (uint32_t)d->cap; i++) {
+        uint32_t pos = (idx + i) & ((uint32_t)d->cap - 1);
+        if (d->entries[pos].k == NULL) {
+            d->entries[pos].k = is_int_val(k) ? k : (void*)rt_str_new(rt_str_c(k));
+            d->entries[pos].v = v;
+            d->n++;
+            return;
+        }
+        if (key_eq(d->entries[pos].k, k)) {
+            d->entries[pos].v = v;
+            return;
+        }
     }
-    d->entries[d->n].k = is_int_val(k) ? k : (void*)rt_str_new(rt_str_c(k));
-    d->entries[d->n].v = v;
-    d->n++;
 }
 
 static void *rt_dict_get(rt_dict_t *d, void *k) {
@@ -217,11 +265,15 @@ static void print_value(void *v) {
     case TYPE_DICT: {
         rt_dict_t *d = (rt_dict_t*)v;
         printf("{");
-        for (int32_t i = 0; i < d->n; i++) {
-            if (i > 0) printf(", ");
-            print_value(d->entries[i].k);
-            printf(": ");
-            print_value(d->entries[i].v);
+        int32_t cnt = 0;
+        for (int32_t i = 0; i < d->cap; i++) {
+            if (d->entries[i].k != NULL) {
+                if (cnt > 0) printf(", ");
+                print_value(d->entries[i].k);
+                printf(": ");
+                print_value(d->entries[i].v);
+                cnt++;
+            }
         }
         printf("}");
         break;
@@ -667,10 +719,12 @@ int vm_run(VM *vm) {
             if (is_dict(a)) {
                 rt_dict_t *d = (rt_dict_t*)a;
                 rt_list_t *l = rt_list_new();
-                for (int32_t i = 0; i < d->n; i++) {
-                    void *k = d->entries[i].k;
-                    if (is_int_val(k)) rt_list_push(l, k);
-                    else rt_list_push(l, rt_str_new(rt_str_c(k)));
+                for (int32_t i = 0; i < d->cap; i++) {
+                    if (d->entries[i].k != NULL) {
+                        void *k = d->entries[i].k;
+                        if (is_int_val(k)) rt_list_push(l, k);
+                        else rt_list_push(l, rt_str_new(rt_str_c(k)));
+                    }
                 }
                 push(vm, l);
             } else push(vm, rt_list_new());

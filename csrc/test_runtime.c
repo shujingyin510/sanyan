@@ -91,20 +91,43 @@ static void rt_list_push(rt_list_t *l, void *v) {
     l->items[l->len++] = v;
 }
 
-/* ── 字典 ── */
+/* ── 字典（哈希表：开放寻址 + 线性探测）── */
+#define DICT_LOAD_FACTOR 70
 typedef struct { void *k; void *v; } rt_entry_t;
 typedef struct { OBJ_HDR; int32_t n; int32_t cap; rt_entry_t *entries; } rt_dict_t;
+static uint32_t hash_key(void *k) {
+    if (is_int_val(k)) {
+        uint32_t h = (uint32_t)untag_i(k);
+        h = ((h >> 16) ^ h) * 0x45d9f3b;
+        h = ((h >> 16) ^ h) * 0x45d9f3b;
+        return (h >> 16) ^ h;
+    }
+    const char *s = rt_str_c(k);
+    uint32_t h = 5381;
+    while (*s) h = ((h << 5) + h) + (unsigned char)*s++;
+    return h;
+}
 static int key_eq(void *a, void *b) {
     if (is_int_val(a) && is_int_val(b)) return untag_i(a) == untag_i(b);
     if (!is_int_val(a) && !is_int_val(b) && a && b)
         return strcmp(((rt_str_t*)a)->data, ((rt_str_t*)b)->data) == 0;
     return a == b;
 }
-static int rt_dict_find(rt_dict_t *d, void *k) {
-    if (!d) return -1;
-    for (int32_t i = 0; i < d->n; i++)
-        if (key_eq(d->entries[i].k, k)) return i;
-    return -1;
+static void rt_dict_rehash(rt_dict_t *d) {
+    int32_t old_cap = d->cap;
+    rt_entry_t *old = d->entries;
+    d->cap = old_cap * 2;
+    d->entries = (rt_entry_t*)calloc((size_t)d->cap, sizeof(rt_entry_t));
+    for (int32_t i = 0; i < old_cap; i++) {
+        if (old[i].k != NULL) {
+            uint32_t h = hash_key(old[i].k);
+            uint32_t idx = h & ((uint32_t)d->cap - 1);
+            while (d->entries[idx].k != NULL)
+                idx = (idx + 1) & ((uint32_t)d->cap - 1);
+            d->entries[idx] = old[i];
+        }
+    }
+    free(old);
 }
 static rt_dict_t *rt_dict_new(void) {
     rt_dict_t *d = (rt_dict_t*)calloc(1, sizeof(rt_dict_t));
@@ -113,17 +136,37 @@ static rt_dict_t *rt_dict_new(void) {
     d->entries = (rt_entry_t*)calloc(DICT_INIT_CAP, sizeof(rt_entry_t));
     return d;
 }
+static int rt_dict_find(rt_dict_t *d, void *k) {
+    if (!d || d->cap == 0) return -1;
+    uint32_t h = hash_key(k);
+    uint32_t cap = (uint32_t)d->cap;
+    uint32_t idx = h & (cap - 1);
+    for (uint32_t i = 0; i < cap; i++) {
+        uint32_t pos = (idx + i) & (cap - 1);
+        if (d->entries[pos].k == NULL) return -1;
+        if (key_eq(d->entries[pos].k, k)) return (int)pos;
+    }
+    return -1;
+}
 static void rt_dict_set(rt_dict_t *d, void *k, void *v) {
     if (!d) return;
-    int i = rt_dict_find(d, k);
-    if (i >= 0) { d->entries[i].v = v; return; }
-    if (d->n >= d->cap) {
-        d->cap *= 2;
-        d->entries = (rt_entry_t*)realloc(d->entries, (size_t)d->cap * sizeof(rt_entry_t));
+    if (d->n >= (d->cap * DICT_LOAD_FACTOR) / 100)
+        rt_dict_rehash(d);
+    uint32_t h = hash_key(k);
+    uint32_t idx = h & ((uint32_t)d->cap - 1);
+    for (uint32_t i = 0; i < (uint32_t)d->cap; i++) {
+        uint32_t pos = (idx + i) & ((uint32_t)d->cap - 1);
+        if (d->entries[pos].k == NULL) {
+            d->entries[pos].k = is_int_val(k) ? k : (void*)rt_str_new(rt_str_c(k));
+            d->entries[pos].v = v;
+            d->n++;
+            return;
+        }
+        if (key_eq(d->entries[pos].k, k)) {
+            d->entries[pos].v = v;
+            return;
+        }
     }
-    d->entries[d->n].k = is_int_val(k) ? k : (void*)rt_str_new(rt_str_c(k));
-    d->entries[d->n].v = v;
-    d->n++;
 }
 static void *rt_dict_get(rt_dict_t *d, void *k) {
     int i = rt_dict_find(d, k);
@@ -342,7 +385,8 @@ static int vm_run(VM *vm) {
             push(vm, a); break; }
         case DICT_KEYS: { a = pop(vm);
             if (is_dict(a)) { rt_dict_t *d = (rt_dict_t*)a; rt_list_t *l = rt_list_new();
-                for (int32_t i = 0; i < d->n; i++) rt_list_push(l, d->entries[i].k);
+                for (int32_t i = 0; i < d->cap; i++)
+                    if (d->entries[i].k != NULL) rt_list_push(l, d->entries[i].k);
                 push(vm, l); } else push(vm, tag_i(0)); break; }
         case STREQ: { b = pop(vm); a = pop(vm);
             push(vm, tag_i(strcmp(rt_str_c(a), rt_str_c(b)) == 0 ? 1 : -1)); break; }
