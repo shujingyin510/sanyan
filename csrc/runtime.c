@@ -949,7 +949,7 @@ static void mock_actuator_write(uint8_t id, int32_t val) {
 /* ── 主入口 ── */
 int main(int argc, char **argv) {
     if (argc < 2) {
-        fprintf(stderr, "用法: %s firmware.bin\n", argv[0]);
+        fprintf(stderr, "用法: %s firmware.bin [--run] [源码文件]\n", argv[0]);
         return 1;
     }
 
@@ -958,7 +958,23 @@ int main(int argc, char **argv) {
 
     VM vm;
     if (vm_load(&vm, argv[1])) return 1;
+
+    /* 如果提供了源码文件，将其路径存入变量 0 */
+    if (argc > 2 && strcmp(argv[2], "--run") != 0) {
+        vm.vars[0] = rt_str_new(argv[2]);
+        vm.var_count = 1;
+    }
+
     int ret = vm_run(&vm);
+
+    /* --run 模式：输出栈顶值（用于管线） */
+    if (argc > 2 && strcmp(argv[2], "--run") == 0) {
+        if (vm.sp > 0) {
+            print_value(vm.stack[vm.sp - 1]);
+            printf("\n");
+        }
+    }
+
     free((void*)vm.code);
     return ret;
 }
