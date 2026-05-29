@@ -1,4 +1,7 @@
-"""求值器主类：组合运行环境、内置操作、自定义命令"""
+"""求值器主类：组合运行环境、内置操作、自定义命令
+
+ops 模块在 SanyanEvaluator 首次实例化时延迟加载，避免模块导入时的启动开销。
+"""
 
 from __future__ import annotations
 import time
@@ -18,9 +21,15 @@ from eval_helpers import (
 )
 from debug_eval import debug_before, debug_after, debug_prompt
 
+_ops_initialized = False
+
 
 def _init_ops() -> None:
-    """初始化所有操作模块的注册（仅在首次导入时执行一次）"""
+    """初始化所有操作模块的注册（延迟加载，仅在首次实例化时执行）"""
+    global _ops_initialized
+    if _ops_initialized:
+        return
+    _ops_initialized = True
     import ops.control_ops
     import ops.logic_ops
     import ops.comparison_ops
@@ -47,9 +56,6 @@ def _init_ops() -> None:
     import ops.unicode_ops  # noqa: F401
 
 
-_init_ops()
-
-
 class SanyanEvaluator(SanyanRuntime):
     """三言求值器核心类，组合运行环境、内置操作、自定义命令。"""
 
@@ -60,6 +66,7 @@ class SanyanEvaluator(SanyanRuntime):
     ) -> None:
         import sys as _sys
 
+        _init_ops()  # 延迟加载 ops 模块
         _sys.setrecursionlimit(max(_sys.getrecursionlimit(), 2000))
         if skin_manager is None:
             from skin import SkinManager

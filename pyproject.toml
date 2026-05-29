@@ -38,9 +38,11 @@ all = [
 dev = [
     "sanyan[all]",
     "pytest>=7.0",
+    "pytest-cov>=4.0",
     "coverage>=6.0",
     "ruff>=0.1.0",
     "mypy>=1.0",
+    "pdoc3>=0.11.0",
 ]
 
 [project.scripts]
@@ -84,9 +86,10 @@ ignore_errors = true
 
 [tool.coverage.run]
 source = ["."]
-omit = ["tests/*", "examples/*", ".github/*"]
-command_line = "-m pytest"
+omit = ["tests/*", "examples/*", ".github/*", "docs/*", "build/*"]
 
 [tool.coverage.report]
-exclude_lines = ["pragma: no cover", "if __name__ == .__main__.:"]
+exclude_lines = ["pragma: no cover", "if __name__ == .__main__.:", "raise NotImplementedError"]
 show_missing = true
+skip_covered = true
+fail_under = 60

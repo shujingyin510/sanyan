@@ -214,3 +214,6 @@ build/*.bin
 tests/*.bin
 # Temp test outputs
 *.bin.tmp
+
+# Generated API docs
+docs/api/
