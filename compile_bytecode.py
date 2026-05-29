@@ -58,7 +58,7 @@ def compile_source(source: str, output_path: str, vars_table: dict | None = None
                     # S-表达式用 (做 ...) 作为顶层包装
                     sugar_ast = ['do'] + s_expr_ast[1:]
                 elif isinstance(s_expr_ast, list):
-                    sugar_ast = ['do'] + s_expr_ast
+                    sugar_ast = ['do', s_expr_ast]
                 else:
                     sugar_ast = ['do', s_expr_ast]
         except Exception:

@@ -104,7 +104,9 @@ def main():
 
     # --profile 标志
     profiling = '--profile' in args
-    # --vm 标志：使用字节码 VM 执行（更快，但部分复杂程序可能不兼容）
+    # --eval 标志：使用 Python 求值器（调试模式，较慢）
+    use_eval = '--eval' in args
+    # --vm 标志：保留向后兼容，等同于默认行为
     use_vm = '--vm' in args
     # --san 标志：使用自举编译器（sugar.san + llvmgen.san）生成原生可执行文件
     use_san = '--san' in args
@@ -157,9 +159,9 @@ def main():
 
         code = preprocess_includes(code)
 
-        # ── 字节码缓存检查（仅 --vm 模式）──
+        # ── 字节码缓存检查（默认模式，--eval 时跳过）──
         bin_path = os.path.join('build', os.path.basename(filepath).replace('.san', '.bin'))
-        if use_vm and not profiling:
+        if not use_eval and not profiling:
             if not os.path.exists(bin_path) or os.path.getmtime(bin_path) < os.path.getmtime(filepath):
                 os.makedirs('build', exist_ok=True)
                 from compile_bytecode import compile_san
@@ -169,6 +171,8 @@ def main():
 
             SanyanVM.from_bin(bin_path)
             sys.exit(0)
+
+        # ── Python 求值器模式（--eval 或 --profile）──
 
         skin_mgr = SkinManager('chinese')
         env: SanyanEvaluator = SanyanEvaluator(skin_manager=skin_mgr)
