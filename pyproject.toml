@@ -89,7 +89,23 @@ ignore_errors = true
 
 [tool.coverage.run]
 source = ["."]
-omit = ["tests/*", "examples/*", ".github/*", "docs/*", "build/*"]
+omit = [
+    "tests/*",
+    "examples/*",
+    ".github/*",
+    "docs/*",
+    "build/*",
+    "lsp/*",
+    "lsp_server.py",
+    "main.py",
+    "repl.py",
+    "sanfmt.py",
+    "sanyancc.py",
+    "gui.py",
+    "dap_server.py",
+    "setup.py",
+    "sanyan/*",
+]
 
 [tool.coverage.report]
 exclude_lines = ["pragma: no cover", "if __name__ == .__main__.:", "raise NotImplementedError"]

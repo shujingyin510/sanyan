@@ -8,10 +8,7 @@ import tkinter as tk
 from tkinter import filedialog, messagebox, ttk, scrolledtext
 from typing import Any
 
-import tomllib
-
-with open('pyproject.toml', 'rb') as f:
-    VERSION = tomllib.load(f)['project']['version']
+from sanyan import __version__ as VERSION
 from skin import SkinManager
 from evaluator import SanyanEvaluator
 from lexer import tokenize

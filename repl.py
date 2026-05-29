@@ -4,10 +4,8 @@ import os
 from typing import Any
 from lexer import tokenize
 from parser import parse
-import tomllib
 
-with open('pyproject.toml', 'rb') as f:
-    VERSION = tomllib.load(f)['project']['version']
+from sanyan import __version__ as VERSION
 from evaluator import SanyanEvaluator
 from sugar import SugarConverter
 from skin import SkinManager

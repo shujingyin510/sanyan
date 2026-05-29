@@ -223,5 +223,184 @@ class TestSandboxOps(unittest.TestCase):
         self.env.eval(['输出', '"x"'])  # should not raise
 
 
+class TestTypeOpsExtended(unittest.TestCase):
+    """类型操作扩展测试"""
+    def setUp(self):
+        self.env = SanyanEvaluator()
+
+    def test_is_dict_true(self):
+        r = self.env.eval(['是字典', ['字典', '"a"', '1']])
+        self.assertEqual(r.to_int(), 1)
+
+    def test_is_dict_false(self):
+        r = self.env.eval(['是字典', '42'])
+        self.assertEqual(r.to_int(), -1)
+
+    def test_is_list_on_dict(self):
+        r = self.env.eval(['是列表', ['字典', '"a"', '1']])
+        self.assertEqual(r.to_int(), -1)
+
+    def test_str_equals_same(self):
+        r = self.env.eval(['字符串相等', '"hello"', '"hello"'])
+        self.assertEqual(r.to_int(), 1)
+
+    def test_str_equals_diff(self):
+        r = self.env.eval(['字符串相等', '"hello"', '"world"'])
+        self.assertEqual(r.to_int(), -1)
+
+    def test_to_number_from_string(self):
+        r = self.env.eval(['to_number', '"42"'])
+        self.assertEqual(r.to_int(), 42)
+
+    def test_to_number_from_float_string(self):
+        r = self.env.eval(['to_number', '"3.14"'])
+        self.assertAlmostEqual(r.to_float(), 3.14, places=2)
+
+    def test_to_number_from_negative_string(self):
+        r = self.env.eval(['to_number', '"-5"'])
+        self.assertEqual(r.to_int(), -5)
+
+    def test_to_number_error(self):
+        from values import SanyanTypeError
+        with self.assertRaises(SanyanTypeError):
+            self.env.eval(['to_number', '"abc"'])
+
+    def test_to_string_from_number(self):
+        r = self.env.eval(['字符串', '42'])
+        self.assertEqual(r, '42')
+
+    def test_to_string_from_list(self):
+        r = self.env.eval(['字符串', ['列表', '1', '2', '3']])
+        self.assertEqual(r, '[1, 2, 3]')
+
+    def test_to_string_from_dict(self):
+        r = self.env.eval(['字符串', ['字典', '"a"', '1']])
+        self.assertIn('a', r)
+
+
+class TestControlOpsExtended(unittest.TestCase):
+    """控制流扩展测试"""
+    def setUp(self):
+        self.env = SanyanEvaluator()
+
+    def test_if_no_else(self):
+        r = self.env.eval(['若', ['等于', '1', '1'], ['输出', '"yes"']])
+        # Should not raise
+
+    def test_if_nested(self):
+        r = self.env.eval(['若', ['等于', '1', '1'],
+            ['若', ['等于', '2', '2'], ['加', '1', '1'], ['加', '2', '2']],
+            ['减', '1', '1']])
+        self.assertEqual(r.to_int(), 2)
+
+    def test_loop_with_break(self):
+        r = self.env.eval(['做',
+            ['设', 'i', '0'],
+            ['循环', ['小于', 'i', '10'],
+                ['若', ['等于', 'i', '5'],
+                    ['跳出'],
+                    ['设', 'i', ['加', 'i', '1']]]],
+            'i'])
+        self.assertEqual(r.to_int(), 5)
+
+    def test_do_multiple_expressions(self):
+        r = self.env.eval(['做', ['设', 'x', '1'], ['设', 'y', '2'], ['加', 'x', 'y']])
+        self.assertEqual(r.to_int(), 3)
+
+    def test_for_loop(self):
+        r = self.env.eval(['做',
+            ['设', 'sum', '0'],
+            ['设', 'i', '1'],
+            ['循环', ['小于等于', 'i', '5'],
+                ['做',
+                    ['设', 'sum', ['加', 'sum', 'i']],
+                    ['设', 'i', ['加', 'i', '1']]]],
+            'sum'])
+        self.assertEqual(r.to_int(), 15)
+
+
+class TestMathExtraOps(unittest.TestCase):
+    """数学扩展操作测试"""
+    def setUp(self):
+        self.env = SanyanEvaluator()
+
+    def test_sum_list(self):
+        r = self.env.eval(['求和', ['列表', '1', '2', '3', '4', '5']])
+        self.assertEqual(r.to_int(), 15)
+
+    def test_avg_list(self):
+        r = self.env.eval(['均值', ['列表', '2', '4', '6']])
+        self.assertEqual(r.to_int(), 4)
+
+
+class TestStringOpsExtended(unittest.TestCase):
+    """字符串扩展测试"""
+    def setUp(self):
+        self.env = SanyanEvaluator()
+
+    def test_replace_all(self):
+        r = self.env.eval(['替换', '"aabaa"', '"a"', '"X"'])
+        self.assertEqual(r, 'XXbXX')
+
+    def test_split(self):
+        r = self.env.eval(['分割', '"a,b,c"', '","'])
+        self.assertEqual(r, ['a', 'b', 'c'])
+
+    def test_join(self):
+        r = self.env.eval(['连接', '"a"', '"b"', '"c"'])
+        self.assertEqual(r, 'abc')
+
+    def test_trim(self):
+        r = self.env.eval(['trim', '"  hello  "'])
+        self.assertEqual(r, 'hello')
+
+    def test_upper(self):
+        r = self.env.eval(['大写', '"hello"'])
+        self.assertEqual(r, 'HELLO')
+
+    def test_lower(self):
+        r = self.env.eval(['小写', '"HELLO"'])
+        self.assertEqual(r, 'hello')
+
+    def test_char_at(self):
+        r = self.env.eval(['字符码', '"A"'])
+        self.assertEqual(r.to_int(), 65)
+
+
+class TestContainerOpsExtended(unittest.TestCase):
+    """容器操作扩展测试"""
+    def setUp(self):
+        self.env = SanyanEvaluator()
+
+    def test_dict_keys(self):
+        r = self.env.eval(['字列', ['字典', '"a"', '1', '"b"', '2']])
+        self.assertEqual(sorted(r), ['a', 'b'])
+
+    def test_list_concat(self):
+        r = self.env.eval(['列表合', ['列表', '1', '2'], ['列表', '3', '4']])
+        self.assertEqual([x.to_int() if hasattr(x, 'to_int') else x for x in r], [1, 2, 3, 4])
+
+    def test_list_slice(self):
+        r = self.env.eval(['切片', ['列表', '1', '2', '3', '4', '5'], '1', '4'])
+        self.assertEqual([x.to_int() if hasattr(x, 'to_int') else x for x in r], [2, 3, 4])
+
+    def test_contains_list(self):
+        r = self.env.eval(['包含', ['列表', '1', '2', '3'], '2'])
+        self.assertEqual(r.to_int(), 1)
+
+    def test_contains_list_missing(self):
+        r = self.env.eval(['包含', ['列表', '1', '2', '3'], '5'])
+        self.assertEqual(r.to_int(), -1)
+
+    def test_get_out_of_range(self):
+        from values import SanyanValueError
+        with self.assertRaises(SanyanValueError):
+            self.env.eval(['取', ['列表', '1', '2', '3'], '10'])
+
+    def test_set_element(self):
+        r = self.env.eval(['置元素', ['列表', '1', '2', '3'], '1', '99'])
+        self.assertEqual([x.to_int() if hasattr(x, 'to_int') else x for x in r], [1, 99, 3])
+
+
 if __name__ == '__main__':
     unittest.main()
