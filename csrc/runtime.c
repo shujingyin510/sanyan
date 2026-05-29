@@ -24,19 +24,13 @@
 #define VAR_MAX 256
 #endif
 #ifndef STACK_MAX
-#define STACK_MAX 512
-#endif
-#ifndef CALL_STACK_DEPTH
-#define CALL_STACK_DEPTH 64
-#endif
-#ifndef STACK_MAX
 #define STACK_MAX 8192
-#endif
-#ifndef NATIVE_DEV_MAX
-#define NATIVE_DEV_MAX 16
 #endif
 #ifndef CALL_STACK_DEPTH
 #define CALL_STACK_DEPTH 255
+#endif
+#ifndef NATIVE_DEV_MAX
+#define NATIVE_DEV_MAX 16
 #endif
 
 /* ── 堆对象类型标签 ── */

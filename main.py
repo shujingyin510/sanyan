@@ -4,10 +4,8 @@ import sys
 import os
 import subprocess
 from repl import demo, repl
-import tomllib
 
-with open('pyproject.toml', 'rb') as f:
-    VERSION = tomllib.load(f)['project']['version']
+from sanyan import __version__ as VERSION
 from evaluator import SanyanEvaluator
 from sugar import SugarConverter
 from ternary_core import TritValue

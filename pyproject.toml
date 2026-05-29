@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "sanyan"
-version = "3.17.0"
+dynamic = ["version"]
 description = "A Chinese programming language based on balanced ternary logic"
 readme = "README.md"
 requires-python = ">=3.12"
@@ -13,6 +13,9 @@ authors = [
     {name = "Sanyan Developers"}
 ]
 dependencies = []
+
+[tool.setuptools.dynamic]
+version = {attr = "sanyan.__version__"}
 
 [project.optional-dependencies]
 # ── 核心语言层 ──
