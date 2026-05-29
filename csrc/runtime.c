@@ -89,6 +89,13 @@ typedef enum {
     ORD      = 0x31,
     DICT_KEYS = 0x32,
     JMP32    = 0x33,
+    OR       = 0x34,
+    AND      = 0x35,
+    STR_FIND = 0x36,
+    STR_TO_LIST = 0x37,
+    STR_STARTSWITH = 0x38,
+    STR_CONTAINS = 0x39,
+    DICT_LEN = 0x3A,
     HALT     = 0xFF,
 } Opcode;
 
@@ -827,6 +834,69 @@ int vm_run(VM *vm) {
         case HALT:
             vm->halted = 1;
             break;
+
+        /* ── 逻辑运算 ── */
+        case OR: {
+            b = pop(vm); a = pop(vm);
+            push(vm, val_true(a) || val_true(b) ? tag_i(1) : tag_i(-1));
+            break;
+        }
+        case AND: {
+            b = pop(vm); a = pop(vm);
+            push(vm, val_true(a) && val_true(b) ? tag_i(1) : tag_i(-1));
+            break;
+        }
+
+        /* ── 字符串操作 ── */
+        case STR_FIND: {
+            /* find(haystack, needle) → index or -1 */
+            b = pop(vm); a = pop(vm);
+            const char *hay = rt_str_c(a);
+            const char *ndl = rt_str_c(b);
+            const char *pos = strstr(hay, ndl);
+            push(vm, tag_i(pos ? (int32_t)(pos - hay) : -1));
+            break;
+        }
+        case STR_TO_LIST: {
+            /* str_to_list(s) → list of single-char strings */
+            a = pop(vm);
+            const char *s = rt_str_c(a);
+            rt_list_t *l = rt_list_new();
+            while (*s) {
+                char ch[2] = {*s, 0};
+                rt_list_push(l, rt_str_new(ch));
+                s++;
+            }
+            push(vm, l);
+            break;
+        }
+        case STR_STARTSWITH: {
+            /* startswith(s, prefix) → 1 or -1 */
+            b = pop(vm); a = pop(vm);
+            const char *str = rt_str_c(a);
+            const char *pre = rt_str_c(b);
+            int32_t plen = (int32_t)strlen(pre);
+            push(vm, strncmp(str, pre, plen) == 0 ? tag_i(1) : tag_i(-1));
+            break;
+        }
+        case STR_CONTAINS: {
+            /* contains(s, sub) → 1 or -1 */
+            b = pop(vm); a = pop(vm);
+            const char *hs = rt_str_c(a);
+            const char *nd = rt_str_c(b);
+            push(vm, strstr(hs, nd) != NULL ? tag_i(1) : tag_i(-1));
+            break;
+        }
+        case DICT_LEN: {
+            /* dict_len(d) → key count */
+            a = pop(vm);
+            if (is_dict(a)) {
+                push(vm, tag_i(((rt_dict_t*)a)->n));
+            } else {
+                push(vm, tag_i(0));
+            }
+            break;
+        }
 
         default:
             fprintf(stderr, "未知指令: 0x%02X @ 0x%04x\n", op, vm->pc - 1);

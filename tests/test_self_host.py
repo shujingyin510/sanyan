@@ -24,7 +24,7 @@ OUTPUT_BIN = os.path.join(
     'self_host_output.bin',
 )
 
-REFERENCE_SHA256 = 'b10cef63a6a73f866f2f8ad719021a994188db6181596e2bc88e018b6e0f4267'
+REFERENCE_SHA256 = 'b8c9619a671b5813031a3384016093903cc576115227af469c9495299ef0b4ce'
 
 
 class TestSelfHost(unittest.TestCase):

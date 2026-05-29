@@ -66,6 +66,13 @@ WRITE_BINARY = 0x30
 ORD = 0x31
 DICT_KEYS = 0x32
 JMP32 = 0x33
+OR = 0x34
+AND = 0x35
+STR_FIND = 0x36
+STR_TO_LIST = 0x37
+STR_STARTSWITH = 0x38
+STR_CONTAINS = 0x39
+DICT_LEN = 0x3A
 HALT = 0xFF
 
 OP_NAMES = {v: k for k, v in vars().items() if isinstance(v, int) and k.isupper()}
@@ -263,10 +270,18 @@ class VM:
         return True
 
     def _exec_comparison(self, op: int) -> bool:
-        """比较与逻辑运算指令：GT, LT, GTE, LTE, EQ, NE, NOT"""
+        """比较与逻辑运算指令：GT, LT, GTE, LTE, EQ, NE, NOT, OR, AND"""
         if op == NOT:
             a = self.stack.pop()
             self.stack.append(1 if a == 0 else 0)
+        elif op == OR:
+            b = self.stack.pop()
+            a = self.stack.pop()
+            self.stack.append(1 if (a != 0 and a != -1) or (b != 0 and b != -1) else 0)
+        elif op == AND:
+            b = self.stack.pop()
+            a = self.stack.pop()
+            self.stack.append(1 if (a != 0 and a != -1) and (b != 0 and b != -1) else 0)
         else:
             b = self.stack.pop()
             a = self.stack.pop()
@@ -301,7 +316,7 @@ class VM:
         return True
 
     def _exec_string(self, op: int) -> bool:
-        """字符串操作指令：STRLEN, STRSUB, STREQ, CONCAT, ORD"""
+        """字符串操作指令：STRLEN, STRSUB, STREQ, CONCAT, ORD, STR_FIND, STR_TO_LIST, STR_STARTSWITH, STR_CONTAINS"""
         if op == STRLEN:
             self.stack.append(len(str(self.stack.pop())))
         elif op == STRSUB:
@@ -320,6 +335,21 @@ class VM:
         elif op == ORD:
             ch = str(self.stack.pop())
             self.stack.append(ord(ch[0]) if ch else 0)
+        elif op == STR_FIND:
+            needle = str(self.stack.pop())
+            haystack = str(self.stack.pop())
+            self.stack.append(haystack.find(needle))
+        elif op == STR_TO_LIST:
+            s = str(self.stack.pop())
+            self.stack.append(list(s))
+        elif op == STR_STARTSWITH:
+            prefix = str(self.stack.pop())
+            s = str(self.stack.pop())
+            self.stack.append(1 if s.startswith(prefix) else 0)
+        elif op == STR_CONTAINS:
+            sub = str(self.stack.pop())
+            s = str(self.stack.pop())
+            self.stack.append(1 if sub in s else 0)
         return True
 
     def _exec_container(self, op: int) -> bool:
@@ -406,6 +436,9 @@ class VM:
         elif op == DICT_KEYS:
             d = self.stack.pop()
             self.stack.append(list(d.keys()) if isinstance(d, dict) else [])
+        elif op == DICT_LEN:
+            d = self.stack.pop()
+            self.stack.append(len(d) if isinstance(d, dict) else 0)
         return True
 
     def _exec_io(self, op: int) -> bool:
@@ -594,6 +627,8 @@ _DISPATCH: dict[int, 'Callable'] = {
     EQ:      VM._exec_comparison,
     NE:      VM._exec_comparison,
     NOT:     VM._exec_comparison,
+    OR:      VM._exec_comparison,
+    AND:     VM._exec_comparison,
     # 类型检查
     IS_NUM:  VM._exec_type_check,
     IS_STR:  VM._exec_type_check,
@@ -605,6 +640,10 @@ _DISPATCH: dict[int, 'Callable'] = {
     STREQ:   VM._exec_string,
     CONCAT:  VM._exec_string,
     ORD:     VM._exec_string,
+    STR_FIND: VM._exec_string,
+    STR_TO_LIST: VM._exec_string,
+    STR_STARTSWITH: VM._exec_string,
+    STR_CONTAINS: VM._exec_string,
     # 容器
     GET:         VM._exec_container,
     SET_ELEMENT: VM._exec_container,
@@ -618,6 +657,7 @@ _DISPATCH: dict[int, 'Callable'] = {
     DICT_SET:  VM._exec_dict,
     DICT_HAS:  VM._exec_dict,
     DICT_KEYS: VM._exec_dict,
+    DICT_LEN:  VM._exec_dict,
     # I/O
     IO_READ:      VM._exec_io,
     IO_WRITE:     VM._exec_io,
