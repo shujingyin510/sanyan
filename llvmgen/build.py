@@ -28,12 +28,32 @@ def _find_cc() -> str:
     msys2_paths = [
         r'C:\msys64\mingw64\bin\gcc.exe',
         r'C:\msys64\ucrt64\bin\gcc.exe',
-        r'C:\msys32\mingw32\bin\gcc.exe',
+        r'D:\msys64\mingw64\bin\gcc.exe',
+        r'D:\msys64\ucrt64\bin\gcc.exe',
     ]
     for p in msys2_paths:
         if os.path.exists(p):
             return p
     raise RuntimeError('未找到 C 编译器 (gcc/clang/cc/MSYS2 mingw)。请安装后再试。')
+
+
+def _find_llc() -> str | None:
+    """查找 llc 工具（优先 MSYS2 路径）。"""
+    for llc in ['llc', 'llc.exe']:
+        try:
+            subprocess.run([llc, '--version'], capture_output=True, timeout=5, check=False)
+            return llc
+        except (FileNotFoundError, subprocess.TimeoutExpired):
+            continue
+    msys2_paths = [
+        r'D:\msys64\ucrt64\bin\llc.exe',
+        r'D:\msys64\mingw64\bin\llc.exe',
+        r'C:\msys64\ucrt64\bin\llc.exe',
+    ]
+    for p in msys2_paths:
+        if os.path.exists(p):
+            return p
+    return None
 
 
 def build(input_path: str, output_path: str | None = None, run: bool = False) -> str:
@@ -63,17 +83,27 @@ def build(input_path: str, output_path: str | None = None, run: bool = False) ->
     with open(ir_path, 'w', encoding='utf-8') as f:
         f.write(ir_text)
 
-    # 用 clang/gcc 编译 IR (需要 LLVM 工具链)
+    # 用 llc/clang/gcc 编译 IR (优先 llc，无 Python 依赖)
     cc_ok = False
-    # clang 原生支持 .ll 文件
-    try:
-        subprocess.run(['clang', '-c', ir_path, '-o', obj_path], check=True)
-        cc_ok = True
-    except (FileNotFoundError, subprocess.CalledProcessError):
-        pass
+    llc = _find_llc()
+    # 优先: llc（独立 LLVM 工具，无需 Python）
+    if llc:
+        try:
+            subprocess.run([llc, '-filetype=obj', ir_path, '-o', obj_path], check=True, timeout=30)
+            cc_ok = True
+        except (FileNotFoundError, subprocess.CalledProcessError, subprocess.TimeoutExpired):
+            pass
 
     if not cc_ok:
-        # 回退: llvmlite 直接生成目标代码
+        # 回退: clang 原生支持 .ll 文件
+        try:
+            subprocess.run(['clang', '-c', ir_path, '-o', obj_path], check=True)
+            cc_ok = True
+        except (FileNotFoundError, subprocess.CalledProcessError):
+            pass
+
+    if not cc_ok:
+        # 最后回退: llvmlite（需要 Python）
         try:
             from llvmlite import binding
 
@@ -81,14 +111,12 @@ def build(input_path: str, output_path: str | None = None, run: bool = False) ->
             binding.initialize_native_asmprinter()
             llvm_mod = binding.parse_assembly(ir_text)
             target = binding.Target.from_default_triple()
-            # Windows COFF 需要 static reloc model
             tm = target.create_target_machine(reloc='static')
             obj_code = tm.emit_object(llvm_mod)
             with open(obj_path, 'wb') as f:
                 f.write(obj_code)
             cc_ok = True
         except Exception:
-            # 对象文件生成失败，尝试汇编
             try:
                 tm = target.create_target_machine(reloc='static', codemodel='large')
                 asm = tm.emit_assembly(llvm_mod)
@@ -101,14 +129,9 @@ def build(input_path: str, output_path: str | None = None, run: bool = False) ->
                 pass
 
     if not cc_ok:
-        # 最后回退: 尝试 llc
-        try:
-            subprocess.run(['llc', '-filetype=obj', ir_path, '-o', obj_path], check=True)
-            cc_ok = True
-        except FileNotFoundError:
-            raise RuntimeError(
-                f'无法编译 LLVM IR。请安装 clang 或 llc，或运行 pip install llvmlite。\nIR 文件已保存至: {ir_path}'
-            ) from None
+        raise RuntimeError(
+            f'无法编译 LLVM IR。请安装 llc/clang 或运行 pip install llvmlite。\nIR 文件已保存至: {ir_path}'
+        )
 
     # 3. 链接
     print(f'[3/3] 链接 → {output_path} ...')

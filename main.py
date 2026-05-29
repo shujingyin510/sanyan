@@ -22,22 +22,40 @@ def _compile_ir_to_exe(ir_text: str, suffix: str, gcc_env: dict | None = None) -
     out_exe = os.path.join('build', out_name + f'_{suffix}.exe')
     os.makedirs('build', exist_ok=True)
     ir_path = os.path.join('build', out_name + f'_{suffix}.ll')
-    asm_path = os.path.join('build', out_name + f'_{suffix}.s')
+    obj_path = os.path.join('build', out_name + f'_{suffix}.o')
 
     with open(ir_path, 'w', encoding='utf-8') as f:
         f.write(ir_text)
     print(f'[{suffix}] LLVM IR → {ir_path} ({len(ir_text)} bytes)')
 
-    from llvmlite import binding as llvm_binding
+    # 优先使用 llc（无 Python 依赖）
+    obj_ok = False
+    for llc in ['llc', 'llc.exe', r'D:\msys64\ucrt64\bin\llc.exe', r'D:\msys64\mingw64\bin\llc.exe']:
+        try:
+            subprocess.run([llc, '-filetype=obj', ir_path, '-o', obj_path], check=True, timeout=30)
+            obj_ok = True
+            break
+        except (FileNotFoundError, subprocess.CalledProcessError, subprocess.TimeoutExpired):
+            continue
 
-    llvm_binding.initialize_all_targets()
-    llvm_binding.initialize_native_asmprinter()
-    target = llvm_binding.Target.from_default_triple()
-    tm = target.create_target_machine(reloc='static', codemodel='large')
-    asm = tm.emit_assembly(llvm_binding.parse_assembly(ir_text))
-    with open(asm_path, 'w') as f:
-        f.write(asm)
-    print(f'[{suffix}] ASM → {asm_path}')
+    if not obj_ok:
+        # 回退: llvmlite
+        try:
+            from llvmlite import binding as llvm_binding
+
+            llvm_binding.initialize_all_targets()
+            llvm_binding.initialize_native_asmprinter()
+            target = llvm_binding.Target.from_default_triple()
+            tm = target.create_target_machine(reloc='static', codemodel='large')
+            asm = tm.emit_assembly(llvm_binding.parse_assembly(ir_text))
+            asm_path = os.path.join('build', out_name + f'_{suffix}.s')
+            with open(asm_path, 'w') as f:
+                f.write(asm)
+            print(f'[{suffix}] ASM → {asm_path}')
+        except Exception as e:
+            raise RuntimeError(f'无法编译 LLVM IR: {e}\nIR 文件: {ir_path}')
+
+    print(f'[{suffix}] OBJ → {obj_path}')
 
     if gcc_env is None:
         gcc_env = os.environ.copy()
@@ -47,28 +65,14 @@ def _compile_ir_to_exe(ir_text: str, suffix: str, gcc_env: dict | None = None) -
     sc_o = os.path.join('build', 'syscall.o')
     subprocess.run(
         [gcc, '-c', 'llvmgen/syscall.c', '-o', sc_o, '-std=c99', '-O2', '-nostartfiles'],
-        check=True,
-        env=gcc_env,
+        check=True, env=gcc_env,
     )
-    subprocess.run([gcc, '-c', asm_path, '-o', asm_path.replace('.s', '.o')], check=True, env=gcc_env)
-    subprocess.run(
-        [
-            gcc,
-            asm_path.replace('.s', '.o'),
-            sc_o,
-            '-o',
-            out_exe,
-            '-nostartfiles',
-            '-e',
-            'main',
-            '-lkernel32',
-            '-lgcc',
-            '-fno-stack-check',
-            '-fno-stack-protector',
-        ],
-        check=True,
-        env=gcc_env,
-    )
+    subprocess.run([gcc, '-c', obj_path, '-o', obj_path], check=True, env=gcc_env)
+    subprocess.run([
+        gcc, obj_path, sc_o, '-o', out_exe,
+        '-nostartfiles', '-e', 'main', '-lkernel32', '-lgcc',
+        '-fno-stack-check', '-fno-stack-protector',
+    ], check=True, env=gcc_env)
     print(f'[{suffix}] EXE → {out_exe}')
     return out_exe
 
