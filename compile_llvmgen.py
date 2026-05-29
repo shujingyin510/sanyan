@@ -1,7 +1,13 @@
 """编译 llvmgen.san → llvmgen.bin
 
-注入必要的辅助函数（替代 Python 注册的命令），
+注入必要的辅助函数（计数器、状态管理、函数名映射），
 然后用字节码编译器编译为 .bin。
+
+薄包装辅助函数（查找/前缀/包含等）已移除——llvmgen.san 直接使用
+内置操作（查找/前缀/包含/字符串包含/含键/置键/取长/取/表长/
+列表合/字列/切片），无需额外注入。
+死桩（转义LLVM字符串/不以终止指令结尾/最后一行/是否为数字字符串/是终止指令）
+已移除——llvmgen.san 自身已定义完整实现。
 """
 
 import sys
@@ -23,7 +29,7 @@ def make_fn(name, params, body_stmts):
     return ['fn', name, params, body]
 
 
-# ── 辅助函数定义 ──────────────────────────────────────────────
+# ── 辅助函数定义（仅保留必需的计数器、状态管理、函数名映射）──
 
 HELPERS = [
     # 计数器：新寄存器ID — 返回当前值并自增
@@ -60,124 +66,6 @@ HELPERS = [
         [
             ['set', 'lid', ['新标签ID']],
             ['return', ['连接', 'prefix', ['字符串', 'lid']]],
-        ],
-    ),
-    # 查找 (s, sub) → index or -1
-    make_fn(
-        '查找',
-        ['s', 'sub'],
-        [
-            ['set', 'slen', ['取长', 's']],
-            ['set', 'sublen', ['取长', 'sub']],
-            ['set', 'i', 0],
-            [
-                'loop',
-                ['小于', 'i', ['加', ['减', 'slen', 'sublen'], 1]],
-                [
-                    'do',
-                    ['if', ['等于', ['子串', 's', 'i', 'sublen'], 'sub'], ['return', 'i']],
-                    ['set', 'i', ['加', 'i', 1]],
-                ],
-            ],
-            ['return', -1],
-        ],
-    ),
-    # 前缀 (s, prefix) → 真/假
-    make_fn(
-        '前缀',
-        ['s', 'prefix'],
-        [
-            ['return', ['等于', ['子串', 's', 0, ['取长', 'prefix']], 'prefix']],
-        ],
-    ),
-    # 包含 (lst, item) → 真/假
-    make_fn(
-        '包含',
-        ['lst', 'item'],
-        [
-            ['set', 'i', 0],
-            ['set', 'llen', ['表长', 'lst']],
-            [
-                'loop',
-                ['小于', 'i', 'llen'],
-                ['do', ['if', ['等于', ['取', 'lst', 'i'], 'item'], ['return', 1]], ['set', 'i', ['加', 'i', 1]]],
-            ],
-            ['return', -1],
-        ],
-    ),
-    # 字符串包含 (s, sub) → 真/假
-    make_fn(
-        '字符串包含',
-        ['s', 'sub'],
-        [
-            ['return', ['大于等于', ['查找', 's', 'sub'], 0]],
-        ],
-    ),
-    # 查键 (d, key, fallback) → value or fallback
-    make_fn(
-        '查键',
-        ['d', 'key', 'fallback'],
-        [
-            ['if', ['含键', 'd', 'key'], ['return', ['取键', 'd', 'key']]],
-            ['return', 'fallback'],
-        ],
-    ),
-    # 存变量 (d, key, value) — 设置字典键
-    make_fn(
-        '存变量',
-        ['d', 'key', 'value'],
-        [
-            ['置键', 'd', 'key', 'value'],
-            ['return', 0],
-        ],
-    ),
-    # 取字长 (s) → UTF-8 字节长度（近似：用字符长度 * 平均字节）
-    make_fn(
-        '取字长',
-        ['s'],
-        [
-            ['return', ['取长', 's']],
-        ],
-    ),
-    # 列表取 (lst, idx) → safe get
-    make_fn(
-        '列表取',
-        ['lst', 'idx'],
-        [
-            ['if', ['小于', 'idx', ['表长', 'lst']], ['return', ['取', 'lst', 'idx']]],
-            ['return', '""'],
-        ],
-    ),
-    # 列表取长 (lst) → length
-    make_fn(
-        '列表取长',
-        ['lst'],
-        [
-            ['return', ['表长', 'lst']],
-        ],
-    ),
-    # 列表追加 (lst, item) → lst with item appended
-    make_fn(
-        '列表追加',
-        ['lst', 'item'],
-        [
-            ['return', ['列表合', 'lst', ['列表', 'item']]],
-        ],
-    ),
-    # 字典取长 (d) → key count
-    make_fn(
-        '字典取长',
-        ['d'],
-        [
-            ['return', ['表长', ['字列', 'd']]],
-        ],
-    ),
-    # 字典键列表 (d) → key list
-    make_fn(
-        '字典键列表',
-        ['d'],
-        [
-            ['return', ['字列', 'd']],
         ],
     ),
     # 循环进栈 (hdr) — 存储到全局变量
@@ -243,54 +131,6 @@ HELPERS = [
         [
             ['if', ['含键', '_fn_map', 'name'], ['return', ['取键', '_fn_map', 'name']]],
             ['return', 'name'],
-        ],
-    ),
-    # 转义LLVM字符串 (s) → escaped string（简化版）
-    make_fn(
-        '转义LLVM字符串',
-        ['s'],
-        [
-            ['return', 's'],
-        ],
-    ),
-    # 是终止指令 (line) → 真/假
-    make_fn(
-        '是终止指令',
-        ['line'],
-        [
-            ['set', 'trimmed', 'line'],  # 近似 trim
-            ['if', ['字符串包含', 'trimmed', '"ret "'], ['return', 1]],
-            ['if', ['字符串包含', 'trimmed', '"br "'], ['return', 1]],
-            ['if', ['字符串包含', 'trimmed', '"unreachable"'], ['return', 1]],
-            ['return', -1],
-        ],
-    ),
-    # 不以终止指令结尾 (text) → 真/假（简化版：总是返回真）
-    make_fn(
-        '不以终止指令结尾',
-        ['text'],
-        [
-            ['return', 1],
-        ],
-    ),
-    # 最后一行 (text) → last non-empty line（简化版）
-    make_fn(
-        '最后一行',
-        ['text'],
-        [
-            ['return', 'text'],
-        ],
-    ),
-    # 是否为数字字符串 (s) → 真/假（简化版：检查首字符）
-    make_fn(
-        '是否为数字字符串',
-        ['s'],
-        [
-            ['if', ['等于', ['取长', 's'], 0], ['return', -1]],
-            ['set', 'c', ['字符码', ['子串', 's', 0, 1]]],
-            ['if', ['小于', 'c', 48], ['return', -1]],
-            ['if', ['大于', 'c', 57], ['return', -1]],
-            ['return', 1],
         ],
     ),
 ]
