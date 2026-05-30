@@ -15,9 +15,11 @@ import unittest
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-SRC = os.path.join(os.path.dirname(__file__), '..', 'csrc', 'runtime.c')
+SRC = os.path.join(os.path.dirname(__file__), '..', 'csrc', 'test_runtime.c')
+RUNTIME_SRC = os.path.join(os.path.dirname(__file__), '..', 'csrc', 'runtime.c')
 EXE_NAME = 'test_runtime.exe' if sys.platform == 'win32' else 'test_runtime'
 CVM_EXE_NAME = 'cvm_test.exe' if sys.platform == 'win32' else 'cvm_test'
+MSYS2_BASH = r'D:\msys64\usr\bin\bash.exe'
 
 
 def _find_compiler() -> str | None:
@@ -33,24 +35,28 @@ def _find_compiler() -> str | None:
     return None
 
 
-def _get_env() -> dict:
-    """获取环境变量（包含 MSYS2 路径）"""
-    env = os.environ.copy()
-    if sys.platform == 'win32':
-        msys_bin = r'D:\msys64\mingw64\bin'
-        if os.path.isdir(msys_bin):
-            env['PATH'] = msys_bin + ';' + env.get('PATH', '')
-    return env
+def _run_in_msys2(cmd: str, timeout: int = 30) -> subprocess.CompletedProcess:
+    """在 MSYS2 bash 中执行命令"""
+    return subprocess.run(
+        [MSYS2_BASH, '-lc', cmd],
+        capture_output=True, text=True, timeout=timeout,
+    )
+
+
+def _win_to_msys2(path: str) -> str:
+    """将 Windows 路径转为 MSYS2 路径（D:\\xxx → /d/xxx, C:\\xxx → /c/xxx）"""
+    p = path.replace('\\', '/')
+    if len(p) >= 2 and p[1] == ':':
+        p = '/' + p[0].lower() + p[2:]
+    return p
 
 
 def _compile_cvm(compiler: str) -> str | None:
     """编译 C VM，返回可执行文件路径"""
-    env = _get_env()
     exe_path = os.path.join(tempfile.gettempdir(), CVM_EXE_NAME)
-    result = subprocess.run(
-        [compiler, '-o', exe_path, SRC, '-std=c99', '-Wall', '-Wno-misleading-indentation'],
-        capture_output=True, text=True, timeout=30, env=env,
-    )
+    src_posix = _win_to_msys2(RUNTIME_SRC)
+    exe_posix = _win_to_msys2(exe_path)
+    result = _run_in_msys2(f'gcc {src_posix} -o {exe_posix} -std=c99 -Wall')
     if result.returncode != 0:
         return None
     return exe_path
@@ -65,20 +71,17 @@ def _compile_and_run() -> tuple[bool, str]:
     if not os.path.exists(SRC):
         return False, f'测试源文件不存在: {SRC}'
 
-    env = _get_env()
-
     with tempfile.TemporaryDirectory() as tmpdir:
         exe_path = os.path.join(tmpdir, EXE_NAME)
-        result = subprocess.run(
-            [compiler, '-o', exe_path, SRC, '-std=c99', '-Wall', '-Wno-misleading-indentation'],
-            capture_output=True, text=True, timeout=30, env=env,
-        )
+        src_posix = _win_to_msys2(SRC)
+        exe_posix = _win_to_msys2(exe_path)
+        result = _run_in_msys2(f'gcc {src_posix} -o {exe_posix} -std=c99 -Wall')
         if result.returncode != 0:
             return False, f'编译失败:\n{result.stderr}'
 
         result = subprocess.run(
             [exe_path],
-            capture_output=True, text=True, timeout=30, env=env,
+            capture_output=True, text=True, timeout=30,
         )
         return result.returncode == 0, result.stdout + result.stderr
 
@@ -93,11 +96,10 @@ def _run_cvm(bin_path: str) -> str | None:
     if cvm_exe is None:
         return None
 
-    env = _get_env()
     # 使用 --run 模式输出栈顶值
     result = subprocess.run(
         [cvm_exe, bin_path, '--run'],
-        capture_output=True, text=True, timeout=10, env=env,
+        capture_output=True, text=True, timeout=10,
     )
     if result.returncode != 0:
         return None

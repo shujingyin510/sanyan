@@ -272,8 +272,8 @@ arm-none-eabi-objcopy -O binary firmware.elf firmware.bin
 `csrc/runtime.c` 是 C 语言字节码解释器，支持全部 52 个操作码。编译运行：
 
 ```bash
-export PATH="/d/msys64/mingw64/bin:$PATH"
-gcc -o csrc/runtime.exe csrc/runtime.c -std=c99 -Wall -Wextra
+# 必须通过 MSYS2 bash 调用 gcc（直接调用 gcc.exe 无法输出文件）
+D:/msys64/usr/bin/bash.exe -lc "gcc /d/Test/sanyan/csrc/runtime.c -o /d/Test/sanyan/csrc/runtime.exe -std=c99 -Wall"
 ./csrc/runtime.exe firmware.bin
 ```
 
@@ -290,5 +290,6 @@ gcc -o csrc/runtime.exe csrc/runtime.c -std=c99 -Wall -Wextra
 - dict → `{key: val, …}`
 
 ### 已知限制
-- GCC 必须通过 MSYS2 的 `/d/msys64/mingw64/bin/gcc.exe` 全路径调用，且需将 mingw64 bin 加入 PATH（否则 as/ld 找不到）
+- **GCC 必须通过 MSYS2 bash 调用**：`D:/msys64/usr/bin/bash.exe -lc "gcc ..."`, 直接调用 `gcc.exe` 无法输出文件（MSYS2 路径映射问题）
+- Windows 路径需转为 MSYS2 格式：`D:\xxx` → `/d/xxx`
 - 字典当前有最大条目限制（`DICT_MAX=256`）
