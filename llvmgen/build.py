@@ -13,47 +13,20 @@ import sys
 import subprocess
 import tempfile
 from llvmgen.compiler import compile_source
+from utils.compiler_tools import find_cc, find_llc, run_in_shell, win_to_posix
 
 
 def _find_cc() -> str:
     """查找可用的 C 编译器。"""
-    candidates = ['gcc', 'clang', 'cc']
-    for cc in candidates:
-        try:
-            subprocess.run([cc, '--version'], capture_output=True, timeout=5, check=False)
-            return cc
-        except (FileNotFoundError, subprocess.TimeoutExpired):
-            continue
-    # Windows/MSYS2
-    msys2_paths = [
-        r'C:\msys64\mingw64\bin\gcc.exe',
-        r'C:\msys64\ucrt64\bin\gcc.exe',
-        r'D:\msys64\mingw64\bin\gcc.exe',
-        r'D:\msys64\ucrt64\bin\gcc.exe',
-    ]
-    for p in msys2_paths:
-        if os.path.exists(p):
-            return p
+    cc = find_cc()
+    if cc:
+        return cc
     raise RuntimeError('未找到 C 编译器 (gcc/clang/cc/MSYS2 mingw)。请安装后再试。')
 
 
 def _find_llc() -> str | None:
-    """查找 llc 工具（优先 MSYS2 路径）。"""
-    for llc in ['llc', 'llc.exe']:
-        try:
-            subprocess.run([llc, '--version'], capture_output=True, timeout=5, check=False)
-            return llc
-        except (FileNotFoundError, subprocess.TimeoutExpired):
-            continue
-    msys2_paths = [
-        r'D:\msys64\ucrt64\bin\llc.exe',
-        r'D:\msys64\mingw64\bin\llc.exe',
-        r'C:\msys64\ucrt64\bin\llc.exe',
-    ]
-    for p in msys2_paths:
-        if os.path.exists(p):
-            return p
-    return None
+    """查找 llc 工具。"""
+    return find_llc()
 
 
 def build(input_path: str, output_path: str | None = None, run: bool = False) -> str:

@@ -52,8 +52,14 @@ dev = [
 sanyan = "main:main"
 
 [tool.setuptools]
-packages = ["sanyan", "ops", "sugar", "lsp", "llvmgen"]
-py-modules = []  # 由 setup.py 动态发现
+packages = ["sanyan", "ops", "sugar", "lsp", "llvmgen", "utils"]
+py-modules = [
+    "ternary_core", "evaluator", "values", "runtime", "runtime_components",
+    "commands", "param_matcher", "tail_call", "lexer", "parser", "preprocess",
+    "skin", "sandbox", "compile_bytecode", "compile_llvmgen", "vm",
+    "eval_helpers", "debug_eval", "repl", "main", "lsp_server", "dap_server",
+    "sanfmt", "sanyancc", "doc_sync",
+]
 
 [tool.ruff]
 line-length = 120

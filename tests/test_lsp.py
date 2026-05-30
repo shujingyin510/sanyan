@@ -9,7 +9,6 @@ import threading
 import queue
 import time
 
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 
 def _encode_msg(msg: dict) -> bytes:

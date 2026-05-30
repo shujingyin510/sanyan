@@ -27,14 +27,15 @@ def _compile_ir_to_exe(ir_text: str, suffix: str, gcc_env: dict | None = None) -
     print(f'[{suffix}] LLVM IR → {ir_path} ({len(ir_text)} bytes)')
 
     # 优先使用 llc（无 Python 依赖）
+    from utils.compiler_tools import find_llc
     obj_ok = False
-    for llc in ['llc', 'llc.exe', r'D:\msys64\ucrt64\bin\llc.exe', r'D:\msys64\mingw64\bin\llc.exe']:
+    llc = find_llc()
+    if llc:
         try:
             subprocess.run([llc, '-filetype=obj', ir_path, '-o', obj_path], check=True, timeout=30)
             obj_ok = True
-            break
         except (FileNotFoundError, subprocess.CalledProcessError, subprocess.TimeoutExpired):
-            continue
+            pass
 
     if not obj_ok:
         # 回退: llvmlite

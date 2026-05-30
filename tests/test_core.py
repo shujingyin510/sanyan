@@ -5,7 +5,6 @@
 import sys
 import os
 
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import unittest
 from ternary_core import BT, TernaryALU, TritValue, ternary_sin, ternary_sqrt, ternary_exp, ternary_log

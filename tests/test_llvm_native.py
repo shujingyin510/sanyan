@@ -1,7 +1,6 @@
 """LLVM 原生编译测试（需要 llc + C 编译器）
 
 若无 llc 或 C 编译器，测试自动跳过 (skip)。
-MSYS2 ucrt64 自带 llc，gcc 需通过 MSYS2 bash 调用。
 """
 
 import sys
@@ -10,71 +9,36 @@ import subprocess
 import tempfile
 import unittest
 
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from llvmgen.compiler import compile_source
+from utils.compiler_tools import find_cc, find_llc, run_in_shell, win_to_posix
 
-MSYS2_BASH = r'D:\msys64\usr\bin\bash.exe'
-LLC = r'D:\msys64\ucrt64\bin\llc.exe'
-
-
-def _win_to_msys2(path: str) -> str:
-    """将 Windows 路径转为 MSYS2 路径"""
-    p = path.replace('\\', '/')
-    if len(p) >= 2 and p[1] == ':':
-        p = '/' + p[0].lower() + p[2:]
-    return p
+_llc = find_llc()
+_gcc = find_cc()
 
 
-def _find_tools() -> tuple[str | None, str | None]:
-    """查找 llc 和 gcc，返回 (llc, gcc)"""
-    llc = LLC if os.path.exists(LLC) else None
-    gcc = None
-    if os.path.exists(MSYS2_BASH):
-        gcc = 'msys2_gcc'  # 标记为可用
-    return llc, gcc
-
-
-_llc, _gcc = _find_tools()
-
-
-@unittest.skipIf(_llc is None or _gcc is None, '需要 llc + gcc (MSYS2 ucrt64)')
+@unittest.skipIf(_llc is None or _gcc is None, '需要 llc + gcc')
 class TestLlvmNativeCompile(unittest.TestCase):
     """验证 LLVM IR 可被 llc + gcc 编译并链接运行时"""
 
     def _compile_ir(self, ir_path: str, obj_path: str):
         """用 llc 将 LLVM IR 编译为目标文件"""
-        ir_posix = _win_to_msys2(ir_path)
-        obj_posix = _win_to_msys2(obj_path)
-        llc_posix = _win_to_msys2(_llc)
-        subprocess.run(
-            [MSYS2_BASH, '-lc', f'{llc_posix} {ir_posix} -filetype=obj -o {obj_posix}'],
-            check=True,
-            capture_output=True,
-            timeout=30,
-        )
+        ir_posix = win_to_posix(ir_path)
+        obj_posix = win_to_posix(obj_path)
+        llc_posix = win_to_posix(_llc)
+        run_in_shell(f'{llc_posix} {ir_posix} -filetype=obj -o {obj_posix}', timeout=30)
 
     def _gcc_compile(self, src: str, obj: str, *extra_args: str):
         """用 gcc 编译 C 源码"""
-        src_posix = _win_to_msys2(src)
-        obj_posix = _win_to_msys2(obj)
+        src_posix = win_to_posix(src)
+        obj_posix = win_to_posix(obj)
         args = ' '.join(extra_args)
-        subprocess.run(
-            [MSYS2_BASH, '-lc', f'gcc -c {src_posix} -o {obj_posix} {args}'],
-            check=True,
-            capture_output=True,
-            timeout=30,
-        )
+        run_in_shell(f'gcc -c {src_posix} -o {obj_posix} {args}', timeout=30)
 
     def _gcc_link(self, *args: str):
         """用 gcc 链接"""
-        cmd = ' '.join(_win_to_msys2(a) for a in args)
-        subprocess.run(
-            [MSYS2_BASH, '-lc', f'gcc {cmd}'],
-            check=True,
-            capture_output=True,
-            timeout=30,
-        )
+        cmd = ' '.join(win_to_posix(a) for a in args)
+        run_in_shell(f'gcc {cmd}', timeout=30)
 
     def test_compile_simple_program(self):
         """编译一个最小程序并运行"""
