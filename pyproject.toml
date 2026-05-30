@@ -93,6 +93,18 @@ module = [
 ]
 ignore_errors = true
 
+# 渐进式 strict：逐步启用核心模块的类型检查
+[[tool.mypy.overrides]]
+module = [
+    "evaluator",
+    "values",
+    "runtime",
+    "runtime_components",
+    "ternary_core",
+]
+warn_return_any = true
+warn_unused_ignores = true
+
 [tool.coverage.run]
 source = ["."]
 omit = [

@@ -321,6 +321,9 @@ class ArrayValue:
         self.length = length
         self.data = [default] * length
 
+    def __len__(self) -> int:
+        return self.length
+
     def get(self, index: int) -> object:
         if index < 0 or index >= self.length:
             from values import SanyanKeyError

@@ -239,7 +239,7 @@ class ContainerOps:
         container = evaluator.eval(args[1])
         if not isinstance(container, (list, ArrayValue)):
             raise SanyanTypeError('第二个参数必须是列表或数组')
-        if len(container) == 0 and len(args) < 3:  # type: ignore[arg-type]
+        if len(container) == 0 and len(args) < 3:
             raise SanyanValueError('空容器且无初始值，无法归并')
         if len(args) == 3:
             accumulator = evaluator.eval(args[2])
@@ -247,7 +247,7 @@ class ContainerOps:
         else:
             accumulator = container[0]
             start_idx = 1
-        for i in range(start_idx, len(container)):  # type: ignore[arg-type]
+        for i in range(start_idx, len(container)):
             accumulator = call_function(evaluator, func, [accumulator, container[i]])
         return accumulator
 
