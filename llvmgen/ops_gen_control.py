@@ -72,7 +72,6 @@ def _compile_if(args: list, cg: CodegenContext) -> ir.Value | None:
     result_alloca = cg._entry_alloca('if_res')
     cg.builder.store(_NULL, result_alloca)
 
-    has_terminated_branch = False
     for cond_node, body_node in branches:
         test_block = cg._add_block(name='if_test')
         body_block = cg._add_block(name='if_body')
@@ -91,7 +90,7 @@ def _compile_if(args: list, cg: CodegenContext) -> ir.Value | None:
                 cg.builder.store(body_val, result_alloca)
             cg.builder.branch(merge_block)
         else:
-            has_terminated_branch = True
+            pass  # 分支已终止，不跳转到 merge
 
         cg.builder.position_at_start(next_test)
 
@@ -106,7 +105,7 @@ def _compile_if(args: list, cg: CodegenContext) -> ir.Value | None:
                 cg.builder.store(else_val, result_alloca)
             cg.builder.branch(merge_block)
         else:
-            has_terminated_branch = True
+            pass  # else 分支已终止
     else:
         cg.builder.branch(merge_block)
 

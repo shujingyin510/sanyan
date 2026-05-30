@@ -21,7 +21,6 @@ from llvmgen.type_mapping import (
     RawValue,
     _is_string_literal,
     _to_int,
-    _unquote,
 )
 
 

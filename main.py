@@ -120,8 +120,6 @@ def main():
     profiling = '--profile' in args
     # --eval 标志：使用 Python 求值器（调试模式，较慢）
     use_eval = '--eval' in args
-    # --vm 标志：保留向后兼容，等同于默认行为
-    use_vm = '--vm' in args
     # --san 标志：使用自举编译器（sugar.san + llvmgen.san）生成原生可执行文件
     use_san = '--san' in args
     # --pycc 标志：使用 Python codegen（SugarConverter 解析 + Python LLVM codegen）生成原生可执行文件

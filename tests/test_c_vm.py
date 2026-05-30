@@ -9,7 +9,6 @@ import subprocess
 import sys
 import os
 import shutil
-import struct
 import tempfile
 import unittest
 
@@ -169,7 +168,7 @@ class TestCVMCrossValidation(unittest.TestCase):
 
             old_stdout = sys.stdout
             sys.stdout = io.StringIO()
-            vm = VM.from_bin(bin_path)
+            VM.from_bin(bin_path)
             py_output = sys.stdout.getvalue().strip()
             sys.stdout = old_stdout
 

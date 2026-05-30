@@ -21,8 +21,6 @@ from llvmgen.type_mapping import (
     _INT,
     _NULL,
     _PTR,
-    BoxedValue,
-    RawValue,
     _is_string_literal,
     _to_int,
     _unquote,

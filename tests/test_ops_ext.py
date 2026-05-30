@@ -171,7 +171,7 @@ class TestNetOps(unittest.TestCase):
     def test_http_get(self):
         """验证 http读 基本功能（mock 网络层）"""
         from unittest.mock import patch
-        from ops.net_ops import _request, _error
+        from ops.net_ops import _request
 
         class FakeResp:
             def read(self):
@@ -300,7 +300,7 @@ class TestControlOpsExtended(unittest.TestCase):
         self.env = SanyanEvaluator()
 
     def test_if_no_else(self):
-        r = self.env.eval(['若', ['等于', '1', '1'], ['输出', '"yes"']])
+        self.env.eval(['若', ['等于', '1', '1'], ['输出', '"yes"']])
         # Should not raise
 
     def test_if_nested(self):
@@ -341,8 +341,8 @@ class TestControlOpsExtended(unittest.TestCase):
         self.assertEqual(r.to_int(), 15)
 
 
-class TestMathExtraOps(unittest.TestCase):
-    """数学扩展操作测试"""
+class TestMathExtraOpsExtended(unittest.TestCase):
+    """数学扩展操作测试（续）"""
 
     def setUp(self):
         self.env = SanyanEvaluator()

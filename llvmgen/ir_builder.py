@@ -13,7 +13,6 @@ from llvmgen.type_mapping import (
     _I32,
     _NULL,
     _ONE,
-    _ONE32,
     _PTR,
     _RUNTIME_FUNCS,
     _ZERO,

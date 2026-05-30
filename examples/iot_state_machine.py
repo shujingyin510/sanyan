@@ -5,7 +5,6 @@ iot_state_machine.py — 二值逻辑IoT设备状态机（对比实现）
 
 import random
 from enum import Enum
-from typing import Optional
 
 
 class TriState(Enum):

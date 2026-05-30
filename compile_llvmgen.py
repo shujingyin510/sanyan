@@ -45,7 +45,7 @@ def compile_llvmgen():
     # V5: 无需注入，辅助函数已内联到源码
     full_ast = ast_ints_to_str(['do'] + fixed_stmts)
 
-    print(f'llvmgen.san V5 自举编译（无注入）')
+    print('llvmgen.san V5 自举编译（无注入）')
     print(f'语句数: {len(fixed_stmts)}')
 
     clear_cache()

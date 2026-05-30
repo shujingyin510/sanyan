@@ -7,7 +7,6 @@
 from __future__ import annotations
 
 from llvmlite import ir
-from ternary_core import TritValue
 
 # ── LLVM 基础类型 ──
 _INT = ir.IntType(64)  # 63 位有符号整数（LSB=1 为 tag）

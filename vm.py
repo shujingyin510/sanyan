@@ -343,7 +343,7 @@ class VM:
             b = self.stack.pop()
             a = self.stack.pop()
             # 比较运算：类型不同时返回假；真=1，假=-1
-            if type(a) != type(b) and not (isinstance(a, int) and isinstance(b, int)):
+            if not isinstance(a, type(b)) and not (isinstance(a, int) and isinstance(b, int)):
                 self.stack.append(-1)
             elif op == GT:
                 self.stack.append(1 if a > b else -1)

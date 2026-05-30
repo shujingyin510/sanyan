@@ -51,7 +51,6 @@ def read_gas() -> Tuple[SensorState, Optional[int]]:
 def fuse_sensor_states(states: list[SensorState]) -> SensorState:
     """融合多个传感器状态 — 需要显式枚举处理"""
     has_fault = any(s == SensorState.FAULT for s in states)
-    has_offline = any(s == SensorState.OFFLINE for s in states)
     all_normal = all(s == SensorState.NORMAL for s in states)
 
     if has_fault:
@@ -89,7 +88,7 @@ def gas_safe(gas: Optional[int]) -> SensorState:
 
 def environment_decision(overall: SensorState, temp, humid, gas) -> str:
     if overall == SensorState.FAULT:
-        print(f'🚨 警报：传感器故障或环境危险！')
+        print('🚨 警报：传感器故障或环境危险！')
         print(f'  温度: {temp}  湿度: {humid}  气体: {gas}')
         return '紧急停机'
     elif overall == SensorState.OFFLINE:
