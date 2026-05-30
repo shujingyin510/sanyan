@@ -1121,6 +1121,96 @@ static char *read_file_str(const char *path) {
     return buf;
 }
 
+/* ── #include 预处理（递归展开）── */
+static char *preprocess_includes_impl(const char *source, const char *base_dir, int depth);
+
+static char *preprocess_includes(const char *source) {
+    return preprocess_includes_impl(source, ".", 0);
+}
+
+static char *preprocess_includes_impl(const char *source, const char *base_dir, int depth) {
+    if (depth > 10) return strdup(source);  /* 防止无限递归 */
+
+    size_t cap = strlen(source) * 2 + 1024;
+    char *result = (char*)malloc(cap);
+    if (!result) return strdup(source);
+    size_t pos = 0;
+
+    const char *p = source;
+    while (*p) {
+        /* 检查 #include 或 ＃include */
+        if ((*p == '#' || (unsigned char)*p == 0xef) &&
+            strncmp(p, "#include", 8) == 0) {
+            p += 8;
+            /* 跳过空白 */
+            while (*p == ' ' || *p == '\t') p++;
+            if (*p == '"' || *p == '\'') {
+                char quote = *p++;
+                const char *path_start = p;
+                while (*p && *p != quote) p++;
+                if (*p == quote) {
+                    size_t path_len = (size_t)(p - path_start);
+                    p++;  /* 跳过结束引号 */
+
+                    /* 构造完整路径 */
+                    char inc_path[1024];
+                    snprintf(inc_path, sizeof(inc_path), "%s/%.*s", base_dir, (int)path_len, path_start);
+
+                    /* 读取并递归展开 */
+                    char *inc_content = read_file_str(inc_path);
+                    if (inc_content) {
+                        /* 获取 included 文件的目录 */
+                        char inc_dir[1024];
+                        strncpy(inc_dir, inc_path, sizeof(inc_dir) - 1);
+                        inc_dir[sizeof(inc_dir) - 1] = '\0';
+                        char *slash = strrchr(inc_dir, '/');
+                        if (!slash) slash = strrchr(inc_dir, '\\');
+                        if (slash) *slash = '\0';
+                        else strcpy(inc_dir, ".");
+
+                        char *expanded = preprocess_includes_impl(inc_content, inc_dir, depth + 1);
+                        free(inc_content);
+
+                        if (expanded) {
+                            size_t elen = strlen(expanded);
+                            while (pos + elen + 1 >= cap) {
+                                cap *= 2;
+                                result = (char*)realloc(result, cap);
+                            }
+                            memcpy(result + pos, expanded, elen);
+                            pos += elen;
+                            free(expanded);
+                        }
+                        /* 跳过 #include 行的剩余部分（换行符） */
+                        if (*p == '\n') p++;
+                        continue;
+                    } else {
+                        /* 文件不存在，保留注释 */
+                        const char *note = "/* #include not found */\n";
+                        size_t nlen = strlen(note);
+                        while (pos + nlen + 1 >= cap) { cap *= 2; result = (char*)realloc(result, cap); }
+                        memcpy(result + pos, note, nlen);
+                        pos += nlen;
+                    }
+                }
+            }
+            /* 跳过 #include 行的剩余部分 */
+            while (*p && *p != '\n') p++;
+            if (*p == '\n') p++;
+            continue;
+        }
+
+        /* 普通字符 */
+        result[pos++] = *p++;
+        if (pos >= cap - 2) {
+            cap *= 2;
+            result = (char*)realloc(result, cap);
+        }
+    }
+    result[pos] = '\0';
+    return result;
+}
+
 /* ── 调用模块导出函数（单参数，返回栈顶值）── */
 static void *call_module_func(Module *mod, const char *func_name, void *arg) {
     int addr = find_export(mod, func_name);
@@ -1295,13 +1385,15 @@ int main(int argc, char **argv) {
 
         fprintf(stderr, "[编译] %s → %s\n", input_path, output_path);
 
-        /* 1. 读取源码 */
-        char *source = read_file_str(input_path);
-        if (!source) {
+        /* 1. 读取源码 + #include 展开 */
+        char *raw_source = read_file_str(input_path);
+        if (!raw_source) {
             fprintf(stderr, "错误: 无法读取 %s\n", input_path);
             return 1;
         }
-        fprintf(stderr, "[1/5] 源码 %ld 字节\n", (long)strlen(source));
+        char *source = preprocess_includes(raw_source);
+        free(raw_source);
+        fprintf(stderr, "[1/5] 源码 %ld 字节（含 #include 展开）\n", (long)strlen(source));
 
         /* 2. 加载 sugar.bin 并调用 解析(source) → AST */
         Module sugar_mod;

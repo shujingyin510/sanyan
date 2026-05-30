@@ -51,9 +51,16 @@
 - 支持全部 52 个操作码
 
 ### LLVM 后端 (`llvmgen/`)
-- `compiler.py` — 将 Sanyan AST 编译为 LLVM IR
-- `codegen.py` — LLVM IR 代码生成（1822 行，最大文件）
-- `build.py` — LLVM → 目标文件编译
+- `codegen.py` — AST → LLVM IR 代码生成（419 行）
+- `compiler.py` — 编译入口 + 源码解析（424 行）
+- `ops_gen.py` — 主编译入口 + `_compile_node_inner`（410 行）
+- `ops_gen_control.py` — 控制流编译：若/判/遍历/循环/尝试（341 行）
+- `ops_gen_helpers.py` — 算术辅助/浮点/容器编译（240 行）
+- `ir_builder.py` — `CodegenContext` 构建器
+- `ir_fixes.py` — IR 后处理工具（220 行）
+- `helpers.py` — Python 辅助函数（377 行）
+- `runtime.c` — C 运行时库（arena 分配器 + 52 操作码）
+- `type_mapping.py` — 类型映射与运行时函数规范
 
 ### LSP 服务器 (`lsp/`)
 - `server.py` — LSP 协议实现

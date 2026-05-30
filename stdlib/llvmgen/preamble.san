@@ -1,0 +1,85 @@
+// llvmgen.san V5 — 自举版（辅助函数已内联）
+
+// ==================== 全局状态变量 ====================
+设 _reg_id = 0           // 寄存器 ID 计数器
+设 _label_id = 0         // 标签 ID 计数器
+设 _fn_counter = 0       // 函数名映射计数器
+设 _fn_map = 字典()      // 函数名 → ASCII 映射
+设 _loop_stack = 列表()  // 循环上下文栈
+设 _merge_label = ""     // 合并标签上下文
+
+// ==================== 辅助函数（原由 compile_llvmgen.py 注入）====================
+
+// 计数器：新寄存器ID — 返回当前值并自增
+定义 新寄存器ID() {
+    _reg_id = 加(_reg_id, 1)
+    返回(_reg_id)
+}
+
+// 计数器：新标签ID — 返回当前值并自增
+定义 新标签ID() {
+    _label_id = 加(_label_id, 1)
+    返回(_label_id)
+}
+
+// 新寄存器 (reg) → [f"%{reg+1}", reg+1]
+定义 新寄存器 (reg) {
+    设 id = 新寄存器ID()
+    返回(列表(连接("%", id), id))
+}
+
+// 新标签 (prefix) → f"{prefix}{id}"
+定义 新标签 (prefix) {
+    设 lid = 新标签ID()
+    返回(连接(prefix, lid))
+}
+
+// 循环进栈 (hdr) — 压入循环上下文
+定义 循环进栈 (hdr) {
+    _loop_stack = 列表合(_loop_stack, 列表(hdr))
+    返回(0)
+}
+
+// 循环出栈 () — 弹出循环上下文
+定义 循环出栈 () {
+    设 llen = 表长(_loop_stack)
+    若 (大于(llen, 0)) {
+        _loop_stack = 切片(_loop_stack, 0, 减(llen, 1))
+    }
+    返回(0)
+}
+
+// 取合并标签 () → 当前合并标签
+定义 取合并标签 () {
+    返回(_merge_label)
+}
+
+// 进入合并上下文 (label)
+定义 进入合并上下文 (label) {
+    _merge_label = label
+    返回(0)
+}
+
+// 退出合并上下文 ()
+定义 退出合并上下文 () {
+    _merge_label = ""
+    返回(0)
+}
+
+// 注册函数名 (name) → 映射后的 ASCII 名称
+定义 注册函数名 (name) {
+    _fn_counter = 加(_fn_counter, 1)
+    设 aname = 连接("_fn", _fn_counter)
+    置键(_fn_map, name, aname)
+    返回(aname)
+}
+
+// 取函数名 (name) → 映射后的名称或原始名称
+定义 取函数名 (name) {
+    若 (含键(_fn_map, name)) {
+        返回(取键(_fn_map, name))
+    }
+    返回(name)
+}
+
+// ==================== 原始代码 ====================

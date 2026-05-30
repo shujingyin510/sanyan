@@ -228,8 +228,7 @@ class CodegenContext:
         gv.linkage = 'private'
         gv.global_constant = True
         gv.initializer = c
-        raw = self.builder.gep(gv, [_ZERO32, ir.Constant(_I32, 2), _ZERO32], inbounds=True)
-        return self.builder.bitcast(raw, _PTR, name=f'.rt_str_p{n}')
+        return self.builder.bitcast(gv, _PTR, name=f'.rt_str_p{n}')
 
     def _get_alloca(self, name: str, is_int: bool = True) -> ir.Value:
         if name not in self._allocas:

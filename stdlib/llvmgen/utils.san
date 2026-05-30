@@ -1,0 +1,154 @@
+
+// 生成 LLVM IR 模块头：模块标识、目标平台、外部函数声明
+定义 生成模块头 () {
+    设 s = "; ModuleID = 'sanyan'"; s = 连接(s, 换行)
+    s = 连接(s, "target triple = \"x86_64-pc-linux-gnu\""); s = 连接(s, 换行)
+    s = 连接(s, 换行)
+    s = 连接(s, "declare void @san_sys_write(i32, i8*, i32)"); s = 连接(s, 换行)
+    s = 连接(s, "declare i8* @_rt_malloc(i32)"); s = 连接(s, 换行)
+    s = 连接(s, "declare void @_rt_free(i8*)"); s = 连接(s, 换行)
+    s = 连接(s, "declare i8* @san_read_file(i8*, i32*)"); s = 连接(s, 换行)
+    s = 连接(s, "declare void @san_write_file(i8*, i8*, i32)"); s = 连接(s, 换行)
+    s = 连接(s, "declare i8* @_next_reg_str()"); s = 连接(s, 换行)
+    s = 连接(s, "@_rt_buf = global [22 x i8] zeroinitializer"); s = 连接(s, 换行)
+    s = 连接(s, 声明运行时())
+    s = 连接(s, "@g_error = external global i8*"); s = 连接(s, 换行)
+    s = 连接(s, 换行)
+    返回(s)
+}
+
+// 生成 LLVM IR 模块尾：返回 null 并关闭函数
+定义 生成模块尾 () {
+    返回(连接("  ret i8* null", 换行, "}", 换行))
+}
+
+设 换行 = "\n"
+
+设 comp_env = 新字典()          // name → alloca register
+设 函数库列表 = 新列表()         // list of function IR strings
+设 函数参数表 = 新字典()         // name → param_count (e.g., "%5")
+
+// 声明外部运行时函数（rt_awake 等）
+定义 声明运行时 () {
+    设 s = "declare i8* @rt_awake(i8* noalias, i8* noalias, i8* noalias, i8* nocapture readonly)" ; s = 连接(s, 换行)
+    // rt_list_*, rt_dict_*, rt_print_* 由 生成运行时IR() 提供定义，不需declare
+    返回(s)
+}
+
+设 字符串常量表 = 新字典()     // string_content → global_name
+设 字符串常量列表 = 新列表()   // list of global constant IR strings
+设 字符串计数器 = 0
+
+// 获取或创建字符串常量的全局名称（@.str.N 格式）
+定义 取字符串常量 (content) {
+    设 existing = 查键(字符串常量表, content)
+    若 (大于(取长(existing), 0)) {
+        返回(existing)
+    }
+    设 idx = 字典取长(字符串常量表)
+    设 name = 连接("@.str.", idx)
+    存变量(字符串常量表, content, name)
+    返回(name)
+}
+
+// 生成所有字符串常量的 LLVM IR 定义
+定义 生成字符串常量定义 () {
+    设 result = ""
+    设 全部键列表 = 字典键列表(字符串常量表)
+    设 k列表长度 = 列表取长(全部键列表)
+    设 ki = 0
+    设 kc = 加(k列表长度, 1)
+    循环 (小于(ki, kc)) {
+        若 (小于(ki, k列表长度)) {
+            设 content = 取(全部键列表, ki)
+            设 name = 查键(字符串常量表, content)
+            设 len = 加(取字长(content), 1)
+            设 escaped = 转义LLVM字符串(content)
+            result = 连接(result, name, " = private constant [", len, " x i8] c\"", escaped, "\\00\"", 换行)
+        }
+        ki = 加(ki, 1)
+    }
+    返回(result)
+}
+
+// 解析字符串为整数（支持负数）
+定义 解析整数 (s) {
+    若 (是数字(s)) { 返回(s) }
+    设 result = 0
+    设 i = 0
+    设 len = 取长(s)
+    设 neg = 假
+    若 (前缀(s, "-")) {
+        neg = 真
+        i = 1
+    }
+    设 digs = "0123456789"
+    循环 (小于(i, len)) {
+        设 ch = 子串(s, i, 1)
+        设 idx = 查找(digs, ch)
+        若 (小于(idx, 0)) { 返回(0) }
+        设 tmp = 乘(result, 10)
+        result = 加(tmp, idx)
+        i = 加(i, 1)
+    }
+    若 (neg) { result = 减(0, result) }
+    返回(result)
+}
+
+// 判断字符串是否为纯数字（支持负号前缀）
+定义 是否为数字字符串 (s) {
+    若 (非(是字符串(s))) { 返回(假) }
+    若 (等于(取长(s), 0)) { 返回(假) }
+    设 i = 0; 设 len = 取长(s)
+    若 (前缀(s, "-")) { i = 1 }
+    若 (等于(i, len)) { 返回(假) }
+    设 digs = "0123456789"
+    循环 (小于(i, len)) {
+        设 ch = 子串(s, i, 1)
+        设 idx = 查找(digs, ch)
+        若 (小于(idx, 0)) { 返回(假) }
+        i = 加(i, 1)
+    }
+    返回(真)
+}
+
+// 提取文本的最后一行（去除尾部换行）
+定义 最后一行 (text) {
+    设 len = 取长(text)
+    若 (等于(len, 0)) { 返回("") }
+    设 end = 减(len, 1)
+    循环 (end >= 0) {
+        设 ch = 子串(text, end, 1)
+        若 (非(字符串包含(换行, ch))) { 跳出 }
+        end = 减(end, 1)
+    }
+    若 (end < 0) { 返回("") }
+    设 i = end
+    循环 (i >= 0) {
+        设 ch = 子串(text, i, 1)
+        若 (字符串包含(换行, ch)) {
+            返回(子串(text, 加(i, 1), 减(end, i)))
+        }
+        i = 减(i, 1)
+    }
+    返回(子串(text, 0, 加(end, 1)))
+}
+
+// 检查文本是否不以终止指令（ret/br）结尾
+定义 不以终止指令结尾 (text) {
+    设 last = 最后一行(text)
+    若 (等于(取长(last), 0)) { 返回(真) }
+    若 (字符串包含(last, "ret")) { 返回(假) }
+    若 (字符串包含(last, "br label")) { 返回(假) }
+    若 (字符串包含(last, "br i1")) { 返回(假) }
+    返回(真)
+}
+
+// 确保 IR 文本以终止指令结尾（缺失则补 br 到合并标签）
+定义 确保终止 (s, merge_label) {
+    若 (不以终止指令结尾(s)) {
+        s = 连接(s, "  br label %", merge_label, 换行)
+    }
+    返回(s)
+}
+

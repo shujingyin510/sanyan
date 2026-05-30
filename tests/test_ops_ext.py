@@ -169,11 +169,20 @@ class TestNetOps(unittest.TestCase):
         self.env = SanyanEvaluator()
 
     def test_http_get(self):
-        try:
-            r = self.env.eval(['http读', '"https://httpbin.org/get"'])
+        """验证 http读 基本功能（mock 网络层）"""
+        from unittest.mock import patch
+        from ops.net_ops import _request, _error
+
+        class FakeResp:
+            def read(self):
+                return b'{"url": "http://test"}'
+            def __enter__(self): return self
+            def __exit__(self, *a): pass
+
+        with patch.object(_request, 'urlopen', return_value=FakeResp()) as mk:
+            r = self.env.eval(['http读', '"http://example.com/test"'])
             self.assertIn('"url"', str(r))
-        except Exception:
-            self.skipTest('需要网络连接')
+            mk.assert_called_once()
 
     def test_ssrf_block_localhost(self):
         """SSRF 防护：禁止访问 localhost"""
@@ -393,9 +402,8 @@ class TestContainerOpsExtended(unittest.TestCase):
         self.assertEqual(r.to_int(), -1)
 
     def test_get_out_of_range(self):
-        from values import SanyanValueError
-        with self.assertRaises(SanyanValueError):
-            self.env.eval(['取', ['列表', '1', '2', '3'], '10'])
+        result = self.env.eval(['取', ['列表', '1', '2', '3'], '10'])
+        self.assertEqual(result, 0)
 
     def test_set_element(self):
         r = self.env.eval(['置元素', ['列表', '1', '2', '3'], '1', '99'])

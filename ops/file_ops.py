@@ -153,7 +153,10 @@ def _parse_with_sugar_san(code, evaluator):
 
 
 def _parse_code(code, evaluator):
-    """解析代码：sugar.san 自举解析 → SugarConverter → S-表达式降级。"""
+    """解析代码：#include 预处理 → sugar.san 自举解析 → SugarConverter → S-表达式降级。"""
+    from preprocess import preprocess_includes
+
+    code = preprocess_includes(code)
     ast = _parse_with_sugar_san(code, evaluator)
     if ast is not None:
         return ast

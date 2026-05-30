@@ -1,0 +1,170 @@
+// packages/web_utils/package.san — Web 工具库
+// 提供 URL 解析、HTML 转义、JSON 处理等 Web 开发常用工具
+
+// ==================== URL 解析 ====================
+
+// 解析 URL 为组件
+定义 解析URL(url) {
+    设 scheme = ""
+    设 host = ""
+    设 port = ""
+    设 path = ""
+    设 query = ""
+
+    // 简化解析：查找协议
+    设 idx = 查找(url, "://")
+    若 (大于(idx, -1)) {
+        scheme = 子串(url, 0, idx)
+        url = 子串(url, 加(idx, 3), 减(取长(url), 加(idx, 3)))
+    }
+
+    // 查找路径
+    设 path_idx = 查找(url, "/")
+    若 (大于(path_idx, -1)) {
+        host = 子串(url, 0, path_idx)
+        path = 子串(url, path_idx, 减(取长(url), path_idx))
+    } 否则 {
+        host = url
+    }
+
+    // 查找端口
+    设 port_idx = 查找(host, ":")
+    若 (大于(port_idx, -1)) {
+        port = 子串(host, 加(port_idx, 1), 减(取长(host), 加(port_idx, 1)))
+        host = 子串(host, 0, port_idx)
+    }
+
+    // 查找查询参数
+    设 q_idx = 查找(path, "?")
+    若 (大于(q_idx, -1)) {
+        query = 子串(path, 加(q_idx, 1), 减(取长(path), 加(q_idx, 1)))
+        path = 子串(path, 0, q_idx)
+    }
+
+    返回(字典(
+        "协议", scheme,
+        "主机", host,
+        "端口", port,
+        "路径", path,
+        "查询", query
+    ))
+}
+
+// 构建 URL
+定义 构建URL(组件) {
+    设 url = ""
+    设 scheme = 取键(组件, "协议")
+    若 (非(等于(scheme, ""))) {
+        url = 连接(url, scheme, "://")
+    }
+    url = 连接(url, 取键(组件, "主机"))
+    设 port = 取键(组件, "端口")
+    若 (非(等于(port, ""))) {
+        url = 连接(url, ":", port)
+    }
+    url = 连接(url, 取键(组件, "路径"))
+    设 query = 取键(组件, "查询")
+    若 (非(等于(query, ""))) {
+        url = 连接(url, "?", query)
+    }
+    返回(url)
+}
+
+// ==================== HTML 工具 ====================
+
+// HTML 转义
+定义 HTML转义(text) {
+    设 result = text
+    result = 替换(result, "&", "&amp;")
+    result = 替换(result, "<", "&lt;")
+    result = 替换(result, ">", "&gt;")
+    result = 替换(result, "\"", "&quot;")
+    result = 替换(result, "'", "&#39;")
+    返回(result)
+}
+
+// HTML 反转义
+定义 HTML反转义(text) {
+    设 result = text
+    result = 替换(result, "&amp;", "&")
+    result = 替换(result, "&lt;", "<")
+    result = 替换(result, "&gt;", ">")
+    result = 替换(result, "&quot;", "\"")
+    result = 替换(result, "&#39;", "'")
+    返回(result)
+}
+
+// 构建 HTML 标签
+定义 HTML标签(tag, 属性, 内容) {
+    设 attrs = ""
+    遍历 key 在 取键(字典("k","v"), "k") {
+        // 简化实现
+    }
+    返回(连接("<", tag, ">", 内容, "</", tag, ">"))
+}
+
+// ==================== JSON 工具 ====================
+
+// JSON 路径查询（简化版）
+定义 JSON路径(json_str, path) {
+    设 obj = 解析JSON(json_str)
+    设 parts = 分割(path, ".")
+    设 current = obj
+    遍历 part 在 parts {
+        若 (是字典(current)) {
+            若 (字典包含(current, part)) {
+                current = 取键(current, part)
+            } 否则 {
+                返回(假)
+            }
+        } 否则 {
+            返回(假)
+        }
+    }
+    返回(current)
+}
+
+// ==================== 表单编码 ====================
+
+// URL 编码
+定义 URL编码(text) {
+    设 result = text
+    result = 替换(result, " ", "%20")
+    result = 替换(result, "&", "%26")
+    result = 替换(result, "=", "%3D")
+    result = 替换(result, "?", "%3F")
+    返回(result)
+}
+
+// 构建查询字符串
+定义 构建查询(params) {
+    设 parts = 列表()
+    遍历 key 在 取键(params, "keys") {
+        // 简化实现
+    }
+    返回(连接(parts, "&"))
+}
+
+// ==================== Cookie ====================
+
+// 解析 Cookie 字符串
+定义 解析Cookie(cookie_str) {
+    设 cookies = 字典()
+    设 pairs = 分割(cookie_str, ";")
+    遍历 pair 在 pairs {
+        设 trimmed = 去空白(pair)
+        设 eq_idx = 查找(trimmed, "=")
+        若 (大于(eq_idx, 0)) {
+            设 key = 子串(trimmed, 0, eq_idx)
+            设 val = 子串(trimmed, 加(eq_idx, 1), 减(取长(trimmed), 加(eq_idx, 1)))
+            置键(cookies, key, val)
+        }
+    }
+    返回(cookies)
+}
+
+导出 解析URL 构建URL
+导出 HTML转义 HTML反转义 HTML标签
+导出 JSON路径
+导出 URL编码 构建查询
+导出 解析Cookie

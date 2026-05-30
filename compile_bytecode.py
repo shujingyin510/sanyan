@@ -22,8 +22,13 @@ COMPILER_MAX_LOOP = 100000
 
 def compile_source(source: str, output_path: str, vars_table: dict | None = None) -> list:
     """编译源码字符串为 .bin 文件。返回 [成功, 代码大小, 变量数]。"""
+    from preprocess import preprocess_includes
+
     if vars_table is None:
         vars_table = {}
+
+    # 预处理 #include 指令
+    source = preprocess_includes(source)
 
     # 将 __exports__ 从变量表中分离（避免被当作变量引用）
     export_names = vars_table.pop('__exports__', []) if isinstance(vars_table, dict) else []

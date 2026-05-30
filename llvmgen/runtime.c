@@ -92,6 +92,11 @@ static rt_str_t *_rt_make(const char *s) {
     return st;
 }
 
+/* 公共接口：从 C 字符串创建三言字符串 */
+void *rt_make(const char *s) {
+    return _rt_make(s);
+}
+
 /* ═══════════════════════════════════════════════════════════
  * 统一字符串访问
  * 所有运行时字符串以 rt_str_t 格式传递。
@@ -177,6 +182,15 @@ void *rt_int_to_str(uintptr_t tagged) {
 
 /* 前置声明 */
 typedef struct rt_list_s rt_list_t;
+
+/* 列表类型 — 必须在使用其成员的函数之前定义 */
+struct rt_list_s {
+    SAN_HEADER;
+    int32_t len;
+    int32_t cap;
+    void **items;
+};
+
 rt_list_t *rt_list_new(void);
 void rt_list_push_item(void *lstp, void *item);
 
@@ -350,7 +364,7 @@ void *rt_list_sort(void *lst) {
     rt_list_t *l = (rt_list_t*)lst;
     if (!l || l->len <= 1) return lst;
     rt_list_t *result = rt_list_new();
-    for (int32_t i = 0; i < l->len; i++) rt_list_push(result, l->items[i]);
+    for (int32_t i = 0; i < l->len; i++) rt_list_push_item(result, l->items[i]);
     for (int32_t i = 1; i < result->len; i++) {
         void *key = result->items[i];
         int32_t j = i - 1;
@@ -393,7 +407,7 @@ void *rt_list_unique(void *lst) {
         for (int32_t j = 0; j < result->len; j++) {
             if ((intptr_t)result->items[j] == (intptr_t)l->items[i]) { found = 1; break; }
         }
-        if (!found) rt_list_push(result, l->items[i]);
+        if (!found) rt_list_push_item(result, l->items[i]);
     }
     return result;
 }
@@ -499,15 +513,9 @@ void *rt_int_to_float(uintptr_t tagged) {
 }
 
 /* ═══════════════════════════════════════════════════════════
- * 列表类型
+ * 列表操作实现
  * 动态数组，cap 不足时 2 倍扩容。
  * ═══════════════════════════════════════════════════════════ */
-struct rt_list_s {
-    SAN_HEADER;
-    int32_t len;
-    int32_t cap;
-    void **items;
-};
 
 /* 创建空列表 */
 rt_list_t *rt_list_new(void) {

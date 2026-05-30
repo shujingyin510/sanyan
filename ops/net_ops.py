@@ -58,7 +58,7 @@ def http_get(evaluator, args):
     _ensure_net()
     if not args:
         raise SanyanRuntimeError('http读 需要一个 URL 参数')
-    url = args[0] if isinstance(args[0], str) else str(evaluator.eval(args[0]))
+    url = str(evaluator.eval(args[0]))
     _validate_url(url)
     try:
         resp = _request.urlopen(url, timeout=HTTP_TIMEOUT)
@@ -72,7 +72,7 @@ def http_post(evaluator, args):
     _ensure_net()
     if len(args) < 1:
         raise SanyanRuntimeError('http写 需要 URL 参数')
-    url = args[0] if isinstance(args[0], str) else str(evaluator.eval(args[0]))
+    url = str(evaluator.eval(args[0]))
     _validate_url(url)
     data = ''
     if len(args) > 1:

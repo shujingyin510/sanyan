@@ -1,0 +1,9 @@
+// llvmgen.san — LLVM IR 代码生成器（拆分源码）
+// 此文件通过 #include 引用各子模块
+// 构建: python build_combined.py  → 生成 stdlib/llvmgen.san（合并版）
+
+#include "llvmgen/preamble.san"
+#include "llvmgen/utils.san"
+#include "llvmgen/compiler.san"
+#include "llvmgen/runtime_ir.san"
+#include "llvmgen/entry.san"

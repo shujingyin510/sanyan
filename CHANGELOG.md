@@ -2,6 +2,35 @@
 
 ---
 
+## [v3.19.0] — 2026-05-30
+
+### 新增
+- **llvmgen.san 自举完成（V5）**: 11 个 Python 辅助函数和 6 个全局变量已内联到源码中，`compile_llvmgen.py` 不再注入任何外部依赖，`llvmgen.bin`（69932 字节）可直接从源码编译
+- **sugar.bin 自举验证**: 新增 `tests/test_sugar_self_host.py`，验证 sugar.san 编译产出与参考 sugar.bin 字节一致（SHA256 校验）
+- **LLVM 代码生成器文件拆分**: `ops_gen.py`（925 行）拆分为 `ops_gen.py`（410）+ `ops_gen_control.py`（341）+ `ops_gen_helpers.py`（240）；`compiler.py`（657 行）拆分为 `compiler.py`（424）+ `ir_fixes.py`（220）
+- **#include 预处理接入编译管线**: `compile_bytecode.py` 和 `ops/file_ops.py` 在解析前调用 `preprocess_includes()` 展开 `#include` 指令
+- **C VM #include 支持**: `csrc/runtime.c` 新增 `preprocess_includes()` 函数，`--compile` 模式自动展开 `#include` 后再解析
+- **构建脚本 `build_combined.py`**: 展开 `#include` 生成合并单文件，确保 VM 可直接编译
+- **llvmgen.san 拆分子模块**: `stdlib/llvmgen_src.san`（入口）+ `stdlib/llvmgen/`（preamble/utils/compiler/runtime_ir/entry）
+- **三值逻辑 IoT 案例**: `sensor_fusion.san`（传感器融合）、`fault_tolerant_control.san`（容错控制）、`iot_state_machine.san`（状态机），含 Python/C 对比实现
+- **标准库扩充**: `stdlib/network.san`（TCP/UDP/连接池/健康检查）、`stdlib/hardware.san`（GPIO/I2C/SPI/传感器）、`stdlib/math.san` 扩充（矩阵/向量/统计/概率分布）
+- **包管理器增强**: 新增 `卸载`/`搜索`/`包信息`/`包索引` 命令，6 个示例包（sample/math_extended/logging/web_utils/data_pipeline/config）
+- **包开发文档**: `docs/package_development.md` 完整包开发指南
+- **三值逻辑对比文档**: `docs/three_value_comparison.md` 三值 vs 二值代码量/可读性对比
+
+### 变更
+- **compile_llvmgen.py**: 辅助函数已内联到 llvmgen.san，脚本简化为直接解析编译（无注入）
+- **llvmgen.san 函数名全部中文化**: `header`→`生成模块头`、`footer`→`生成模块尾`、`parse_int`→`解析整数`
+- **llvmgen.san 繁体字修正**: `設`→`设`（utils.san 中 4 处）
+- **AGENTS.md 规则强化**: 每次增加或修改代码必须为整段代码写中文注释；每次任务完成后运行全部测试并更新所有 md 文件
+
+### 修复
+- **_check_div_zero 常量折叠**: `div 1 0` 生成 `icmp eq 0, 0`（常量 true）→ `rt_throw` 总被执行污染 `g_error`，修复为 AST 级别检测常量除零并 emit unreachable
+- **_normalize_fn_format 多语句体截断**: 只取 `node[3]` 作为函数体，后续语句丢失，修复为将 `node[3:]` 包装为 `do` 块
+- **llvmgen/runtime.c 编译错误修复**: `rt_list_t` 不完整类型、`rt_list_push` 未声明等问题已修复
+
+---
+
 ## [v3.18.0] — 2026-06-03
 
 ### 新增

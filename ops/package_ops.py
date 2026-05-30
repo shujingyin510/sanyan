@@ -41,6 +41,36 @@ def _resolve_package_path(name: str) -> str:
     return candidates[0]
 
 
+def _get_package_info(name: str) -> dict | None:
+    """读取包的元信息（从 package.json 或 index.json）。"""
+    base = os.path.abspath(PACKAGES_DIR)
+    safe = name.replace('.', '_').replace('/', '_')
+    pkg_dir = os.path.join(base, safe)
+
+    # 从本地 package.json 读取
+    meta_path = os.path.join(pkg_dir, 'package.json')
+    if os.path.exists(meta_path):
+        try:
+            with open(meta_path, 'r', encoding='utf-8') as f:
+                return json.load(f)
+        except (IOError, OSError, json.JSONDecodeError):
+            pass
+
+    # 从 index.json 读取
+    local_idx = os.path.join(base, 'index.json')
+    if os.path.exists(local_idx):
+        try:
+            with open(local_idx, 'r', encoding='utf-8') as f:
+                index = json.load(f)
+            entry = index.get(name)
+            if entry:
+                return entry
+        except (IOError, OSError, json.JSONDecodeError):
+            pass
+
+    return None
+
+
 class PackageOps:
     """包管理器：安装、查询、管理三言包"""
 
@@ -63,6 +93,7 @@ class PackageOps:
         pkg_path = _resolve_package_path(name)
         if os.path.exists(os.path.dirname(pkg_path)):
             # 已安装，直接加载
+            print(f"包 '{name}' 已安装")
             return PackageOps.load(evaluator, [name])
 
         # 尝试从 URL 安装
@@ -102,6 +133,120 @@ class PackageOps:
                 raise SanyanValueError(f"包 '{name}' 未找到")
 
         return PackageOps.load(evaluator, [name])
+
+    @staticmethod
+    def uninstall(evaluator, args):
+        """卸载包：卸载("包名")"""
+        import shutil
+
+        if len(args) < 1:
+            raise SanyanSyntaxError('卸载 需要包名')
+        name = evaluator.eval(args[0])
+        if hasattr(name, 'to_int'):
+            name = str(name.to_int())
+        name = str(name)
+
+        base = os.path.abspath(PACKAGES_DIR)
+        safe = name.replace('.', '_').replace('/', '_')
+        pkg_dir = os.path.join(base, safe)
+
+        if not os.path.isdir(pkg_dir):
+            raise SanyanValueError(f"包 '{name}' 未安装")
+
+        try:
+            shutil.rmtree(pkg_dir)
+            print(f"包 '{name}' 已卸载")
+        except (IOError, OSError) as e:
+            raise SanyanIOError(f'卸载包失败: {e}')
+
+        # 清除缓存
+        _installed_cache.pop(name, None)
+        return TritValue(0)
+
+    @staticmethod
+    def search(evaluator, args):
+        """搜索包：搜索("关键词")"""
+        if len(args) < 1:
+            raise SanyanSyntaxError('搜索 需要关键词')
+        keyword = evaluator.eval(args[0])
+        if hasattr(keyword, 'to_int'):
+            keyword = str(keyword.to_int())
+        keyword = str(keyword).lower()
+
+        results = []
+
+        # 搜索本地索引
+        local_idx = os.path.join(os.path.abspath(PACKAGES_DIR), 'index.json')
+        if os.path.exists(local_idx):
+            try:
+                with open(local_idx, 'r', encoding='utf-8') as f:
+                    index = json.load(f)
+                for name, info in index.items():
+                    desc = info.get('description', '').lower()
+                    if keyword in name.lower() or keyword in desc:
+                        results.append((name, info))
+            except (IOError, OSError, json.JSONDecodeError):
+                pass
+
+        # 搜索远程索引
+        if not results:
+            try:
+                index = PackageOps._fetch_remote_index()
+                if index:
+                    for name, info in index.items():
+                        desc = info.get('description', '').lower()
+                        if keyword in name.lower() or keyword in desc:
+                            results.append((name, info))
+            except Exception:
+                pass
+
+        if results:
+            print(f"搜索 '{keyword}' 找到 {len(results)} 个结果:")
+            for name, info in results:
+                desc = info.get('description', '无描述')
+                ver = info.get('version', '?')
+                print(f"  {name} (v{ver}) — {desc}")
+        else:
+            print(f"未找到与 '{keyword}' 相关的包")
+
+        return TritValue(0)
+
+    @staticmethod
+    def info(evaluator, args):
+        """查看包信息：包信息("包名")"""
+        if len(args) < 1:
+            raise SanyanSyntaxError('包信息 需要包名')
+        name = evaluator.eval(args[0])
+        if hasattr(name, 'to_int'):
+            name = str(name.to_int())
+        name = str(name)
+
+        # 检查是否已安装
+        base = os.path.abspath(PACKAGES_DIR)
+        safe = name.replace('.', '_').replace('/', '_')
+        pkg_dir = os.path.join(base, safe)
+        installed = os.path.isdir(pkg_dir)
+
+        # 获取元信息
+        info = _get_package_info(name)
+
+        print(f"包: {name}")
+        print(f"  已安装: {'是' if installed else '否'}")
+        if info:
+            print(f"  版本: {info.get('version', '?')}")
+            print(f"  描述: {info.get('description', '无')}")
+            if info.get('author'):
+                print(f"  作者: {info['author']}")
+            if info.get('url'):
+                print(f"  地址: {info['url']}")
+        elif installed:
+            # 列出包中的文件
+            san_files = [f for f in os.listdir(pkg_dir) if f.endswith('.san')]
+            print(f"  文件: {', '.join(san_files) if san_files else '无 .san 文件'}")
+        else:
+            print("  信息: 未找到包元信息")
+
+        return TritValue(0)
 
     @staticmethod
     def load(evaluator, args):
@@ -155,13 +300,44 @@ class PackageOps:
         for name in sorted(os.listdir(base)):
             pkg_dir = os.path.join(base, name)
             if os.path.isdir(pkg_dir) and not name.startswith('.'):
-                packages.append(name)
+                # 尝试读取版本信息
+                info = _get_package_info(name)
+                ver = info.get('version', '') if info else ''
+                packages.append((name, ver))
         if packages:
             print('已安装的包:')
-            for p in packages:
-                print(f'  - {p}')
+            for p, v in packages:
+                ver_str = f' (v{v})' if v else ''
+                print(f'  - {p}{ver_str}')
         else:
             print('没有已安装的包')
+        return TritValue(0)
+
+    @staticmethod
+    def index_list(evaluator, args):
+        """列出可用的包：包索引"""
+        try:
+            index = PackageOps._fetch_remote_index()
+        except Exception:
+            # 回退到本地索引
+            local_idx = os.path.join(os.path.abspath(PACKAGES_DIR), 'index.json')
+            if os.path.exists(local_idx):
+                try:
+                    with open(local_idx, 'r', encoding='utf-8') as f:
+                        index = json.load(f)
+                except (IOError, OSError, json.JSONDecodeError):
+                    index = {}
+            else:
+                index = {}
+
+        if index:
+            print('可用的包:')
+            for name, info in sorted(index.items()):
+                desc = info.get('description', '无描述')
+                ver = info.get('version', '?')
+                print(f'  {name} (v{ver}) — {desc}')
+        else:
+            print('无法获取包索引')
         return TritValue(0)
 
     @staticmethod
@@ -236,8 +412,38 @@ class PackageOps:
             return entry.get('url') or entry.get('download')  # type: ignore[no-any-return]
         return None
 
+    @staticmethod
+    def _fetch_remote_index() -> dict:
+        """获取远程包索引。"""
+        import urllib.request
+
+        local_idx = os.path.join(os.path.abspath(PACKAGES_DIR), 'index.json')
+        if os.path.exists(local_idx):
+            try:
+                with open(local_idx, 'r', encoding='utf-8') as f:
+                    return json.load(f)
+            except (IOError, OSError, json.JSONDecodeError):
+                pass
+
+        try:
+            with urllib.request.urlopen(PACKAGE_INDEX_URL, timeout=INDEX_TIMEOUT) as resp:
+                return json.loads(resp.read().decode('utf-8'))
+        except Exception:
+            return {}
+
 
 # 注册包管理操作
 register('install', PackageOps.install)
+register('安装', PackageOps.install)
+register('uninstall', PackageOps.uninstall)
+register('卸载', PackageOps.uninstall)
+register('search', PackageOps.search)
+register('搜索', PackageOps.search)
+register('info', PackageOps.info)
+register('包信息', PackageOps.info)
 register('list_packages', PackageOps.list_packages)
+register('包列表', PackageOps.list_packages)
+register('index_list', PackageOps.index_list)
+register('包索引', PackageOps.index_list)
 register('load_package', PackageOps.load)
+register('加载包', PackageOps.load)

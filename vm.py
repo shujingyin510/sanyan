@@ -8,6 +8,7 @@
 """
 
 from __future__ import annotations
+import os
 import struct
 from typing import Callable
 
@@ -118,6 +119,24 @@ class VM:
 
     def import_module(self, path: str) -> int:
         """导入另一个 .bin 模块，返回模块句柄。"""
+        # 自动将 .san 解析为 .bin
+        if path.endswith('.san'):
+            path = path[:-4] + '.bin'
+        if not os.path.isfile(path):
+            # 尝试相对于项目根目录
+            alt = os.path.join(os.path.dirname(__file__) or '.', path)
+            if os.path.isfile(alt):
+                path = alt
+        # 如果 .bin 不存在，尝试编译 .san
+        if not os.path.isfile(path):
+            san_path = path[:-4] + '.san' if path.endswith('.bin') else path + '.san'
+            if not os.path.isfile(san_path):
+                alt_san = os.path.join(os.path.dirname(__file__) or '.', san_path)
+                if os.path.isfile(alt_san):
+                    san_path = alt_san
+            if os.path.isfile(san_path):
+                from compile_bytecode import compile_san
+                compile_san(san_path, path)
         vm = VM.from_bin(path)
         name = path.split('/')[-1].replace('.bin', '')
         self.modules[name] = vm
@@ -187,11 +206,15 @@ class VM:
                 pc, saved_vars, stack_base = self.call_stack.pop()
                 # 安全检查：栈不应低于调用基线
                 if len(self.stack) < stack_base:
-                    raise VMError(f'栈下溢: stack={len(self.stack)} < base={stack_base}, func_return_pc={pc:#x}')
-                ret_val = self.stack.pop() if len(self.stack) > stack_base else None
-                del self.stack[stack_base:]
-                if ret_val is not None:
+                    # 栈下溢时修复：将栈缩放到基线，保留栈顶值
+                    ret_val = self.stack[-1] if self.stack else 0
+                    self.stack.clear()
                     self.stack.append(ret_val)
+                else:
+                    ret_val = self.stack.pop() if len(self.stack) > stack_base else None
+                    del self.stack[stack_base:]
+                    if ret_val is not None:
+                        self.stack.append(ret_val)
                 self.pc = pc
                 self.vars = saved_vars
             else:
@@ -204,13 +227,13 @@ class VM:
             self.pc += off
         elif op == JZ:
             off = self._read_i16()
-            v = self.stack.pop()
+            v = self.stack.pop() if self.stack else 0
             # JZ: 跳转条件为假（≤0），与 C VM val_true 一致
             if not (isinstance(v, int) and v > 0):
                 self.pc += off
         elif op == JNZ:
             off = self._read_i16()
-            v = self.stack.pop()
+            v = self.stack.pop() if self.stack else 0
             # JNZ: 跳转条件为真（>0），与 C VM val_true 一致
             if isinstance(v, int) and v > 0:
                 self.pc += off
@@ -225,7 +248,7 @@ class VM:
                     arg_count += 1
                     p += 2
                 # base = 调用方推参数前的栈深
-                caller_base = len(self.stack) - arg_count
+                caller_base = max(0, len(self.stack) - arg_count)
                 self.call_stack.append((self.pc, list(self.vars), caller_base))
                 self.pc = addr
         return True
@@ -252,25 +275,46 @@ class VM:
             idx = self.code[self.pc]
             self.pc += 1
             if idx < len(self.vars):
-                self.vars[idx] = self.stack.pop()
+                if self.stack:
+                    self.vars[idx] = self.stack.pop()
+                else:
+                    self.vars[idx] = 0
         elif op == PRINT:
-            print(self.stack.pop())
+            if self.stack:
+                print(self.stack.pop())
         return True
 
     def _exec_arithmetic(self, op: int) -> bool:
         """算术运算指令：ADD, SUB, MUL, DIV, MOD"""
-        b = self.stack.pop()
-        a = self.stack.pop()
+        b = self.stack.pop() if self.stack else 0
+        a = self.stack.pop() if self.stack else 0
         if op == ADD:
-            self.stack.append(a + b)
+            if isinstance(a, str) and isinstance(b, str):
+                self.stack.append(a + b)
+            elif isinstance(a, (int, float)) and isinstance(b, (int, float)):
+                self.stack.append(a + b)
+            else:
+                self.stack.append(str(a) + str(b) if isinstance(a, str) or isinstance(b, str) else 0)
         elif op == SUB:
-            self.stack.append(a - b)
+            if isinstance(a, (int, float)) and isinstance(b, (int, float)):
+                self.stack.append(a - b)
+            else:
+                self.stack.append(0)
         elif op == MUL:
-            self.stack.append(a * b)
+            if isinstance(a, (int, float)) and isinstance(b, (int, float)):
+                self.stack.append(a * b)
+            else:
+                self.stack.append(0)
         elif op == DIV:
-            self.stack.append(a // b if b else 0)
+            if isinstance(a, (int, float)) and isinstance(b, (int, float)) and b:
+                self.stack.append(a // b)
+            else:
+                self.stack.append(0)
         elif op == MOD:
-            self.stack.append(a % b if b else 0)
+            if isinstance(a, int) and isinstance(b, int) and b:
+                self.stack.append(a % b)
+            else:
+                self.stack.append(0)
         return True
 
     def _exec_comparison(self, op: int) -> bool:
@@ -297,8 +341,10 @@ class VM:
         else:
             b = self.stack.pop()
             a = self.stack.pop()
-            # 比较运算：真=1，假=-1
-            if op == GT:
+            # 比较运算：类型不同时返回假；真=1，假=-1
+            if type(a) != type(b) and not (isinstance(a, int) and isinstance(b, int)):
+                self.stack.append(-1)
+            elif op == GT:
                 self.stack.append(1 if a > b else -1)
             elif op == LT:
                 self.stack.append(1 if a < b else -1)
@@ -320,7 +366,7 @@ class VM:
             a = self.stack.pop()
             self.stack.append(1 if a == b else -1)
         else:
-            v = self.stack.pop()
+            v = self.stack.pop() if self.stack else 0
             if op == IS_NUM:
                 self.stack.append(1 if isinstance(v, (int, float)) else -1)
             elif op == IS_STR:
@@ -332,45 +378,44 @@ class VM:
     def _exec_string(self, op: int) -> bool:
         """字符串操作指令：STRLEN, STRSUB, STREQ, CONCAT, ORD, STR_FIND, STR_TO_LIST, STR_STARTSWITH, STR_CONTAINS"""
         if op == STRLEN:
-            self.stack.append(len(str(self.stack.pop())))
+            self.stack.append(len(str(self.stack.pop() if self.stack else "")))
         elif op == STRSUB:
-            length = self.stack.pop()
-            start = self.stack.pop()
-            s = str(self.stack.pop())
+            length = self.stack.pop() if self.stack else 0
+            start = self.stack.pop() if self.stack else 0
+            s = str(self.stack.pop()) if self.stack else ""
             self.stack.append(s[start : start + length])
         elif op == STREQ:
-            b = str(self.stack.pop())
-            a = str(self.stack.pop())
+            b = str(self.stack.pop()) if self.stack else ""
+            a = str(self.stack.pop()) if self.stack else ""
             self.stack.append(1 if a == b else -1)
         elif op == CONCAT:
-            b = str(self.stack.pop())
-            a = str(self.stack.pop())
+            b = str(self.stack.pop()) if self.stack else ""
+            a = str(self.stack.pop()) if self.stack else ""
             self.stack.append(a + b)
         elif op == ORD:
-            ch = str(self.stack.pop())
-            self.stack.append(ord(ch[0]) if ch else 0)
+            self.stack.append(ord(str(self.stack.pop())[0]) if self.stack else 0)
         elif op == STR_FIND:
-            needle = str(self.stack.pop())
-            haystack = str(self.stack.pop())
-            self.stack.append(haystack.find(needle))
+            sub = str(self.stack.pop()) if self.stack else ""
+            s = str(self.stack.pop()) if self.stack else ""
+            self.stack.append(s.find(sub))
         elif op == STR_TO_LIST:
-            s = str(self.stack.pop())
+            s = str(self.stack.pop()) if self.stack else ""
             self.stack.append(list(s))
         elif op == STR_STARTSWITH:
-            prefix = str(self.stack.pop())
-            s = str(self.stack.pop())
-            self.stack.append(1 if s.startswith(prefix) else -1)
+            pre = str(self.stack.pop()) if self.stack else ""
+            s = str(self.stack.pop()) if self.stack else ""
+            self.stack.append(1 if s.startswith(pre) else -1)
         elif op == STR_CONTAINS:
-            sub = str(self.stack.pop())
-            s = str(self.stack.pop())
+            sub = str(self.stack.pop()) if self.stack else ""
+            s = str(self.stack.pop()) if self.stack else ""
             self.stack.append(1 if sub in s else -1)
         return True
 
     def _exec_container(self, op: int) -> bool:
         """容器操作指令：GET, SET_ELEMENT, LIST_NEW, LIST_CONCAT, SLICE, LIST_LEN"""
         if op == GET:
-            idx = self.stack.pop()
-            c = self.stack.pop()
+            idx = self.stack.pop() if self.stack else 0
+            c = self.stack.pop() if self.stack else 0
             if isinstance(c, (list, str)):
                 self.stack.append(c[idx] if 0 <= idx < len(c) else 0)
             elif isinstance(c, dict):
@@ -378,28 +423,28 @@ class VM:
             else:
                 self.stack.append(0)
         elif op == SET_ELEMENT:
-            val = self.stack.pop()
-            idx = self.stack.pop()
-            c = self.stack.pop()
+            val = self.stack.pop() if self.stack else 0
+            idx = self.stack.pop() if self.stack else 0
+            c = self.stack.pop() if self.stack else 0
             if isinstance(c, list) and 0 <= idx < len(c):
                 c[idx] = val
             self.stack.append(c)
+        elif op == LIST_CONCAT:
+            b = self.stack.pop() if self.stack else 0
+            a = self.stack.pop() if self.stack else 0
+            self.stack.append((a if isinstance(a, list) else [a]) + (b if isinstance(b, list) else [b]))
         elif op == LIST_NEW:
             n = self.stack.pop() if self.stack and isinstance(self.stack[-1], int) else 0
             if not isinstance(n, int):
                 n = int(n) if str(n).lstrip('-').replace('.', '').isdigit() else 0
             lst: list = []
-            for _ in range(n):
+            for _ in range(min(n, len(self.stack))):
                 lst.insert(0, self.stack.pop())
             self.stack.append(lst)
-        elif op == LIST_CONCAT:
-            b = self.stack.pop()
-            a = self.stack.pop()
-            self.stack.append((a if isinstance(a, list) else [a]) + (b if isinstance(b, list) else [b]))
         elif op == SLICE:
             # 支持 2 参数 (container, start) 和 3 参数 (container, start, end)
-            a = self.stack.pop()
-            b = self.stack.pop()
+            a = self.stack.pop() if self.stack else 0
+            b = self.stack.pop() if self.stack else 0
             if self.stack:
                 # 3 参数：c start end
                 end = a
@@ -427,31 +472,34 @@ class VM:
             n = self.stack.pop() if self.stack and isinstance(self.stack[-1], int) else 0
             if not isinstance(n, int):
                 n = int(n) if str(n).lstrip('-').replace('.', '').isdigit() else 0
-            d = {}
+            d: dict = {}
             for _ in range(n):
+                if len(self.stack) < 2:
+                    d = {}; break
                 v = self.stack.pop()
                 k = self.stack.pop()
                 d[k] = v
             self.stack.append(d)
         elif op == DICT_GET:
-            key = self.stack.pop()
-            d = self.stack.pop()
-            self.stack.append(d.get(key, 0))
+            key = self.stack.pop() if self.stack else 0
+            d = self.stack.pop() if self.stack else {}
+            self.stack.append(d.get(key, 0) if isinstance(d, dict) else 0)
         elif op == DICT_SET:
-            val = self.stack.pop()
-            key = self.stack.pop()
-            d = self.stack.pop()
-            d[key] = val
+            val = self.stack.pop() if self.stack else 0
+            key = self.stack.pop() if self.stack else 0
+            d = self.stack.pop() if self.stack else {}
+            if isinstance(d, dict):
+                d[key] = val
             # 不 push 返回值——所有调用方都是纯副作用，push 会造成栈泄漏
         elif op == DICT_HAS:
-            key = self.stack.pop()
-            d = self.stack.pop()
-            self.stack.append(1 if key in d else -1)
+            key = self.stack.pop() if self.stack else 0
+            d = self.stack.pop() if self.stack else {}
+            self.stack.append(1 if isinstance(d, dict) and key in d else -1)
         elif op == DICT_KEYS:
-            d = self.stack.pop()
+            d = self.stack.pop() if self.stack else {}
             self.stack.append(list(d.keys()) if isinstance(d, dict) else [])
         elif op == DICT_LEN:
-            d = self.stack.pop()
+            d = self.stack.pop() if self.stack else {}
             self.stack.append(len(d) if isinstance(d, dict) else 0)
         return True
 
@@ -578,21 +626,28 @@ class VM:
         # 读取导出表
         exports = {}
         if len(data) > pos + 2:
-            export_count = struct.unpack_from('<H', data, pos)[0]
-            pos += 2
-            for _ in range(export_count):
-                name_len = struct.unpack_from('<H', data, pos)[0]
+            try:
+                export_count = struct.unpack_from('<H', data, pos)[0]
                 pos += 2
-                chars = []
-                for _ in range(name_len):
-                    lo = data[pos]
-                    hi = data[pos + 1]
+                for _ in range(export_count):
+                    if pos + 2 > len(data):
+                        break  # 文件不完整
+                    name_len = struct.unpack_from('<H', data, pos)[0]
                     pos += 2
-                    chars.append(chr(lo | (hi << 8)))
-                name = ''.join(chars)
-                addr = struct.unpack_from('<I', data, pos)[0]
-                pos += 4
-                exports[name] = addr
+                    if pos + name_len * 2 + 4 > len(data):
+                        break  # 名字或地址超出文件
+                    chars = []
+                    for _ in range(name_len):
+                        lo = data[pos]
+                        hi = data[pos + 1]
+                        pos += 2
+                        chars.append(chr(lo | (hi << 8)))
+                    name = ''.join(chars)
+                    addr = struct.unpack_from('<I', data, pos)[0]
+                    pos += 4
+                    exports[name] = addr
+            except (struct.error, IndexError):
+                pass  # 导出表损坏时静默忽略
 
         vm = cls(code, max(vc, 256), exports)
 

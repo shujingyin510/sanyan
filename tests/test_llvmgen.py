@@ -272,7 +272,6 @@ class TestLLVMVariableIndex(unittest.TestCase):
 class TestLLVMImport(unittest.TestCase):
     """模块导入"""
 
-    @unittest.skip('导入系统为桩函数，尚未实现模块加载')
     def test_import_resolves(self):
         ir = _compile_ast([['设', 'test', ['导入', '"stdlib/test.san"']]])
         self.assertIn('@"测试套件"', ir)
@@ -354,7 +353,6 @@ class TestLLVMNoRegression(unittest.TestCase):
     def test_sensor_pipeline(self):
         self._check_example('sensor_pipeline_simple')
 
-    @unittest.skip('依赖导入系统（桩函数），text_analysis.san 使用 test.测试套件')
     def test_text_analysis(self):
         self._check_example('text_analysis')
 

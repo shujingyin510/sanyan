@@ -200,29 +200,83 @@ The LLVM codegen (llvmgen/) compiles to native binaries via C runtime linkage.
 
 ```
 sanyan/
-├── vm.py                    # Bytecode VM (self-hosting capable)
-├── evaluator.py             # Tree-walking interpreter
-├── lexer.py                 # S-expression tokenizer (supports // comments)
-├── parser.py                # S-expression parser
-├── ternary_core.py          # Balanced ternary arithmetic (simulated)
-├── compile_bytecode.py      # .san → .bin compiler entry
-├── sanyancc.py              # Cross-compiler for STM32
-├── main.py                  # Entry point / REPL
-├── runtime.py               # Runtime environment
-├── sugar/                   # C-like sugar → S-expression converter
-├── ops/                     # Built-in operations (30 modules)
-├── llvmgen/                 # LLVM code generator
-├── lsp/                     # Language server protocol
-├── csrc/                    # C VM (52 instructions, 61 unit tests)
-├── stdlib/                  # Standard library
-├── tests/                   # 43 integration tests + 500+ unit tests
-├── examples/                # Example programs
-├── docs/                    # Manual, syntax guide, LLVM docs
-├── benchmark/               # Performance benchmarks
-├── packages/                # Package manager cache
-├── ARCHITECTURE.md          # Architecture documentation
-├── CONTRIBUTING.md          # Contribution guide
-└── sanyan-vscode/           # VS Code extension
+├── ARCHITECTURE.md            # Architecture documentation
+├── AGENTS.md                  # AI collaboration rules (self-hosting, tests, conventions)
+├── CHANGELOG.md               # Changelog
+├── CONTRIBUTING.md            # Contribution guide
+├── README.md                  # Project README (Chinese)
+├── README_EN.md               # Project README (English)
+├── build_combined.py          # Build script: expand #include → combined .san
+├── vm.py                      # Bytecode VM (self-hosting capable)
+├── evaluator.py               # Tree-walking interpreter
+├── lexer.py                   # S-expression tokenizer
+├── parser.py                  # S-expression parser
+├── ternary_core.py            # Balanced ternary arithmetic (simulated)
+├── compile_bytecode.py        # .san → .bin compiler (supports #include)
+├── compile_llvmgen.py         # llvmgen.san → llvmgen.bin (V5 self-hosted, no injection)
+├── sanyancc.py                # Cross-compiler for STM32
+├── main.py                    # Entry point / REPL
+├── runtime.py                 # Runtime environment
+├── preprocess.py              # #include preprocessor
+├── sugar/                     # C-like sugar → S-expression converter
+├── llvmgen/                   # LLVM code generator (split)
+│   ├── codegen.py             # AST → LLVM IR
+│   ├── compiler.py            # Compiler entry + source parsing
+│   ├── ir_fixes.py            # IR post-processing (from compiler.py)
+│   ├── ops_gen.py             # Main compilation entry
+│   ├── ops_gen_control.py     # Control flow compilation (from ops_gen.py)
+│   ├── ops_gen_helpers.py     # Arithmetic/container helpers (from ops_gen.py)
+│   ├── ir_builder.py          # CodegenContext builder
+│   ├── helpers.py             # Python helper functions
+│   ├── runtime.c              # C runtime library
+│   └── type_mapping.py        # Type mapping & runtime function specs
+├── ops/                       # Built-in operations (30 modules)
+├── lsp/                       # Language server protocol
+├── csrc/                      # C VM (52 instructions, with #include preprocessing)
+│   ├── runtime.c              # VM implementation
+│   ├── test_runtime.c         # VM unit tests (61 tests)
+│   └── dp.c                   # parse_sanyan native compile test
+├── stdlib/                    # Standard library
+│   ├── _bootstrap.san         # S-expression bootstrap parser
+│   ├── bytecode_compiler.san  # Self-hosted bytecode compiler
+│   ├── sugar.san              # Sugar parser (merged, from build_combined.py)
+│   ├── llvmgen.san            # LLVM codegen (merged, from build_combined.py)
+│   ├── llvmgen_src.san        # llvmgen split source (#include submodules)
+│   ├── llvmgen/               # llvmgen submodules
+│   │   ├── preamble.san       # Global vars + helper functions
+│   │   ├── utils.san          # Utility functions
+│   │   ├── compiler.san       # Main compilation function
+│   │   ├── runtime_ir.san     # Runtime IR generation
+│   │   └── entry.san          # Top-level entry + exports
+│   ├── network.san            # Network library (TCP/UDP/connection pool)
+│   ├── hardware.san           # Hardware abstraction (GPIO/I2C/SPI/sensors)
+│   ├── math.san               # Math library (matrix/vector/statistics)
+│   └── ...                    # More standard library modules
+├── packages/                  # Package manager
+│   ├── index.json             # Package index (6 packages)
+│   ├── sample/                # Example package (greeting tool)
+│   ├── math_extended/         # Extended math (complex/vector)
+│   ├── logging/               # Structured logging
+│   ├── web_utils/             # Web utilities (URL/HTML/Cookie)
+│   ├── data_pipeline/         # Data pipeline (map/filter/aggregate)
+│   └── config/                # Configuration management
+├── examples/                  # Example programs
+│   ├── sensor_fusion.san      # Three-value sensor fusion (Sanyan)
+│   ├── sensor_fusion.py       # Sensor fusion (Python comparison)
+│   ├── sensor_fusion.c        # Sensor fusion (C comparison)
+│   ├── fault_tolerant_control.san # Fault-tolerant control
+│   ├── iot_state_machine.san  # IoT device state machine
+│   ├── greenhouse.san         # Smart greenhouse
+│   └── stm32-blinky/          # STM32 embedded example
+├── tests/                     # Automated tests (351 tests)
+├── docs/                      # Documentation
+│   ├── manual.md              # User manual
+│   ├── syntax.md              # Syntax guide
+│   ├── commands.md            # Command reference
+│   ├── llvm.md                # LLVM documentation
+│   ├── three_value_comparison.md # Three-value vs two-value comparison
+│   └── package_development.md # Package development guide
+└── benchmark/                 # Performance benchmarks
 ```
 
 ---

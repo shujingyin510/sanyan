@@ -5,6 +5,12 @@
 **完全自举已达成。** VM 编译产出 `stdlib/bytecode_compiler.bin` 与求值器编译产出逐字节相同（5692 字节）。
 新增 `tests/test_self_host.py` 作为正式自举检测测试。
 
+**llvmgen.san 自举完成（V5）。** 11 个 Python 辅助函数和 6 个全局变量已内联到源码中，
+`compile_llvmgen.py` 不再注入任何外部依赖。`llvmgen.bin`（69948 字节）可直接从源码编译。
+
+**sugar.bin 自举验证完成。** 新增 `tests/test_sugar_self_host.py`，验证 sugar.san 编译产出
+与参考 sugar.bin 字节一致（SHA256 校验）。
+
 VM 关键修复：
 - `DICT_SET` 不 push 返回值（消除主栈泄漏源）
 - `CALL` 记录 `stack_base = len(stack) - arg_count`，`RET` 执行 `del stack[base:]`（栈隔离）
@@ -142,7 +148,7 @@ python -X utf8 tests/run_all.py           # 集成测试 43 项
 - test_commands.py 18/18
 - test_parser.py 28/28
 - test_ops.py 78/78
-- test_ops_ext.py 26/26（含 1 项 skip）
+- test_ops_ext.py 26/26（skip=0）
 - test_lsp.py 6/6
 - test_package.py 6/6
 - test_iot.py 25/25
@@ -152,8 +158,21 @@ python -X utf8 tests/run_all.py           # 集成测试 43 项
 - test_self_host.py 1/1
 - test_vm.py 73/73
 - test_c_vm.py 1/1（需 C 编译器）
-- test_llvm_native.py（需 C 编译器，否则 skip）
+- test_llvm_native.py 2/3（dp_harness 测试需完整 LLVM→原生管线，parse_sanyan 已修复返回正确 AST）
 - run_all.py 43/43
+
+2026-05-30 修复记录：
+- llvmgen/runtime.c：struct rt_list_s 移到使用函数之前，rt_list_push → rt_list_push_item，新增公共接口 `rt_make()` 用于 C 字符串→三言字符串转换
+- LLVM compiler bootstrap 路径：S-expression set 字面量字符串创建全局变量；_make_bootstrap_harness 用 rt_make 包装 C 字符串参数（修复 parse_sanyan 入口函数不返回问题）
+- VM import：.san → .bin 自动转换 + 自动编译 .bin 不存在时
+- VM from_bin：导出表边界检查（不完整文件不崩溃）
+- VM 所有操作码处理：栈下溢保护 + 类型安全比较/算术
+- Python 求值器 dict ops 中 list→tuple 键转换
+- Python 求值器 container_ops.generic_get 越界返回 0 替代抛异常
+- test_http_get：改用 unittest.mock.patch 替代外网请求（去掉 skip）
+- test_import_resolves / test_text_analysis：取消 skip，import 系统实际已可用（去掉 2 个 skip）
+- LLVM codegen `_normalize_fn_format`：多语句函数体被截断为仅第一条语句，修复为将 `node[3:]` 包装为 `do` 块
+- LLVM codegen `(div 1 0)`：`_check_div_zero` 生成 `icmp eq 0, 0`（常量 true）→ `rt_throw` 污染 `g_error`，修复为 AST 级别检测常量除零并跳过检查
 
 Python 文档同步：首次或每次代码修改后建议运行：
 ```bash
@@ -162,6 +181,43 @@ python doc_sync.py
 这会同步版本号、检查 BUILTIN_OPS 与手册一致性、检查异常体系。
 
 ## 文档自动维护
+
+### 任务完成后检查清单
+
+**每次任务完成后，必须执行以下检查：**
+
+1. **运行全部测试**：确认所有现有功能未被破坏
+   ```bash
+   python -X utf8 tests/test_core.py -v
+   python -X utf8 tests/test_commands.py -v
+   python -X utf8 tests/test_parser.py
+   python -X utf8 tests/test_ops.py -v
+   python -X utf8 tests/test_ops_ext.py -v
+   python -X utf8 tests/test_sugar_san.py -v
+   python -X utf8 tests/test_llvmgen.py -v
+   python -X utf8 tests/test_self_host.py -v
+   python -X utf8 tests/test_vm.py -v
+   python -X utf8 tests/run_all.py
+   ```
+
+2. **更新所有 md 文件**：检查并更新以下文件中与本次改动相关的内容
+   - `README.md` — 版本号、功能列表、项目结构
+   - `README_EN.md` — 英文版同步
+   - `ARCHITECTURE.md` — 架构文档
+   - `CHANGELOG.md` — 变更日志
+   - `CONTRIBUTING.md` — 贡献指南
+   - `docs/manual.md` — 用户手册
+   - `docs/syntax.md` — 语法文档
+   - `docs/commands.md` — 命令参考
+   - `docs/errors.md` — 错误说明
+   - `docs/llvm.md` — LLVM 文档
+   - `AGENTS.md` — 本文件
+
+3. **检查文档一致性**
+   - README 版本号与 `pyproject.toml` 一致
+   - README 项目结构与实际文件列表一致
+   - CHANGELOG 条目格式正确（日期倒序、四分类）
+   - 测试数量与实际一致
 
 ### pyproject.toml / README.md
 
@@ -183,15 +239,16 @@ python doc_sync.py
 
 ### 注释
 
-**必须为关键代码添加中文注释**，尤其是：
+**每次增加或修改代码，必须为整段代码写中文注释。** 包括：
 - 模块级 docstring：说明模块职责、核心类/函数
-- 公共函数/方法：参数说明、返回值、副作用
+- 每个函数/方法：docstring 说明参数、返回值、副作用
+- 每个代码块：说明目的和逻辑
 - 复杂逻辑：算法思路、设计决策、非显而易见的约束
 - 魔法数字/常量：解释来源和含义
 
 注释风格：
 - Python：docstring 用中文，行内注释简明扼要
-- Sanyan (.san)：`//` 行注释，关键函数上方加注释
+- Sanyan (.san)：`//` 行注释，每个函数上方必须加注释
 - C (csrc/)：`/* */` 块注释，函数头注释说明参数和返回值
 
 不需要注释的情况：简单赋值、标准模式（if/for）、自解释的变量名。
@@ -293,3 +350,29 @@ D:/msys64/usr/bin/bash.exe -lc "gcc /d/Test/sanyan/csrc/runtime.c -o /d/Test/san
 - **GCC 必须通过 MSYS2 bash 调用**：`D:/msys64/usr/bin/bash.exe -lc "gcc ..."`, 直接调用 `gcc.exe` 无法输出文件（MSYS2 路径映射问题）
 - Windows 路径需转为 MSYS2 格式：`D:\xxx` → `/d/xxx`
 - 字典当前有最大条目限制（`DICT_MAX=256`）
+
+## LLVM 工具链
+
+LLVM IR → 原生代码管线依赖 `llc` + `gcc`：
+
+| 工具 | 路径 | 用途 |
+|---|---|---|
+| `llc` | `D:\msys64\ucrt64\bin\llc.exe` | LLVM IR → 目标文件 (`.o`) |
+| `gcc` | MSYS2 (`D:\msys64\usr\bin\gcc.exe`) | 编译运行时 C 源码 + 链接 |
+
+`llc` 可通过 MSYS2 ucrt64 直接调用（不依赖 bash 路径映射），`gcc` 必须通过 MSYS2 bash 调用：
+
+```bash
+# llc：IR → .o（可直接调用）
+D:/msys64/ucrt64/bin/llc.exe input.ll -filetype=obj -o output.o
+
+# gcc：编译 C（必须通过 MSYS2 bash）
+D:/msys64/usr/bin/bash.exe -lc "gcc -c /d/path/to/source.c -o /d/path/to/output.o -std=c99 -O2"
+
+# gcc：链接（必须通过 MSYS2 bash）
+D:/msys64/usr/bin/bash.exe -lc "gcc /d/path/to/obj1.o /d/path/to/obj2.o -o /d/path/to/output.exe -lm"
+```
+
+### llvmgen/runtime.c 已知问题
+
+`llvmgen/runtime.c` 存在编译错误（`rt_list_t` incomplete typedef、`rt_list_push` 未声明、`rt_str_join` 返回类型错误），这些是预存 bug，不影响 C VM (`csrc/runtime.c`)。

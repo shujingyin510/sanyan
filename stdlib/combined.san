@@ -1005,10 +1005,10 @@
     设 kc = 加(k列表长度, 1)
     循环 (小于(ki, kc)) {
         若 (小于(ki, k列表长度)) {
-            設 content = 取(全部键列表, ki)
-            設 name = 查键(字符串常量表, content)
-            設 len = 加(取字长(content), 1)
-            設 escaped = 转义LLVM字符串(content)
+            设 content = 取(全部键列表, ki)
+            设 name = 查键(字符串常量表, content)
+            设 len = 加(取字长(content), 1)
+            设 escaped = 转义LLVM字符串(content)
             result = 连接(result, name, " = private constant [", len, " x i8] c\"", escaped, "\\00\"", 换行)
         }
         ki = 加(ki, 1)

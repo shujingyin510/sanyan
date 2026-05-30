@@ -96,7 +96,7 @@ class ContainerOps:
             try:
                 return container[index]
             except (IndexError, ValueError, TypeError):
-                raise SanyanValueError(f'索引 {index} 超出范围，容器长度 {len(container)}')  # type: ignore[arg-type]
+                return 0  # 越界返回 0（与 VM 行为一致）
         raise SanyanTypeError('第一个参数必须是列表、数组或字典')
 
     @staticmethod
@@ -134,7 +134,10 @@ class ContainerOps:
         key = evaluator.eval(args[1])
         if isinstance(key, TritValue):
             key = key.to_int()
-        return TritValue(1 if key in d else -1)
+        try:
+            return TritValue(1 if key in d else -1)
+        except TypeError:
+            return TritValue(-1)
 
     @staticmethod
     def dict_get(evaluator, args):
@@ -151,6 +154,8 @@ class ContainerOps:
         key = evaluator.eval(args[1])
         if isinstance(key, TritValue):
             key = key.to_int()
+        if isinstance(key, list):
+            key = tuple(key)
         try:
             return d[key]
         except KeyError:
@@ -172,6 +177,8 @@ class ContainerOps:
             raise SanyanTypeError('字典栈顶不是字典')
         if not isinstance(d, dict):
             raise SanyanTypeError('第一个参数必须是字典')
+        if isinstance(key, list):
+            key = tuple(key)
         d[key] = value
         return d
 

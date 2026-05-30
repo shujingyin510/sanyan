@@ -78,14 +78,23 @@ def _merge_if_chain(nodes: list) -> list:
 
 
 def _normalize_fn_format(nodes: list) -> list:
-    """将 SugarConverter 的 ['fn', 'name', ['p'], body] 转为标准 ['fn', ['name', 'p'], body]。"""
+    """将 SugarConverter 的 ['fn', 'name', ['p'], body...] 转为标准 ['fn', ['name', 'p'], body]。
+
+    若有多个 body 表达式，包装为 ['do', body1, body2, ...]。
+    """
     result = []
     for node in nodes:
         if isinstance(node, list) and len(node) >= 3 and node[0] == 'fn':
             if isinstance(node[1], str) and isinstance(node[2], list):
                 name = node[1]
                 params = node[2]
-                body = node[3] if len(node) > 3 else []
+                body_parts = node[3:]
+                if len(body_parts) == 0:
+                    body = []
+                elif len(body_parts) == 1:
+                    body = body_parts[0]
+                else:
+                    body = ['do'] + body_parts
                 result.append(['fn', [name] + params, body])
                 continue
         result.append(node)
@@ -177,6 +186,15 @@ def _resolve_imports(nodes: list, cg: CodegenContext) -> tuple[list, list]:
 
 def _make_bootstrap_harness(cg: CodegenContext):
     """为 bootstrap 模块添加 parse_sanyan() ASCII 入口。"""
+    def _get_or_declare(name, fnty):
+        """查找已声明的函数，不存在则声明。"""
+        for g in cg.module.globals.values():
+            if hasattr(g, 'name') and g.name == name:
+                return g
+        return ir.Function(cg.module, fnty, name)
+
+    rt_make_fn = _get_or_declare('rt_make', ir.FunctionType(_PTR, [_PTR]))
+
     cg.begin_function('parse_sanyan', ['source'])
     # 全局变量初始化
     for gname, gval in cg._global_inits:
@@ -195,12 +213,38 @@ def _make_bootstrap_harness(cg: CodegenContext):
     # 调用 解析(source)
     func = cg._funcs.get('解析')
     if func:
-        src = cg.get_var('source')
-        result = cg.builder.call(func, [src], name='ast')
+        from llvmgen.ops_gen import _unwrap_call_arg
+        src = _unwrap_call_arg(cg.get_var('source'), cg)
+        # C 字符串 → 三言字符串（用 rt_make 包装）
+        src_str = cg.builder.call(rt_make_fn, [src], name='src_str')
+        result = cg.builder.call(func, [src_str], name='ast')
         cg.builder.ret(result)
     else:
         cg.builder.ret(_NULL)
     cg.end_function()
+
+    # 诊断入口：仅调用词法分析
+    tok_func = cg._funcs.get('词法分析')
+    if tok_func:
+        cg.begin_function('lex_only', ['source'])
+        for gname, gval in cg._global_inits:
+            if isinstance(gval, (int, float)):
+                init_val = cg._box_int(ir.Constant(_INT, int(gval)))
+            elif isinstance(gval, str):
+                init_val = cg._make_rt_string(gval)
+            else:
+                if isinstance(gval, list):
+                    init_val = compile_node(gval, cg)
+                else:
+                    init_val = _NULL
+            if init_val is not None:
+                cg.builder.store(init_val, cg._globals[gname])
+        from llvmgen.ops_gen import _unwrap_call_arg
+        src2 = _unwrap_call_arg(cg.get_var('source'), cg)
+        src_str2 = cg.builder.call(rt_make_fn, [src2], name='src_str')
+        toks = cg.builder.call(tok_func, [src_str2], name='toks')
+        cg.builder.ret(toks)
+        cg.end_function()
 
 
 # ── 顶层编译入口 ──
@@ -247,7 +291,7 @@ def _compile_in_context(ast_nodes: list, cg: CodegenContext) -> None:
                         # 数字 — 不预建全局（走 alloca）
                     elif isinstance(val, str):
                         if _is_string_literal(val):
-                            pass
+                            cg.create_global(name, _unquote(val))
                         elif _to_int(val) is not None:
                             if name.startswith('_'):
                                 cg.create_global(name, val)
