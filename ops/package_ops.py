@@ -52,7 +52,8 @@ def _get_package_info(name: str) -> dict | None:
     if os.path.exists(meta_path):
         try:
             with open(meta_path, 'r', encoding='utf-8') as f:
-                return json.load(f)
+                result: dict = json.load(f)
+                return result
         except (IOError, OSError, json.JSONDecodeError):
             pass
 
@@ -61,8 +62,8 @@ def _get_package_info(name: str) -> dict | None:
     if os.path.exists(local_idx):
         try:
             with open(local_idx, 'r', encoding='utf-8') as f:
-                index = json.load(f)
-            entry = index.get(name)
+                index: dict = json.load(f)
+            entry: dict | None = index.get(name)
             if entry:
                 return entry
         except (IOError, OSError, json.JSONDecodeError):
@@ -421,13 +422,15 @@ class PackageOps:
         if os.path.exists(local_idx):
             try:
                 with open(local_idx, 'r', encoding='utf-8') as f:
-                    return json.load(f)
+                    result: dict = json.load(f)
+                    return result
             except (IOError, OSError, json.JSONDecodeError):
                 pass
 
         try:
             with urllib.request.urlopen(PACKAGE_INDEX_URL, timeout=INDEX_TIMEOUT) as resp:
-                return json.loads(resp.read().decode('utf-8'))
+                index: dict = json.loads(resp.read().decode('utf-8'))
+                return index
         except Exception:
             return {}
 
