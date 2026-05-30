@@ -16,14 +16,14 @@ if sys.platform == 'win32':
 TEST_DIR = 'tests'
 EXAMPLES_DIR = 'examples'
 EXCLUDE_TESTS = set()
-MAX_WORKERS = 1  # CI 环境串行执行（避免资源争用导致超时）
+MAX_WORKERS = 4  # VM 模式下可更高并行
 
 
 def run_san(filepath: str) -> tuple[bool, str]:
     """运行一个 .san 文件，返回 (成功, 输出)"""
     try:
         result = subprocess.run(
-            [sys.executable, '-X', 'utf8', 'main.py', filepath],
+            [sys.executable, '-X', 'utf8', 'main.py', '--vm', filepath],
             capture_output=True,
             text=True,
             timeout=60,
