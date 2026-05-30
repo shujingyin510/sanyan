@@ -1,15 +1,27 @@
-"""文档自动同步脚本：在代码变更后更新 docs/manual.md 的关键表格。
+"""文档自动同步脚本：在代码变更后更新 docs/ 的关键表格。
 
 用法: python doc_sync.py
 """
 
 from __future__ import annotations
+import os
 import re
 
 
 MANUAL_PATH = 'docs/manual.md'
 COMMANDS_PATH = 'docs/commands.md'
 ERRORS_PATH = 'docs/errors.md'
+
+# 需要检查版本号的文件及其版本号所在行的正则模式
+VERSION_FILES = {
+    'README.md': r'# 三言 Sanyan v([\d.]+)',
+    'README_EN.md': r'# Sanyan v([\d.]+)',
+    'docs/manual.md': r'# 三言 v([\d.]+) 语言手册',
+    'docs/commands.md': r'# 三言 v([\d.]+) 内置命令速查表',
+    'docs/errors.md': r'# 三言 v([\d.]+) 错误信息说明',
+    'docs/llvm.md': r'# 三言 LLVM 代码生成器 v([\d.]+)',
+    'docs/syntax.md': r'v([\d.]+)',
+}
 
 
 def _read(path: str) -> str:
@@ -22,6 +34,13 @@ def _write(path: str, content: str) -> None:
         f.write(content)
 
 
+def _get_canonical_version() -> str:
+    """从 sanyan/__init__.py 读取权威版本号。"""
+    init = _read('sanyan/__init__.py')
+    m = re.search(r"__version__\s*=\s*['\"]([^'\"]+)['\"]", init)
+    return m.group(1) if m else '0.0.0'
+
+
 def _guess_syntax(op: str) -> str:
     """为缺失的内置操作猜测合理的语法列内容。"""
     return f'`{op}(…)`'
@@ -30,6 +49,64 @@ def _guess_syntax(op: str) -> str:
 def _guess_description(op: str) -> str:
     """为缺失的内置操作猜测合理的说明列内容。"""
     return f'内置操作（{op}）'
+
+
+def check_version_consistency() -> bool:
+    """检查所有 md 文件中的版本号是否与 sanyan/__init__.py 一致。
+
+    Returns:
+        True 表示全部一致，False 表示有不一致。
+    """
+    canonical = _get_canonical_version()
+    print(f'权威版本: v{canonical}')
+    ok = True
+
+    for filepath, pattern in VERSION_FILES.items():
+        if not os.path.exists(filepath):
+            continue
+        content = _read(filepath)
+        # 只检查文件开头的标题行（前 3 行）
+        header = '\n'.join(content.split('\n')[:3])
+        m = re.search(pattern, header)
+        if m:
+            found_ver = m.group(1)
+            if found_ver != canonical:
+                print(f'  版本不一致: {filepath} = v{found_ver} (应为 v{canonical})')
+                ok = False
+        # 检查 CHANGELOG 最新条目
+    changelog = _read('CHANGELOG.md')
+    m = re.search(r'## \[(v[^\]]+)\]', changelog)
+    if m:
+        changelog_ver = m.group(1).lstrip('v')
+        if changelog_ver != canonical:
+            print(f'  CHANGELOG 最新条目: v{changelog_ver} (应为 v{canonical})')
+            ok = False
+
+    if ok:
+        print('版本号全部一致')
+    return ok
+
+
+def fix_version_consistency() -> None:
+    """将所有 md 文件的版本号同步为 sanyan/__init__.py 的版本。"""
+    canonical = _get_canonical_version()
+    print(f'同步版本号: v{canonical}')
+
+    for filepath, pattern in VERSION_FILES.items():
+        if not os.path.exists(filepath):
+            continue
+        content = _read(filepath)
+        lines = content.split('\n')
+        # 只修改前 3 行中的版本号
+        changed = False
+        for i in range(min(3, len(lines))):
+            new_line = re.sub(r'v[\d.]+(?!.*\d{4})', f'v{canonical}', lines[i])
+            if new_line != lines[i]:
+                lines[i] = new_line
+                changed = True
+        if changed:
+            _write(filepath, '\n'.join(lines))
+            print(f'  已更新: {filepath}')
 
 
 def sync_builtin_ops_table():
@@ -132,7 +209,8 @@ def sync_error_table():
 
 def main():
     print('=== 文档同步 ===')
-    sync_version()
+    check_version_consistency()
+    fix_version_consistency()
     sync_builtin_ops_table()
     sync_error_table()
     print('=== 完成 ===')

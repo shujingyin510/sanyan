@@ -240,7 +240,7 @@ class _Parser:
             if catch_tok:
                 catch_kw = KEYWORD_MAP.get(catch_tok.value, catch_tok.value)
                 if catch_kw != 'catch':
-                    raise SyntaxError(f"行 {catch_tok.line}: 期望 'catch'，但得到 '{catch_tok.value}'")
+                    raise SanyanSyntaxError(f"行 {catch_tok.line}: 期望 'catch'，但得到 '{catch_tok.value}'")
             self.advance()
             err_var = '_'
             if self.peek() and self.peek().value == '(':
@@ -399,7 +399,7 @@ class _Parser:
             saved_pos = self.pos
             try:
                 inner_expr = self.parse_expression()
-            except SyntaxError:
+            except SanyanSyntaxError:
                 inner_expr = None
                 self.pos = saved_pos
 

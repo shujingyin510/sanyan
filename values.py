@@ -67,6 +67,12 @@ class SanyanIOError(OSError, SanyanError):
     pass
 
 
+class SanyanIndexError(IndexError, SanyanError):
+    """索引越界错误（列表/数组访问越界）"""
+
+    pass
+
+
 class ContinueException(Exception):
     pass
 

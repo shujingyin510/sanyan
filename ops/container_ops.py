@@ -4,7 +4,7 @@ from typing import Any
 
 from ternary_core import TritValue, ArrayValue
 from values import FunctionValue, ModuleValue, call_function
-from values import SanyanSyntaxError, SanyanTypeError, SanyanValueError, SanyanKeyError, to_num
+from values import SanyanSyntaxError, SanyanTypeError, SanyanValueError, SanyanKeyError, SanyanIndexError, to_num
 from ops.registry import register
 
 
@@ -96,7 +96,7 @@ class ContainerOps:
             try:
                 return container[index]
             except (IndexError, ValueError, TypeError):
-                return 0  # 越界返回 0（与 VM 行为一致）
+                raise SanyanIndexError(f'索引 {index} 越界（容器长度 {len(container)}）')
         raise SanyanTypeError('第一个参数必须是列表、数组或字典')
 
     @staticmethod

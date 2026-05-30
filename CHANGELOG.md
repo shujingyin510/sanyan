@@ -31,7 +31,7 @@
 
 ---
 
-## [v3.18.0] — 2026-06-03
+## [v3.18.0] — 2026-05-29
 
 ### 新增
 - **C VM 与 Python VM 三值逻辑统一**: Python VM（`vm.py`）所有布尔返回指令统一为三值逻辑（1=真，-1=假），与 C VM（`csrc/runtime.c`）和 Python 求值器行为一致
@@ -54,7 +54,7 @@
 
 ---
 
-## [v3.17.0] — 2026-06-02
+## [v3.17.0] — 2026-05-28
 
 ### 新增
 - **C VM 单元测试**: `csrc/test_runtime.c` 61 项测试，覆盖标记指针/字符串/列表/字典/算术/比较/变量/控制流/函数调用/嵌套调用，`tests/test_c_vm.py` Python 包装器自动编译运行
@@ -111,7 +111,7 @@
 - **README.md**: 修复 CI badge URL（`ci.yml` → `test.yml`），删除结构树中不存在的 `VERSION.py`、`ast_json.py`、`_error_handler.py`、`_util.py`
 - **ops/type_ops.py**: 删除与 `time_ops.py` 重复的 `time_now` 和 `sleep_op`
 
-## [v3.15.1] — 2026-06-01
+## [v3.15.1] — 2026-05-27
 
 ### 修复
 - **`param_matcher.py:evaluate_args()`**: 列表代码表达式（如 `(取 a i)`）不再被当作数据字面量原样返回而不求值，修复自举编译时 `编译节点` 收到未求值 AST 节点导致的 C 栈递归溢出（`runtime/param_matcher.py`）

@@ -9,7 +9,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import unittest
 from ternary_core import TritValue, ArrayValue
 from evaluator import SanyanEvaluator
-from values import SanyanValueError, SanyanTypeError, SanyanSyntaxError, SanyanNameError
+from values import SanyanValueError, SanyanTypeError, SanyanSyntaxError, SanyanNameError, SanyanIndexError
 
 
 class TestArithmetic(unittest.TestCase):
@@ -448,8 +448,8 @@ class TestNegativeCases(unittest.TestCase):
 
     def test_get_out_of_range(self):
         self.env.eval(['set', 'lst', ['list', 1, 2]])
-        result = self.env.eval(['get', 'lst', 99])
-        self.assertEqual(result, 0)
+        with self.assertRaises(SanyanIndexError):
+            self.env.eval(['get', 'lst', 99])
 
     def test_dict_contains_missing(self):
         self.env.eval(['set', 'd', ['dict', '"a"', 1]])
