@@ -36,6 +36,11 @@ jobs:
           python-version: ${{ matrix.python-version }}
       - run: python -m pip install --upgrade pip
       - run: pip install .[dev]
+      - name: Cache build artifacts
+        uses: actions/cache@v4
+        with:
+          path: build/
+          key: build-${{ matrix.python-version }}-${{ hashFiles('stdlib/*.san') }}
       - run: python -X utf8 tests/test_core.py -v
       - run: python -X utf8 tests/test_commands.py -v
       - run: python -X utf8 tests/test_parser.py

@@ -16,7 +16,7 @@ if sys.platform == 'win32':
 TEST_DIR = 'tests'
 EXAMPLES_DIR = 'examples'
 EXCLUDE_TESTS = set()
-MAX_WORKERS = 4  # VM 模式下可更高并行
+MAX_WORKERS = 2  # CI 共享虚拟机资源有限，降低并行避免争用
 
 
 def run_san(filepath: str) -> tuple[bool, str]:
