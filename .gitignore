@@ -208,6 +208,26 @@ NUL
 !stdlib/bytecode_compiler.bin
 !stdlib/sugar.bin
 !stdlib/llvmgen.bin
+!stdlib/parse.bin
+!stdlib/eval.bin
+!stdlib/test.bin
+!stdlib/tokenize.bin
+!stdlib/math.bin
+!stdlib/algorithm.bin
+!stdlib/string.bin
+!stdlib/list.bin
+!stdlib/io.bin
+!stdlib/logic.bin
+!stdlib/stat.bin
+!stdlib/json.bin
+!stdlib/http.bin
+!stdlib/regex.bin
+!stdlib/csv.bin
+!stdlib/file.bin
+!stdlib/datetime.bin
+!stdlib/collection.bin
+!stdlib/validate.bin
+!stdlib/iot.bin
 # Build outputs
 build/*.bin
 # Test build outputs
