@@ -1,9 +1,10 @@
-"""回归测试运行器：执行所有 .san 测试文件"""
+"""回归测试运行器：并行执行所有 .san 测试文件"""
 
 from __future__ import annotations
 import subprocess
 import sys
 import os
+from concurrent.futures import ThreadPoolExecutor, as_completed
 
 if sys.platform == 'win32':
     try:
@@ -15,6 +16,7 @@ if sys.platform == 'win32':
 TEST_DIR = 'tests'
 EXAMPLES_DIR = 'examples'
 EXCLUDE_TESTS = set()
+MAX_WORKERS = 4  # CI 环境并行数
 
 
 def run_san(filepath: str) -> tuple[bool, str]:
@@ -31,7 +33,7 @@ def run_san(filepath: str) -> tuple[bool, str]:
         output = (result.stdout + result.stderr).strip()
         return result.returncode == 0, output
     except subprocess.TimeoutExpired:
-        return False, '测试超时 (>30s)'
+        return False, '测试超时 (>60s)'
     except Exception as e:
         return False, str(e)
 
@@ -51,13 +53,24 @@ def main():
                 if os.path.exists(fp):
                     test_files.append(fp)
 
+    test_files.sort()
     total = len(test_files)
     passed = 0
     failed = []
+    results = {}
 
-    for filepath in sorted(test_files):
+    # 并行执行所有测试
+    with ThreadPoolExecutor(max_workers=MAX_WORKERS) as executor:
+        futures = {executor.submit(run_san, fp): fp for fp in test_files}
+        for future in as_completed(futures):
+            filepath = futures[future]
+            ok, output = future.result()
+            results[filepath] = (ok, output)
+
+    # 按文件顺序输出结果
+    for filepath in test_files:
+        ok, output = results[filepath]
         print(f'运行: {filepath} ... ', end='', flush=True)
-        ok, output = run_san(filepath)
         if ok:
             print('✓')
             passed += 1
