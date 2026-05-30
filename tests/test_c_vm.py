@@ -210,7 +210,6 @@ class TestCVMCrossValidation(unittest.TestCase):
         )
 
     def test_list(self):
-        self.skipTest('已知bug: bytecode_compiler.san 嵌套列表操作编译错误')
         self._compile_and_compare(
             '(输出 (表长 (列表 1 2 3)))',
             '3'

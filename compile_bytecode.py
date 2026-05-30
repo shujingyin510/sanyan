@@ -29,26 +29,28 @@ def compile_source(source: str, output_path: str, vars_table: dict | None = None
     export_names = vars_table.pop('__exports__', []) if isinstance(vars_table, dict) else []
 
     # 解析源码为 AST
-    # 先尝试 sugar 解析器，失败则回退到 S-表达式解析器
+    # 检测 S-表达式输入（以 ( 开头且括号平衡），直接用 S-表达式解析器
     ast = None
     sugar_ast = None
-    
-    # 1. 尝试 sugar 解析器
-    try:
-        sugar_result, errors = sugar_parse(source)
-        has_syntax_err = any(
-            isinstance(e, str) and '行' in e and ('：' in e or ':' in e)
-            for e in errors
-        )
-        if sugar_result and not has_syntax_err:
-            if isinstance(sugar_result, list) and len(sugar_result) > 0 and sugar_result[0] == 'do':
-                sugar_ast = sugar_result
-            else:
-                sugar_ast = ['do', sugar_result]
-    except (SyntaxError, Exception):
-        pass
-    
-    # 2. 如果 sugar 解析失败，尝试 S-表达式解析器
+    is_sexpr = source.strip().startswith('(') and source.count('(') == source.count(')')
+
+    if not is_sexpr:
+        # 1. 尝试 sugar 解析器
+        try:
+            sugar_result, errors = sugar_parse(source)
+            has_syntax_err = any(
+                isinstance(e, str) and '行' in e and ('：' in e or ':' in e)
+                for e in errors
+            )
+            if sugar_result and not has_syntax_err:
+                if isinstance(sugar_result, list) and len(sugar_result) > 0 and sugar_result[0] == 'do':
+                    sugar_ast = sugar_result
+                else:
+                    sugar_ast = ['do', sugar_result]
+        except (SyntaxError, Exception):
+            pass
+
+    # 2. 如果 sugar 解析失败或跳过，尝试 S-表达式解析器
     if not sugar_ast:
         try:
             tokens = tokenize(source)
