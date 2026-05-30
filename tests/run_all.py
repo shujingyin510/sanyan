@@ -16,7 +16,7 @@ if sys.platform == 'win32':
 TEST_DIR = 'tests'
 EXAMPLES_DIR = 'examples'
 EXCLUDE_TESTS = set()
-MAX_WORKERS = 4  # CI 环境并行数
+MAX_WORKERS = 1  # CI 环境串行执行（避免资源争用导致超时）
 
 
 def run_san(filepath: str) -> tuple[bool, str]:
