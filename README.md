@@ -586,9 +586,6 @@ sanyan/
 ├── benchmark/                 # 性能基准测试
 └── csrc/dp.c                  # parse_sanyan 原生编译验证
 ```
-├── benchmark/                # 性能基准测试
-└── packages/                 # 包管理器缓存
-```
 
 ## 三态词表
 
