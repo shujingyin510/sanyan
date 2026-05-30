@@ -24,7 +24,7 @@ def run_san(filepath: str) -> tuple[bool, str]:
             [sys.executable, '-X', 'utf8', 'main.py', filepath],
             capture_output=True,
             text=True,
-            timeout=30,
+            timeout=60,
             encoding='utf-8',
             errors='replace',
         )

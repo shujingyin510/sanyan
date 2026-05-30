@@ -176,8 +176,12 @@ class TestNetOps(unittest.TestCase):
         class FakeResp:
             def read(self):
                 return b'{"url": "http://test"}'
-            def __enter__(self): return self
-            def __exit__(self, *a): pass
+
+            def __enter__(self):
+                return self
+
+            def __exit__(self, *a):
+                pass
 
         with patch.object(_request, 'urlopen', return_value=FakeResp()) as mk:
             r = self.env.eval(['http读', '"http://example.com/test"'])
@@ -234,6 +238,7 @@ class TestSandboxOps(unittest.TestCase):
 
 class TestTypeOpsExtended(unittest.TestCase):
     """类型操作扩展测试"""
+
     def setUp(self):
         self.env = SanyanEvaluator()
 
@@ -271,6 +276,7 @@ class TestTypeOpsExtended(unittest.TestCase):
 
     def test_to_number_error(self):
         from values import SanyanTypeError
+
         with self.assertRaises(SanyanTypeError):
             self.env.eval(['to_number', '"abc"'])
 
@@ -289,6 +295,7 @@ class TestTypeOpsExtended(unittest.TestCase):
 
 class TestControlOpsExtended(unittest.TestCase):
     """控制流扩展测试"""
+
     def setUp(self):
         self.env = SanyanEvaluator()
 
@@ -297,19 +304,20 @@ class TestControlOpsExtended(unittest.TestCase):
         # Should not raise
 
     def test_if_nested(self):
-        r = self.env.eval(['若', ['等于', '1', '1'],
-            ['若', ['等于', '2', '2'], ['加', '1', '1'], ['加', '2', '2']],
-            ['减', '1', '1']])
+        r = self.env.eval(
+            ['若', ['等于', '1', '1'], ['若', ['等于', '2', '2'], ['加', '1', '1'], ['加', '2', '2']], ['减', '1', '1']]
+        )
         self.assertEqual(r.to_int(), 2)
 
     def test_loop_with_break(self):
-        r = self.env.eval(['做',
-            ['设', 'i', '0'],
-            ['循环', ['小于', 'i', '10'],
-                ['若', ['等于', 'i', '5'],
-                    ['跳出'],
-                    ['设', 'i', ['加', 'i', '1']]]],
-            'i'])
+        r = self.env.eval(
+            [
+                '做',
+                ['设', 'i', '0'],
+                ['循环', ['小于', 'i', '10'], ['若', ['等于', 'i', '5'], ['跳出'], ['设', 'i', ['加', 'i', '1']]]],
+                'i',
+            ]
+        )
         self.assertEqual(r.to_int(), 5)
 
     def test_do_multiple_expressions(self):
@@ -317,19 +325,25 @@ class TestControlOpsExtended(unittest.TestCase):
         self.assertEqual(r.to_int(), 3)
 
     def test_for_loop(self):
-        r = self.env.eval(['做',
-            ['设', 'sum', '0'],
-            ['设', 'i', '1'],
-            ['循环', ['小于等于', 'i', '5'],
-                ['做',
-                    ['设', 'sum', ['加', 'sum', 'i']],
-                    ['设', 'i', ['加', 'i', '1']]]],
-            'sum'])
+        r = self.env.eval(
+            [
+                '做',
+                ['设', 'sum', '0'],
+                ['设', 'i', '1'],
+                [
+                    '循环',
+                    ['小于等于', 'i', '5'],
+                    ['做', ['设', 'sum', ['加', 'sum', 'i']], ['设', 'i', ['加', 'i', '1']]],
+                ],
+                'sum',
+            ]
+        )
         self.assertEqual(r.to_int(), 15)
 
 
 class TestMathExtraOps(unittest.TestCase):
     """数学扩展操作测试"""
+
     def setUp(self):
         self.env = SanyanEvaluator()
 
@@ -344,6 +358,7 @@ class TestMathExtraOps(unittest.TestCase):
 
 class TestStringOpsExtended(unittest.TestCase):
     """字符串扩展测试"""
+
     def setUp(self):
         self.env = SanyanEvaluator()
 
@@ -378,6 +393,7 @@ class TestStringOpsExtended(unittest.TestCase):
 
 class TestContainerOpsExtended(unittest.TestCase):
     """容器操作扩展测试"""
+
     def setUp(self):
         self.env = SanyanEvaluator()
 

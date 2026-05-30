@@ -29,6 +29,7 @@ from llvmgen.type_mapping import (
 def _get_compile_node():
     """获取 compile_node 函数引用（延迟导入避免循环依赖）。"""
     from llvmgen.ops_gen import compile_node
+
     return compile_node
 
 

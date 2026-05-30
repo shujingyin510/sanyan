@@ -136,6 +136,7 @@ class VM:
                     san_path = alt_san
             if os.path.isfile(san_path):
                 from compile_bytecode import compile_san
+
                 compile_san(san_path, path)
         vm = VM.from_bin(path)
         name = path.split('/')[-1].replace('.bin', '')
@@ -378,36 +379,36 @@ class VM:
     def _exec_string(self, op: int) -> bool:
         """字符串操作指令：STRLEN, STRSUB, STREQ, CONCAT, ORD, STR_FIND, STR_TO_LIST, STR_STARTSWITH, STR_CONTAINS"""
         if op == STRLEN:
-            self.stack.append(len(str(self.stack.pop() if self.stack else "")))
+            self.stack.append(len(str(self.stack.pop() if self.stack else '')))
         elif op == STRSUB:
             length = self.stack.pop() if self.stack else 0
             start = self.stack.pop() if self.stack else 0
-            s = str(self.stack.pop()) if self.stack else ""
+            s = str(self.stack.pop()) if self.stack else ''
             self.stack.append(s[start : start + length])
         elif op == STREQ:
-            b = str(self.stack.pop()) if self.stack else ""
-            a = str(self.stack.pop()) if self.stack else ""
+            b = str(self.stack.pop()) if self.stack else ''
+            a = str(self.stack.pop()) if self.stack else ''
             self.stack.append(1 if a == b else -1)
         elif op == CONCAT:
-            b = str(self.stack.pop()) if self.stack else ""
-            a = str(self.stack.pop()) if self.stack else ""
+            b = str(self.stack.pop()) if self.stack else ''
+            a = str(self.stack.pop()) if self.stack else ''
             self.stack.append(a + b)
         elif op == ORD:
             self.stack.append(ord(str(self.stack.pop())[0]) if self.stack else 0)
         elif op == STR_FIND:
-            sub = str(self.stack.pop()) if self.stack else ""
-            s = str(self.stack.pop()) if self.stack else ""
+            sub = str(self.stack.pop()) if self.stack else ''
+            s = str(self.stack.pop()) if self.stack else ''
             self.stack.append(s.find(sub))
         elif op == STR_TO_LIST:
-            s = str(self.stack.pop()) if self.stack else ""
+            s = str(self.stack.pop()) if self.stack else ''
             self.stack.append(list(s))
         elif op == STR_STARTSWITH:
-            pre = str(self.stack.pop()) if self.stack else ""
-            s = str(self.stack.pop()) if self.stack else ""
+            pre = str(self.stack.pop()) if self.stack else ''
+            s = str(self.stack.pop()) if self.stack else ''
             self.stack.append(1 if s.startswith(pre) else -1)
         elif op == STR_CONTAINS:
-            sub = str(self.stack.pop()) if self.stack else ""
-            s = str(self.stack.pop()) if self.stack else ""
+            sub = str(self.stack.pop()) if self.stack else ''
+            s = str(self.stack.pop()) if self.stack else ''
             self.stack.append(1 if sub in s else -1)
         return True
 
@@ -475,7 +476,8 @@ class VM:
             d: dict = {}
             for _ in range(n):
                 if len(self.stack) < 2:
-                    d = {}; break
+                    d = {}
+                    break
                 v = self.stack.pop()
                 k = self.stack.pop()
                 d[k] = v
@@ -671,72 +673,72 @@ class VM:
 # ═══════════════════════════════════════════════════════════════
 _DISPATCH: dict[int, 'Callable'] = {
     # 控制流
-    RET:     VM._exec_control_flow,
-    JMP:     VM._exec_control_flow,
-    JMP32:   VM._exec_control_flow,
-    JZ:      VM._exec_control_flow,
-    JNZ:     VM._exec_control_flow,
-    CALL:    VM._exec_control_flow,
+    RET: VM._exec_control_flow,
+    JMP: VM._exec_control_flow,
+    JMP32: VM._exec_control_flow,
+    JZ: VM._exec_control_flow,
+    JNZ: VM._exec_control_flow,
+    CALL: VM._exec_control_flow,
     # 栈操作
-    PUSH_I:  VM._exec_stack_ops,
+    PUSH_I: VM._exec_stack_ops,
     PUSH_STR: VM._exec_stack_ops,
-    LOAD:    VM._exec_stack_ops,
-    STORE:   VM._exec_stack_ops,
-    PRINT:   VM._exec_stack_ops,
+    LOAD: VM._exec_stack_ops,
+    STORE: VM._exec_stack_ops,
+    PRINT: VM._exec_stack_ops,
     # 算术
-    ADD:     VM._exec_arithmetic,
-    SUB:     VM._exec_arithmetic,
-    MUL:     VM._exec_arithmetic,
-    DIV:     VM._exec_arithmetic,
-    MOD:     VM._exec_arithmetic,
+    ADD: VM._exec_arithmetic,
+    SUB: VM._exec_arithmetic,
+    MUL: VM._exec_arithmetic,
+    DIV: VM._exec_arithmetic,
+    MOD: VM._exec_arithmetic,
     # 比较与逻辑
-    GT:      VM._exec_comparison,
-    LT:      VM._exec_comparison,
-    GTE:     VM._exec_comparison,
-    LTE:     VM._exec_comparison,
-    EQ:      VM._exec_comparison,
-    NE:      VM._exec_comparison,
-    NOT:     VM._exec_comparison,
-    OR:      VM._exec_comparison,
-    AND:     VM._exec_comparison,
+    GT: VM._exec_comparison,
+    LT: VM._exec_comparison,
+    GTE: VM._exec_comparison,
+    LTE: VM._exec_comparison,
+    EQ: VM._exec_comparison,
+    NE: VM._exec_comparison,
+    NOT: VM._exec_comparison,
+    OR: VM._exec_comparison,
+    AND: VM._exec_comparison,
     # 类型检查
-    IS_NUM:  VM._exec_type_check,
-    IS_STR:  VM._exec_type_check,
+    IS_NUM: VM._exec_type_check,
+    IS_STR: VM._exec_type_check,
     IS_LIST: VM._exec_type_check,
-    SAME:    VM._exec_type_check,
+    SAME: VM._exec_type_check,
     # 字符串
-    STRLEN:  VM._exec_string,
-    STRSUB:  VM._exec_string,
-    STREQ:   VM._exec_string,
-    CONCAT:  VM._exec_string,
-    ORD:     VM._exec_string,
+    STRLEN: VM._exec_string,
+    STRSUB: VM._exec_string,
+    STREQ: VM._exec_string,
+    CONCAT: VM._exec_string,
+    ORD: VM._exec_string,
     STR_FIND: VM._exec_string,
     STR_TO_LIST: VM._exec_string,
     STR_STARTSWITH: VM._exec_string,
     STR_CONTAINS: VM._exec_string,
     # 容器
-    GET:         VM._exec_container,
+    GET: VM._exec_container,
     SET_ELEMENT: VM._exec_container,
-    LIST_NEW:    VM._exec_container,
+    LIST_NEW: VM._exec_container,
     LIST_CONCAT: VM._exec_container,
-    SLICE:       VM._exec_container,
-    LIST_LEN:    VM._exec_container,
+    SLICE: VM._exec_container,
+    LIST_LEN: VM._exec_container,
     # 字典
-    DICT:      VM._exec_dict,
-    DICT_GET:  VM._exec_dict,
-    DICT_SET:  VM._exec_dict,
-    DICT_HAS:  VM._exec_dict,
+    DICT: VM._exec_dict,
+    DICT_GET: VM._exec_dict,
+    DICT_SET: VM._exec_dict,
+    DICT_HAS: VM._exec_dict,
     DICT_KEYS: VM._exec_dict,
-    DICT_LEN:  VM._exec_dict,
+    DICT_LEN: VM._exec_dict,
     # I/O
-    IO_READ:      VM._exec_io,
-    IO_WRITE:     VM._exec_io,
-    WAIT:         VM._exec_io,
-    READ_FILE:    VM._exec_io,
-    WRITE_FILE:   VM._exec_io,
+    IO_READ: VM._exec_io,
+    IO_WRITE: VM._exec_io,
+    WAIT: VM._exec_io,
+    READ_FILE: VM._exec_io,
+    WRITE_FILE: VM._exec_io,
     WRITE_BINARY: VM._exec_io,
     # 模块
-    IMPORT:   VM._exec_module,
+    IMPORT: VM._exec_module,
     CALL_EXT: VM._exec_module,
 }
 

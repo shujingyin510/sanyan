@@ -205,7 +205,7 @@ class PackageOps:
             for name, info in results:
                 desc = info.get('description', '无描述')
                 ver = info.get('version', '?')
-                print(f"  {name} (v{ver}) — {desc}")
+                print(f'  {name} (v{ver}) — {desc}')
         else:
             print(f"未找到与 '{keyword}' 相关的包")
 
@@ -230,21 +230,21 @@ class PackageOps:
         # 获取元信息
         info = _get_package_info(name)
 
-        print(f"包: {name}")
-        print(f"  已安装: {'是' if installed else '否'}")
+        print(f'包: {name}')
+        print(f'  已安装: {"是" if installed else "否"}')
         if info:
-            print(f"  版本: {info.get('version', '?')}")
-            print(f"  描述: {info.get('description', '无')}")
+            print(f'  版本: {info.get("version", "?")}')
+            print(f'  描述: {info.get("description", "无")}')
             if info.get('author'):
-                print(f"  作者: {info['author']}")
+                print(f'  作者: {info["author"]}')
             if info.get('url'):
-                print(f"  地址: {info['url']}")
+                print(f'  地址: {info["url"]}')
         elif installed:
             # 列出包中的文件
             san_files = [f for f in os.listdir(pkg_dir) if f.endswith('.san')]
-            print(f"  文件: {', '.join(san_files) if san_files else '无 .san 文件'}")
+            print(f'  文件: {", ".join(san_files) if san_files else "无 .san 文件"}')
         else:
-            print("  信息: 未找到包元信息")
+            print('  信息: 未找到包元信息')
 
         return TritValue(0)
 

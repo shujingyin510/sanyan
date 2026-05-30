@@ -43,10 +43,7 @@ def compile_source(source: str, output_path: str, vars_table: dict | None = None
         # 1. 尝试 sugar 解析器
         try:
             sugar_result, errors = sugar_parse(source)
-            has_syntax_err = any(
-                isinstance(e, str) and '行' in e and ('：' in e or ':' in e)
-                for e in errors
-            )
+            has_syntax_err = any(isinstance(e, str) and '行' in e and ('：' in e or ':' in e) for e in errors)
             if sugar_result and not has_syntax_err:
                 if isinstance(sugar_result, list) and len(sugar_result) > 0 and sugar_result[0] == 'do':
                     sugar_ast = sugar_result

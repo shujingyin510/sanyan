@@ -186,6 +186,7 @@ def _resolve_imports(nodes: list, cg: CodegenContext) -> tuple[list, list]:
 
 def _make_bootstrap_harness(cg: CodegenContext):
     """为 bootstrap 模块添加 parse_sanyan() ASCII 入口。"""
+
     def _get_or_declare(name, fnty):
         """查找已声明的函数，不存在则声明。"""
         for g in cg.module.globals.values():
@@ -214,6 +215,7 @@ def _make_bootstrap_harness(cg: CodegenContext):
     func = cg._funcs.get('解析')
     if func:
         from llvmgen.ops_gen import _unwrap_call_arg
+
         src = _unwrap_call_arg(cg.get_var('source'), cg)
         # C 字符串 → 三言字符串（用 rt_make 包装）
         src_str = cg.builder.call(rt_make_fn, [src], name='src_str')
@@ -240,6 +242,7 @@ def _make_bootstrap_harness(cg: CodegenContext):
             if init_val is not None:
                 cg.builder.store(init_val, cg._globals[gname])
         from llvmgen.ops_gen import _unwrap_call_arg
+
         src2 = _unwrap_call_arg(cg.get_var('source'), cg)
         src_str2 = cg.builder.call(rt_make_fn, [src2], name='src_str')
         toks = cg.builder.call(tok_func, [src_str2], name='toks')

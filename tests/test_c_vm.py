@@ -36,15 +36,28 @@ def _find_compiler() -> str | None:
 
 
 def _run_in_msys2(cmd: str, timeout: int = 30) -> subprocess.CompletedProcess:
-    """在 MSYS2 bash 中执行命令"""
+    """执行命令。Windows 用 MSYS2 bash，Linux/macOS 直接执行。"""
+    if sys.platform == 'win32' and os.path.exists(MSYS2_BASH):
+        return subprocess.run(
+            [MSYS2_BASH, '-lc', cmd],
+            capture_output=True,
+            text=True,
+            timeout=timeout,
+        )
+    # Linux/macOS：直接执行（cmd 中的路径已是 POSIX 格式）
     return subprocess.run(
-        [MSYS2_BASH, '-lc', cmd],
-        capture_output=True, text=True, timeout=timeout,
+        cmd,
+        shell=True,
+        capture_output=True,
+        text=True,
+        timeout=timeout,
     )
 
 
 def _win_to_msys2(path: str) -> str:
-    """将 Windows 路径转为 MSYS2 路径（D:\\xxx → /d/xxx, C:\\xxx → /c/xxx）"""
+    """路径格式转换。Windows 转 MSYS2 格式，Linux/macOS 原样返回。"""
+    if sys.platform != 'win32':
+        return path
     p = path.replace('\\', '/')
     if len(p) >= 2 and p[1] == ':':
         p = '/' + p[0].lower() + p[2:]
@@ -81,7 +94,9 @@ def _compile_and_run() -> tuple[bool, str]:
 
         result = subprocess.run(
             [exe_path],
-            capture_output=True, text=True, timeout=30,
+            capture_output=True,
+            text=True,
+            timeout=30,
         )
         return result.returncode == 0, result.stdout + result.stderr
 
@@ -99,7 +114,9 @@ def _run_cvm(bin_path: str) -> str | None:
     # 使用 --run 模式输出栈顶值
     result = subprocess.run(
         [cvm_exe, bin_path, '--run'],
-        capture_output=True, text=True, timeout=10,
+        capture_output=True,
+        text=True,
+        timeout=10,
     )
     if result.returncode != 0:
         return None
@@ -149,6 +166,7 @@ class TestCVMCrossValidation(unittest.TestCase):
 
             # Python VM 执行（from_bin 已执行主代码）
             import io
+
             old_stdout = sys.stdout
             sys.stdout = io.StringIO()
             vm = VM.from_bin(bin_path)
@@ -195,27 +213,17 @@ class TestCVMCrossValidation(unittest.TestCase):
 
     def test_loop(self):
         self._compile_and_compare(
-            '(做 (设 s 0) (设 i 1) (循环 (小于等于 i 5) (做 (设 s (加 s i)) (设 i (加 i 1)))) (输出 s))',
-            '15'
+            '(做 (设 s 0) (设 i 1) (循环 (小于等于 i 5) (做 (设 s (加 s i)) (设 i (加 i 1)))) (输出 s))', '15'
         )
 
     def test_function(self):
-        self._compile_and_compare(
-            '(做 (定义 双倍 (x) (乘 x 2)) (输出 (双倍 21)))',
-            '42'
-        )
+        self._compile_and_compare('(做 (定义 双倍 (x) (乘 x 2)) (输出 (双倍 21)))', '42')
 
     def test_dict(self):
-        self._compile_and_compare(
-            '(做 (设 d (字典 "a" 1)) (输出 (含键 d "a")))',
-            '1'
-        )
+        self._compile_and_compare('(做 (设 d (字典 "a" 1)) (输出 (含键 d "a")))', '1')
 
     def test_list(self):
-        self._compile_and_compare(
-            '(输出 (表长 (列表 1 2 3)))',
-            '3'
-        )
+        self._compile_and_compare('(输出 (表长 (列表 1 2 3)))', '3')
 
 
 if __name__ == '__main__':

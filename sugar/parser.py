@@ -11,9 +11,14 @@ from typing import Optional, Any
 from sugar.tokenizer import Token, tokenize
 from sugar.errors import SugarErrorReporter
 from sugar.ast_nodes import (
-    KEYWORD_MAP, OP_MAP, PREC, RIGHT_ASSOC,
-    PREFIXABLE_OPS, PREFIXABLE_SINGLE_ARG,
-    _is_ident, annotate_ast,
+    KEYWORD_MAP,
+    OP_MAP,
+    PREC,
+    RIGHT_ASSOC,
+    PREFIXABLE_OPS,
+    PREFIXABLE_SINGLE_ARG,
+    _is_ident,
+    annotate_ast,
 )
 
 
@@ -35,6 +40,7 @@ class _Parser:
 
     def _node(self, items: list, tok: Optional[Token] = None):
         from values import SrcNode
+
         if tok is None:
             tok = self.tokens[max(0, min(self.pos - 1, len(self.tokens) - 1))] if self.tokens else Token('', '', 0, 0)
         return SrcNode(items, line=tok.line, col=tok.col)
@@ -42,6 +48,7 @@ class _Parser:
     def _wrap(self, items):
         """Wrap list returns with SrcNode when they are plain lists."""
         from values import SrcNode
+
         if isinstance(items, list) and not isinstance(items, SrcNode):
             tok = self.peek() or (self.tokens[-1] if self.tokens else Token('', '', 0, 0))
             return SrcNode(items, line=tok.line, col=tok.col)

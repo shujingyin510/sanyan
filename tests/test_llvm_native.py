@@ -49,7 +49,9 @@ class TestLlvmNativeCompile(unittest.TestCase):
         llc_posix = _win_to_msys2(_llc)
         subprocess.run(
             [MSYS2_BASH, '-lc', f'{llc_posix} {ir_posix} -filetype=obj -o {obj_posix}'],
-            check=True, capture_output=True, timeout=30,
+            check=True,
+            capture_output=True,
+            timeout=30,
         )
 
     def _gcc_compile(self, src: str, obj: str, *extra_args: str):
@@ -59,7 +61,9 @@ class TestLlvmNativeCompile(unittest.TestCase):
         args = ' '.join(extra_args)
         subprocess.run(
             [MSYS2_BASH, '-lc', f'gcc -c {src_posix} -o {obj_posix} {args}'],
-            check=True, capture_output=True, timeout=30,
+            check=True,
+            capture_output=True,
+            timeout=30,
         )
 
     def _gcc_link(self, *args: str):
@@ -67,7 +71,9 @@ class TestLlvmNativeCompile(unittest.TestCase):
         cmd = ' '.join(_win_to_msys2(a) for a in args)
         subprocess.run(
             [MSYS2_BASH, '-lc', f'gcc {cmd}'],
-            check=True, capture_output=True, timeout=30,
+            check=True,
+            capture_output=True,
+            timeout=30,
         )
 
     def test_compile_simple_program(self):
