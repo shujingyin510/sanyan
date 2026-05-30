@@ -76,6 +76,8 @@ class SanyanEvaluator(SanyanRuntime):
         self._op_cache: Dict[str, tuple] = {}
         self._name_cache: Dict[str, str] = {}
         self._name_cache_max: int = 5000
+        self._module_cache: Dict[str, Any] = {}
+        self._import_stack: set = set()
 
     def eval(self, node: Any) -> Any:
         """求值 AST 节点，返回三言值。"""

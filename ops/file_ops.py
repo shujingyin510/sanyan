@@ -27,6 +27,13 @@ def clear_cache():
     _sugar_parser_module = None
 
 
+def _get_cache(evaluator) -> tuple[dict, set]:
+    """获取模块缓存和导入栈（优先使用 evaluator 实例属性）。"""
+    if hasattr(evaluator, '_module_cache'):
+        return evaluator._module_cache, evaluator._import_stack
+    return _module_cache, _import_stack
+
+
 def _resolve_path(raw_path, auto_stdlib=True):
     path = str(raw_path)
     norm = os.path.normpath(path)
@@ -261,12 +268,15 @@ class FileOps:
 
         abs_path = os.path.abspath(path)
 
+        # 使用 evaluator 实例缓存（多实例隔离）
+        cache, stack = _get_cache(evaluator)
+
         # 循环依赖检测
-        if abs_path in _import_stack:
+        if abs_path in stack:
             raise SanyanValueError(f'循环依赖检测: {path} 已在导入链中')
 
-        if abs_path in _module_cache:
-            return _module_cache[abs_path]
+        if abs_path in cache:
+            return cache[abs_path]
 
         try:
             with open(path, 'r', encoding='utf-8') as f:
@@ -285,14 +295,14 @@ class FileOps:
         exports = _collect_exports(ast)
 
         # 执行模块
-        _import_stack.add(abs_path)
+        stack.add(abs_path)
         try:
             module_env.eval(ast)
         finally:
-            _import_stack.discard(abs_path)
+            stack.discard(abs_path)
 
         module = ModuleValue(module_env.scope_vars, module_env.commands, exports)
-        _module_cache[abs_path] = module
+        cache[abs_path] = module
         return module
 
     # 注册文件操作
