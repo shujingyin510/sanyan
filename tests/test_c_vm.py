@@ -39,7 +39,9 @@ def _compile_and_run() -> tuple[bool, str]:
 
         result = subprocess.run(
             [exe_path],
-            capture_output=True, text=True, timeout=30,
+            capture_output=True,
+            text=True,
+            timeout=30,
         )
         return result.returncode == 0, result.stdout + result.stderr
 
