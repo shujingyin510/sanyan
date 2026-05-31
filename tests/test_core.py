@@ -2,8 +2,6 @@
 运行方式：python tests/test_core.py
 """
 
-
-
 import unittest
 from ternary_core import BT, TernaryALU, TritValue, ternary_sin, ternary_sqrt, ternary_exp, ternary_log
 from values import (

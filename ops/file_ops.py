@@ -14,8 +14,31 @@ from values import (
 from skin import SkinManager
 from ops.registry import register
 
+
 # 项目根目录：文件操作不允许超越此目录
-_PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
+def _find_project_root() -> str:
+    """查找项目根目录（含 stdlib/ 的目录）。
+
+    开发环境：模块在 ops/file_ops.py → 上级目录
+    pip 安装：模块在 site-packages/ops/file_ops.py → 需搜索 CWD
+    """
+    # 从模块目录向上查找含 stdlib/ 的目录
+    d = os.path.dirname(os.path.abspath(__file__))
+    for _ in range(6):
+        if os.path.isdir(os.path.join(d, 'stdlib')):
+            return d
+        d = os.path.dirname(d)
+    # 回退：从 CWD 向上查找
+    d = os.getcwd()
+    for _ in range(6):
+        if os.path.isdir(os.path.join(d, 'stdlib')):
+            return d
+        d = os.path.dirname(d)
+    # 最后回退
+    return os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
+
+
+_PROJECT_ROOT = _find_project_root()
 _SAFE_PATH_SEPARATORS = frozenset({'/', '\\'})
 _module_cache: dict = {}
 _import_stack: set = set()
