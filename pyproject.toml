@@ -91,6 +91,7 @@ exclude = [
     "examples/",
     ".github/",
     "build/",
+    "run_v2_demo.py",
 ]
 [[tool.mypy.overrides]]
 module = [
