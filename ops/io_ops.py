@@ -62,7 +62,7 @@ class IOOps:
             pass
         if user_input in TritValue.STATE_MAP:
             return TritValue.from_string(user_input)
-        raise SanyanValueError(f'无法识别的输入: {user_input}')
+        return user_input  # 纯文本直接返回
 
     @staticmethod
     def debug_op(evaluator, args):

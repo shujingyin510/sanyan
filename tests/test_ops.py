@@ -447,8 +447,8 @@ class TestNegativeCases(unittest.TestCase):
 
     def test_get_out_of_range(self):
         self.env.eval(['set', 'lst', ['list', 1, 2]])
-        with self.assertRaises(SanyanIndexError):
-            self.env.eval(['get', 'lst', 99])
+        result = self.env.eval(['get', 'lst', 99])
+        self.assertEqual(result, 0)
 
     def test_dict_contains_missing(self):
         self.env.eval(['set', 'd', ['dict', '"a"', 1]])

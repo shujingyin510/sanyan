@@ -176,9 +176,11 @@ _RUNTIME_FUNCS: dict[str, tuple] = {
     # 输入
     '输入': ('rt_read_input', _PTR, []),
     'input': ('rt_read_input', _PTR, []),
-    # 导入（桩）
-    '导入': ('rt_import', _PTR, []),
-    'import': ('rt_import', _PTR, []),
+    # 导入
+    '导入': ('rt_import', _PTR, [_PTR]),
+    'import': ('rt_import', _PTR, [_PTR]),
+    '模块调用': ('rt_module_call', _PTR, [_PTR, _PTR, _PTR]),
+    'module_call': ('rt_module_call', _PTR, [_PTR, _PTR, _PTR]),
     # IoT 操作（桩）
     '置': ('rt_iot_set', ir.VoidType(), [_PTR, _PTR]),
     '读': ('rt_iot_read', _PTR, [_PTR]),
@@ -303,7 +305,45 @@ def _is_string_literal(s: str) -> bool:
 
 
 def _unquote(s: str) -> str:
-    """去掉字符串两端的引号。"""
-    if _is_string_literal(s):
-        return s[1:-1]
-    return s
+    """去掉字符串两端的引号并处理转义序列。"""
+    if not _is_string_literal(s):
+        return s
+    s = s[1:-1]
+    # 处理转义序列（与 eval_helpers.parse_string_literal 一致）
+    result = []
+    i = 0
+    while i < len(s):
+        if s[i] == '\\' and i + 1 < len(s):
+            esc = s[i + 1]
+            if esc == 'n':
+                result.append('\n')
+                i += 2
+            elif esc == 't':
+                result.append('\t')
+                i += 2
+            elif esc == 'r':
+                result.append('\r')
+                i += 2
+            elif esc == '\\':
+                result.append('\\')
+                i += 2
+            elif esc == '"':
+                result.append('"')
+                i += 2
+            elif esc == "'":
+                result.append("'")
+                i += 2
+            elif esc == 'u' and i + 5 < len(s):
+                try:
+                    result.append(chr(int(s[i + 2: i + 6], 16)))
+                    i += 6
+                except ValueError:
+                    result.append(s[i])
+                    i += 1
+            else:
+                result.append(s[i])
+                i += 1
+        else:
+            result.append(s[i])
+            i += 1
+    return ''.join(result)

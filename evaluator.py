@@ -79,6 +79,24 @@ class SanyanEvaluator(SanyanRuntime):
         self._module_cache: Dict[str, Any] = {}
         self._import_stack: set = set()
 
+    @staticmethod
+    def _is_numeric_string(s: str) -> bool:
+        """判断字符串是否为数值（整数、浮点数、十六进制）。"""
+        if not s:
+            return False
+        # 十六进制：0xABC
+        if s.startswith('0x') or s.startswith('-0x'):
+            hex_part = s.lstrip('-')[2:]
+            return len(hex_part) > 0 and all(c in '0123456789abcdefABCDEF' for c in hex_part)
+        # 整数或浮点数
+        t = s.lstrip('-')
+        if not t:
+            return False
+        if '.' in t:
+            parts = t.split('.', 1)
+            return len(parts) == 2 and parts[0].isdigit() and parts[1].isdigit()
+        return t.isdigit()
+
     def eval(self, node: Any) -> Any:
         """求值 AST 节点，返回三言值。"""
         if isinstance(node, (TritValue, ArrayValue, FunctionValue, ModuleValue)):
@@ -88,7 +106,7 @@ class SanyanEvaluator(SanyanRuntime):
         if isinstance(node, list):
             if len(node) == 0 or not isinstance(node[0], str):
                 return node
-            if isinstance(node[0], str) and node[0].lstrip('-').replace('.', '', 1).replace('x', '', 1).isdigit():
+            if isinstance(node[0], str) and self._is_numeric_string(node[0]):
                 return node
             return self._eval_list(node)
         if isinstance(node, (int, float)):
@@ -106,7 +124,7 @@ class SanyanEvaluator(SanyanRuntime):
             s = node[0]
             if len(s) >= 2 and s[0] in ('"', '\u201c', '\u2018', "'"):
                 return self._parse_string_literal(s[1:-1])
-            if s.replace('.', '', 1).replace('-', '', 1).isdigit():
+            if self._is_numeric_string(s):
                 return TritValue(float(s)) if '.' in s else TritValue(int(s))
         first = node[0]
         if isinstance(first, FunctionValue):

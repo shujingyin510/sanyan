@@ -1,0 +1,10 @@
+// 三言 Agent — 配置文件
+// 运行前请修改 API密钥 为实际值
+
+设 模型URL = "https://api.deepseek.com/v1/chat/completions"
+设 API密钥 = "sk-你的key"
+设 模型名 = "deepseek-chat"
+设 超时秒数 = 60
+设 最大犹豫次数 = 3
+设 最小增益阈值 = 0.1
+设 默认TTL = 1800

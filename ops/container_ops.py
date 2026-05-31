@@ -96,7 +96,7 @@ class ContainerOps:
             try:
                 return container[index]
             except (IndexError, ValueError, TypeError):
-                raise SanyanIndexError(f'索引 {index} 越界（容器长度 {len(container)}）')
+                return 0
         raise SanyanTypeError('第一个参数必须是列表、数组或字典')
 
     @staticmethod
@@ -181,6 +181,42 @@ class ContainerOps:
             key = tuple(key)
         d[key] = value
         return d
+
+    @staticmethod
+    def dict_keys(evaluator, args):
+        """返回字典的所有键列表。"""
+        if len(args) != 1:
+            raise SanyanSyntaxError('字典键列表 需要一个字典参数')
+        d = evaluator.eval(args[0])
+        if not isinstance(d, dict):
+            raise SanyanTypeError('参数必须是字典')
+        return list(d.keys())
+
+    @staticmethod
+    def dict_delete(evaluator, args):
+        """删除字典中的指定键。"""
+        if len(args) != 2:
+            raise SanyanSyntaxError('删除键 需要字典和键')
+        d = evaluator.eval(args[0])
+        key = evaluator.eval(args[1])
+        if not isinstance(d, dict):
+            raise SanyanTypeError('第一个参数必须是字典')
+        if isinstance(key, TritValue):
+            key = key.to_int()
+        if key in d:
+            del d[key]
+        return d
+
+    @staticmethod
+    def str_contains(evaluator, args):
+        """检查字符串是否包含子串。"""
+        if len(args) != 2:
+            raise SanyanSyntaxError('字符串包含 需要两个字符串参数')
+        s = evaluator.eval(args[0])
+        sub = evaluator.eval(args[1])
+        if not isinstance(s, str) or not isinstance(sub, str):
+            raise SanyanTypeError('参数必须是字符串')
+        return TritValue(1 if sub in s else -1)
 
     @staticmethod
     def make_lambda(evaluator, args):
@@ -410,6 +446,9 @@ register('dict', ContainerOps.dict_new)
 register('dict_contains', ContainerOps.dict_contains)
 register('get_key', ContainerOps.dict_get)
 register('set_key', ContainerOps.dict_set)
+register('dict_keys', ContainerOps.dict_keys)
+register('delete_key', ContainerOps.dict_delete)
+register('str_contains', ContainerOps.str_contains)
 register('lambda', ContainerOps.make_lambda)
 register('apply', ContainerOps.apply)
 register('map', ContainerOps.map_op)

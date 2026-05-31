@@ -61,6 +61,29 @@ def _is_paren_sexpr(source: str) -> bool:
     return stripped.startswith('(')
 
 
+def _parse_all_sexprs(source: str) -> list | None:
+    """解析源码中所有顶层 S 表达式，返回列表的列表。
+
+    单表达式时直接返回（兼容旧版 _parse_source 行为）；
+    多表达式时返回 [expr1, expr2, ...]。
+    """
+    from lexer import tokenize
+    from parser import parse
+
+    tokens = tokenize(source)
+    results = []
+    while tokens:
+        parsed = parse(tokens)
+        if parsed is None:
+            break
+        results.append(parsed)
+    if not results:
+        return None
+    if len(results) == 1:
+        return results[0]  # 单表达式：不套外层列表
+    return results  # 多表达式：返回列表的列表
+
+
 def _parse_source(source: str) -> list:
     from ops.file_ops import _parse_with_sugar_san, clear_cache
     from evaluator import SanyanEvaluator
@@ -70,14 +93,10 @@ def _parse_source(source: str) -> list:
 
     if _is_paren_sexpr(source):
         # S 表达式语法：先用 S 表达式解析器
-        # 1. Python S 表达式解析器
+        # 1. Python S 表达式解析器（批量解析）
         try:
-            from lexer import tokenize
-            from parser import parse
-
-            tokens = tokenize(source)
-            parsed = parse(tokens)
-            if parsed is not None and isinstance(parsed, list):
+            parsed = _parse_all_sexprs(source)
+            if parsed is not None:
                 return cast(list[Any], parsed)
         except Exception:
             pass
@@ -111,14 +130,10 @@ def _parse_source(source: str) -> list:
         if parsed is not None:
             return parsed
 
-        # 4. Python S 表达式解析器（fallback）
+        # 4. Python S 表达式解析器（fallback，批量解析）
         try:
-            from lexer import tokenize
-            from parser import parse
-
-            tokens = tokenize(source)
-            parsed = parse(tokens)
-            if parsed is not None and isinstance(parsed, list):
+            parsed = _parse_all_sexprs(source)
+            if parsed is not None:
                 return cast(list[Any], parsed)
         except Exception:
             pass

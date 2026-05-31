@@ -1,0 +1,39 @@
+// 三言 Agent — TTL 记忆系统
+
+设 记忆表 = 字典()
+
+定义 记 (key, state, source, 默认TTL) {
+    置键(记忆表, key, 字典(
+        "state", state,
+        "source", source,
+        "ttl", 时间戳() + 默认TTL
+    ))
+}
+
+定义 忆 (key) {
+    若 (不(含键(记忆表, key))) { 返回("") }
+    设 entry = 取键(记忆表, key)
+    设 expire = 取键(entry, "ttl")
+    若 (时间戳() > expire) {
+        删除键(记忆表, key)
+        返回("")
+    }
+    返回(取键(entry, "state"))
+}
+
+定义 更新记忆 (key, newState, 默认TTL) {
+    若 (含键(记忆表, key)) {
+        设 entry = 取键(记忆表, key)
+        置键(entry, "state", newState)
+        置键(entry, "ttl", 时间戳() + 默认TTL)
+        置键(记忆表, key, entry)
+    } 否则 {
+        记(key, newState, "agent", 默认TTL)
+    }
+}
+
+定义 取记忆表 () {
+    返回(记忆表)
+}
+
+导出 记 忆 更新记忆 取记忆表

@@ -1,4 +1,4 @@
-# 三言 Sanyan v3.19.0
+# 三言 Sanyan v3.20.0
 
 [![VS Code Marketplace](https://img.shields.io/badge/VS%20Code-Marketplace-%23007ACC?logo=visualstudiocode)](https://marketplace.visualstudio.com/items?itemName=sanyan-lang.sanyan-language)
 [![CI](https://github.com/shujingyin510/sanyan/actions/workflows/test.yml/badge.svg)](https://github.com/shujingyin510/sanyan/actions)
@@ -369,6 +369,19 @@ tests/
 | **IoT 抽象** | `注册设备`/`置`/`读`/`查`/`对` 传感器/执行器操作 |
 | **三值 IoT 案例** | 传感器融合、容错控制、状态机（含 Python/C 对比） |
 
+### Agent 可读决策 DSL
+
+| 特性 | 说明 |
+|---|---|
+| **三态推理 Agent** | LLM 5 种认知态 → 三态映射 → 置信度传播 → 保护 → 动作分发 |
+| **概率三态** | `TritValue` 置信度字段，贝叶斯传播，`真(0.9)` 显示 |
+| **中文决策追踪** | 每步输出可读中文追踪（LLM → 映射 → 传播 → 动作 → 回答） |
+| **声明式策略** | `agent_policy.san` 纯数据 + 5 条场景规则，非程序员可直接编辑 |
+| **自解释决策** | `解释决策(N)` 6 步推理链 + `解释原因()` 5 层解释 |
+| **规则引擎** | `匹配规则()` 关键词匹配 + `策略概览()` 中文展示 + `验证策略()` 检查 |
+| **热重载** | 修改策略文件后自动重载，无需重启 |
+| **记忆系统** | TTL 过期 + 上下文压缩 + 冲突检测 |
+
 ## 三进制算术（模拟实现）
 
 三言的三进制不是"用二进制模拟三进制"。`ternary_core.py` 从位运算层开始就是三值的：
@@ -584,6 +597,11 @@ sanyan/
 │   ├── three_value_comparison.md # 三值 vs 二值对比（IoT 案例）
 │   └── package_development.md # 包开发指南
 ├── benchmark/                 # 性能基准测试
+├── ternary_agent/             # 三言 Agent（可读决策 DSL）
+│   ├── agent.san              # Agent 核心逻辑（决策函数、记忆、追踪）
+│   ├── agent_policy.san       # 纯数据策略（配置、阈值、映射规则）
+│   └── memory.json            # Agent 记忆持久化
+├── run_agent.py               # Agent 启动器（单次/交互/热重载）
 └── csrc/dp.c                  # parse_sanyan 原生编译验证
 ```
 
@@ -639,6 +657,8 @@ sanyan/
 - [x] BUILTIN_OPS 自动生成（从 language/*.json 同步）
 - [x] 核心模块 docstring 注释
 - [x] 架构文档 ARCHITECTURE.md + 贡献指南 CONTRIBUTING.md
+- [x] 三言 Agent v0.2 — 可读决策 DSL（决策追踪 + 声明式策略 + 自解释 + 热重载）
+- [ ] 概率三态（置信度 + 贝叶斯传播）
 - [ ] GPIO 真实硬件控制
 - [ ] Web IDE
 - [ ] 标准库扩展（更多自举模块）

@@ -79,18 +79,18 @@ def find_bash() -> str | None:
     return None
 
 
-def run_in_shell(cmd: str, timeout: int = 30) -> subprocess.CompletedProcess:
+def run_in_shell(cmd: str, timeout: int = 30, check: bool = True) -> subprocess.CompletedProcess:
     """跨平台执行命令。Windows 用 MSYS2 bash，Linux/macOS 直接执行。"""
     bash = find_bash()
     if bash:
         return subprocess.run(
             [bash, '-lc', cmd],
-            capture_output=True, text=True, timeout=timeout,
+            capture_output=True, text=True, timeout=timeout, check=check,
         )
     # Linux/macOS: 直接执行
     return subprocess.run(
         cmd, shell=True,
-        capture_output=True, text=True, timeout=timeout,
+        capture_output=True, text=True, timeout=timeout, check=check,
     )
 
 

@@ -102,7 +102,7 @@ def _load_sugar_parser(evaluator):
     bootstrap_env = SanyanEvaluator(skin_manager=skin_mgr, max_loop_steps=BOOTSTRAP_MAX_LOOP)
     try:
         bootstrap_env.eval(bootstrap_ast)
-    except Exception:
+    except (SanyanError, SyntaxError, RecursionError):
         return None
 
     # Phase 2: 用 bootstap 的 解析 解析 sugar.san
@@ -122,7 +122,7 @@ def _load_sugar_parser(evaluator):
                 sugar_ast = ret.value
                 break
         bootstrap_env.pop_scope()
-    except Exception:
+    except (SanyanError, SyntaxError, RecursionError):
         return None
 
     if sugar_ast is None:
@@ -132,7 +132,7 @@ def _load_sugar_parser(evaluator):
     module_env = SanyanEvaluator(skin_manager=skin_mgr, max_loop_steps=SUGAR_MODULE_MAX_LOOP)
     try:
         module_env.eval(sugar_ast)
-    except Exception:
+    except (SanyanError, SyntaxError, RecursionError):
         return None
 
     exports = _collect_exports(sugar_ast) or {'词法分析', '解析'}

@@ -68,7 +68,7 @@ def http_get(evaluator, args):
 
 
 def http_post(evaluator, args):
-    """http写(url, 数据) — HTTP POST 请求"""
+    """http写(url, 数据, headers?) — HTTP POST 请求"""
     _ensure_net()
     if len(args) < 1:
         raise SanyanRuntimeError('http写 需要 URL 参数')
@@ -78,9 +78,14 @@ def http_post(evaluator, args):
     if len(args) > 1:
         data_arg = evaluator.eval(args[1])
         data = str(data_arg) if not isinstance(data_arg, str) else data_arg
+    headers = {}
+    if len(args) > 2:
+        headers_arg = evaluator.eval(args[2])
+        if isinstance(headers_arg, dict):
+            headers = {str(k): str(v) for k, v in headers_arg.items()}
     try:
         body = data.encode('utf-8')
-        req = _request.Request(url, data=body, method='POST')
+        req = _request.Request(url, data=body, method='POST', headers=headers)
         resp = _request.urlopen(req, timeout=HTTP_TIMEOUT)
         return resp.read().decode('utf-8', errors='replace')
     except (_error.URLError, _error.HTTPError, ValueError, OSError) as e:

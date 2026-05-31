@@ -97,7 +97,11 @@ class VM:
         halted     — 是否已停机
     """
 
-    def __init__(self, code: bytearray, vars_count: int = 256, exports: dict | None = None):
+    # 与 C VM (csrc/runtime.c) 一致的常量
+    VAR_MAX: int = 256      # 最大变量数
+    STACK_MAX: int = 8192   # 最大栈深度
+
+    def __init__(self, code: bytearray, vars_count: int = VAR_MAX, exports: dict | None = None):
         self.code = code
         self.pc = 0
         self.stack: list = []
@@ -520,7 +524,7 @@ class VM:
             try:
                 with open(path, 'r', encoding='utf-8') as f:
                     self.stack.append(f.read())
-            except Exception:
+            except (IOError, OSError, UnicodeDecodeError):
                 self.stack.append('')
         elif op == WRITE_FILE:
             data = str(self.stack.pop())
@@ -529,7 +533,7 @@ class VM:
                 with open(path, 'w', encoding='utf-8') as f:
                     f.write(data)
                 self.stack.append(1)
-            except Exception:
+            except (IOError, OSError):
                 self.stack.append(0)
         elif op == WRITE_BINARY:
             data = self.stack.pop()
@@ -540,7 +544,7 @@ class VM:
                     with open(path, 'wb') as f:
                         f.write(raw)
                 self.stack.append(1)
-            except Exception:
+            except (IOError, OSError, TypeError):
                 self.stack.append(0)
         return True
 
@@ -651,7 +655,7 @@ class VM:
             except (struct.error, IndexError):
                 pass  # 导出表损坏时静默忽略
 
-        vm = cls(code, max(vc, 256), exports)
+        vm = cls(code, max(vc, VM.VAR_MAX), exports)
 
         # 执行模块初始化代码（设置全局变量：操作码值、OP映射等）
         # 初始化代码从 PC=0 开始，执行到代码末尾自动退出

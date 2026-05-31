@@ -80,11 +80,15 @@ class TypeOps:
         if isinstance(val, str):
             return val
         if isinstance(val, TritValue):
+            if val.is_float():
+                return f'{val.to_float():.4f}'.rstrip('0').rstrip('.')
             return str(val.to_int())
         if isinstance(val, list):
             return '[' + ', '.join(str(v) for v in val) + ']'
         if isinstance(val, dict):
             return '{' + ', '.join(f'{k}: {v}' for k, v in val.items()) + '}'
+        if isinstance(val, float):
+            return f'{val:.4f}'.rstrip('0').rstrip('.')
         return str(val)
 
 

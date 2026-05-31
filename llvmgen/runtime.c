@@ -10,6 +10,7 @@
 #ifdef _WIN32
 void __chkstk(void) {}
 #include <windows.h>
+#include <winhttp.h>
 #else
 #include <unistd.h>
 #endif
@@ -345,10 +346,108 @@ void *rt_str_join(void *sep, void *lst) {
 }
 
 /* ═══════════════════════════════════════════════════════════
- * HTTP / 正则（桩函数，待完整实现）
+ * URL 解析与 HTTP 客户端（WinHTTP）
  * ═══════════════════════════════════════════════════════════ */
-void *rt_http_get(void *url)                    { (void)url; return _rt_make(""); }
-void *rt_http_post(void *url, void *d)          { (void)url; (void)d; return _rt_make(""); }
+
+typedef struct {
+    char host[256];
+    char path[1024];
+    int port;
+    int use_ssl;
+} _parsed_url_t;
+
+static int _parse_url(const char *url, _parsed_url_t *pu) {
+    memset(pu, 0, sizeof(*pu));
+    pu->port = 80;
+    pu->use_ssl = 0;
+    if (strncmp(url, "https://", 8) == 0) {
+        url += 8; pu->use_ssl = 1; pu->port = 443;
+    } else if (strncmp(url, "http://", 7) == 0) {
+        url += 7;
+    }
+    const char *hs = url;
+    while (*url && *url != ':' && *url != '/' && *url != '?' && *url != '#') url++;
+    int hl = (int)(url - hs);
+    if (hl <= 0 || hl >= 256) return 0;
+    memcpy(pu->host, hs, hl); pu->host[hl] = '\0';
+    if (*url == ':') {
+        url++; pu->port = 0;
+        while (*url >= '0' && *url <= '9') { pu->port = pu->port * 10 + (*url - '0'); url++; }
+    }
+    if (!*url) {
+        strcpy(pu->path, "/");
+    } else {
+        int pl = 0;
+        while (*url && pl < 1023) pu->path[pl++] = *url++;
+        pu->path[pl] = '\0';
+    }
+    return 1;
+}
+
+static WCHAR *_u2w(const char *u) {
+    int len = MultiByteToWideChar(CP_UTF8, 0, u, -1, NULL, 0);
+    WCHAR *w = (WCHAR*)malloc((size_t)len * sizeof(WCHAR));
+    if (w) MultiByteToWideChar(CP_UTF8, 0, u, -1, w, len);
+    return w;
+}
+
+static void *_http_request(const char *url, const char *method, const char *body) {
+    if (!url || !*url) return _rt_make("");
+    _parsed_url_t pu;
+    if (!_parse_url(url, &pu)) return _rt_make("");
+    WCHAR *whost = _u2w(pu.host);
+    WCHAR *wpath = _u2w(pu.path);
+    WCHAR *wmethod = _u2w(method);
+    void *ret = _rt_make("");
+    HINTERNET hSession = WinHttpOpen(L"Sanyan-LLVM/1.0", WINHTTP_ACCESS_TYPE_DEFAULT_PROXY, NULL, NULL, 0);
+    if (!hSession) goto cleanup_str;
+    HINTERNET hConnect = WinHttpConnect(hSession, whost, (INTERNET_PORT)pu.port, 0);
+    if (!hConnect) goto cleanup_ses;
+    DWORD flags = pu.use_ssl ? WINHTTP_FLAG_SECURE : 0;
+    HINTERNET hRequest = WinHttpOpenRequest(hConnect, wmethod, wpath, NULL, NULL, NULL, flags);
+    if (!hRequest) goto cleanup_conn;
+    if (pu.use_ssl) {
+        DWORD secure_prot = WINHTTP_FLAG_SECURE_PROTOCOL_TLS1_2 | WINHTTP_FLAG_SECURE_PROTOCOL_TLS1_3;
+        WinHttpSetOption(hRequest, WINHTTP_OPTION_SECURE_PROTOCOLS, &secure_prot, sizeof(secure_prot));
+    }
+    LPVOID body_data = WINHTTP_NO_REQUEST_DATA;
+    DWORD body_len = 0;
+    if (body) { body_data = (LPVOID)body; body_len = (DWORD)strlen(body); }
+    if (!WinHttpSendRequest(hRequest, WINHTTP_NO_ADDITIONAL_HEADERS, 0, body_data, body_len, body_len, 0))
+        goto cleanup_req;
+    if (!WinHttpReceiveResponse(hRequest, NULL)) goto cleanup_req;
+    char buf[4096];
+    char *resp = NULL;
+    size_t rlen = 0;
+    DWORD read = 0;
+    while (WinHttpReadData(hRequest, buf, sizeof(buf) - 1, &read) && read > 0) {
+        buf[read] = '\0';
+        resp = realloc(resp, rlen + read + 1);
+        if (resp) { memcpy(resp + rlen, buf, read); rlen += read; }
+    }
+    if (resp) { resp[rlen] = '\0'; ret = _rt_make(resp); free(resp); }
+cleanup_req:
+    WinHttpCloseHandle(hRequest);
+cleanup_conn:
+    WinHttpCloseHandle(hConnect);
+cleanup_ses:
+    WinHttpCloseHandle(hSession);
+cleanup_str:
+    free(whost); free(wpath); free(wmethod);
+    return ret;
+}
+
+void *rt_http_get(void *url) {
+    return _http_request(_cstr(url), "GET", NULL);
+}
+
+void *rt_http_post(void *url, void *d) {
+    return _http_request(_cstr(url), "POST", _cstr(d));
+}
+
+/* ═══════════════════════════════════════════════════════════
+ * 正则（桩函数，待完整实现）
+ * ═══════════════════════════════════════════════════════════ */
 void *rt_regex_match(void *p, void *t)          { (void)p; (void)t; return _rt_make(""); }
 void *rt_regex_search(void *p, void *t)         { (void)p; (void)t; return _rt_make(""); }
 void *rt_regex_findall(void *p, void *t)        { (void)p; (void)t; return _rt_make(""); }
@@ -469,12 +568,6 @@ int32_t rt_math_nlt(int32_t a, int32_t b) { return a >= b; }
 
 /* 当前 Unix 时间戳（秒） */
 int32_t rt_time_now(void) { return (int32_t)time(NULL); }
-
-/* ═══════════════════════════════════════════════════════════
- * JSON（桩函数，待完整实现）
- * ═══════════════════════════════════════════════════════════ */
-void *rt_json_parse(void *s)     { (void)s; return _rt_make("{}"); }
-void *rt_json_stringify(void *v) { (void)v; return _rt_make("\"\""); }
 
 /* ═══════════════════════════════════════════════════════════
  * 浮点类型
@@ -745,6 +838,206 @@ void *rt_dict_from_pairs(void *dictp, void *pairs_list) {
 }
 
 /* ═══════════════════════════════════════════════════════════
+ * JSON 解析与序列化
+ * ═══════════════════════════════════════════════════════════ */
+
+static void _js_ws(const char **p) {
+    while (**p == ' ' || **p == '\t' || **p == '\n' || **p == '\r') (*p)++;
+}
+
+static void *_js_val(const char **p);
+
+static void *_js_str(const char **p) {
+    _js_ws(p);
+    if (**p != '"') return _rt_make("");
+    (*p)++;
+    size_t cap = 64, len = 0;
+    char *buf = (char*)malloc(cap);
+    while (**p && **p != '"') {
+        if (**p == '\\') {
+            (*p)++;
+            switch (**p) {
+                case '"': buf[len++] = '"'; break;
+                case '\\': buf[len++] = '\\'; break;
+                case 'n': buf[len++] = '\n'; break;
+                case 't': buf[len++] = '\t'; break;
+                case 'r': buf[len++] = '\r'; break;
+                case '/': buf[len++] = '/'; break;
+                case 'u': { if (p[1] && p[2] && p[3] && p[4]) { buf[len++] = '?'; (*p) += 4; } break; }
+                default: buf[len++] = **p; break;
+            }
+        } else { buf[len++] = **p; }
+        if (len + 4 >= cap) { cap *= 2; buf = (char*)realloc(buf, cap); }
+        (*p)++;
+    }
+    if (**p == '"') (*p)++;
+    buf[len] = '\0';
+    void *r = _rt_make(buf);
+    free(buf);
+    return r;
+}
+
+static void *_js_num(const char **p) {
+    _js_ws(p);
+    const char *st = *p;
+    int is_float = 0;
+    if (**p == '-') (*p)++;
+    while (**p >= '0' && **p <= '9') (*p)++;
+    if (**p == '.') { is_float = 1; (*p)++; while (**p >= '0' && **p <= '9') (*p)++; }
+    if (**p == 'e' || **p == 'E') { is_float = 1; (*p)++; if (**p == '+' || **p == '-') (*p)++; while (**p >= '0' && **p <= '9') (*p)++; }
+    int nl = (int)(*p - st);
+    char *ns = (char*)malloc((size_t)nl + 1);
+    memcpy(ns, st, (size_t)nl); ns[nl] = '\0';
+    void *r;
+    if (is_float) {
+        r = rt_float_new(atof(ns));
+    } else {
+        int64_t v = (int64_t)atoll(ns);
+        r = (void*)(uintptr_t)((v << 1) | 1);
+    }
+    free(ns);
+    return r;
+}
+
+static void *_js_arr(const char **p) {
+    _js_ws(p);
+    if (**p != '[') return NULL;
+    (*p)++;
+    rt_list_t *lst = rt_list_new();
+    _js_ws(p);
+    if (**p == ']') { (*p)++; return lst; }
+    while (1) {
+        rt_list_push_item(lst, _js_val(p));
+        _js_ws(p);
+        if (**p == ']') { (*p)++; return lst; }
+        if (**p == ',') { (*p)++; _js_ws(p); } else break;
+    }
+    return lst;
+}
+
+static void *_js_obj(const char **p) {
+    _js_ws(p);
+    if (**p != '{') return NULL;
+    (*p)++;
+    void *d = rt_dict_new();
+    _js_ws(p);
+    if (**p == '}') { (*p)++; return d; }
+    while (1) {
+        void *k = _js_str(p);
+        _js_ws(p);
+        if (**p == ':') (*p)++;
+        _js_ws(p);
+        void *v = _js_val(p);
+        rt_dict_set(d, k, v);
+        _js_ws(p);
+        if (**p == '}') { (*p)++; return d; }
+        if (**p == ',') { (*p)++; _js_ws(p); } else break;
+    }
+    return d;
+}
+
+static void *_js_val(const char **p) {
+    _js_ws(p);
+    if (**p == '{') return _js_obj(p);
+    if (**p == '[') return _js_arr(p);
+    if (**p == '"') return _js_str(p);
+    if (**p == 't') { if (strncmp(*p, "true", 4) == 0) { *p += 4; return (void*)(uintptr_t)3; } return _rt_make(""); }
+    if (**p == 'f') { if (strncmp(*p, "false", 5) == 0) { *p += 5; return (void*)(uintptr_t)1; } return _rt_make(""); }
+    if (**p == 'n') { if (strncmp(*p, "null", 4) == 0) { *p += 4; return NULL; } return _rt_make(""); }
+    if (**p == '-' || (**p >= '0' && **p <= '9')) return _js_num(p);
+    return _rt_make("");
+}
+
+void *rt_json_parse(void *s) {
+    if (!s) return _rt_make("{}");
+    const char *cs = _cstr(s);
+    if (!cs || !*cs) return _rt_make("{}");
+    return _js_val(&cs);
+}
+
+/* ── 序列化 ── */
+
+typedef struct { char *buf; size_t len, cap; } _jb_t;
+
+static void _jb_ap(_jb_t *b, const char *s) {
+    size_t sl = strlen(s);
+    if (b->len + sl >= b->cap) { b->cap = (b->len + sl) * 2 + 64; b->buf = (char*)realloc(b->buf, b->cap); }
+    memcpy(b->buf + b->len, s, sl); b->len += sl;
+}
+
+static void _jb_ch(_jb_t *b, char c) {
+    if (b->len + 1 >= b->cap) { b->cap = b->cap * 2 + 32; b->buf = (char*)realloc(b->buf, b->cap); }
+    b->buf[b->len++] = c;
+}
+
+static void _js_val_str(_jb_t *b, void *v);
+
+static void _js_str_str(_jb_t *b, const char *s) {
+    _jb_ch(b, '"');
+    for (; *s; s++) {
+        switch (*s) {
+            case '"': _jb_ap(b, "\\\""); break;
+            case '\\': _jb_ap(b, "\\\\"); break;
+            case '\n': _jb_ap(b, "\\n"); break;
+            case '\t': _jb_ap(b, "\\t"); break;
+            case '\r': _jb_ap(b, "\\r"); break;
+            default: _jb_ch(b, *s); break;
+        }
+    }
+    _jb_ch(b, '"');
+}
+
+static void _js_val_str(_jb_t *b, void *v) {
+    if (!v) { _jb_ap(b, "null"); return; }
+    if ((uintptr_t)v & 1) {
+        char buf[32];
+        snprintf(buf, sizeof(buf), "%lld", (long long)((intptr_t)v >> 1));
+        _jb_ap(b, buf); return;
+    }
+    uint32_t ht = *(uint32_t*)v;
+    if (ht == OBJ_STRING) { _js_str_str(b, _cstr(v)); return; }
+    if (ht == OBJ_FLOAT) {
+        char buf[64];
+        snprintf(buf, sizeof(buf), "%.15g", ((rt_float_t*)v)->value);
+        _jb_ap(b, buf); return;
+    }
+    if (ht == OBJ_LIST) {
+        rt_list_t *l = (rt_list_t*)v;
+        _jb_ch(b, '[');
+        for (int32_t i = 0; i < l->len; i++) {
+            if (i > 0) _jb_ch(b, ',');
+            _js_val_str(b, l->items[i]);
+        }
+        _jb_ch(b, ']'); return;
+    }
+    if (ht == OBJ_DICT) {
+        rt_dict_t *d = (rt_dict_t*)v;
+        _jb_ch(b, '{');
+        int first = 1;
+        for (int32_t i = 0; i < d->cap; i++) {
+            if (d->entries[i].used) {
+                if (!first) _jb_ch(b, ',');
+                first = 0;
+                _js_str_str(b, d->entries[i].key);
+                _jb_ch(b, ':');
+                _js_val_str(b, d->entries[i].value);
+            }
+        }
+        _jb_ch(b, '}'); return;
+    }
+    _jb_ap(b, "null");
+}
+
+void *rt_json_stringify(void *v) {
+    _jb_t b = {0, 0, 0};
+    _js_val_str(&b, v);
+    _jb_ch(&b, '\0');
+    void *r = _rt_make(b.buf ? b.buf : "");
+    free(b.buf);
+    return r;
+}
+
+/* ═══════════════════════════════════════════════════════════
  * 随机数
  * ═══════════════════════════════════════════════════════════ */
 static int _rand_ok = 0;
@@ -923,6 +1216,545 @@ void rt_throw(void *msg) {
 }
 
 /* ═══════════════════════════════════════════════════════════
- * 模块导入（桩）
+ * 内嵌字节码 VM（用于加载 .bin 模块）
  * ═══════════════════════════════════════════════════════════ */
-void *rt_import(void *path) { (void)path; return _rt_make(""); }
+/* 前向声明 */
+void *rt_import(void *path);
+
+/* 标记指针 */
+#define _TAG_I(v)  ((void*)(intptr_t)(((int64_t)(v) << 1) | 1))
+#define _IS_INT(p) (((intptr_t)(p) & 1) != 0)
+#define _UNTAG(p)  ((int32_t)((intptr_t)(p) >> 1))
+#define _TO_INT(p) (_IS_INT(p) ? _UNTAG(p) : 0)
+
+/* 字节码 VM 结构 */
+#define _VM_STACK_MAX 4096
+#define _VM_CALL_DEPTH 128
+#define _BMOD_MAX 32
+#define _BEXPORT_MAX 64
+#define _BVAR_MAX 256
+
+typedef struct {
+    void *stack[_VM_STACK_MAX];
+    int32_t sp;
+    void *vars[_BVAR_MAX];
+    uint8_t var_cnt;
+    const uint8_t *code;
+    uint32_t code_len;
+    uint32_t pc;
+    struct { uint32_t ret_pc; int32_t stack_base; } call_stack[_VM_CALL_DEPTH];
+    uint8_t call_depth;
+    int halted;
+} _BVM;
+
+typedef struct {
+    const uint8_t *code;
+    uint32_t size;
+    uint8_t var_cnt;
+    void *vars[_BVAR_MAX];
+    int export_count;
+    char export_names[_BEXPORT_MAX][64];
+    uint32_t export_addrs[_BEXPORT_MAX];
+} _BModule;
+
+static _BModule _bmods[_BMOD_MAX];
+static int _bmod_cnt = 0;
+
+static void _bpush(_BVM *vm, void *v) {
+    if (vm->sp >= _VM_STACK_MAX) return;
+    vm->stack[vm->sp++] = v;
+}
+static void *_bpop(_BVM *vm) {
+    if (vm->sp <= 0) return _TAG_I(0);
+    return vm->stack[--vm->sp];
+}
+
+static uint8_t _brd_u8(const uint8_t *c, uint32_t *pc) { return c[(*pc)++]; }
+static int32_t _brd_i32(const uint8_t *c, uint32_t *pc) {
+    int32_t v; memcpy(&v, c + *pc, 4); *pc += 4; return v;
+}
+static int16_t _brd_i16(const uint8_t *c, uint32_t *pc) {
+    int16_t v; memcpy(&v, c + *pc, 2); *pc += 2; return v;
+}
+
+static int _bval_true(void *v) {
+    if (_IS_INT(v)) return _UNTAG(v) > 0;
+    return v != NULL;
+}
+
+/* UTF-16LE 转 UTF-8（模块导出表名 + PUSH_STR 用） */
+static char *_butf16_to_utf8(const uint8_t *src, int codepoints) {
+    char *out = (char*)malloc((size_t)codepoints * 4 + 1);
+    if (!out) return NULL;
+    int pos = 0;
+    for (int i = 0; i < codepoints; i++) {
+        uint32_t cp = src[0] | ((uint32_t)src[1] << 8);
+        src += 2;
+        if (cp < 0x80) out[pos++] = (char)cp;
+        else if (cp < 0x800) {
+            out[pos++] = (char)(0xC0 | (cp >> 6));
+            out[pos++] = (char)(0x80 | (cp & 0x3F));
+        } else if (cp < 0x10000) {
+            out[pos++] = (char)(0xE0 | (cp >> 12));
+            out[pos++] = (char)(0x80 | ((cp >> 6) & 0x3F));
+            out[pos++] = (char)(0x80 | (cp & 0x3F));
+        } else {
+            out[pos++] = (char)(0xF0 | (cp >> 18));
+            out[pos++] = (char)(0x80 | ((cp >> 12) & 0x3F));
+            out[pos++] = (char)(0x80 | ((cp >> 6) & 0x3F));
+            out[pos++] = (char)(0x80 | (cp & 0x3F));
+        }
+    }
+    out[pos] = '\0';
+    return out;
+}
+
+/* 检查 .bin 头部 */
+static int _bcheck_hdr(const uint8_t *hdr) {
+    if (memcmp(hdr, "SAN0", 4) == 0) return 0;
+    if (hdr[0] == 0x53 && hdr[3] == 0x30 && hdr[4] == 0x01) return 0;
+    return 1;
+}
+
+/* 从已打开文件读取导出表 */
+static int _bread_exports(FILE *fp, _BModule *mod) {
+    uint8_t buf[2];
+    if (fread(buf, 1, 2, fp) != 2) { mod->export_count = 0; return 0; }
+    uint16_t cnt;
+    memcpy(&cnt, buf, 2);
+    if (cnt > _BEXPORT_MAX) cnt = _BEXPORT_MAX;
+    mod->export_count = 0;
+    for (uint16_t i = 0; i < cnt; i++) {
+        if (fread(buf, 1, 2, fp) != 2) break;
+        uint16_t nl;
+        memcpy(&nl, buf, 2);
+        if (nl > 63) nl = 63;
+        uint8_t *u16 = (uint8_t*)malloc((size_t)nl * 2);
+        if (!u16) break;
+        if (fread(u16, 1, (size_t)nl * 2, fp) != (size_t)nl * 2) { free(u16); break; }
+        char *u8 = _butf16_to_utf8(u16, nl);
+        free(u16);
+        if (!u8) break;
+        strncpy(mod->export_names[mod->export_count], u8, 63);
+        mod->export_names[mod->export_count][63] = '\0';
+        free(u8);
+        uint8_t addr_buf[4];
+        if (fread(addr_buf, 1, 4, fp) != 4) break;
+        memcpy(&mod->export_addrs[mod->export_count], addr_buf, 4);
+        mod->export_count++;
+    }
+    return 0;
+}
+
+/* 内嵌 VM 主循环 */
+static int _bvm_run(_BVM *vm) {
+    uint64_t steps = 0;
+    while (!vm->halted) {
+        if (vm->pc >= vm->code_len) { vm->halted = 1; break; }
+        if (++steps > 50000000) { fprintf(stderr, "[rt_import] 超时\n"); return 1; }
+        uint8_t op = _brd_u8(vm->code, &vm->pc);
+        void *a, *b;
+        int32_t ib;
+
+        switch (op) {
+        case 0x00: break; /* NOP */
+        case 0x01: _bpush(vm, _TAG_I(_brd_i32(vm->code, &vm->pc))); break; /* PUSH_I */
+        case 0x02: b = _bpop(vm); a = _bpop(vm); _bpush(vm, _TAG_I(_TO_INT(a) + _TO_INT(b))); break; /* ADD */
+        case 0x03: b = _bpop(vm); a = _bpop(vm); _bpush(vm, _TAG_I(_TO_INT(a) - _TO_INT(b))); break; /* SUB */
+        case 0x04: b = _bpop(vm); a = _bpop(vm); _bpush(vm, _TAG_I(_TO_INT(a) * _TO_INT(b))); break; /* MUL */
+        case 0x05: b = _bpop(vm); a = _bpop(vm); ib = _TO_INT(b); _bpush(vm, ib ? _TAG_I(_TO_INT(a) / ib) : _TAG_I(0)); break; /* DIV */
+        case 0x06: b = _bpop(vm); a = _bpop(vm); ib = _TO_INT(b); _bpush(vm, ib ? _TAG_I(_TO_INT(a) % ib) : _TAG_I(0)); break; /* MOD */
+
+        /* 变量操作 */
+        case 0x07: { uint8_t idx = _brd_u8(vm->code, &vm->pc); _bpush(vm, vm->vars[idx]); break; } /* LOAD */
+        case 0x08: { uint8_t idx = _brd_u8(vm->code, &vm->pc); vm->vars[idx] = _bpop(vm); break; } /* STORE */
+
+        /* 跳转 */
+        case 0x09: { int16_t off = _brd_i16(vm->code, &vm->pc); vm->pc += off; break; } /* JMP */
+        case 0x33: { int32_t off = _brd_i32(vm->code, &vm->pc); vm->pc += off; break; } /* JMP32 */
+        case 0x0A: { int16_t off = _brd_i16(vm->code, &vm->pc); if (!_bval_true(_bpop(vm))) vm->pc += off; break; } /* JZ */
+        case 0x0B: { int16_t off = _brd_i16(vm->code, &vm->pc); if (_bval_true(_bpop(vm))) vm->pc += off; break; } /* JNZ */
+
+        /* 调用 / 返回 */
+        case 0x0C: {
+            int16_t addr = _brd_i16(vm->code, &vm->pc);
+            if (addr == 0) { _bpush(vm, _TAG_I(0)); break; }
+            if (vm->call_depth >= _VM_CALL_DEPTH) { fprintf(stderr, "[rt_import] 调用栈溢出\n"); return 1; }
+            int32_t arg_count = 0;
+            uint32_t p = (uint32_t)addr;
+            while (p + 1 < vm->code_len && vm->code[p] == 0x08) { arg_count++; p += 2; }
+            vm->call_stack[vm->call_depth].ret_pc = vm->pc;
+            vm->call_stack[vm->call_depth].stack_base = vm->sp - arg_count;
+            vm->pc = (uint32_t)addr;
+            vm->call_depth++;
+            break;
+        }
+        case 0x0D: {
+            if (vm->call_depth == 0) { vm->halted = 1; break; }
+            vm->call_depth--;
+            void *rv = vm->sp > vm->call_stack[vm->call_depth].stack_base ? vm->stack[--vm->sp] : _TAG_I(0);
+            vm->sp = vm->call_stack[vm->call_depth].stack_base;
+            _bpush(vm, rv);
+            vm->pc = vm->call_stack[vm->call_depth].ret_pc;
+            break;
+        }
+
+        /* 比较 */
+        case 0x11: b = _bpop(vm); a = _bpop(vm); _bpush(vm, _TAG_I(_TO_INT(a) == _TO_INT(b) ? 1 : -1)); break;
+        case 0x12: b = _bpop(vm); a = _bpop(vm); _bpush(vm, _TAG_I(_TO_INT(a) != _TO_INT(b) ? 1 : -1)); break;
+        case 0x13: b = _bpop(vm); a = _bpop(vm); _bpush(vm, _TAG_I(_TO_INT(a) > _TO_INT(b) ? 1 : -1)); break;
+        case 0x14: b = _bpop(vm); a = _bpop(vm); _bpush(vm, _TAG_I(_TO_INT(a) < _TO_INT(b) ? 1 : -1)); break;
+        case 0x15: b = _bpop(vm); a = _bpop(vm); _bpush(vm, _TAG_I(_TO_INT(a) >= _TO_INT(b) ? 1 : -1)); break;
+        case 0x16: b = _bpop(vm); a = _bpop(vm); _bpush(vm, _TAG_I(_TO_INT(a) <= _TO_INT(b) ? 1 : -1)); break;
+        case 0x17: a = _bpop(vm); { int32_t v = _TO_INT(a); _bpush(vm, _TAG_I(v > 0 ? -1 : 1)); } break;
+
+        /* 字符串 */
+        case 0x19: { /* CONCAT */
+            int32_t n = _TO_INT(_bpop(vm));
+            if (n <= 0) { _bpush(vm, _rt_make("")); break; }
+            int32_t total = 0;
+            int32_t *lens = (int32_t*)malloc((size_t)n * sizeof(int32_t));
+            const char **strs = (const char**)malloc((size_t)n * sizeof(char*));
+            if (!lens || !strs) { free(lens); free(strs); _bpush(vm, _rt_make("")); break; }
+            for (int32_t i = n - 1; i >= 0; i--) {
+                void *item = _bpop(vm);
+                strs[i] = item ? ((rt_str_t*)item)->data : "";
+                lens[i] = (int32_t)strlen(strs[i]);
+                total += lens[i];
+            }
+            rt_str_t *r = (rt_str_t*)malloc(sizeof(rt_str_t) + total + 1);
+            if (!r) { free(lens); free(strs); _bpush(vm, _rt_make("")); break; }
+            r->h_type = OBJ_STRING;
+            r->len = total;
+            char *dst = r->data;
+            for (int32_t i = 0; i < n; i++) { memcpy(dst, strs[i], lens[i]); dst += lens[i]; }
+            *dst = '\0';
+            free(lens); free(strs);
+            _bpush(vm, r);
+            break;
+        }
+        case 0x1A: a = _bpop(vm); _bpush(vm, _TAG_I((int32_t)strlen(_IS_INT(a) ? "" : ((rt_str_t*)a)->data))); break;
+        case 0x1B: { /* STRSUB */
+            int32_t n = _TO_INT(_bpop(vm));
+            int32_t st = _TO_INT(_bpop(vm));
+            const char *s = a = _bpop(vm); if (a && !_IS_INT(a)) s = ((rt_str_t*)a)->data; else s = "";
+            int32_t sl = (int32_t)strlen(s);
+            if (st < 0) st = 0;
+            if (st > sl) st = sl;
+            if (n < 0) n = 0;
+            if (st + n > sl) n = sl - st;
+            char *buf = (char*)malloc((size_t)n + 1);
+            if (buf) { memcpy(buf, s + st, (size_t)n); buf[n] = '\0'; _bpush(vm, _rt_make(buf)); free(buf); }
+            else _bpush(vm, _rt_make(""));
+            break;
+        }
+        case 0x1C: b = _bpop(vm); a = _bpop(vm); { /* STREQ */
+            const char *sa = a && !_IS_INT(a) ? ((rt_str_t*)a)->data : "";
+            const char *sb = b && !_IS_INT(b) ? ((rt_str_t*)b)->data : "";
+            _bpush(vm, _TAG_I(strcmp(sa, sb) == 0 ? 1 : -1));
+            break;
+        }
+
+        /* 输出 */
+        case 0x0E: { a = _bpop(vm); /* PRINT - print to stderr for diagnostics */
+            if (_IS_INT(a)) fprintf(stderr, "%d\n", _UNTAG(a));
+            else if (a) fprintf(stderr, "%s\n", ((rt_str_t*)a)->data);
+            else fprintf(stderr, "null\n");
+            break;
+        }
+
+        /* 读写文件 */
+        case 0x2B: { /* READ_FILE */
+            const char *p = a = _bpop(vm); if (a && !_IS_INT(a)) p = ((rt_str_t*)a)->data; else p = "";
+            FILE *f = fopen(p, "rb");
+            if (!f) { _bpush(vm, _rt_make("")); break; }
+            fseek(f, 0, SEEK_END); long sz = ftell(f); fseek(f, 0, SEEK_SET);
+            char *buf = (char*)malloc((size_t)sz + 1);
+            if (!buf) { fclose(f); _bpush(vm, _rt_make("")); break; }
+            size_t nr = fread(buf, 1, (size_t)sz, f); fclose(f);
+            buf[nr] = '\0';
+            _bpush(vm, _rt_make(buf)); free(buf);
+            break;
+        }
+        case 0x2C: { /* WRITE_FILE */
+            const char *c = b = _bpop(vm); if (b && !_IS_INT(b)) c = ((rt_str_t*)b)->data; else c = "";
+            const char *p = a = _bpop(vm); if (a && !_IS_INT(a)) p = ((rt_str_t*)a)->data; else p = "";
+            FILE *f = fopen(p, "wb");
+            if (f) { fwrite(c, 1, strlen(c), f); fclose(f); _bpush(vm, _TAG_I(1)); }
+            else _bpush(vm, _TAG_I(0));
+            break;
+        }
+
+        /* 列表 */
+        case 0x27: _bpush(vm, rt_list_new()); break; /* LIST_NEW */
+        case 0x25: { /* GET */
+            int32_t idx = _TO_INT(_bpop(vm));
+            a = _bpop(vm);
+            if (!a || _IS_INT(a)) { _bpush(vm, _TAG_I(0)); break; }
+            rt_list_t *lst = (rt_list_t*)a;
+            if (idx < 0 || idx >= lst->len) { _bpush(vm, _TAG_I(0)); break; }
+            _bpush(vm, lst->items[idx]); break;
+        }
+        case 0x26: { /* SET_ELEM */
+            void *val = _bpop(vm);
+            int32_t idx = _TO_INT(_bpop(vm));
+            a = _bpop(vm);
+            if (a && !_IS_INT(a)) {
+                rt_list_t *lst = (rt_list_t*)a;
+                if (idx >= 0 && idx < lst->len) lst->items[idx] = val;
+            }
+            _bpush(vm, val); break;
+        }
+        case 0x28: { /* LIST_CCAT */
+            b = _bpop(vm); a = _bpop(vm);
+            if (!a || _IS_INT(a)) { _bpush(vm, b ? b : _TAG_I(0)); break; }
+            if (!b || _IS_INT(b)) { _bpush(vm, a); break; }
+            rt_list_t *la = (rt_list_t*)a, *lb = (rt_list_t*)b;
+            rt_list_t *res = rt_list_new();
+            for (int i = 0; i < la->len; i++) rt_list_push_item(res, la->items[i]);
+            for (int i = 0; i < lb->len; i++) rt_list_push_item(res, lb->items[i]);
+            _bpush(vm, res); break;
+        }
+        case 0x29: { /* SLICE */
+            int32_t end = _TO_INT(_bpop(vm));
+            int32_t st = _TO_INT(_bpop(vm));
+            a = _bpop(vm);
+            if (!a || _IS_INT(a)) { _bpush(vm, rt_list_new()); break; }
+            rt_list_t *lst = (rt_list_t*)a;
+            if (st < 0) st = 0;
+            if (st > lst->len) st = lst->len;
+            if (end > lst->len) end = lst->len;
+            if (end < st) end = st;
+            rt_list_t *res = rt_list_new();
+            for (int i = st; i < end; i++) rt_list_push_item(res, lst->items[i]);
+            _bpush(vm, res); break;
+        }
+        case 0x2A: a = _bpop(vm); /* LIST_LEN */
+            _bpush(vm, _TAG_I(a && !_IS_INT(a) ? ((rt_list_t*)a)->len : 0)); break;
+
+        /* 字典 */
+        case 0x1D: _bpush(vm, rt_dict_new()); break; /* DICT */
+        case 0x1E: { /* DICT_GET */
+            void *key = _bpop(vm);
+            a = _bpop(vm);
+            if (!a || _IS_INT(a)) { _bpush(vm, _TAG_I(0)); break; }
+            _bpush(vm, rt_dict_get(a, key)); break;
+        }
+        case 0x1F: { /* DICT_SET */
+            void *val = _bpop(vm);
+            void *key = _bpop(vm);
+            a = _bpop(vm);
+            if (a && !_IS_INT(a)) rt_dict_set(a, key, val);
+            _bpush(vm, val); break;
+        }
+        case 0x20: { /* DICT_HAS */
+            void *key = _bpop(vm);
+            a = _bpop(vm);
+            _bpush(vm, _TAG_I(a && !_IS_INT(a) && rt_dict_contains(a, key) ? 1 : -1)); break;
+        }
+        case 0x32: { /* DICT_KEYS */
+            a = _bpop(vm);
+            if (!a || _IS_INT(a)) { _bpush(vm, rt_list_new()); break; }
+            rt_dict_t *d = (rt_dict_t*)a;
+            rt_list_t *kl = rt_list_new();
+            for (int32_t i = 0; i < d->cap; i++) {
+                if (d->entries[i].used) {
+                    rt_list_push_item(kl, _rt_make(d->entries[i].key));
+                }
+            }
+            _bpush(vm, kl); break;
+        }
+        case 0x3A: a = _bpop(vm); /* DICT_LEN */
+            _bpush(vm, _TAG_I(0)); break; /* 简化实现 */
+
+        /* 字符串查找 */
+        case 0x36: { /* STR_FIND */
+            b = _bpop(vm); a = _bpop(vm);
+            const char *hs = a && !_IS_INT(a) ? ((rt_str_t*)a)->data : "";
+            const char *nd = b && !_IS_INT(b) ? ((rt_str_t*)b)->data : "";
+            const char *f = strstr(hs, nd);
+            _bpush(vm, _TAG_I(f ? (int32_t)(f - hs) : -1)); break;
+        }
+        case 0x37: { /* STR_TO_LIST */
+            a = _bpop(vm);
+            const char *s = a && !_IS_INT(a) ? ((rt_str_t*)a)->data : "";
+            rt_list_t *lst = rt_list_new();
+            while (*s) { char tmp[2] = {*s++, 0}; rt_list_push_item(lst, _rt_make(tmp)); }
+            _bpush(vm, lst); break;
+        }
+        case 0x38: { /* STR_STARTSWITH */
+            b = _bpop(vm); a = _bpop(vm);
+            const char *s = a && !_IS_INT(a) ? ((rt_str_t*)a)->data : "";
+            const char *pre = b && !_IS_INT(b) ? ((rt_str_t*)b)->data : "";
+            size_t pl = strlen(pre);
+            _bpush(vm, _TAG_I(strncmp(s, pre, pl) == 0 ? 1 : -1)); break;
+        }
+        case 0x39: { /* STR_CONTAINS */
+            b = _bpop(vm); a = _bpop(vm);
+            const char *hs = a && !_IS_INT(a) ? ((rt_str_t*)a)->data : "";
+            const char *nd = b && !_IS_INT(b) ? ((rt_str_t*)b)->data : "";
+            _bpush(vm, _TAG_I(strstr(hs, nd) != NULL ? 1 : -1)); break;
+        }
+
+        /* 类型检查 */
+        case 0x21: a = _bpop(vm); _bpush(vm, _TAG_I(_IS_INT(a) ? 1 : -1)); break;
+        case 0x22: a = _bpop(vm); _bpush(vm, _TAG_I(!a || _IS_INT(a) ? -1 : 1)); break;
+        case 0x23: a = _bpop(vm); _bpush(vm, _TAG_I(!a || _IS_INT(a) ? -1 : 1)); break;
+        case 0x24: b = _bpop(vm); a = _bpop(vm); _bpush(vm, _TAG_I(a == b ? 1 : -1)); break;
+
+        /* 字符串 push（UTF-16LE in bytecode） */
+        case 0x2D: {
+            int len = _brd_u8(vm->code, &vm->pc);
+            char *u8 = _butf16_to_utf8(vm->code + vm->pc, len);
+            vm->pc += len * 2;
+            _bpush(vm, _rt_make(u8 ? u8 : ""));
+            free(u8);
+            break;
+        }
+
+        /* 逻辑或/与 */
+        case 0x34: b = _bpop(vm); a = _bpop(vm); _bpush(vm, _TAG_I((_TO_INT(a) || _TO_INT(b)) ? 1 : -1)); break;
+        case 0x35: b = _bpop(vm); a = _bpop(vm); _bpush(vm, _TAG_I((_TO_INT(a) && _TO_INT(b)) ? 1 : -1)); break;
+
+        /* 等待/睡眠 */
+        case 0x18: {
+            int32_t ms = _TO_INT(_bpop(vm));
+#ifdef _WIN32
+            Sleep(ms);
+#else
+            struct timespec ts = {ms / 1000, (ms % 1000) * 1000000L};
+            nanosleep(&ts, NULL);
+#endif
+            break;
+        }
+
+        /* 模块导入（递归） */
+        case 0x2E: {
+            void *pval = _bpop(vm);
+            _bpush(vm, rt_import(pval));
+            break;
+        }
+
+        case 0xFF: vm->halted = 1; break; /* HALT */
+        default:
+            fprintf(stderr, "[rt_import] 未知操作码 0x%02X at pc=%u\n", op, vm->pc - 1);
+            return 1;
+        }
+    }
+    return 0;
+}
+
+/* 获取 .bin 路径（尝试 path.san → path.bin 自动转换） */
+static char *_bresolve_path(const char *path) {
+    if (!path) return NULL;
+    size_t pl = strlen(path);
+    if (pl >= 4 && strcmp(path + pl - 4, ".bin") == 0) return _rt_make(path) ? strdup(path) : NULL;
+    /* 尝试 path.bin、stdlib/path.bin */
+    char buf1[512], buf2[512], buf3[512];
+    snprintf(buf1, sizeof(buf1), "%s.bin", path);
+    if (pl >= 4 && strcmp(path + pl - 4, ".san") == 0) {
+        snprintf(buf1, sizeof(buf1), "%s", path);
+        size_t bl = strlen(buf1);
+        if (bl >= 4) memcpy(buf1 + bl - 4, ".bin", 4);
+    }
+    snprintf(buf2, sizeof(buf2), "stdlib/%s.bin", path);
+    if (pl >= 4 && strcmp(path + pl - 4, ".san") == 0) {
+        snprintf(buf2, sizeof(buf2), "stdlib/%s", path);
+        size_t bl2 = strlen(buf2);
+        if (bl2 >= 4) memcpy(buf2 + bl2 - 4, ".bin", 4);
+    }
+    if (path[0] != '/' && path[0] != '\\' && !strchr(path, ':')) {
+        snprintf(buf3, sizeof(buf3), "stdlib/%s", path);
+    }
+    for (int i = 0; i < 3; i++) {
+        const char *cp = i == 0 ? buf1 : (i == 1 ? buf2 : buf3);
+        if (!cp || !*cp) continue;
+        FILE *f = fopen(cp, "rb");
+        if (f) { fclose(f); return strdup(cp); }
+    }
+    return NULL;
+}
+
+/* ═══════════════════════════════════════════════════════════
+ * 模块导入（真实实现）
+ * ═══════════════════════════════════════════════════════════ */
+void *rt_import(void *path) {
+    if (!path || _IS_INT(path)) return _rt_make("");
+    const char *path_str = ((rt_str_t*)path)->data;
+    if (!path_str || !*path_str) return _rt_make("");
+
+    char *bin_path = _bresolve_path(path_str);
+    if (!bin_path) return _rt_make("");
+
+    FILE *f = fopen(bin_path, "rb");
+    if (!f) { free(bin_path); return _rt_make(""); }
+
+    uint8_t hdr[10];
+    if (fread(hdr, 1, 10, f) != 10 || _bcheck_hdr(hdr)) {
+        fclose(f); free(bin_path); return _rt_make("");
+    }
+
+    uint32_t sz;
+    memcpy(&sz, hdr + 6, 4);
+    uint8_t *code = (uint8_t*)malloc(sz);
+    if (!code) { fclose(f); free(bin_path); return _rt_make(""); }
+    if (fread(code, 1, sz, f) != sz) {
+        free(code); fclose(f); free(bin_path); return _rt_make("");
+    }
+
+    int mid = _bmod_cnt;
+    if (mid >= _BMOD_MAX) { free(code); fclose(f); free(bin_path); return _TAG_I(0); }
+
+    _bmods[mid].code = code;
+    _bmods[mid].size = sz;
+    _bmods[mid].var_cnt = hdr[5];
+    memset(_bmods[mid].vars, 0, sizeof(void*) * _BVAR_MAX);
+    _bmods[mid].export_count = 0;
+    _bread_exports(f, &_bmods[mid]);
+    fclose(f);
+
+    /* 执行模块初始化代码 */
+    {
+        _BVM init_vm;
+        memset(&init_vm, 0, sizeof(init_vm));
+        init_vm.code = code;
+        init_vm.code_len = sz;
+        init_vm.var_cnt = hdr[5];
+        _bvm_run(&init_vm);
+        memcpy(_bmods[mid].vars, init_vm.vars, sizeof(void*) * _BVAR_MAX);
+        _bmod_cnt++;
+    }
+
+    free(bin_path);
+    return _TAG_I(mid + 1);  /* 返回模块 ID（1-based，0 表示无效） */
+}
+
+/* 跨模块函数调用 */
+void *rt_module_call(void *mod_handle, void *func_name, void *arg_list) {
+    if (!mod_handle || _IS_INT(mod_handle)) return _TAG_I(0);
+    int32_t mid = _UNTAG(mod_handle) - 1;
+    if (mid < 0 || mid >= _bmod_cnt) return _TAG_I(0);
+    const char *fname = func_name && !_IS_INT(func_name) ? ((rt_str_t*)func_name)->data : "";
+    _BModule *mod = &_bmods[mid];
+    for (int i = 0; i < mod->export_count; i++) {
+        if (strcmp(mod->export_names[i], fname) == 0) {
+            uint32_t addr = mod->export_addrs[i];
+            _BVM call_vm;
+            memset(&call_vm, 0, sizeof(call_vm));
+            call_vm.code = mod->code;
+            call_vm.code_len = mod->size;
+            call_vm.var_cnt = mod->var_cnt;
+            memcpy(call_vm.vars, mod->vars, sizeof(void*) * _BVAR_MAX);
+            /* 压入参数 */
+            if (arg_list && !_IS_INT(arg_list)) {
+                rt_list_t *lst = (rt_list_t*)arg_list;
+                for (int j = lst->len - 1; j >= 0; j--) _bpush(&call_vm, lst->items[j]);
+            }
+            /* 压入函数地址并执行 CALL */
+            call_vm.pc = addr;
+            _bvm_run(&call_vm);
+            return call_vm.sp > 0 ? call_vm.stack[call_vm.sp - 1] : _TAG_I(0);
+        }
+    }
+    return _TAG_I(0);
+}

@@ -1,0 +1,37 @@
+// 三言 Agent — LLM 接口层
+
+定义 解析响应 (llmRaw) {
+    设 content = 提取内容(llmRaw)
+    尝试 {
+        设 parsed = 解析JSON(content)
+        若 (parsed == 0 或 不(是字典(parsed))) {
+            返回(字典(
+                "cogState", "UNCERT", "actState", "NEED_HUMAN",
+                "answer", "LLM 返回格式异常", "tool", "", "params", ""
+            ))
+        }
+        返回(字典(
+            "cogState", 取键(parsed, "cog"),
+            "actState", 取键(parsed, "act"),
+            "answer", 取键(parsed, "answer"),
+            "tool", 取键(parsed, "tool"),
+            "params", 取键(parsed, "params")
+        ))
+    } 捕获 (e) {
+        返回(字典(
+            "cogState", "UNCERT", "actState", "NEED_HUMAN",
+            "answer", "LLM 返回格式异常", "tool", "", "params", ""
+        ))
+    }
+}
+
+定义 提取内容 (raw) {
+    设 outer = 解析JSON(raw)
+    若 (不(是字典(outer))) { 返回("") }
+    设 choices = 取键(outer, "choices")
+    设 first = 取(choices, 0)
+    设 msg = 取键(first, "message")
+    返回(取键(msg, "content"))
+}
+
+导出 解析响应 提取内容

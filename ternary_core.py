@@ -187,7 +187,7 @@ class TernaryALU:
 
 
 class TritValue:
-    __slots__ = ('value', 'symbol', 'float_val', '_initialized', 'precision')
+    __slots__ = ('value', 'symbol', 'float_val', '_initialized', 'precision', 'confidence')
 
     STATE_MAP = {
         '开': 1,
@@ -228,13 +228,14 @@ class TritValue:
             obj._initialized = True
             obj.precision = 0
             obj.float_val = None
+            obj.confidence = 1.0
             obj.value = BT.from_int(i)
             obj.symbol = BT.to_str(obj.value)
             cls._SMALL_INT_CACHE[i] = obj
         cls._SMALL_INT_BUILT = True
 
-    def __new__(cls, value, precision: Optional[int] = None):
-        if isinstance(value, int) and precision is None:
+    def __new__(cls, value, precision: Optional[int] = None, confidence: float = 1.0):
+        if isinstance(value, int) and precision is None and confidence == 1.0:
             cls._build_small_cache()
             cached = cls._SMALL_INT_CACHE.get(value)
             if cached is not None:
@@ -246,11 +247,11 @@ class TritValue:
             return v
 
         key = (
-            (value, precision)
+            (value, precision, confidence)
             if isinstance(value, (int, float))
-            else (_hashable(value), precision)
+            else (_hashable(value), precision, confidence)
             if isinstance(value, list)
-            else (value, precision)
+            else (value, precision, confidence)
         )
         with cls._pool_lock:
             if key in cls._pool:
@@ -262,12 +263,13 @@ class TritValue:
             cls._pool[key] = obj
             return obj
 
-    def __init__(self, value: Union[int, float, list], precision: Optional[int] = None):
+    def __init__(self, value: Union[int, float, list], precision: Optional[int] = None, confidence: float = 1.0):
         if hasattr(self, '_initialized'):
             return
         self._initialized = True
         self.precision = precision if precision is not None else 0
         self.float_val = None
+        self.confidence = max(0.0, min(1.0, confidence))
         if isinstance(value, int):
             self.value = BT.from_int(value)
         elif isinstance(value, float):
@@ -310,6 +312,16 @@ class TritValue:
         if self.float_val is not None:
             return f'{self.float_val}'
         return str(self.to_int())  # 只返回整数，如 "3"
+
+    def with_confidence(self, confidence: float) -> 'TritValue':
+        """返回同值但不同置信度的新 TritValue。"""
+        return TritValue(self.to_int(), self.precision, confidence)
+
+    def confidence_str(self) -> str:
+        """返回带置信度的字符串表示，如 '真(0.9)' 或 '真'（默认 1.0）。"""
+        if self.confidence >= 1.0:
+            return repr(self)
+        return f'{self.to_int()}({self.confidence:.2f})'
 
 
 class ArrayValue:

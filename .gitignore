@@ -216,6 +216,12 @@ NUL
 !stdlib/algorithm.bin
 !stdlib/string.bin
 !stdlib/list.bin
+
+# Agent runtime artifacts
+ternary_agent/memory.json
+ternary_agent/runtime_v2/memory_v2.json
+ternary_agent/runtime_v2/association.json
+*.env
 !stdlib/io.bin
 !stdlib/logic.bin
 !stdlib/stat.bin

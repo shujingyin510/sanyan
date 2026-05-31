@@ -218,7 +218,7 @@ def main():
 
         try:
             result = env.eval(ast)
-        except Exception as e:
+        except (SanyanError, SyntaxError, RecursionError) as e:
             import traceback
 
             traceback.print_exc()
@@ -231,7 +231,7 @@ def main():
             from compile_bytecode import compile_san
 
             compile_san(filepath, bin_path)
-        except Exception:
+        except (SanyanError, SyntaxError, OSError):
             pass
 
         if profiling:
