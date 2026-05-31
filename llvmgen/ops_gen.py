@@ -303,6 +303,10 @@ def _compile_node_inner(node, cg: CodegenContext) -> ir.Value | None:
     if op in ('若', 'if'):
         return _compile_if(args, cg)
 
+    # ── 再若/否则 — 在 sugar.san fallback 中作为独立节点，跳过（_compile_if 已处理）
+    if op in ('再若', '否则', 'elif', 'else'):
+        return _NULL
+
     # ── 遍历 ──
     if op in ('遍历', 'for', 'forin'):
         return _compile_for(args, cg)
@@ -394,7 +398,8 @@ def _compile_node_inner(node, cg: CodegenContext) -> ir.Value | None:
         result = cg.builder.call(cg._funcs[resolved_op], arg_vals, name=f'call_{op}')
         _maybe_unwind(cg)
         return result
-    # 单元素列表 → 变量引用
+    # 单元素列表 → 变量引用（排除字符串字面量）
     if isinstance(node, list) and len(node) == 1 and isinstance(node[0], str):
-        return cg.get_var(node[0])
+        if not (node[0].startswith('"') or node[0].startswith("'")):
+            return cg.get_var(node[0])
     raise NameError(f'编译错误: 未定义的操作或函数 {op}')

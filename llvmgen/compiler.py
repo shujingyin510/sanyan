@@ -61,6 +61,19 @@ def _is_paren_sexpr(source: str) -> bool:
     return stripped.startswith('(')
 
 
+def _has_chinese_keywords(ast: list) -> bool:
+    """检测 AST 是否含 LLVM 编译器无法处理的中文关键字。"""
+    # 只检测 LLVM 代码生成器不支持的（try/捕获/尝试 已支持）
+    chinese_kw = {'再若', '遍历', '跳出', '继续', '导出', '判'}
+    for node in ast:
+        if isinstance(node, str) and node in chinese_kw:
+            return True
+        if isinstance(node, list):
+            if _has_chinese_keywords(node):
+                return True
+    return False
+
+
 def _parse_all_sexprs(source: str) -> list | None:
     """解析源码中所有顶层 S 表达式，返回列表的列表。
 
@@ -113,7 +126,9 @@ def _parse_source(source: str) -> list:
 
             parsed = SugarConverter.convert(source, evaluator.skin_manager)
             if parsed is not None and isinstance(parsed, list):
-                return cast(list[Any], parsed)
+                # 检查是否含中文关键字（说明 SugarConverter 失败回退到 sugar.san）
+                if not _has_chinese_keywords(parsed):
+                    return cast(list[Any], parsed)
         except Exception:
             pass
 
