@@ -2,7 +2,7 @@
 
 import os
 from ternary_core import TritValue
-from values import SanyanSyntaxError, SanyanValueError, SanyanNameError, SanyanTypeError, SanyanIOError, ModuleValue
+from values import SanyanError, SanyanSyntaxError, SanyanValueError, SanyanNameError, SanyanTypeError, SanyanIOError, ModuleValue
 from skin import SkinManager
 from ops.registry import register
 

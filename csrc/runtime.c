@@ -1,5 +1,10 @@
 /**
- * runtime.c — 三言平坦字节码 C 解释器（52 指令完整版）
+ * runtime.c — 三言字节码 C 解释器（52 指令完整版）
+ *
+ * 用途：执行 .bin 字节码文件（离线 VM）
+ * 与 llvmgen/runtime.c 的关系：两者都实现了标记指针值系统、字符串/列表/字典操作。
+ *   但 API 有差异（如 rt_list_push vs rt_list_push_item），暂未合并。
+ *   如需统一，建议先抽取公共值系统头文件 csrc/runtime_types.h。
  *
  * 值系统: void* 栈值，LSB=1 为标记整数，LSB=0 为堆对象（带类型标签）。
  * 编译:   gcc -o runtime runtime.c && ./runtime firmware.bin

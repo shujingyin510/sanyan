@@ -10,6 +10,7 @@ from evaluator import SanyanEvaluator
 from sugar import SugarConverter
 from ternary_core import TritValue
 from skin import SkinManager
+from values import SanyanError
 
 
 def _compile_ir_to_exe(ir_text: str, suffix: str, gcc_env: dict | None = None) -> str:
