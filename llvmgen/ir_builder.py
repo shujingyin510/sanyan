@@ -313,11 +313,14 @@ class CodegenContext:
             if i == len(body) - 1 and not self.builder.block.is_terminated:
                 if isinstance(stmt, list) and stmt[0] in ('返回', 'return'):
                     pass  # 已有显式返回
-                elif result is not None:
-                    if isinstance(result, RawValue):
-                        result = self._box_int(result.ll_val)
-                    elif isinstance(result, BoxedValue):
-                        result = result.ll_val
+                else:
+                    if result is not None:
+                        if isinstance(result, RawValue):
+                            result = self._box_int(result.ll_val)
+                        elif isinstance(result, BoxedValue):
+                            result = result.ll_val
+                    else:
+                        result = _NULL
                     self.builder.ret(result)
         self.end_function()
 
