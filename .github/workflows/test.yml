@@ -18,7 +18,7 @@ jobs:
         with:
           python-version: "3.12"
       - run: python -m pip install --upgrade pip
-      - run: pip install .[dev]
+      - run: pip install --no-cache-dir .[dev]
       - run: ruff format --check .
       - run: ruff check .
       - run: mypy .
@@ -38,7 +38,7 @@ jobs:
         with:
           python-version: ${{ matrix.python-version }}
       - run: python -m pip install --upgrade pip
-      - run: pip install .[dev]
+      - run: pip install --no-cache-dir .[dev]
       - name: Cache build artifacts
         uses: actions/cache@v4
         with:
@@ -68,7 +68,7 @@ jobs:
         with:
           python-version: "3.12"
       - run: python -m pip install --upgrade pip
-      - run: pip install .[dev]
+      - run: pip install --no-cache-dir .[dev]
       - run: sudo apt-get install -y gcc
       - run: python -X utf8 tests/test_c_vm.py -v
 
@@ -81,7 +81,7 @@ jobs:
         with:
           python-version: "3.12"
       - run: python -m pip install --upgrade pip
-      - run: pip install .[dev]
+      - run: pip install --no-cache-dir .[dev]
       - name: Run tests with coverage
         run: python -m pytest tests/test_core.py tests/test_commands.py tests/test_parser.py tests/test_ops.py tests/test_ops_ext.py tests/test_lsp.py tests/test_package.py tests/test_iot.py tests/test_dp_python.py tests/test_self_host.py tests/test_sugar_self_host.py tests/test_vm.py tests/test_llvmgen.py tests/test_sugar_san.py --cov=. --cov-report=term-missing --cov-report=xml -q
       - name: Upload coverage to Codecov
@@ -100,6 +100,6 @@ jobs:
         with:
           python-version: "3.12"
       - run: python -m pip install --upgrade pip
-      - run: pip install .[dev]
+      - run: pip install --no-cache-dir .[dev]
       - name: Run benchmark
         run: python benchmark/run_benchmark.py --quick
