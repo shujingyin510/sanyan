@@ -30,20 +30,17 @@ class TestSugarParserAST(unittest.TestCase):
     def test_print(self):
         self.assertAST('输出(x)', lambda ast: ast[0] == 'print' and ast[1] == 'x')
 
-    @unittest.skipIf(sys.platform == 'darwin', 'macOS 解析器对 > < + 运算符处理差异')
     def test_if(self):
         self.assertAST(
             '若 (x > 5) { 输出(x) }', lambda ast: ast[0] == 'if' and ast[1][0] == 'gt' and ast[2][0] == 'print'
         )
 
-    @unittest.skipIf(sys.platform == 'darwin', 'macOS 解析器对 > < + 运算符处理差异')
     def test_if_elif_else(self):
         self.assertAST(
             '若 (x > 5) { 输出(1) } 再若 (x < 0) { 输出(-1) } 否则 { 输出(0) }',
             lambda ast: ast[0] == 'if' and len(ast) == 4 and ast[3][0] == 'if',
         )
 
-    @unittest.skipIf(sys.platform == 'darwin', 'macOS 解析器对 > < + 运算符处理差异')
     def test_loop(self):
         self.assertAST(
             '循环 (x < 10) { x = x + 1 }', lambda ast: ast[0] == 'loop' and ast[1][0] == 'lt' and ast[2][0] == 'set'
@@ -100,7 +97,6 @@ class TestSugarParserAST(unittest.TestCase):
     def test_concat(self):
         self.assertAST('输出(连接("a", "b"))', lambda ast: ast[0] == 'print' and ast[1][0] == 'concat')
 
-    @unittest.skipIf(sys.platform == 'darwin', 'macOS 解析器对 > < + 运算符处理差异')
     def test_fullwidth_symbols(self):
         self.assertAST('设 a＝5；输出（a＋2）', lambda ast: ast[0] == 'do' and ast[1][0] == 'set')
 

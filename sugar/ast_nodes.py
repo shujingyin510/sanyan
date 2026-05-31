@@ -67,6 +67,19 @@ def _build_keyword_map() -> dict[str, str]:
 def _build_op_map() -> dict[str, str]:
     """从皮肤文件构建运算符映射。"""
     maps: dict[str, str] = {}
+    # 符号 → 内部名（皮肤文件只映射内部名→中文，需补全符号反向映射）
+    maps['+'] = 'add'
+    maps['-'] = 'sub'
+    maps['*'] = 'mul'
+    maps['/'] = 'div'
+    maps['%'] = 'mod'
+    maps['^'] = 'pow'
+    maps['>'] = 'gt'
+    maps['<'] = 'lt'
+    maps['>='] = 'gte'
+    maps['<='] = 'lte'
+    maps['='] = 'eq'
+    maps['!='] = 'ne'
     for lang_file in ['chinese.json', 'english.json']:
         path = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'language', lang_file)
         try:
