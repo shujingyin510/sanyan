@@ -657,11 +657,17 @@ sanyan/
 - [x] BUILTIN_OPS 自动生成（从 language/*.json 同步）
 - [x] 核心模块 docstring 注释
 - [x] 架构文档 ARCHITECTURE.md + 贡献指南 CONTRIBUTING.md
-- [x] 三言 Agent v0.2 — 可读决策 DSL（决策追踪 + 声明式策略 + 自解释 + 热重载）
-- [ ] 概率三态（置信度 + 贝叶斯传播）
+- [x] llvmgen.san 自举完成 V5（辅助函数内联）
+- [x] 包管理器增强（卸载/搜索/包信息）
+- [x] 标准库扩充（network/hardware/math 矩阵统计）
+- [x] 三值逻辑 IoT 案例（传感器融合/容错控制/状态机）
+- [x] 三值 vs 二值对比文档
+- [x] 快速入门指南 docs/GETTING_STARTED.md
+- [x] Agent 子系统测试（17 项）
+- [x] #include 预处理全链路支持（Python + C VM）
 - [ ] GPIO 真实硬件控制
 - [ ] Web IDE
-- [ ] 标准库扩展（更多自举模块）
+- [ ] 社区生态建设
 
 ## 为什么是中文
 

@@ -295,9 +295,17 @@ sanyan/
 - [x] Auto-generated BUILTIN_OPS from language JSON
 - [x] Core module docstrings
 - [x] Architecture docs + contribution guide
+- [x] llvmgen.san self-hosting V5 (helper functions inlined)
+- [x] Package manager enhanced (uninstall/search/info)
+- [x] Standard library expansion (network/hardware/math matrix)
+- [x] Three-value IoT cases (sensor fusion, fault-tolerant control, state machine)
+- [x] Three-value vs two-value comparison docs
+- [x] Quick start guide docs/GETTING_STARTED.md
+- [x] Agent subsystem tests (17 tests)
+- [x] #include preprocessing full pipeline (Python + C VM)
 - [ ] GPIO hardware control
 - [ ] Web IDE
-- [ ] Expanded standard library
+- [ ] Community ecosystem
 
 ---
 

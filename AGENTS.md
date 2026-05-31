@@ -213,9 +213,11 @@ python -X utf8 tests/test_llvmgen.py -v   # LLVM 代码生成测试 53 项
 python -X utf8 tests/test_dp_python.py -v # S 表达式解析测试 10 项
 python -X utf8 tests/test_llvm_native.py -v # LLVM 原生编译测试（需 C 编译器）
 python -X utf8 tests/test_self_host.py -v # 自举验证测试 1 项
+python -X utf8 tests/test_sugar_self_host.py -v # sugar.bin 自举验证 3 项
 python -X utf8 tests/test_vm.py -v        # VM 字节码测试 73 项
 python -X utf8 tests/test_c_vm.py -v      # C VM 测试 1 项（需 gcc）
-python -X utf8 tests/run_all.py           # 集成测试 43 项
+python -X utf8 tests/test_agent.py -v     # Agent 测试 19 项
+python -X utf8 tests/run_all.py           # 集成测试 46 项
 
 全部通过才算成功：
 - test_core.py 52/52
@@ -230,8 +232,10 @@ python -X utf8 tests/run_all.py           # 集成测试 43 项
 - test_llvmgen.py 53/53
 - test_dp_python.py 10/10
 - test_self_host.py 1/1
+- test_sugar_self_host.py 3/3
 - test_vm.py 73/73
 - test_c_vm.py 1/1（需 C 编译器）
+- test_agent.py 19/19
 - test_llvm_native.py 2/3（dp_harness 测试需完整 LLVM→原生管线，parse_sanyan 已修复返回正确 AST）
 - run_all.py 43/43
 
