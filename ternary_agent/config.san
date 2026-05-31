@@ -1,5 +1,6 @@
-// 三言 Agent — 配置文件
-// 运行前请修改 API密钥 为实际值
+// [遗留] 三言 Agent — 配置文件 (v0.2)
+// 此文件已被 agent_policy.san 替代，仅保留供参考
+// 新代码请使用 agent_policy.san 中的配置
 
 设 模型URL = "https://api.deepseek.com/v1/chat/completions"
 设 API密钥 = "sk-你的key"
