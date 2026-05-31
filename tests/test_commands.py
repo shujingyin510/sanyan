@@ -1,7 +1,5 @@
 """Commands 模块单元测试：定义、调用、类型检查、尾递归"""
 
-import sys
-import os
 import contextlib
 
 

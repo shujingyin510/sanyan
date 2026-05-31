@@ -13,7 +13,7 @@ import sys
 import subprocess
 import tempfile
 from llvmgen.compiler import compile_source
-from utils.compiler_tools import find_cc, find_llc, run_in_shell, win_to_posix
+from utils.compiler_tools import find_cc, find_llc
 
 
 def _find_cc() -> str:

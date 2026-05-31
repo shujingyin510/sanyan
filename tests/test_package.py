@@ -1,6 +1,5 @@
 """包管理器测试"""
 
-import sys
 import os
 
 

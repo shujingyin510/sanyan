@@ -1,11 +1,9 @@
 """桃花村 v2.0 — 时间+日程+天气 自动演示"""
 
-import sys, os, builtins
+import os
+import builtins
 
 os.chdir(os.path.dirname(os.path.abspath(__file__)) or '.')
-import ops.type_ops, ops.json_ops, ops.time_ops, ops.file_ops
-import ops.string_ops, ops.container_ops, ops.control_ops, ops.logic_ops
-import ops.comparison_ops, ops.arithmetic_ops
 from ops.registry import register_alias
 
 for a, t in [

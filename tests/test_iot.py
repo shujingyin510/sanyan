@@ -1,6 +1,5 @@
 """IoT 模块单元测试：设备注册、传感器、执行器、随机态"""
 
-import sys
 import os
 import tempfile
 

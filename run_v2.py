@@ -4,13 +4,11 @@
     python -X utf8 run_v2.py npc      # 运行 NPC 30天演示
 """
 
-import sys, os
+import sys
+import os
 
 os.chdir(os.path.dirname(os.path.abspath(__file__)) or '.')
 
-import ops.type_ops, ops.json_ops, ops.time_ops, ops.net_ops, ops.file_ops
-import ops.string_ops, ops.container_ops, ops.control_ops, ops.logic_ops
-import ops.comparison_ops, ops.arithmetic_ops
 from ops.registry import register_alias
 
 aliases = [
@@ -62,7 +60,7 @@ file_map = {
 }
 
 if cmd not in file_map:
-    print(f'用法: python -X utf8 run_v2.py [test|npc]')
+    print('用法: python -X utf8 run_v2.py [test|npc]')
     sys.exit(1)
 
 e = SanyanEvaluator(max_loop_steps=500000)

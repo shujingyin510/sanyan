@@ -1,6 +1,5 @@
 """字节码编译器自举检测：验证 bytecode_compiler.san 能编译自身并输出字节一致的结果"""
 
-import sys
 import os
 import hashlib
 

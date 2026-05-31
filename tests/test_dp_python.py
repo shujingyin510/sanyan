@@ -8,8 +8,6 @@ dp.c 使用 LLVM 编译的 parse_sanyan() C 入口，
 顶层单数则解析为 Python int，字符串字面量保留引号。
 """
 
-import sys
-import os
 
 
 import unittest

@@ -2,13 +2,10 @@
 每一步输入都会显示，像真人操作一样
 """
 
-import sys, os
+import os
 
 os.chdir(os.path.dirname(os.path.abspath(__file__)) or '.')
 
-import ops.type_ops, ops.json_ops, ops.time_ops, ops.file_ops
-import ops.string_ops, ops.container_ops, ops.control_ops, ops.logic_ops
-import ops.comparison_ops, ops.arithmetic_ops
 from ops.registry import register_alias
 
 for a, t in [
@@ -119,7 +116,7 @@ steps = [
     ('退出', '游戏结束'),
 ]
 
-import builtins, time
+import builtins
 
 
 def echo_input():

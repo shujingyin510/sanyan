@@ -1,6 +1,5 @@
 """ops 模块单元测试：覆盖所有内置操作"""
 
-import sys
 import os
 import contextlib
 
@@ -8,7 +7,7 @@ import contextlib
 import unittest
 from ternary_core import TritValue, ArrayValue
 from evaluator import SanyanEvaluator
-from values import SanyanValueError, SanyanTypeError, SanyanSyntaxError, SanyanNameError, SanyanIndexError
+from values import SanyanValueError, SanyanTypeError, SanyanSyntaxError, SanyanNameError
 
 
 class TestArithmetic(unittest.TestCase):

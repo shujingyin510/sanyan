@@ -2,8 +2,6 @@
 运行方式：python tests/test_core.py
 """
 
-import sys
-import os
 
 
 import unittest

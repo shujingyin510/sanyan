@@ -1,7 +1,5 @@
 """sugar.san 专项测试：AST 兼容性 + 解析正确性"""
 
-import sys
-import os
 
 
 import unittest

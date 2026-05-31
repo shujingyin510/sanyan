@@ -1,6 +1,5 @@
 """字节码 VM 单元测试：直接构造字节码验证每条指令"""
 
-import sys
 import os
 import struct
 import tempfile

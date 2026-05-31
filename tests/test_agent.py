@@ -1,7 +1,9 @@
 """三态 Agent 测试 — mock LLM 调用，验证决策流水线"""
 
 import unittest
-import sys, os, json
+import sys
+import os
+import json
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from evaluator import SanyanEvaluator

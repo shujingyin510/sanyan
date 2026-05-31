@@ -8,7 +8,6 @@ from __future__ import annotations
 import subprocess
 import sys
 import os
-import shutil
 import tempfile
 import unittest
 
@@ -132,9 +131,9 @@ class TestCVMCrossValidation(unittest.TestCase):
             cvm_output = _run_cvm(bin_path)
 
             # 比较
-            self.assertEqual(py_output, expected_output, f'Python VM 输出不匹配')
+            self.assertEqual(py_output, expected_output, 'Python VM 输出不匹配')
             if cvm_output is not None:
-                self.assertEqual(cvm_output, expected_output, f'C VM 输出不匹配')
+                self.assertEqual(cvm_output, expected_output, 'C VM 输出不匹配')
 
     def test_arithmetic(self):
         self._compile_and_compare('(输出 (加 10 20))', '30')

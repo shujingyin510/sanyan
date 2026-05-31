@@ -4,7 +4,7 @@ from typing import Any
 
 from ternary_core import TritValue, ArrayValue
 from values import FunctionValue, ModuleValue, call_function
-from values import SanyanSyntaxError, SanyanTypeError, SanyanValueError, SanyanKeyError, SanyanIndexError, to_num
+from values import SanyanSyntaxError, SanyanTypeError, SanyanValueError, SanyanKeyError, to_num
 from ops.registry import register
 
 

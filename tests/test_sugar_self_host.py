@@ -7,7 +7,6 @@
 4. 输出与参考 sugar.bin 比较
 """
 
-import sys
 import os
 import hashlib
 

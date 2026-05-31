@@ -1,7 +1,6 @@
 """扩展 ops 模块基本冒烟测试"""
 
 import os
-import sys
 
 
 import unittest
@@ -115,13 +114,11 @@ class TestSystemOps(unittest.TestCase):
         self.assertIn(r, ('win32', 'linux', 'darwin'))
 
     def test_pid(self):
-        import os
 
         r = self.env.eval(['进程号'])
         self.assertEqual(r.to_int(), os.getpid())
 
     def test_exists(self):
-        import os
 
         path = os.path.abspath(__file__).replace('\\', '\\\\')
         self.env.eval(['设', 'f', '"' + path + '"'])

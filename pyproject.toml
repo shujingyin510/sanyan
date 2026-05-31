@@ -69,6 +69,13 @@ target-version = "py312"
 select = ["E", "F", "W"]
 ignore = ["E501", "E701", "E702", "E703"]
 
+[tool.ruff.lint.per-file-ignores]
+# Demo 脚本：os.chdir() 后 import ops 模块是设计需要
+"run_agent.py" = ["E402"]
+"run_v2.py" = ["E402", "E401", "E722"]
+"run_v2_demo.py" = ["E402", "E401", "E722"]
+"run_village_demo.py" = ["E402", "E401", "E722"]
+
 [tool.ruff.format]
 quote-style = "single"
 

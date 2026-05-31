@@ -13,17 +13,6 @@ import os
 
 os.chdir(os.path.dirname(os.path.abspath(__file__)) or '.')
 
-import ops.type_ops
-import ops.json_ops
-import ops.time_ops
-import ops.net_ops
-import ops.file_ops
-import ops.string_ops
-import ops.container_ops
-import ops.control_ops
-import ops.logic_ops
-import ops.comparison_ops
-import ops.arithmetic_ops
 from ops.registry import register_alias
 
 register_alias('转字符串', 'to_string')

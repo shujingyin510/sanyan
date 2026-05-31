@@ -8,6 +8,7 @@ Pratt 解析用「前缀/中缀」统一处理所有表达式：
 
 from __future__ import annotations
 from typing import Optional, Any
+from values import SanyanSyntaxError
 from sugar.tokenizer import Token, tokenize
 from sugar.errors import SugarErrorReporter
 from sugar.ast_nodes import (

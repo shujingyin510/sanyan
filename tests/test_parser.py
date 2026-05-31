@@ -1,7 +1,6 @@
 """糖语法解析器回归测试 — 验证 AST 结构正确性（unittest 格式）"""
 
 import sys
-import os
 
 
 if sys.platform == 'win32':
