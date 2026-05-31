@@ -154,6 +154,19 @@ class TestAgentDecision(unittest.TestCase):
         r = _agent_call(self.e, "匹配规则", "xyz123不存在的词")
         self.assertEqual(r["场景"], "未知")
 
+    def test_match_rule_borrow_negated(self):
+        """匹配规则：否定借钱→风险降为低"""
+        r = _agent_call(self.e, "匹配规则", "我不借钱给你")
+        self.assertIn(r["场景"], ("借钱", "未知"))
+        # 否定句不应是高风险
+        if r["场景"] == "借钱":
+            self.assertNotEqual(r["风险"], "高")
+
+    def test_match_rule_multikey(self):
+        """匹配规则：多关键词匹配"""
+        r = _agent_call(self.e, "匹配规则", "今天北京天气怎么样会不会下雨")
+        self.assertEqual(r["场景"], "天气查询")
+
     def test_cognitive_names(self):
         """认知态名：英文→中文映射"""
         a = _agent_call
