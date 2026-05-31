@@ -33,15 +33,13 @@ def _compile_and_run() -> tuple[bool, str]:
         exe_path = os.path.join(tmpdir, EXE_NAME)
         src_posix = win_to_posix(SRC)
         exe_posix = win_to_posix(exe_path)
-        result = run_in_shell(f'gcc {src_posix} -o {exe_posix} -std=c99 -Wall')
+        result = run_in_shell(f'gcc {src_posix} -o {exe_posix} -std=c99 -Wall', check=False)
         if result.returncode != 0:
             return False, f'编译失败:\n{result.stderr}'
 
         result = subprocess.run(
             [exe_path],
-            capture_output=True,
-            text=True,
-            timeout=30,
+            capture_output=True, text=True, timeout=30,
         )
         return result.returncode == 0, result.stdout + result.stderr
 
@@ -54,7 +52,7 @@ def _compile_cvm() -> str | None:
     exe_path = os.path.join(tempfile.gettempdir(), CVM_EXE_NAME)
     src_posix = win_to_posix(RUNTIME_SRC)
     exe_posix = win_to_posix(exe_path)
-    result = run_in_shell(f'gcc {src_posix} -o {exe_posix} -std=c99 -Wall')
+    result = run_in_shell(f'gcc {src_posix} -o {exe_posix} -std=c99 -Wall', check=False)
     if result.returncode != 0:
         return None
     return exe_path
