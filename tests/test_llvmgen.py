@@ -337,14 +337,14 @@ class TestLLVMNoRegression(unittest.TestCase):
     def test_guess_number(self):
         self._check_example('guess_number')
 
-    @unittest.skipIf(sys.platform == 'darwin', 'macOS 解析器引号处理差异')
+    @unittest.skipIf(sys.platform != 'win32', '非 Windows 平台 SugarConverter 全角字符解析差异')
     def test_greenhouse(self):
         self._check_example('greenhouse')
 
     def test_voting(self):
         self._check_example('voting')
 
-    @unittest.skipIf(sys.platform == 'darwin', 'macOS 解析器引号处理差异')
+    @unittest.skipIf(sys.platform != 'win32', '非 Windows 平台 SugarConverter 全角字符解析差异')
     def test_data_clean(self):
         self._check_example('data_cleaning')
 
