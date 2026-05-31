@@ -13,17 +13,20 @@ class ContainerOps:
 
     @staticmethod
     def _as_list(val):
+        """将 ArrayValue 转为 Python list，其他类型原样返回。"""
         if isinstance(val, ArrayValue):
             return val.data
         return val
 
     @staticmethod
     def list_new(evaluator, args):
+        """创建列表：列表(元素...) → [元素...]"""
         items = [evaluator.eval(a) for a in args]
         return items
 
     @staticmethod
     def list_concat(evaluator, args):
+        """列表合并：列表合(list1, list2, ...) → 合并后的列表"""
         if not args:
             return []
         result = evaluator.eval(args[0])
@@ -38,6 +41,7 @@ class ContainerOps:
 
     @staticmethod
     def list_length(evaluator, args):
+        """列表长度：取长(list) → 元素个数"""
         if len(args) != 1:
             raise SanyanSyntaxError('表长 需要一个列表参数')
         lst = evaluator.eval(args[0])
@@ -75,6 +79,7 @@ class ContainerOps:
 
     @staticmethod
     def generic_get(evaluator, args):
+        """通用取值：取(容器, 索引) → 元素。支持列表/数组/字典。"""
         if len(args) != 2:
             raise SanyanSyntaxError('取 需要容器和索引')
         container = evaluator.eval(args[0])
