@@ -80,22 +80,22 @@ class TestSugarParserAST(unittest.TestCase):
         self.assertAST('输出(非 真)', lambda ast: ast[0] == 'print' and ast[1][0] == 'not')
 
     def test_list_literal(self):
-        self.assertAST('设 lst = 列表(1, 2, 3)', lambda ast: ast[0] == 'set' and ast[2][0] == '列表')
+        self.assertAST('设 lst = 列表(1, 2, 3)', lambda ast: ast[0] == 'set' and ast[2][0] == 'list')
 
     def test_dict(self):
-        self.assertAST('设 d = 字典("a", 1, "b", 2)', lambda ast: ast[0] == 'set' and ast[2][0] == '字典')
+        self.assertAST('设 d = 字典("a", 1, "b", 2)', lambda ast: ast[0] == 'set' and ast[2][0] == 'dict')
 
     def test_array(self):
-        self.assertAST('设 arr = 数组(5, 0)', lambda ast: ast[0] == 'set' and ast[2][0] == '数组')
+        self.assertAST('设 arr = 数组(5, 0)', lambda ast: ast[0] == 'set' and ast[2][0] == 'array')
 
     def test_container_index(self):
         self.assertAST('输出(lst(0))', lambda ast: ast[0] == 'print' and ast[1][0] == 'lst')
 
     def test_map(self):
-        self.assertAST('映射(函数(x) { x * 2 }, 列表(1,2))', lambda ast: ast[0] == '映射' and ast[1][0] == 'lambda')
+        self.assertAST('映射(函数(x) { x * 2 }, 列表(1,2))', lambda ast: ast[0] == 'map' and ast[1][0] == 'lambda')
 
     def test_concat(self):
-        self.assertAST('输出(连接("a", "b"))', lambda ast: ast[0] == 'print' and ast[1][0] == '连接')
+        self.assertAST('输出(连接("a", "b"))', lambda ast: ast[0] == 'print' and ast[1][0] == 'concat')
 
     def test_fullwidth_symbols(self):
         self.assertAST('设 a＝5；输出（a＋2）', lambda ast: ast[0] == 'do' and ast[1][0] == 'set')
