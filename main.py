@@ -29,6 +29,7 @@ def _compile_ir_to_exe(ir_text: str, suffix: str, gcc_env: dict | None = None) -
 
     # 优先使用 llc（无 Python 依赖）
     from utils.compiler_tools import find_llc
+
     obj_ok = False
     llc = find_llc()
     if llc:

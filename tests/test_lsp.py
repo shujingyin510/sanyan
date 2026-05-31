@@ -10,7 +10,6 @@ import queue
 import time
 
 
-
 def _encode_msg(msg: dict) -> bytes:
     body = json.dumps(msg, ensure_ascii=False)
     header = f'Content-Length: {len(body.encode("utf-8"))}\r\n\r\n'

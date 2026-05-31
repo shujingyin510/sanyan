@@ -3,7 +3,9 @@
     python -X utf8 run_v2.py test     # 运行测试
     python -X utf8 run_v2.py npc      # 运行 NPC 30天演示
 """
+
 import sys, os
+
 os.chdir(os.path.dirname(os.path.abspath(__file__)) or '.')
 
 import ops.type_ops, ops.json_ops, ops.time_ops, ops.net_ops, ops.file_ops
@@ -12,23 +14,44 @@ import ops.comparison_ops, ops.arithmetic_ops
 from ops.registry import register_alias
 
 aliases = [
-    ('转字符串','to_string'),('转JSON','to_json'),('解析JSON','from_json'),
-    ('时间戳','timestamp'),('字符串包含','str_contains'),('表长','list_len'),
-    ('字符串相等','str_equals'),('是字典','is_dict'),('是列表','is_list'),
-    ('连接','concat'),('取长','length'),('子串','substring'),('查找','find'),
-    ('分割','split'),('包含','contains'),('字典键列表','dict_keys'),
-    ('含键','dict_contains'),('置键','set_key'),('取键','get_key'),
-    ('删除键','delete_key'),('列表合','list_concat'),('取','get'),
-    ('不','not'),('读文件','read_file'),('写文件','write_file'),
-    ('切片','slice'),('置元素','set_element'),
+    ('转字符串', 'to_string'),
+    ('转JSON', 'to_json'),
+    ('解析JSON', 'from_json'),
+    ('时间戳', 'timestamp'),
+    ('字符串包含', 'str_contains'),
+    ('表长', 'list_len'),
+    ('字符串相等', 'str_equals'),
+    ('是字典', 'is_dict'),
+    ('是列表', 'is_list'),
+    ('连接', 'concat'),
+    ('取长', 'length'),
+    ('子串', 'substring'),
+    ('查找', 'find'),
+    ('分割', 'split'),
+    ('包含', 'contains'),
+    ('字典键列表', 'dict_keys'),
+    ('含键', 'dict_contains'),
+    ('置键', 'set_key'),
+    ('取键', 'get_key'),
+    ('删除键', 'delete_key'),
+    ('列表合', 'list_concat'),
+    ('取', 'get'),
+    ('不', 'not'),
+    ('读文件', 'read_file'),
+    ('写文件', 'write_file'),
+    ('切片', 'slice'),
+    ('置元素', 'set_element'),
 ]
-for a,t in aliases:
-    try: register_alias(a,t)
-    except: pass
+for a, t in aliases:
+    try:
+        register_alias(a, t)
+    except:
+        pass
 
 from sugar.parser import parse_code
 from evaluator import SanyanEvaluator
 from ops.file_ops import clear_cache
+
 clear_cache()
 
 cmd = sys.argv[1] if len(sys.argv) > 1 else 'test'
@@ -39,7 +62,7 @@ file_map = {
 }
 
 if cmd not in file_map:
-    print(f"用法: python -X utf8 run_v2.py [test|npc]")
+    print(f'用法: python -X utf8 run_v2.py [test|npc]')
     sys.exit(1)
 
 e = SanyanEvaluator(max_loop_steps=500000)

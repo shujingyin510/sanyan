@@ -111,10 +111,10 @@ def _watch_files():
 
 
 def run_interactive(evaluator, api_key):
-    print("三言 Agent v0.2.0 - 多轮对话（最多10轮，输入 exit 退出）")
-    print("  /解释 → 查看最近决策解释")
-    print("  /解释 N → 查看第N轮决策解释")
-    print("  修改 agent_policy.san 后自动重载")
+    print('三言 Agent v0.2.0 - 多轮对话（最多10轮，输入 exit 退出）')
+    print('  /解释 → 查看最近决策解释')
+    print('  /解释 N → 查看第N轮决策解释')
+    print('  修改 agent_policy.san 后自动重载')
     print()
     mtimes = _watch_files()
     for round_num in range(1, 11):
@@ -122,21 +122,21 @@ def run_interactive(evaluator, api_key):
         try:
             new_mtimes = _watch_files()
             if new_mtimes != mtimes:
-                print("[策略文件已更新，正在重新加载...]")
+                print('[策略文件已更新，正在重新加载...]')
                 evaluator = init_evaluator(api_key)
                 mtimes = new_mtimes
         except OSError:
             pass
 
         try:
-            q = input(f"[{round_num}/10] > ").strip()
+            q = input(f'[{round_num}/10] > ').strip()
         except (EOFError, KeyboardInterrupt):
-            print("\n再见")
+            print('\n再见')
             break
         if not q:
             continue
         if q.lower() in ('exit', '退出', 'quit', 'q'):
-            print("再见")
+            print('再见')
             break
 
         # 特殊命令
@@ -146,7 +146,7 @@ def run_interactive(evaluator, api_key):
                 try:
                     evaluator.eval(['解释决策', int(parts[1])])
                 except ValueError:
-                    print("用法: /解释 N")
+                    print('用法: /解释 N')
             else:
                 evaluator.eval(['最近决策'])
             continue
@@ -157,9 +157,9 @@ def run_interactive(evaluator, api_key):
                 try:
                     evaluator.eval(['解释原因', int(parts[1])])
                 except ValueError:
-                    print("用法: /原因 N")
+                    print('用法: /原因 N')
             else:
-                print("用法: /原因 N")
+                print('用法: /原因 N')
             continue
 
         if q == '/策略':
@@ -169,7 +169,7 @@ def run_interactive(evaluator, api_key):
         try:
             evaluator.eval(['Agent运行', q])
         except Exception as e:
-            print(f"错误: {e}")
+            print(f'错误: {e}')
         try:
             evaluator.eval(['保存记忆'])
         except Exception:
@@ -180,7 +180,7 @@ def run_interactive(evaluator, api_key):
 def main():
     api_key = load_api_key()
     if not api_key or '你的' in api_key:
-        print("请设置 API 密钥：set SANYAN_API_KEY=sk-xxx")
+        print('请设置 API 密钥：set SANYAN_API_KEY=sk-xxx')
         sys.exit(1)
 
     evaluator = init_evaluator(api_key)

@@ -85,12 +85,19 @@ def run_in_shell(cmd: str, timeout: int = 30, check: bool = True) -> subprocess.
     if bash:
         return subprocess.run(
             [bash, '-lc', cmd],
-            capture_output=True, text=True, timeout=timeout, check=check,
+            capture_output=True,
+            text=True,
+            timeout=timeout,
+            check=check,
         )
     # Linux/macOS: 直接执行
     return subprocess.run(
-        cmd, shell=True,
-        capture_output=True, text=True, timeout=timeout, check=check,
+        cmd,
+        shell=True,
+        capture_output=True,
+        text=True,
+        timeout=timeout,
+        check=check,
     )
 
 

@@ -32,12 +32,12 @@ def _build_builtin_ops() -> set:
                     ops.update(v)
                 else:
                     ops.add(v)
-    # 三态字面量
-    for names in data.get('ternary_states', {}).values():
-        if isinstance(names, list):
-            ops.update(names)
-        else:
-            ops.add(names)
+        # 三态字面量（在同一个 data 作用域内）
+        for names in data.get('ternary_states', {}).values():
+            if isinstance(names, list):
+                ops.update(names)
+            else:
+                ops.add(names)
     return ops
 
 

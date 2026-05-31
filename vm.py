@@ -98,8 +98,8 @@ class VM:
     """
 
     # 与 C VM (csrc/runtime.c) 一致的常量
-    VAR_MAX: int = 256      # 最大变量数
-    STACK_MAX: int = 8192   # 最大栈深度
+    VAR_MAX: int = 256  # 最大变量数
+    STACK_MAX: int = 8192  # 最大栈深度
 
     def __init__(self, code: bytearray, vars_count: int = VAR_MAX, exports: dict | None = None):
         self.code = code

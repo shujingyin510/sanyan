@@ -335,7 +335,7 @@ def _unquote(s: str) -> str:
                 i += 2
             elif esc == 'u' and i + 5 < len(s):
                 try:
-                    result.append(chr(int(s[i + 2: i + 6], 16)))
+                    result.append(chr(int(s[i + 2 : i + 6], 16)))
                     i += 6
                 except ValueError:
                     result.append(s[i])

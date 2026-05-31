@@ -47,8 +47,7 @@ class TestLlvmNativeCompile(unittest.TestCase):
             libs.append('-lwinhttp')
         return libs
 
-    def _compile_and_run(self, code: str, module: str = 'test',
-                         run_timeout: int = 10) -> str:
+    def _compile_and_run(self, code: str, module: str = 'test', run_timeout: int = 10) -> str:
         """编译并运行三言代码，返回 stdout 字符串
 
         Args:
@@ -63,6 +62,7 @@ class TestLlvmNativeCompile(unittest.TestCase):
         ir_text, cg = compile_source(code, module)
 
         import tempfile
+
         with tempfile.TemporaryDirectory() as tmp:
             ir_path = os.path.join(tmp, f'{module}.ll')
             obj_path = os.path.join(tmp, f'{module}.o')
@@ -116,13 +116,10 @@ class TestLlvmNativeCompile(unittest.TestCase):
         # 单个数字/标识符解析正常，但含引号的字符串会挂起
         self.skipTest('词法分析器字符串处理 LLVM 编译后无限循环，待调试')
 
-
     def test_http_get_compiles(self):
         """验证 http读 可被编译链接"""
         try:
-            out = self._compile_and_run(
-                r'输出(http读("https://httpbin.org/get"))', run_timeout=15
-            )
+            out = self._compile_and_run(r'输出(http读("https://httpbin.org/get"))', run_timeout=15)
         except subprocess.TimeoutExpired:
             self.skipTest('httpbin.org 无响应（超时）')
         if '503 Service Temporarily Unavailable' in out:
@@ -153,9 +150,7 @@ class TestLlvmNativeCompile(unittest.TestCase):
 
     def test_json_stringify(self):
         """验证 转JSON 序列化正确（S 表达式语法）"""
-        out = self._compile_and_run(
-            r'(设 d (字典)) (置键 d "x" 42) (置键 d "y" "test") (输出 (转JSON d))'
-        )
+        out = self._compile_and_run(r'(设 d (字典)) (置键 d "x" 42) (置键 d "y" "test") (输出 (转JSON d))')
         self.assertIn('"x"', out)
         self.assertIn('42', out)
         self.assertIn('"y"', out)
@@ -196,10 +191,7 @@ class TestLlvmNativeCompile(unittest.TestCase):
     def test_rt_module_call(self):
         """验证 rt_module_call 可调用已导入模块的导出函数"""
         bin_path = os.path.join('stdlib', '_test_call_mod.bin')
-        self._make_test_bin(
-            '(设 msg "hi")(fn greet() 输出(msg))(导出 greet)',
-            bin_path
-        )
+        self._make_test_bin('(设 msg "hi")(fn greet() 输出(msg))(导出 greet)', bin_path)
         bin_esc = bin_path.replace('\\', '\\\\')
         main_src = (
             r'(fn f (_) '
@@ -216,6 +208,7 @@ class TestLlvmNativeCompile(unittest.TestCase):
         """创建一个测试 .bin 文件（直接在当前进程内编译）"""
         try:
             from compile_bytecode import compile_source as _bc_compile
+
             _bc_compile(src, bin_path)
             if not os.path.exists(bin_path):
                 raise Exception(f'.bin 文件未生成: {bin_path}')

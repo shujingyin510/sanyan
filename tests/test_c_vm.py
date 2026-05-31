@@ -40,7 +40,9 @@ def _compile_and_run() -> tuple[bool, str]:
 
         result = subprocess.run(
             [exe_path],
-            capture_output=True, text=True, timeout=30,
+            capture_output=True,
+            text=True,
+            timeout=30,
         )
         return result.returncode == 0, result.stdout + result.stderr
 
@@ -69,7 +71,9 @@ def _run_cvm(bin_path: str) -> str | None:
         return None
     result = subprocess.run(
         [cvm_exe, bin_path, '--run'],
-        capture_output=True, text=True, timeout=10,
+        capture_output=True,
+        text=True,
+        timeout=10,
     )
     if result.returncode != 0:
         return None
@@ -117,6 +121,7 @@ class TestCVMCrossValidation(unittest.TestCase):
 
             # Python VM
             import io
+
             old_stdout = sys.stdout
             sys.stdout = io.StringIO()
             VM.from_bin(bin_path)
@@ -153,34 +158,22 @@ class TestCVMCrossValidation(unittest.TestCase):
         self._compile_and_compare('(做 (设 x 42) (输出 x))', '42')
 
     def test_if_true(self):
-        self._compile_and_compare(
-            '(若 (大于 5 3) (输出 1) (输出 -1))', '1'
-        )
+        self._compile_and_compare('(若 (大于 5 3) (输出 1) (输出 -1))', '1')
 
     def test_if_false(self):
-        self._compile_and_compare(
-            '(若 (小于 5 3) (输出 1) (输出 -1))', '-1'
-        )
+        self._compile_and_compare('(若 (小于 5 3) (输出 1) (输出 -1))', '-1')
 
     def test_loop(self):
-        self._compile_and_compare(
-            '(做 (设 x 0) (循环 (小于 x 3) (做 (设 x (加 x 1)))) (输出 x))', '3'
-        )
+        self._compile_and_compare('(做 (设 x 0) (循环 (小于 x 3) (做 (设 x (加 x 1)))) (输出 x))', '3')
 
     def test_function(self):
-        self._compile_and_compare(
-            '(做 (定义 两倍 (n) (乘 n 2)) (输出 (两倍 21)))', '42'
-        )
+        self._compile_and_compare('(做 (定义 两倍 (n) (乘 n 2)) (输出 (两倍 21)))', '42')
 
     def test_dict(self):
-        self._compile_and_compare(
-            '(做 (设 d (字典 "a" 1 "b" 2)) (输出 (取键 d "b")))', '2'
-        )
+        self._compile_and_compare('(做 (设 d (字典 "a" 1 "b" 2)) (输出 (取键 d "b")))', '2')
 
     def test_list(self):
-        self._compile_and_compare(
-            '(做 (设 lst (列表 10 20 30)) (输出 (取 lst 1)))', '20'
-        )
+        self._compile_and_compare('(做 (设 lst (列表 10 20 30)) (输出 (取 lst 1)))', '20')
 
 
 if __name__ == '__main__':
