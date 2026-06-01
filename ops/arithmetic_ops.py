@@ -1,4 +1,7 @@
-"""算术操作：纯三进制加减乘除余幂取位"""
+"""算术操作：纯三进制加减乘除余幂取位
+
+每个操作独立注册，消除 if/elif 二次分发。
+"""
 
 from ternary_core import BT, TernaryALU, TritValue
 from ternary_core import _int_at_precision, ternary_log, ternary_exp
@@ -69,167 +72,181 @@ def _ternary_pow_int(base_trits, exp_int):
     return result
 
 
-class ArithmeticOps:
-    @staticmethod
-    def arithmetic(evaluator, op, args):
-        if op == 'add':
-            vals = [_to_tritvalue(evaluator.eval(arg)) for arg in args]
-            if all(isinstance(v, TritValue) for v in vals):
-                trits_list = [v.value for v in vals]
-                precs_list = [v.precision for v in vals]
-                aligned, prec = _align_trits(trits_list, precs_list)
-                result = _fold_ternary('add', aligned)
-                return TritValue(result, prec)
-            parts = []
-            for val in vals:
-                if isinstance(val, TritValue):
-                    parts.append(str(val.to_float() if val.is_float() else val.to_int()))
-                else:
-                    parts.append(str(val))
-            return ''.join(parts)
-
-        elif op == 'sub':
-            if len(args) < 2:
-                raise SanyanSyntaxError('减 需要至少两个参数')
-            vals = [_to_tritvalue(evaluator.eval(arg)) for arg in args]
-            if not all(isinstance(v, TritValue) for v in vals):
-                raise SanyanTypeError('减 的参数必须为数字')
-            trits_list = [v.value for v in vals]
-            precs_list = [v.precision for v in vals]
-            aligned, prec = _align_trits(trits_list, precs_list)
-            result = _fold_ternary('sub', aligned)
-            return TritValue(result, prec)
-
-        elif op == 'mul':
-            vals = [_to_tritvalue(evaluator.eval(arg)) for arg in args]
-            if not all(isinstance(v, TritValue) for v in vals):
-                raise SanyanTypeError('乘 的参数必须为数字')
-            trits_list = [v.value for v in vals]
-            precs_list = [v.precision for v in vals]
-            aligned, prec = _align_trits(trits_list, precs_list)
-            if prec == 0:
-                result = _fold_ternary('mul', aligned)
-                return TritValue(result, 0)
-            result = aligned[0]
-            for t in aligned[1:]:
-                result = TernaryALU.fixed_mul(result, t, prec)
-            return TritValue(result, prec)
-
-        elif op == 'div':
-            if len(args) != 2:
-                raise SanyanSyntaxError('除 需要两个参数')
-            a = _to_tritvalue(evaluator.eval(args[0]))
-            b = _to_tritvalue(evaluator.eval(args[1]))
-            if not isinstance(a, TritValue) or not isinstance(b, TritValue):
-                raise SanyanTypeError('除 的参数必须为数字')
-            a_trits, b_trits = a.value, b.value
-            if TernaryALU.is_zero(b_trits):
-                raise SanyanValueError('除数不能为零')
-            a_prec, b_prec = a.precision, b.precision
-            if a_prec == 0 and b_prec == 0:
-                result = TernaryALU.div(a_trits, b_trits, _DEFAULT_PRECISION)
-                val = BT.to_int(result)
-                scale = 3**_DEFAULT_PRECISION
-                if val % scale == 0:
-                    return TritValue(val // scale)
-                return TritValue(result, _DEFAULT_PRECISION)
-            prec = max(a_prec, b_prec)
-            if a_prec != b_prec:
-                aligned, _ = _align_trits([a_trits, b_trits], [a_prec, b_prec])
-                a_trits, b_trits = aligned
-            result = TernaryALU.fixed_div(a_trits, b_trits, prec)
-            val = BT.to_int(result)
-            scale = 3**prec
-            if val % scale == 0:
-                return TritValue(val // scale)
-            return TritValue(result, prec)
-
-        elif op == 'mod':
-            if len(args) != 2:
-                raise SanyanSyntaxError('余 需要两个参数')
-            a = _to_tritvalue(evaluator.eval(args[0]))
-            b = _to_tritvalue(evaluator.eval(args[1]))
-            if not isinstance(a, TritValue) or not isinstance(b, TritValue):
-                raise SanyanTypeError('余 的参数必须为数字')
-            a_trits, b_trits = a.value, b.value
-            if TernaryALU.is_zero(b_trits):
-                raise SanyanValueError('除数不能为零')
-            a_prec, b_prec = a.precision, b.precision
-            if a_prec != b_prec:
-                aligned, _ = _align_trits([a_trits, b_trits], [a_prec, b_prec])
-                a_trits, b_trits = aligned
-                prec = max(a_prec, b_prec)
-            else:
-                prec = a_prec
-            a_int = BT.to_int(a_trits)
-            b_int = BT.to_int(b_trits)
-            q = a_int // b_int
-            q_trits = BT.from_int(q)
-            remainder = TernaryALU.sub(a_trits, TernaryALU.multiply(q_trits, b_trits))
-            r_int = BT.to_int(remainder)
-            if prec > 0:
-                return TritValue(BT.from_int(r_int), prec)
-            return TritValue(r_int)
-
-        elif op == 'pow':
-            if len(args) != 2:
-                raise SanyanSyntaxError('幂 需要两个参数')
-            a = evaluator.eval(args[0])
-            b = evaluator.eval(args[1])
-            if not isinstance(a, TritValue) or not isinstance(b, TritValue):
-                raise SanyanTypeError('幂 的参数必须为数字')
-            a_trits, b_trits = a.value, b.value
-            a_prec, b_prec = a.precision, b.precision
-
-            if b_prec == 0:
-                exp = BT.to_int(b_trits)
-                if exp < 0:
-                    raise SanyanValueError('幂指数暂不支持负数')
-                if a_prec == 0:
-                    result = _ternary_pow_int(a_trits, exp)
-                    return TritValue(BT.to_int(result))
-                prec = a_prec
-                result = _ternary_pow_int(a_trits, exp)
-                val = BT.to_int(result)
-                scale = 3**prec
-                if val % scale == 0:
-                    return TritValue(val // scale)
-                return TritValue(result, prec)
-
-            prec = max(a_prec, b_prec)
-            if a_prec != b_prec:
-                aligned, _ = _align_trits([a_trits, b_trits], [a_prec, b_prec])
-                a_trits, b_trits = aligned
-            if BT.to_int(a_trits) <= 0:
-                raise SanyanValueError('浮点幂的底数必须为正数')
-            ln_a = ternary_log(a_trits, prec)
-            prod = TernaryALU.fixed_mul(b_trits, ln_a, prec)
-            result = ternary_exp(prod, prec)
-            val = BT.to_int(result)
-            scale = 3**prec
-            if val % scale == 0:
-                return TritValue(val // scale)
-            return TritValue(result, prec)
-
-        elif op == 'digit':
-            if len(args) != 2:
-                raise SanyanSyntaxError('取位 需要数字和位置')
-            num = evaluator.eval(args[0])
-            pos = evaluator.eval(args[1])
-            if not isinstance(num, TritValue) or not isinstance(pos, TritValue):
-                raise SanyanTypeError('取位 的参数必须为数字')
-            num_int = BT.to_int(num.value)
-            pos_int = BT.to_int(pos.value)
-            digit = (abs(num_int) // (10**pos_int)) % 10
-            return TritValue(digit)
-
-        raise SanyanValueError(f'未知的算术操作: {op}')
+# ═══════════════════════════════════════════════════════════
+# 独立操作函数：消除 arithmetic() 中的 if/elif 二次分发
+# ═══════════════════════════════════════════════════════════
 
 
-register('add', ArithmeticOps.arithmetic, 'add')
-register('sub', ArithmeticOps.arithmetic, 'sub')
-register('mul', ArithmeticOps.arithmetic, 'mul')
-register('div', ArithmeticOps.arithmetic, 'div')
-register('mod', ArithmeticOps.arithmetic, 'mod')
-register('pow', ArithmeticOps.arithmetic, 'pow')
-register('digit', ArithmeticOps.arithmetic, 'digit')
+def _op_add(evaluator, args):
+    """加法：支持数字加法和字符串连接。"""
+    vals = [_to_tritvalue(evaluator.eval(arg)) for arg in args]
+    if all(isinstance(v, TritValue) for v in vals):
+        trits_list = [v.value for v in vals]
+        precs_list = [v.precision for v in vals]
+        aligned, prec = _align_trits(trits_list, precs_list)
+        result = _fold_ternary('add', aligned)
+        return TritValue(result, prec)
+    parts = []
+    for val in vals:
+        if isinstance(val, TritValue):
+            parts.append(str(val.to_float() if val.is_float() else val.to_int()))
+        else:
+            parts.append(str(val))
+    return ''.join(parts)
+
+
+def _op_sub(evaluator, args):
+    """减法：至少两个参数。"""
+    if len(args) < 2:
+        raise SanyanSyntaxError('减 需要至少两个参数')
+    vals = [_to_tritvalue(evaluator.eval(arg)) for arg in args]
+    if not all(isinstance(v, TritValue) for v in vals):
+        raise SanyanTypeError('减 的参数必须为数字')
+    trits_list = [v.value for v in vals]
+    precs_list = [v.precision for v in vals]
+    aligned, prec = _align_trits(trits_list, precs_list)
+    result = _fold_ternary('sub', aligned)
+    return TritValue(result, prec)
+
+
+def _op_mul(evaluator, args):
+    """乘法：支持整数和定点乘法。"""
+    vals = [_to_tritvalue(evaluator.eval(arg)) for arg in args]
+    if not all(isinstance(v, TritValue) for v in vals):
+        raise SanyanTypeError('乘 的参数必须为数字')
+    trits_list = [v.value for v in vals]
+    precs_list = [v.precision for v in vals]
+    aligned, prec = _align_trits(trits_list, precs_list)
+    if prec == 0:
+        result = _fold_ternary('mul', aligned)
+        return TritValue(result, 0)
+    result = aligned[0]
+    for t in aligned[1:]:
+        result = TernaryALU.fixed_mul(result, t, prec)
+    return TritValue(result, prec)
+
+
+def _op_div(evaluator, args):
+    """除法：两个参数，除数不能为零。"""
+    if len(args) != 2:
+        raise SanyanSyntaxError('除 需要两个参数')
+    a = _to_tritvalue(evaluator.eval(args[0]))
+    b = _to_tritvalue(evaluator.eval(args[1]))
+    if not isinstance(a, TritValue) or not isinstance(b, TritValue):
+        raise SanyanTypeError('除 的参数必须为数字')
+    a_trits, b_trits = a.value, b.value
+    if TernaryALU.is_zero(b_trits):
+        raise SanyanValueError('除数不能为零')
+    a_prec, b_prec = a.precision, b.precision
+    if a_prec == 0 and b_prec == 0:
+        result = TernaryALU.div(a_trits, b_trits, _DEFAULT_PRECISION)
+        val = BT.to_int(result)
+        scale = 3**_DEFAULT_PRECISION
+        if val % scale == 0:
+            return TritValue(val // scale)
+        return TritValue(result, _DEFAULT_PRECISION)
+    prec = max(a_prec, b_prec)
+    if a_prec != b_prec:
+        aligned, _ = _align_trits([a_trits, b_trits], [a_prec, b_prec])
+        a_trits, b_trits = aligned
+    result = TernaryALU.fixed_div(a_trits, b_trits, prec)
+    val = BT.to_int(result)
+    scale = 3**prec
+    if val % scale == 0:
+        return TritValue(val // scale)
+    return TritValue(result, prec)
+
+
+def _op_mod(evaluator, args):
+    """取余：两个参数，除数不能为零。"""
+    if len(args) != 2:
+        raise SanyanSyntaxError('余 需要两个参数')
+    a = _to_tritvalue(evaluator.eval(args[0]))
+    b = _to_tritvalue(evaluator.eval(args[1]))
+    if not isinstance(a, TritValue) or not isinstance(b, TritValue):
+        raise SanyanTypeError('余 的参数必须为数字')
+    a_trits, b_trits = a.value, b.value
+    if TernaryALU.is_zero(b_trits):
+        raise SanyanValueError('除数不能为零')
+    a_prec, b_prec = a.precision, b.precision
+    if a_prec != b_prec:
+        aligned, _ = _align_trits([a_trits, b_trits], [a_prec, b_prec])
+        a_trits, b_trits = aligned
+        prec = max(a_prec, b_prec)
+    else:
+        prec = a_prec
+    a_int = BT.to_int(a_trits)
+    b_int = BT.to_int(b_trits)
+    q = a_int // b_int
+    q_trits = BT.from_int(q)
+    remainder = TernaryALU.sub(a_trits, TernaryALU.multiply(q_trits, b_trits))
+    r_int = BT.to_int(remainder)
+    if prec > 0:
+        return TritValue(BT.from_int(r_int), prec)
+    return TritValue(r_int)
+
+
+def _op_pow(evaluator, args):
+    """幂运算：两个参数，指数暂不支持负数。"""
+    if len(args) != 2:
+        raise SanyanSyntaxError('幂 需要两个参数')
+    a = evaluator.eval(args[0])
+    b = evaluator.eval(args[1])
+    if not isinstance(a, TritValue) or not isinstance(b, TritValue):
+        raise SanyanTypeError('幂 的参数必须为数字')
+    a_trits, b_trits = a.value, b.value
+    a_prec, b_prec = a.precision, b.precision
+
+    if b_prec == 0:
+        exp = BT.to_int(b_trits)
+        if exp < 0:
+            raise SanyanValueError('幂指数暂不支持负数')
+        if a_prec == 0:
+            result = _ternary_pow_int(a_trits, exp)
+            return TritValue(BT.to_int(result))
+        prec = a_prec
+        result = _ternary_pow_int(a_trits, exp)
+        val = BT.to_int(result)
+        scale = 3**prec
+        if val % scale == 0:
+            return TritValue(val // scale)
+        return TritValue(result, prec)
+
+    prec = max(a_prec, b_prec)
+    if a_prec != b_prec:
+        aligned, _ = _align_trits([a_trits, b_trits], [a_prec, b_prec])
+        a_trits, b_trits = aligned
+    if BT.to_int(a_trits) <= 0:
+        raise SanyanValueError('浮点幂的底数必须为正数')
+    ln_a = ternary_log(a_trits, prec)
+    prod = TernaryALU.fixed_mul(b_trits, ln_a, prec)
+    result = ternary_exp(prod, prec)
+    val = BT.to_int(result)
+    scale = 3**prec
+    if val % scale == 0:
+        return TritValue(val // scale)
+    return TritValue(result, prec)
+
+
+def _op_digit(evaluator, args):
+    """取位：数字和位置。"""
+    if len(args) != 2:
+        raise SanyanSyntaxError('取位 需要数字和位置')
+    num = evaluator.eval(args[0])
+    pos = evaluator.eval(args[1])
+    if not isinstance(num, TritValue) or not isinstance(pos, TritValue):
+        raise SanyanTypeError('取位 的参数必须为数字')
+    num_int = BT.to_int(num.value)
+    pos_int = BT.to_int(pos.value)
+    digit = (abs(num_int) // (10**pos_int)) % 10
+    return TritValue(digit)
+
+
+# ── 注册：每个操作独立函数 ──
+register('add', _op_add)
+register('sub', _op_sub)
+register('mul', _op_mul)
+register('div', _op_div)
+register('mod', _op_mod)
+register('pow', _op_pow)
+register('digit', _op_digit)

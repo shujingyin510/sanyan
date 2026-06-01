@@ -1,8 +1,14 @@
-"""预处理：统一处理 #include 指令展开"""
+"""预处理：统一处理 #include 指令展开
+
+文件缓存：相同路径的 #include 不重复读取磁盘。
+"""
 
 import os
 from typing import Optional
 from values import SanyanValueError
+
+# 文件内容缓存：abspath → content，避免重复磁盘读取
+_include_cache: dict[str, str] = {}
 
 
 def _resolve_include_path(raw_path: str, base_dir: Optional[str] = None) -> str:
@@ -35,6 +41,11 @@ def _resolve_include_path(raw_path: str, base_dir: Optional[str] = None) -> str:
 def _safe_include_path(raw_path: str) -> None:
     """验证 #include 路径安全（兼容旧接口）。"""
     _resolve_include_path(raw_path)
+
+
+def clear_cache() -> None:
+    """清空 #include 文件缓存（热重载或测试用）。"""
+    _include_cache.clear()
 
 
 def preprocess_includes(
@@ -74,12 +85,16 @@ def preprocess_includes(
                 if abspath in _seen:
                     raise SanyanValueError(f'检测到循环 #include: {path}')
                 if os.path.exists(abspath):
-                    try:
-                        with open(abspath, 'r', encoding='utf-8') as f:
-                            included = f.read()
-                    except (IOError, OSError):
-                        processed.append(f'／／ #include {path} (文件读取失败，已跳过)')
-                        continue
+                    if abspath in _include_cache:
+                        included = _include_cache[abspath]
+                    else:
+                        try:
+                            with open(abspath, 'r', encoding='utf-8') as f:
+                                included = f.read()
+                        except (IOError, OSError):
+                            processed.append(f'／／ #include {path} (文件读取失败，已跳过)')
+                            continue
+                        _include_cache[abspath] = included
                     if add_comment:
                         processed.append(f'／／ #include {path}')
                     _seen.add(abspath)

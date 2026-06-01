@@ -194,24 +194,17 @@ class SanyanRuntime:
 
     # ── 工具方法 ──
     def _parse_pairs(self, items: List[str]) -> List[Tuple[str, str]]:
+        """解析批量设置项，格式统一为 "对象.属性"。
+
+        旧版本支持三种格式（a.b / 交替 . / 分隔 ;），现已精简为
+        只支持 a.b 格式，降低复杂度和维护成本。
+        """
         pairs: List[Tuple[str, str]] = []
-        if all(isinstance(x, str) and '.' in x for x in items):
-            for item in items:
-                obj, val = item.split('.')
-                pairs.append((obj, val))
-            return pairs
-        i = 0
-        while i < len(items):
-            if not isinstance(items[i], str):
-                raise SanyanSyntaxError(f'批量设置中发现了非字符串: {items[i]}')
-            obj = items[i]
-            if '.' in obj:
-                obj, val = obj.split('.')
-                i += 1
-            elif i + 2 < len(items) and items[i + 1] == '.':
-                val = items[i + 2]
-                i += 3
-            else:
-                raise SanyanSyntaxError(f'无法解析的批量设置项: 从 {items[i]} 开始')
+        for item in items:
+            if not isinstance(item, str):
+                raise SanyanSyntaxError(f'批量设置中发现了非字符串: {item}')
+            if '.' not in item:
+                raise SanyanSyntaxError(f'无法解析的批量设置项: {item}（需格式: 对象.属性）')
+            obj, val = item.split('.', 1)
             pairs.append((obj, val))
         return pairs
