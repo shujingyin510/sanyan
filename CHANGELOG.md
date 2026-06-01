@@ -2,6 +2,55 @@
 
 ---
 
+## [v3.23.0] — 2026-06
+
+### 新增
+- **三态系统完整闭环**: 值+信度+来源+时间戳 四元组（`ternary_core.py`）
+- **52 个三态 API**: 构造/传播/判定/冲突/融合/衰减/序列化/容器/调试/数学/逻辑/分布/校准/信念
+- **信念系统**: `信念(命题,信度,来源,时间)` 结构化记忆单元（`ops/type_ops.py`）
+- **VM 三态支持**: `vm.py` 算术/比较/逻辑 ops 自动传播 TritValue 置信度（`vm.py`）
+- **C VM 三态支持**: `OBJ_TRIT` 堆类型，紧凑 12 字节存储（`csrc/runtime_common.h`, `csrc/runtime.c`）
+- **LLVM 三态支持**: `rt_trit_*` 辅助函数系列（`llvmgen/runtime.c`）
+- **主观逻辑共识融合**: `共识(a,b)` 信念三元组融合算子（`ops/type_ops.py`）
+- **贝叶斯更新**: `贝叶斯更新(先验,证据)` P(H|E) 更新（`ops/type_ops.py`）
+- **三态容器**: `三态列/三态字典` 每元素独立信度（`ops/ternary_container_ops.py`）
+- **时间衰减**: `衰减()` 自动用 `_timestamp` 算 Δt（`ops/ternary_time_ops.py`）
+- **量化编码**: `量化/反量化` 1 字节存值+信度（`ops/type_ops.py`）
+- **三态压缩**: `三态压缩/解压` 3 trit = 1 byte（`ops/type_ops.py`）
+- **冲突模型**: `检测冲突` `冲突合并` `判定` `断言信度`（`ops/type_ops.py`）
+- **调试工具**: `追踪` `解释` `来源` 信度推导链（`ops/io_ops.py`）
+- **模糊测试**: `tests/test_fuzzing.py` 括号/字符串/随机验证（`tests/test_fuzzing.py`）
+
+### 变更
+- **parser.py 重写**: 支持行号/列号追踪、索引遍历（`parser.py`）
+- **sugar/parser.py 重构**: if-elif 链 → 字典调度（`sugar/parser.py`）
+- **main.py 拆分**: 175 行 → 4 辅助函数（`main.py`）
+- **TritValue 扩展**: `_val_type`/`_payload`/`_source`/`_timestamp` 多类型承载（`ternary_core.py`）
+- **数学函数传播**: sqrt/sin/cos/tan/log/log10 自动信度传播（`ops/math_funcs_ops.py`）
+- **信度守恒定律重构**: 且=min, 或=max, 非=keep（`ops/logic_ops.py`）
+
+### 修复
+- **闭包支持**: `eval_str` 返回 FunctionValue 捕获作用域（`eval_helpers.py`）
+- **lambda 关键字**: 仅后跟 `(` 时激活（`sugar/parser.py`）
+- **C VM 测试卡死**: sugar parser 缓存保留 + VM 最大步数（`ops/file_ops.py`, `vm.py`）
+- **Agent 启动器**: register_alias 移到 init 后（`run_*.py`）
+- **agent.san 缺失括号**: `加载记忆` 函数补 `}`（`agent.san`）
+- **try discard `_`**: 不存入作用域（`ops/control_ops.py`）
+- **tokenizer 错误报告**: 未知字符 → ERROR token（`sugar/tokenizer.py`）
+- **好感度规则**: Agent 强制执行好感门槛（`agent.san`）
+- **热重载**: decision.san 纳入监听（`run_agent.py`）
+- **llvmgen/runtime.c**: 编译错误修复（struct rt_list_s/rt_list_push_item/rt_str_join）
+
+### 文档
+- `docs/ternary-confidence.md` — 三层设计规范（离散/连续/复合）
+- `docs/ternary-truth-table.md` — Kleene+Bayesian 扩展真值表
+- `docs/roadmap.md` — 10 大类扩展路线图
+- `docs/migration.md` — v3.22 迁移指南
+- `sanyan-vscode/` — VS Code 语法高亮修复（`\b` → `(?<!\w)`）
+- AGENTS.md/CONTRIBUTING.md — 覆盖率配置 + 测试数量更新
+
+---
+
 ## [v3.22.0] — 2026-06-01
 
 ### 新增

@@ -75,6 +75,27 @@ VM 关键修复：
 - 字节码格式升级：代码大小从 16 位改为 32 位（支持 >64KB 字节码）
 - `DICT`/`LIST_NEW` 空栈安全处理（`新字典`/`新列表` 无参数时不 pop）
 
+## 三态系统状态（2026-06）
+
+**完整闭环已达成。** TritValue 统一承载数值/字符串/列表/字典 + 置信度(0-1) + 来源链 + 时间戳。
+
+| 层 | 状态 | 关键实现 |
+|----|------|----------|
+| Python 求值器 | ✅ | 52 API（构造/传播/判定/冲突/融合/衰减/序列化/容器/信念）|
+| 字节码 VM | ✅ | 算术/比较/逻辑/输出 自动传播信度 |
+| C VM | ✅ | OBJ_TRIT 堆类型 + 紧凑编码 |
+| LLVM 运行时 | ✅ | rt_trit_* 辅助函数系列 |
+
+**核心文件：**
+- `ternary_core.py` — TritValue 多类型承载力
+- `ops/type_ops.py` — 45 个三态操作
+- `ops/ternary_time_ops.py` — 衰减/序列化
+- `ops/ternary_container_ops.py` — 三态列/字典
+- `ops/ternary_math_ops.py` — 分布/熵/校准
+- `docs/ternary-confidence.md` — 三层设计规范
+- `docs/ternary-truth-table.md` — Kleene+Bayesian 真值表
+- `docs/roadmap.md` — 扩展路线图
+
 编译器关键修复：
 - `(等于 (ord (子串 n 0 1)) 34)` 替代 `(str_equals ... "\"")`（tokenizer 不认 `\"` 转义）
 - `(set op "set")` 对非列表节点
@@ -220,7 +241,7 @@ python -X utf8 tests/test_agent.py -v     # Agent 测试 29 项
 python -X utf8 tests/run_all.py           # 集成测试 46 项
 
 全部通过才算成功：
-- test_core.py 78/78（含闭包+import as 测试）
+- test_core.py 100/100（含闭包+三态测试）
 - test_commands.py 18/18
 - test_parser.py 28/28
 - test_ops.py 92/92
