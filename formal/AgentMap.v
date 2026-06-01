@@ -1,4 +1,6 @@
-(* Agent 5→3 认知态映射 — 独立模块，不依赖 Trit *)
+(* Agent 5→3 认知态映射 *)
+
+Require Import Arith.
 
 Inductive CognitiveState : Set :=
   | AFFIRM | NEGATE | UNCERT | CONFLICTED | UNKNOWN.
@@ -29,9 +31,14 @@ Proof. auto. Qed.
 (* 低置信度触发门控 *)
 Theorem low_confidence_gates : forall c : nat,
   c < gating_threshold -> should_defer_to_human c = true.
-Proof. intros. unfold should_defer_to_human. apply Nat.ltb_lt. assumption. Qed.
+Proof.
+  unfold should_defer_to_human, gating_threshold. simpl.
+  intros c H. now apply Nat.ltb_lt.
+Qed.
 
-(* 高置信度通过门控 *)
 Theorem high_confidence_passes : forall c : nat,
   c >= gating_threshold -> should_defer_to_human c = false.
-Proof. intros. unfold should_defer_to_human. apply Nat.ltb_ge. assumption. Qed.
+Proof.
+  unfold should_defer_to_human, gating_threshold. simpl.
+  intros c H. now apply Nat.ltb_ge.
+Qed.
