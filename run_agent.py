@@ -103,11 +103,12 @@ def run_once(evaluator, question):
 
 
 def _watch_files():
-    """返回当前策略文件的修改时间戳字典。"""
+    """返回当前所有 Agent 文件的修改时间戳字典。"""
     agent_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'ternary_agent')
     return {
         'agent.san': os.path.getmtime(os.path.join(agent_dir, 'agent.san')),
         'agent_policy.san': os.path.getmtime(os.path.join(agent_dir, 'agent_policy.san')),
+        'decision.san': os.path.getmtime(os.path.join(agent_dir, 'decision.san')),
     }
 
 
