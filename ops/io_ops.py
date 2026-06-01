@@ -189,9 +189,50 @@ class IOOps:
         time.sleep(ms / 1000.0)
         return TritValue(0)
 
+    @staticmethod
+    def trace_op(evaluator, args):
+        """追踪(表达式) — 执行并打印每一步的置信度变化路径。
+        适用于单表达式调试。"""
+        if len(args) == 0:
+            return TritValue(0)
+        print('═══ 置信度追踪 ═══')
+        for i, a in enumerate(args):
+            val = evaluator.eval(a)
+            if isinstance(val, TritValue) and val.confidence < 1.0:
+                src = f' [{val._source}]' if val._source else ''
+                print(f'  步骤{i+1}: {val.to_int()} (信度: {val.confidence:.3f}{src})')
+            else:
+                print(f'  步骤{i+1}: {val}')
+        print('═════════════════')
+        return TritValue(0)
+
+    @staticmethod
+    def explain_op(evaluator, args):
+        """解释(表达式) — 展示并执行，显示最终值的来源和置信度推导。"""
+        if len(args) == 0:
+            return TritValue(0)
+        result = None
+        for a in args:
+            result = evaluator.eval(a)
+        print('─── 置信度解释 ───')
+        if isinstance(result, TritValue):
+            print(f'  值: {result.to_int() if result.is_numeric() else result.to_payload()}')
+            print(f'  置信度: {result.confidence:.3f}')
+            if result._source:
+                print(f'  来源: {result._source}')
+            print(f'  类型: {"字符串" if result.is_string() else "数值"}')
+            if result.confidence < 0.5:
+                print(f'  ⚠ 低信度 — 建议判定()处理')
+        else:
+            print(f'  值: {result}')
+        print('──────────────────')
+        return result if result is not None else TritValue(0)
+
 
 # 注册 IO 操作
 register('print', IOOps.output)
 register('input', IOOps.input_op)
 register('debug', IOOps.debug_op)
 register('wait', IOOps.wait_op)
+register('trace', IOOps.trace_op)
+register('explain', IOOps.explain_op)
