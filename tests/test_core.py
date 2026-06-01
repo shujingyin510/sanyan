@@ -791,6 +791,45 @@ class TestTernaryDeep(unittest.TestCase):
         self.assertEqual(d.to_int(), 1)
         self.assertAlmostEqual(d.confidence, 0.9, places=1)
 
+    def test_trit_dist(self):
+        """三态分布: 完整概率三元组"""
+        from evaluator import SanyanEvaluator
+
+        e = SanyanEvaluator()
+        r = e.eval(['trit_dist', 0.8, 0.1, 0.1])
+        self.assertEqual(r.to_int(), 1)
+
+    def test_entropy(self):
+        """熵: 完全确定→0, 完全不确定→1"""
+        from evaluator import SanyanEvaluator
+
+        e = SanyanEvaluator()
+        v1 = e.eval(['ternary_value', 1, 1.0])
+        h1 = e.eval(['entropy', v1])
+        self.assertAlmostEqual(h1.to_float(), 0.0, places=1)
+
+        v2 = e.eval(['ternary_value', 1, 0.5])
+        h2 = e.eval(['entropy', v2])
+        self.assertAlmostEqual(h2.to_float(), 1.0, places=1)
+
+    def test_observe_correct(self):
+        """观察: 预测正确→信度上升"""
+        from evaluator import SanyanEvaluator
+
+        e = SanyanEvaluator()
+        pred = e.eval(['ternary_value', 1, 0.8])
+        r = e.eval(['observe', pred, e.eval(['ternary_value', 1])])
+        self.assertGreater(r.confidence, 0.8)
+
+    def test_observe_wrong(self):
+        """观察: 预测错误→信度下降"""
+        from evaluator import SanyanEvaluator
+
+        e = SanyanEvaluator()
+        pred = e.eval(['ternary_value', 1, 0.8])
+        r = e.eval(['observe', pred, e.eval(['ternary_value', -1])])
+        self.assertLess(r.confidence, 0.8)
+
 
 if __name__ == '__main__':
     unittest.main()
