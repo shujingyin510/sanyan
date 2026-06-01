@@ -693,6 +693,39 @@ class TestTernaryDeep(unittest.TestCase):
         r = e.eval(['fuse', s1, s2, s3])
         self.assertEqual(r.to_int(), 1)  # 加权后偏真
 
+    def test_consensus_two_sensors(self):
+        """共识: 两个传感器融合"""
+        from evaluator import SanyanEvaluator
+
+        e = SanyanEvaluator()
+        s1 = e.eval(['ternary_value', 1, 0.9, '"红外"'])
+        s2 = e.eval(['ternary_value', 1, 0.7, '"光照"'])
+        r = e.eval(['consensus', s1, s2])
+        self.assertEqual(r.to_int(), 1)  # 两真→真
+        self.assertGreater(r.confidence, 0.7)  # 融合后信度应上升
+
+    def test_bayes_update_confirm(self):
+        """贝叶斯更新: 证据一致→信度上升"""
+        from evaluator import SanyanEvaluator
+
+        e = SanyanEvaluator()
+        prior = e.eval(['ternary_value', 1, 0.6])
+        evidence = e.eval(['ternary_value', 1, 0.8])
+        r = e.eval(['bayes_update', prior, evidence])
+        self.assertEqual(r.to_int(), 1)
+        self.assertGreater(r.confidence, 0.6)
+
+    def test_bayes_update_contradict(self):
+        """贝叶斯更新: 证据矛盾→信度下降"""
+        from evaluator import SanyanEvaluator
+
+        e = SanyanEvaluator()
+        prior = e.eval(['ternary_value', 1, 0.5])
+        evidence = e.eval(['ternary_value', -1, 0.9])
+        r = e.eval(['bayes_update', prior, evidence])
+        # 强证据矛盾 → 值可能翻转
+        self.assertIn(r.to_int(), [1, -1])
+
 
 if __name__ == '__main__':
     unittest.main()

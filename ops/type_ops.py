@@ -302,5 +302,102 @@ def _fuse(evaluator, args):
     return TritValue(result, confidence=fused_c, source=merged_src)
 
 register('fuse', _fuse)
+
+
+def _consensus_op(evaluator, args):
+    """共识(a, b) — 主观逻辑共识融合算子。
+    将 TritValue 映射为信念三元组 (b,d,u):
+      v=真: b=c, d=0, u=1-c
+      v=假: b=0, d=c, u=1-c
+      v=可能: b=0, d=0, u=1
+    融合公式: bC = (bA*uB + bB*uA) / (uA + uB - uA*uB)
+    返回融合后的 TritValue with 融合信度。
+    
+    适用场景: 两个独立的传感器/Agent 对同一命题给出意见时融合。"""
+    if len(args) < 2:
+        raise SanyanSyntaxError('共识 需要至少两个三态值')
+    vals = [evaluator.eval(a) for a in args]
+
+    def _to_opinion(v):
+        if not isinstance(v, TritValue):
+            c = 1.0
+            iv = int(v) if isinstance(v, (int, float)) else 0
+        else:
+            c = v.confidence
+            iv = v.to_int() if v.is_numeric() else 0
+        if iv == 1:
+            return (c, 0.0, 1.0 - c)  # b, d, u
+        elif iv == -1:
+            return (0.0, c, 1.0 - c)
+        else:
+            return (0.0, 0.0, 1.0)
+
+    b_total, d_total, u_total = _to_opinion(vals[0])
+    for v in vals[1:]:
+        b2, d2, u2 = _to_opinion(v)
+        denom = u_total + u2 - u_total * u2
+        if denom < 1e-10:
+            b_total = (b_total + b2) / 2
+            d_total = (d_total + d2) / 2
+            u_total = 1.0 - b_total - d_total
+        else:
+            b_total = (b_total * u2 + b2 * u_total) / denom
+            d_total = (d_total * u2 + d2 * u_total) / denom
+            u_total = max(0.0, 1.0 - b_total - d_total)
+
+    # 信念三元组 → TritValue
+    if b_total > d_total and b_total > 0.1:
+        result_val, result_c = 1, b_total
+    elif d_total > b_total and d_total > 0.1:
+        result_val, result_c = -1, d_total
+    else:
+        result_val, result_c = 0, u_total
+    return TritValue(result_val, confidence=min(1.0, result_c / max(0.01, b_total + d_total + u_total)),
+                     source='主观逻辑共识')
+
+register('consensus', _consensus_op)
+
+
+def _bayes_update(evaluator, args):
+    """贝叶斯更新(先验, 证据) — P(H|E) = P(E|H) × P(H) / P(E)。
+    先验: 当前信念 (TritValue)
+    证据: 新观测 (TritValue)
+    返回更新后的 TritValue。
+    
+    如果证据与先验一致: 信度上升。
+    如果证据与先验矛盾: 信度下降，值可能翻转。"""
+    if len(args) != 2:
+        raise SanyanSyntaxError('贝叶斯更新 需要两个参数: 先验值, 证据值')
+    prior = evaluator.eval(args[0])
+    evidence = evaluator.eval(args[1])
+
+    if not isinstance(prior, TritValue):
+        prior = TritValue(int(prior) if isinstance(prior, (int, float)) else 0)
+    if not isinstance(evidence, TritValue):
+        evidence = TritValue(int(evidence) if isinstance(evidence, (int, float)) else 0)
+
+    pv = prior.to_int() if prior.is_numeric() else 0
+    ev = evidence.to_int() if evidence.is_numeric() else 0
+    pc = prior.confidence
+    ec = evidence.confidence
+
+    # 简化的贝叶斯更新公式
+    if pv == ev:
+        # 证据一致: 信度上升
+        new_c = 1.0 - (1.0 - pc) * (1.0 - ec)
+        new_val = pv
+    else:
+        # 证据矛盾: 按信度比例切换
+        if ec > pc:
+            new_val = ev
+            new_c = ec * (1.0 - pc) / max(0.01, ec * (1.0 - pc) + (1.0 - ec) * pc)
+        else:
+            new_val = pv
+            new_c = pc * (1.0 - ec) / max(0.01, pc * (1.0 - ec) + (1.0 - pc) * ec)
+    new_c = max(0.01, min(0.99, new_c))
+    src = f'贝叶斯(先验={prior._source or "?"}→证据={evidence._source or "?"})'
+    return TritValue(new_val, confidence=new_c, source=src if src != '贝叶斯(先验=?→证据=?)' else '')
+
+register('bayes_update', _bayes_update)
 register('to_string', TypeOps.to_string)
 register('to_number', TypeOps.to_number)
