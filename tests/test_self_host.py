@@ -57,5 +57,77 @@ class TestSelfHost(unittest.TestCase):
             os.remove(OUTPUT_BIN)
 
 
+class TestCompileBytecode(unittest.TestCase):
+    """compile_bytecode.py 编译路径覆盖"""
+
+    def test_compile_source_sexpr(self):
+        """compile_source: S-表达式输入"""
+        from compile_bytecode import compile_source
+        from ternary_core import TritValue
+
+        path = os.path.join(os.path.dirname(__file__), '..', 'build', '_test_sexpr.bin')
+        os.makedirs(os.path.dirname(path), exist_ok=True)
+        try:
+            result = compile_source('(做 (设 x 42))', path)
+            self.assertTrue(isinstance(result[0], (int, TritValue)) and result[0] == 1 or result[0].to_int() == 1)
+            self.assertGreater(result[1] if isinstance(result[1], int) else result[1].to_int(), 0)
+        finally:
+            if os.path.exists(path):
+                os.unlink(path)
+
+    def test_compile_source_single_expr(self):
+        """compile_source: 单个表达式（非列表）"""
+        from compile_bytecode import compile_source
+
+        path = os.path.join(os.path.dirname(__file__), '..', 'build', '_test_single.bin')
+        os.makedirs(os.path.dirname(path), exist_ok=True)
+        try:
+            result = compile_source('42', path)
+            val = result[0].to_int() if not isinstance(result[0], int) else result[0]
+            self.assertEqual(val, 1)
+        finally:
+            if os.path.exists(path):
+                os.unlink(path)
+
+    def test_compile_san_from_file(self):
+        """compile_san: 从文件编译"""
+        from compile_bytecode import compile_san
+
+        src_path = os.path.join(os.path.dirname(__file__), '..', 'build', '_test_compile.san')
+        out_path = os.path.join(os.path.dirname(__file__), '..', 'build', '_test_compile.bin')
+        os.makedirs(os.path.dirname(src_path), exist_ok=True)
+        with open(src_path, 'w', encoding='utf-8') as f:
+            f.write('(做 (设 x 42))')
+        try:
+            data = compile_san(src_path, out_path)
+            self.assertGreater(len(data), 10)
+            self.assertEqual(data[:4], b'SAN0')
+        finally:
+            for p in (src_path, out_path):
+                if os.path.exists(p):
+                    os.unlink(p)
+
+    def test_run_bin(self):
+        """run_bin: 执行编译后的 bin"""
+        from compile_bytecode import compile_source, run_bin
+        import io, sys
+
+        path = os.path.join(os.path.dirname(__file__), '..', 'build', '_test_run.bin')
+        os.makedirs(os.path.dirname(path), exist_ok=True)
+        try:
+            compile_source('(输出 (加 1 2))', path)
+            old = sys.stdout
+            sys.stdout = io.StringIO()
+            try:
+                run_bin(path)
+                output = sys.stdout.getvalue()
+            finally:
+                sys.stdout = old
+            self.assertIn('3', output)
+        finally:
+            if os.path.exists(path):
+                os.unlink(path)
+
+
 if __name__ == '__main__':
     unittest.main()

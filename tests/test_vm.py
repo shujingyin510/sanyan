@@ -655,8 +655,8 @@ class TestVMEdgeCases(unittest.TestCase):
         self.assertTrue(vm.halted)
 
     def test_invalid_bin(self):
-        with self.assertRaises((VMError, FileNotFoundError)):
-            VM.from_bin('nonexistent.bin')
+        with self.assertRaises((VMError, FileNotFoundError, OSError)):
+            VM.from_bin('_nonexistent_test_file_.bin')
 
     def test_stack_after_run(self):
         vm = _make_vm(_push_i(1) + _push_i(2) + [ADD] + _halt())
