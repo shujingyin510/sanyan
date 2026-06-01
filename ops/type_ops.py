@@ -95,32 +95,41 @@ class TypeOps:
 
     @staticmethod
     def ternary_value(evaluator, args):
-        """构造显式三态值：三态值(v, confidence=1.0) — 返回带置信度的 TritValue。
-        三态值("hello", 0.8) 创建一个置信度 0.8 的字符串值。
-        三态值(42, 0.9) 创建一个置信度 0.9 的数值。"""
-        if len(args) < 1 or len(args) > 2:
-            raise SanyanSyntaxError('三态值 需要 1-2 个参数: 值 [, 置信度]')
+        """构造显式三态值：三态值(v, 置信度, 来源) — 返回带置信度和来源的 TritValue。
+        三态值("hello", 0.8, "用户输入") 创建置信度 0.8 的字符串值，来源为用户输入。
+        三态值(42, 0.9) 置信度 0.9，无来源。"""
+        if len(args) < 1 or len(args) > 3:
+            raise SanyanSyntaxError('三态值 需要 1-3 个参数: 值 [, 置信度] [, 来源]')
         val = evaluator.eval(args[0])
         confidence = 1.0
+        source = ''
         if len(args) >= 2:
             c = evaluator.eval(args[1])
             if isinstance(c, TritValue):
                 confidence = c.to_float()
             elif isinstance(c, (int, float)):
                 confidence = float(c)
+        if len(args) >= 3:
+            s = evaluator.eval(args[2])
+            if isinstance(s, TritValue) and s.is_string():
+                source = s.to_payload()
+            elif isinstance(s, str):
+                source = s
         if isinstance(val, TritValue):
-            return val.with_confidence(confidence)
+            return TritValue(val.to_int() if val.is_numeric() else val.to_payload(),
+                           val.precision if val.is_float() else 0,
+                           confidence=confidence, source=source or val._source)
         if isinstance(val, str):
-            return TritValue(val, confidence=confidence)
+            return TritValue(val, confidence=confidence, source=source)
         if isinstance(val, (int, float)):
-            return TritValue(val, confidence=confidence)
+            return TritValue(val, confidence=confidence, source=source)
         raise SanyanTypeError(f'三态值 不支持类型: {type(val).__name__}')
 
     @staticmethod
     def ternary_propagate(evaluator, args):
         """贝叶斯置信度传播：传递(上游, 当前) → 新 TritValue with 传播后的置信度。
         传播置信度 = 上游置信度 × 当前置信度（独立贝叶斯更新）。
-        用于不确定推理管线中的概率累积。"""
+        来源合并为 "上游来源 → 当前来源"。"""
         if len(args) != 2:
             raise SanyanSyntaxError('传递 需要 2 个参数: (传递 上游值 当前值)')
         upstream = evaluator.eval(args[0])
@@ -130,13 +139,20 @@ class TypeOps:
         cc = current.confidence if isinstance(current, TritValue) else 1.0
         propagated = max(0.0, min(1.0, uc * cc))
 
+        # 合并来源链
+        us = upstream._source if isinstance(upstream, TritValue) else ''
+        cs = current._source if isinstance(current, TritValue) else ''
+        merged_source = ' → '.join(filter(None, [us, cs])) if (us or cs) else ''
+
         if isinstance(current, TritValue):
-            return current.with_confidence(propagated)
+            return current.with_confidence(propagated) if not merged_source else \
+                   TritValue(current.to_int() if current.is_numeric() else current.to_payload(),
+                            confidence=propagated, source=merged_source)
         if isinstance(current, str):
-            return TritValue(current, confidence=propagated)
+            return TritValue(current, confidence=propagated, source=merged_source)
         if isinstance(current, (int, float)):
-            return TritValue(current, confidence=propagated)
-        return TritValue(0, confidence=propagated)
+            return TritValue(current, confidence=propagated, source=merged_source)
+        return TritValue(0, confidence=propagated, source=merged_source)
 
 
 # 注册类型操作
@@ -147,5 +163,31 @@ register('is_dict', TypeOps.is_dict)
 register('str_equals', TypeOps.str_equals)
 register('ternary_value', TypeOps.ternary_value)
 register('ternary_propagate', TypeOps.ternary_propagate)
+
+# ── 来源/证据链操作 ──
+from ternary_core import TritValue
+
+def _source_op(evaluator, args):
+    """来源(x) — 查询三态值的来源/证据链。"""
+    if len(args) != 1:
+        raise SanyanSyntaxError('来源 需要一个参数')
+    val = evaluator.eval(args[0])
+    if isinstance(val, TritValue):
+        return TritValue(val._source) if val._source else TritValue('')
+    return TritValue('')
+
+def _source_chain_op(evaluator, args):
+    """来源链(列表) — 合并多个来源为证据链 'A → B → C'。"""
+    sources = []
+    for a in args:
+        v = evaluator.eval(a)
+        if isinstance(v, TritValue) and v._source:
+            sources.append(v._source)
+        elif isinstance(v, str) and v:
+            sources.append(v)
+    return TritValue(' → '.join(sources)) if sources else TritValue('')
+
+register('source', _source_op)
+register('source_chain', _source_chain_op)
 register('to_string', TypeOps.to_string)
 register('to_number', TypeOps.to_number)

@@ -200,7 +200,7 @@ class TritValue:
     """
     __slots__ = (
         'value', 'symbol', 'float_val', '_initialized', 'precision', 'confidence',
-        '_val_type', '_payload',
+        '_val_type', '_payload', '_source',
     )
 
     # ── 值类型常量 ──
@@ -251,16 +251,17 @@ class TritValue:
             obj.confidence = 1.0
             obj._val_type = cls.TYPE_NUMERIC
             obj._payload = None
+            obj._source = ''
             obj.value = BT.from_int(i)
             obj.symbol = BT.to_str(obj.value)
             cls._SMALL_INT_CACHE[i] = obj
         cls._SMALL_INT_BUILT = True
 
     def __new__(
-        cls, value: Union[int, float, list, str, dict], precision: Optional[int] = None, confidence: float = 1.0
+        cls, value: Union[int, float, list, str, dict], precision: Optional[int] = None, confidence: float = 1.0, source: str = ''
     ) -> 'TritValue':
-        # 小整数缓存（仅数值类型）
-        if isinstance(value, int) and precision is None and confidence == 1.0:
+        # 小整数缓存（仅数值类型，无来源）
+        if isinstance(value, int) and precision is None and confidence == 1.0 and not source:
             cls._build_small_cache()
             cached = cls._SMALL_INT_CACHE.get(value)
             if cached is not None:
@@ -288,13 +289,14 @@ class TritValue:
             cls._pool[key] = obj
             return obj
 
-    def __init__(self, value: Union[int, float, list, str, dict], precision: Optional[int] = None, confidence: float = 1.0):
+    def __init__(self, value: Union[int, float, list, str, dict], precision: Optional[int] = None, confidence: float = 1.0, source: str = ''):
         if hasattr(self, '_initialized'):
             return
         self._initialized = True
         self.precision = precision if precision is not None else 0
         self.float_val = None
         self.confidence = max(0.0, min(1.0, confidence))
+        self._source = source
         self._payload = None
         self._val_type = self.TYPE_NUMERIC
 
@@ -394,8 +396,10 @@ class TritValue:
         return str(self.to_int())
 
     def with_confidence(self, confidence: float) -> 'TritValue':
-        """返回同值但不同置信度的新 TritValue。"""
-        return TritValue(self.to_int(), self.precision, confidence)
+        """返回同值、同来源但不同置信度的新 TritValue。"""
+        if self.is_string():
+            return TritValue(self._payload, confidence=confidence, source=self._source)
+        return TritValue(self.to_int(), self.precision, confidence, source=self._source)
 
     def confidence_str(self) -> str:
         """返回带置信度的字符串表示，如 '真(0.9)' 或 '真'（默认 1.0）。"""
