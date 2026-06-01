@@ -118,15 +118,15 @@ Agent 将 LLM 返回的 5 种认知态映射为三进制决策：
 
 | 文件 | 版本 | 说明 |
 |---|---|---|
-| `agent.san` | v0.2 | 主程序，包含全部模块逻辑 |
-| `run_agent.py` | v0.2 | Python 启动器，注册中文别名 |
-| `config.san` | v0.2 | 配置文件 |
-| `prompts.san` | v0.2 | 协议提示词模板 |
-| `decision.san` | v0.2 | 决策核心 |
-| `memory.san` | v0.2 | TTL 记忆系统 |
-| `llm_http.san` | v0.2 | HTTP 调用封装 |
-| `llm_iface.san` | v0.2 | LLM 接口层 |
-| `context_mgr.san` | v0.2 | 上下文管理器 |
+| `agent.san` | v0.3 | 主程序，包含全部模块逻辑 |
+| `run_agent.py` | v0.3 | Python 启动器，注册中文别名 |
+| `agent_policy.san` | v0.3 | 策略配置（纯数据文件） |
+| `prompts.san` | v0.3 | 协议提示词模板 |
+| `decision.san` | v0.3 | 决策核心（字典驱动版） |
+| `memory.san` | v0.3 | TTL 记忆系统 |
+| `llm_http.san` | v0.3 | HTTP 调用封装 |
+| `llm_iface.san` | v0.3 | LLM 接口层 |
+| `context_mgr.san` | v0.3 | 上下文管理器 |
 | `tool_sched.san` | v0.2 | 工具调度层 |
 | `tests.san` | v0.2 | 11 项核心测试 |
 | `tests_all.san` | v0.2 | 11 项自测（决策/传播/投票/压缩/冲突） |
@@ -496,10 +496,10 @@ python -X utf8 main.py ternary_agent/demo_ambient.san
 - 记忆系统：新增 `清理过期记忆()` 函数，在每轮对话开始时自动清理过期条目
 
 ### 变更
-- `agent_policy.san`：API密钥 优先从环境变量 `DEEPSEEK_API_KEY` 读取
+- `agent_policy.san`：API密钥 优先从环境变量 `SANYAN_API_KEY` 读取
 - `agent.san`：LLM 调用增加 API 密钥未配置检查和更详细的错误信息
-- `config.san`：标记为遗留文件（已被 `agent_policy.san` 替代）
-- `agent.san`：添加注释说明与 `decision.san` 的关系（策略扩展 vs 基础版）
+- `config.san`：已删除（已被 `agent_policy.san` 替代）
+- `decision.san`：升级为字典驱动版，与 `agent.san` 统一（`#include` 引用）
 
 ### 新增
 - `decision.san` 与 `agent.san` 代码关系文档化
