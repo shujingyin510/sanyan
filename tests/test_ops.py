@@ -459,5 +459,101 @@ class TestNegativeCases(unittest.TestCase):
         self.assertEqual(result.to_int(), 5)
 
 
+class TestStringOpsExtended(unittest.TestCase):
+    """字符串操作扩展测试 — 覆盖当前覆盖率缺口"""
+
+    def setUp(self):
+        self.env = SanyanEvaluator()
+
+    def test_substring_middle(self):
+        result = self.env.eval(['substring', '"hello"', 1, 3])
+        self.assertEqual(result, 'ell')
+
+    def test_upper_lower_ext(self):
+        result = self.env.eval(['upper', '"hello"'])
+        self.assertEqual(result, 'HELLO')
+        result = self.env.eval(['lower', '"HELLO"'])
+        self.assertEqual(result, 'hello')
+
+    def test_str_equals(self):
+        result = self.env.eval(['str_equals', '"hello"', '"hello"'])
+        self.assertEqual(result.to_int(), 1)
+
+    def test_str_equals_false(self):
+        result = self.env.eval(['str_equals', '"hello"', '"world"'])
+        self.assertEqual(result.to_int(), -1)
+
+    def test_string_contains(self):
+        result = self.env.eval(['字符串包含', '"hello world"', '"world"'])
+        self.assertEqual(result.to_int(), 1)
+        result = self.env.eval(['字符串包含', '"hello"', '"xyz"'])
+        self.assertEqual(result.to_int(), -1)
+
+    def test_reverse_list(self):
+        self.env.eval(['set', 'lst', ['list', 1, 2, 3]])
+        result = self.env.eval(['reverse', 'lst'])
+        self.assertEqual([x.to_int() for x in result], [3, 2, 1])
+
+
+class TestControlOpsExtended(unittest.TestCase):
+    """控制流操作扩展测试 — 覆盖当前覆盖率缺口"""
+
+    def setUp(self):
+        self.env = SanyanEvaluator()
+
+    def test_if_trit_values(self):
+        self.env.eval(['set', 'x', 0])
+        self.env.eval(['if', 1, ['do', ['set', 'x', 100]], ['do', ['set', 'x', -100]]])
+        self.assertEqual(self.env.get_var('x').to_int(), 100)
+        self.env.eval(['if', -1, ['do', ['set', 'x', 200]], ['do', ['set', 'x', -200]]])
+        self.assertEqual(self.env.get_var('x').to_int(), -200)
+
+    def test_loop_and_break(self):
+        self.env.eval(['set', 'x', 0])
+        self.env.eval([
+            'loop', ['lt', 'x', 100],
+            ['do', ['set', 'x', ['add', 'x', 1]],
+             ['if', ['gt', 'x', 5], ['do', ['break']]]]
+        ])
+        self.assertEqual(self.env.get_var('x').to_int(), 6)
+
+    def test_for_range(self):
+        self.env.eval(['set', 's', 0])
+        self.env.eval(['for', 'i', 1, 5, ['do', ['set', 's', ['add', 's', 'i']]]])
+        self.assertEqual(self.env.get_var('s').to_int(), 15)
+
+
+class TestContainerOpsExtended(unittest.TestCase):
+    """容器操作扩展测试 — 覆盖当前覆盖率缺口"""
+
+    def setUp(self):
+        self.env = SanyanEvaluator()
+
+    def test_dict_keys_list(self):
+        self.env.eval(['set', 'd', ['dict', '"a"', 1, '"b"', 2]])
+        result = self.env.eval(['字典键列表', 'd'])
+        self.assertEqual(sorted(result), ['a', 'b'])
+
+    def test_dict_delete_key(self):
+        self.env.eval(['set', 'd', ['dict', '"a"', 1, '"b"', 2]])
+        self.env.eval(['删除键', 'd', '"a"'])
+        self.assertEqual(self.env.eval(['含键', 'd', '"a"']).to_int(), -1)
+
+    def test_list_slice(self):
+        self.env.eval(['set', 'lst', ['list', 1, 2, 3, 4, 5]])
+        result = self.env.eval(['slice', 'lst', 1, 3])
+        self.assertEqual([x.to_int() for x in result], [2, 3])
+
+    def test_list_sum(self):
+        self.env.eval(['set', 'lst', ['list', 1, 2, 3, 4, 5]])
+        result = self.env.eval(['sum', 'lst'])
+        self.assertEqual(result.to_int(), 15)
+
+    def test_list_count(self):
+        self.env.eval(['set', 'lst', ['list', 1, 2, 1, 3, 1]])
+        result = self.env.eval(['count', 'lst', 1])
+        self.assertEqual(result.to_int(), 3)
+
+
 if __name__ == '__main__':
     unittest.main()
