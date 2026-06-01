@@ -48,14 +48,30 @@ def _load_agent():
     e = SanyanEvaluator(skin_manager=SkinManager('chinese'), max_loop_steps=5000)
     # 注册中文别名
     aliases = {
-        '转字符串': 'to_string', '转JSON': 'to_json', '解析JSON': 'from_json',
-        '字符串包含': 'str_contains', '表长': 'list_len', '字符串相等': 'str_equals',
-        '是字典': 'is_dict', '是列表': 'is_list', '连接': 'concat',
-        '取长': 'length', '子串': 'substring', '查找': 'find',
-        '分割': 'split', '包含': 'contains', '字典键列表': 'dict_keys',
-        '含键': 'dict_contains', '置键': 'set_key', '取键': 'get_key',
-        '删除键': 'delete_key', '列表合': 'list_concat', '取': 'get',
-        '不': 'not', '读文件': 'read_file', '写文件': 'write_file',
+        '转字符串': 'to_string',
+        '转JSON': 'to_json',
+        '解析JSON': 'from_json',
+        '字符串包含': 'str_contains',
+        '表长': 'list_len',
+        '字符串相等': 'str_equals',
+        '是字典': 'is_dict',
+        '是列表': 'is_list',
+        '连接': 'concat',
+        '取长': 'length',
+        '子串': 'substring',
+        '查找': 'find',
+        '分割': 'split',
+        '包含': 'contains',
+        '字典键列表': 'dict_keys',
+        '含键': 'dict_contains',
+        '置键': 'set_key',
+        '取键': 'get_key',
+        '删除键': 'delete_key',
+        '列表合': 'list_concat',
+        '取': 'get',
+        '不': 'not',
+        '读文件': 'read_file',
+        '写文件': 'write_file',
         '转数字': 'to_number',
     }
     for alias, target in aliases.items():
@@ -233,21 +249,38 @@ def _load_village():
 
     e = SanyanEvaluator(skin_manager=SkinManager('chinese'), max_loop_steps=10000)
     # 注册别名
-    for a, t in [('转字符串', 'to_string'), ('连接', 'concat'), ('取长', 'length'),
-                  ('表长', 'list_len'), ('取', 'get'), ('含键', 'dict_contains'),
-                  ('取键', 'get_key'), ('置键', 'set_key'), ('删除键', 'delete_key'),
-                  ('字典键列表', 'dict_keys'), ('不', 'not'), ('字符串相等', 'str_equals'),
-                  ('列表合', 'list_concat'), ('转JSON', 'to_json'), ('是字典', 'is_dict'),
-                  ('是列表', 'is_list'), ('时间戳', 'timestamp')]:
-        try: reg.register_alias(a, t)
-        except: pass
+    for a, t in [
+        ('转字符串', 'to_string'),
+        ('连接', 'concat'),
+        ('取长', 'length'),
+        ('表长', 'list_len'),
+        ('取', 'get'),
+        ('含键', 'dict_contains'),
+        ('取键', 'get_key'),
+        ('置键', 'set_key'),
+        ('删除键', 'delete_key'),
+        ('字典键列表', 'dict_keys'),
+        ('不', 'not'),
+        ('字符串相等', 'str_equals'),
+        ('列表合', 'list_concat'),
+        ('转JSON', 'to_json'),
+        ('是字典', 'is_dict'),
+        ('是列表', 'is_list'),
+        ('时间戳', 'timestamp'),
+    ]:
+        try:
+            reg.register_alias(a, t)
+        except:
+            pass
     src = open('ternary_agent/runtime_v2/village_game.san', encoding='utf-8').read()
     ast, _ = parse_code(src)
     for stmt in ast[1:]:
         if isinstance(stmt, list) and stmt[0] == 'export':
             continue
-        try: e.eval(stmt)
-        except: pass
+        try:
+            e.eval(stmt)
+        except:
+            pass
     return e
 
 
@@ -331,22 +364,42 @@ def _load_npc():
     import ops.registry as reg
 
     e = SanyanEvaluator(skin_manager=SkinManager('chinese'), max_loop_steps=10000)
-    for a, t in [('转字符串', 'to_string'), ('连接', 'concat'), ('取长', 'length'),
-                  ('表长', 'list_len'), ('取', 'get'), ('含键', 'dict_contains'),
-                  ('取键', 'get_key'), ('置键', 'set_key'), ('删除键', 'delete_key'),
-                  ('字典键列表', 'dict_keys'), ('不', 'not'), ('字符串相等', 'str_equals'),
-                  ('列表合', 'list_concat'), ('转JSON', 'to_json'), ('是字典', 'is_dict'),
-                  ('是列表', 'is_list'), ('时间戳', 'timestamp'), ('包含', 'contains'),
-                  ('查找', 'find'), ('子串', 'substring'), ('分割', 'split')]:
-        try: reg.register_alias(a, t)
-        except: pass
+    for a, t in [
+        ('转字符串', 'to_string'),
+        ('连接', 'concat'),
+        ('取长', 'length'),
+        ('表长', 'list_len'),
+        ('取', 'get'),
+        ('含键', 'dict_contains'),
+        ('取键', 'get_key'),
+        ('置键', 'set_key'),
+        ('删除键', 'delete_key'),
+        ('字典键列表', 'dict_keys'),
+        ('不', 'not'),
+        ('字符串相等', 'str_equals'),
+        ('列表合', 'list_concat'),
+        ('转JSON', 'to_json'),
+        ('是字典', 'is_dict'),
+        ('是列表', 'is_list'),
+        ('时间戳', 'timestamp'),
+        ('包含', 'contains'),
+        ('查找', 'find'),
+        ('子串', 'substring'),
+        ('分割', 'split'),
+    ]:
+        try:
+            reg.register_alias(a, t)
+        except:
+            pass
     src = open('ternary_agent/runtime_v2/npc_game.san', encoding='utf-8').read()
     ast, _ = parse_code(src)
     for stmt in ast[1:]:
         if isinstance(stmt, list) and stmt[0] == 'export':
             continue
-        try: e.eval(stmt)
-        except: pass
+        try:
+            e.eval(stmt)
+        except:
+            pass
     return e
 
 

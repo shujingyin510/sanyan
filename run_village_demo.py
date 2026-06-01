@@ -11,23 +11,40 @@ from ops.file_ops import clear_cache
 
 clear_cache()
 
+
 def _register_aliases():
     """注册中文别名（必须在 SanyanEvaluator 实例化之后调用）"""
     from ops.registry import register_alias
+
     aliases = [
-        ('转字符串', 'to_string'), ('转JSON', 'to_json'), ('解析JSON', 'from_json'),
-        ('字符串包含', 'str_contains'), ('表长', 'list_len'), ('字符串相等', 'str_equals'),
-        ('是字典', 'is_dict'), ('连接', 'concat'), ('取长', 'length'),
-        ('子串', 'substring'), ('包含', 'contains'), ('字典键列表', 'dict_keys'),
-        ('含键', 'dict_contains'), ('置键', 'set_key'), ('取键', 'get_key'),
-        ('删除键', 'delete_key'), ('列表合', 'list_concat'), ('取', 'get'),
-        ('不', 'not'), ('读文件', 'read_file'), ('写文件', 'write_file'),
+        ('转字符串', 'to_string'),
+        ('转JSON', 'to_json'),
+        ('解析JSON', 'from_json'),
+        ('字符串包含', 'str_contains'),
+        ('表长', 'list_len'),
+        ('字符串相等', 'str_equals'),
+        ('是字典', 'is_dict'),
+        ('连接', 'concat'),
+        ('取长', 'length'),
+        ('子串', 'substring'),
+        ('包含', 'contains'),
+        ('字典键列表', 'dict_keys'),
+        ('含键', 'dict_contains'),
+        ('置键', 'set_key'),
+        ('取键', 'get_key'),
+        ('删除键', 'delete_key'),
+        ('列表合', 'list_concat'),
+        ('取', 'get'),
+        ('不', 'not'),
+        ('读文件', 'read_file'),
+        ('写文件', 'write_file'),
     ]
     for a, t in aliases:
         try:
             register_alias(a, t)
         except Exception:
             pass
+
 
 steps = [
     ('送苹果', '见面礼'),

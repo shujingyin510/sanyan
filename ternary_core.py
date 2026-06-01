@@ -234,7 +234,9 @@ class TritValue:
             cls._SMALL_INT_CACHE[i] = obj
         cls._SMALL_INT_BUILT = True
 
-    def __new__(cls, value: Union[int, float, list], precision: Optional[int] = None, confidence: float = 1.0) -> 'TritValue':
+    def __new__(
+        cls, value: Union[int, float, list], precision: Optional[int] = None, confidence: float = 1.0
+    ) -> 'TritValue':
         if isinstance(value, int) and precision is None and confidence == 1.0:
             cls._build_small_cache()
             cached = cls._SMALL_INT_CACHE.get(value)

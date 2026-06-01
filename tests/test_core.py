@@ -519,7 +519,8 @@ class TestClosure(unittest.TestCase):
 
         e = SanyanEvaluator(max_loop_steps=500)
         ast, _ = parse_code('定义 add10 (x) { 返回 x 加 10 }')
-        e.eval(ast)
+        # parse_code 返回 ['do', ['fn', 'add10', ...]]
+        e.eval(ast)  # eval 整个 do 块
         # 函数名作为变量求值应返回 FunctionValue
         result = e.eval('add10')
         self.assertIsInstance(result, FunctionValue)
@@ -530,16 +531,16 @@ class TestClosure(unittest.TestCase):
         from sugar.parser import parse_code
 
         e = SanyanEvaluator(max_loop_steps=500)
-        code = '''
+        code = """
         定义 outer (x) {
             定义 inner (y) { 返回 x 加 y }
             返回 inner
         }
         设 f = outer(10)
         输出 f(5)
-        '''
+        """
         ast, _ = parse_code(code)
-        for stmt in ast:
+        for stmt in ast[1:]:
             result = e.eval(stmt)
         self.assertEqual(result.to_int(), 15)
 
@@ -549,16 +550,16 @@ class TestClosure(unittest.TestCase):
         from sugar.parser import parse_code
 
         e = SanyanEvaluator(max_loop_steps=500)
-        code = '''
+        code = """
         定义 mkcounter () {
             设 n = 0
             定义 tick () { 设 n = n 加 1 返回 n }
             返回 tick
         }
         设 c = mkcounter()
-        '''
+        """
         ast, _ = parse_code(code)
-        for stmt in ast:
+        for stmt in ast[1:]:
             e.eval(stmt)
         self.assertEqual(e.eval(['c']).to_int(), 1)
         self.assertEqual(e.eval(['c']).to_int(), 2)
@@ -570,13 +571,13 @@ class TestClosure(unittest.TestCase):
         from sugar.parser import parse_code
 
         e = SanyanEvaluator(max_loop_steps=500)
-        code = '''
+        code = """
         设 x = 100
         定义 add_x (y) { 返回 x 加 y }
         设 result = add_x(5)
-        '''
+        """
         ast, _ = parse_code(code)
-        for stmt in ast:
+        for stmt in ast[1:]:
             e.eval(stmt)
         self.assertEqual(e.get_var('result').to_int(), 105)
         # 外部 x 应保持不变
