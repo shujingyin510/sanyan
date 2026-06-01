@@ -305,9 +305,9 @@ python doc_sync.py
    - `CHANGELOG.md` — 变更日志
    - `CONTRIBUTING.md` — 贡献指南
    - `docs/manual.md` — 用户手册
-   - `docs/syntax.md` — 语法文档
-   - `docs/commands.md` — 命令参考
-   - `docs/errors.md` — 错误说明
+   - `docs/manual.md` — 用户手册（语法、命令速查、错误说明）
+   - `docs/llvm.md` — LLVM 代码生成文档
+   - `docs/sugar_grammar.md` — 糖语法规范
    - `docs/llvm.md` — LLVM 文档
    - `AGENTS.md` — 本文件
 
@@ -473,4 +473,9 @@ D:/msys64/usr/bin/bash.exe -lc "gcc /d/path/to/obj1.o /d/path/to/obj2.o -o /d/pa
 
 ### llvmgen/runtime.c 已知问题
 
-`llvmgen/runtime.c` 存在编译错误（`rt_list_t` incomplete typedef、`rt_list_push` 未声明、`rt_str_join` 返回类型错误），这些是预存 bug，不影响 C VM (`csrc/runtime.c`)。
+**2026-05-30 已修复。** 以下问题已不存在：
+- ~~`rt_list_t` incomplete typedef~~ → `#include "../csrc/runtime_common.h"` 提供完整类型定义
+- ~~`rt_list_push` 未声明~~ → 已统一为 `rt_list_push_item`
+- ~~`rt_str_join` 返回类型错误~~ → 返回值类型已修正
+
+`gcc -c runtime.c -std=c99 -Wall` 编译通过，无警告。

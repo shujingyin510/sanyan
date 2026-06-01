@@ -54,6 +54,12 @@ from vm import (
     READ_FILE,
     WRITE_FILE,
     HALT,
+    PRINT,
+    AND,
+    IO_READ,
+    IO_WRITE,
+    STR_TO_LIST,
+    DICT_LEN,
     JMP32,
 )
 
@@ -657,6 +663,48 @@ class TestVMEdgeCases(unittest.TestCase):
         vm.run()
         self.assertEqual(len(vm.stack), 1)
         self.assertEqual(vm.stack[0], 3)
+
+
+class TestVMUncoveredOps(unittest.TestCase):
+    """覆盖之前未测试的 opcode"""
+
+    def test_print(self):
+        """PRINT: 输出栈顶值"""
+        vm = _make_vm(_push_i(42) + [PRINT] + _halt())
+        vm.run()
+        self.assertTrue(vm.halted)
+
+    def test_and_op(self):
+        """AND: 三态逻辑与"""
+        vm = _make_vm(_push_i(1) + _push_i(1) + [AND] + _halt())
+        vm.run()
+        self.assertEqual(vm.stack[0], 1)
+
+    def test_io_read(self):
+        """IO_READ: 读取设备"""
+        vm = _make_vm(_push_i(0) + [IO_READ] + _halt())
+        vm.run()
+        self.assertTrue(vm.halted)
+
+    def test_io_write(self):
+        """IO_WRITE: 写入设备"""
+        vm = _make_vm(_push_i(0) + _push_i(0) + [IO_WRITE] + _halt())
+        vm.run()
+        self.assertTrue(vm.halted)
+
+    def test_str_to_list(self):
+        """STR_TO_LIST: 字符串转字符列表"""
+        s = 'ab'
+        code = [PUSH_STR, len(s)] + [ord(c) for c in s]
+        vm = _make_vm(code + [STR_TO_LIST] + _halt())
+        vm.run()
+        self.assertIsNotNone(vm.stack[0])
+
+    def test_dict_len(self):
+        """DICT_LEN: 字典长度"""
+        vm = _make_vm(_push_i(0) + [DICT] + [DICT_LEN] + _halt())
+        vm.run()
+        self.assertEqual(vm.stack[0], 0)
 
 
 if __name__ == '__main__':
