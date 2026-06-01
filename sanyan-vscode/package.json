@@ -2,15 +2,17 @@
   "name": "sanyan-language",
   "displayName": "三言 Sanyan Language",
   "description": "三言编程语言支持 — LSP 语法高亮/补全/诊断/跳转定义",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "publisher": "sanyan-lang",
   "license": "MIT",
+  "icon": "icon.png",
   "repository": {
     "type": "git",
     "url": "https://github.com/shujingyin510/sanyan"
   },
   "engines": { "vscode": "^1.85.0" },
   "categories": ["Programming Languages"],
+  "keywords": ["sanyan", "三言", "chinese", "ternary"],
   "main": "./extension.js",
   "activationEvents": ["onLanguage:sanyan"],
   "contributes": {
