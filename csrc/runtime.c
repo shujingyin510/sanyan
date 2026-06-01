@@ -533,12 +533,15 @@ int vm_run(VM *vm) {
             int16_t addr = rd_i16(vm->code, &vm->pc);
             if (addr == 0) { push(vm, tag_i(0)); break; }  /* 未解析的 Python 辅助函数调用，压入 0 */
             if (vm->call_depth >= CALL_STACK_DEPTH) { fprintf(stderr, "调用栈溢出\n"); return 1; }
-            // 扫描目标地址连续 STORE 指令个数 = 参数数量（与 Python VM 一致）
+            /* 扫描函数入口连续 STORE 指令数作为参数数量。
+             * ⚠ 已知限制：假设函数以 arg_count 个连续 STORE 开头。
+             *   如果函数在 STORE 之间插入了其他指令，参数计数会错误。
+             *   改进方向：在函数元数据中显式存储 arg_count。 */
             int32_t arg_count = 0;
             uint32_t p = (uint32_t)addr;
             while (p + 1 < vm->code_len && vm->code[p] == STORE) {
                 arg_count++;
-                p += 2;
+                p += 2;  /* STORE 占 2 字节 */
             }
             CallFrame *fr = &vm->call_stack[vm->call_depth++];
             fr->ret_pc = vm->pc;
