@@ -5,6 +5,7 @@ from typing import Any
 from ternary_core import TritValue, ArrayValue
 from values import SanyanSyntaxError, SanyanTypeError, SanyanValueError, SanyanKeyError, to_num
 from ops.registry import register
+from eval_helpers import unwrap_trit
 
 
 def _as_list(val):

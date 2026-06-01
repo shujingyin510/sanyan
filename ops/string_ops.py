@@ -7,14 +7,14 @@ from eval_helpers import unwrap_trit
 
 
 def _unwrap_str(val):
-    """从 TritValue 或 raw 值中提取字符串。"""
+    """从 TritValue 或 raw 值中提取字符串。非字符串值返回原值。"""
     if isinstance(val, str):
         return val
     if isinstance(val, TritValue):
         if val.is_string():
             return val.to_payload()
         return str(val.to_int())
-    return str(val)
+    return val  # 保持 dict/list/其他 不变，让调用者处理
 
 
 class StringOps:

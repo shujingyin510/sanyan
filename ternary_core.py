@@ -337,10 +337,11 @@ class TritValue:
 
     @staticmethod
     def from_string(word: str) -> 'TritValue':
-        """从三态词创建 TritValue。非三态词返回带该字符串的 TritValue。"""
+        """从三态词创建 TritValue。非三态词抛异常（在 DSL 中禁止未定义三态词）。"""
         if word in TritValue.STATE_MAP:
             return TritValue(TritValue.STATE_MAP[word])
-        return TritValue(word)  # 回退为字符串值
+        from values import SanyanValueError
+        raise SanyanValueError(f'未知的三态词: {word}')
 
     def to_int(self) -> int:
         """返回整数值。非数值类型返回 0（三态中性值）。"""
