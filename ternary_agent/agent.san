@@ -44,6 +44,21 @@
         "Content-Type", "application/json",
         "Authorization", 连接("Bearer ", API密钥)
     )
+
+    // ── 多提供商格式适配 ──
+    // Gemini 使用完全不同的 API（key 在 URL 参数中）
+    尝试 {
+        若 (字符串相等(模型提供商, "gemini")) {
+            设 模型URL = 连接("https://generativelanguage.googleapis.com/v1beta/models/", 连接(模型名, ":generateContent?key=", API密钥))
+            设 headers = 字典("Content-Type", "application/json")
+            设 body = 转JSON(字典(
+                "system_instruction", 字典("parts", 列表(字典("text", 系统提示))),
+                "contents", 列表(字典("parts", 列表(字典("text", 用户消息)))),
+                "generationConfig", 字典("temperature", 0.7)
+            ))
+        }
+    } 捕获 (e) { }
+
     // 重试机制：最多 3 次，间隔 1s → 2s → 4s
     设 最大重试 = 3
     设 重试间隔 = 1000
