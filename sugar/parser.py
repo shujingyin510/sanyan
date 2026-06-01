@@ -441,20 +441,25 @@ class _Parser:
             self._expect(']')
             return ['list'] + items
 
-        # 前缀操作符
+        # 前缀操作符（仅当后跟合法表达式时激活，避免误匹配函数参数）
         kw = KEYWORD_MAP.get(tok.value, OP_MAP.get(tok.value, tok.value))
         if kw in PREFIXABLE_OPS:
-            if kw in PREFIXABLE_SINGLE_ARG:
+            next_tok = self.peek()
+            next_val = next_tok.value if next_tok else ''
+            # 如果下一个 token 是 , 或 ) → 这是函数参数/列表元素，不是前缀操作符
+            if next_val in (',', ')', ']', '}'):
+                pass  # fall through to identifier
+            elif kw in PREFIXABLE_SINGLE_ARG:
                 return [kw, self.parse_expression(10)]
-            # 多参数前缀操作符需要括号
-            self._expect('(')
-            args = []
-            while self.peek() and self.peek().value != ')':
-                args.append(self.parse_expression())
-                if self.peek() and self.peek().value == ',':
-                    self.advance()
-            self._expect(')')
-            return [kw] + args
+            elif self.peek() and self.peek().value == '(':
+                self._expect('(')
+                args = []
+                while self.peek() and self.peek().value != ')':
+                    args.append(self.parse_expression())
+                    if self.peek() and self.peek().value == ',':
+                        self.advance()
+                self._expect(')')
+                return [kw] + args
 
         # lambda（仅当后跟 ( 时才作为 lambda 关键字，否则降级为标识符）
         if kw == 'lambda' and self.peek() and self.peek().value == '(':
