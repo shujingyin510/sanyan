@@ -148,10 +148,46 @@ int32_t rt_str_find(const void *hs, const void *ndl) {
 
 /* 整数转字符串 */
 void *rt_int_to_str(uintptr_t tagged) {
+    /* 检查是否为 OBJ_TRIT */
+    if (!is_int_val(tagged)) {
+        rt_str_t *hdr = (rt_str_t*)tagged;
+        if (hdr->h_type == OBJ_TRIT) {
+            rt_trit_t *t = (rt_trit_t*)tagged;
+            char buf[64];
+            snprintf(buf, sizeof(buf), "%d(信度:%.2f)", t->value, t->confidence / 100.0);
+            return _rt_make(buf);
+        }
+    }
     int64_t val = (int64_t)((intptr_t)tagged >> 1);
     char buf[32];
     snprintf(buf, sizeof(buf), "%lld", (long long)val);
     return _rt_make(buf);
+}
+
+/* ── 三态值创建与传播 ── */
+
+void *rt_trit_create(int32_t val, double conf) {
+    return (void*)rt_trit_new(val, conf);
+}
+
+int32_t rt_trit_value(void *trit) {
+    if (!trit || is_int_val(trit)) return (int32_t)to_int(trit);
+    if (((rt_str_t*)trit)->h_type == OBJ_TRIT)
+        return ((rt_trit_t*)trit)->value;
+    return 0;
+}
+
+double rt_trit_confidence(void *trit) {
+    if (!trit || is_int_val(trit)) return 1.0;
+    if (((rt_str_t*)trit)->h_type == OBJ_TRIT)
+        return ((rt_trit_t*)trit)->confidence / 100.0;
+    return 1.0;
+}
+
+void *rt_trit_propagate(int32_t result, void *a, void *b) {
+    double ca = rt_trit_confidence(a);
+    double cb = rt_trit_confidence(b);
+    return (void*)rt_trit_new(result, ca * cb);
 }
 
 rt_list_t *rt_list_new(void);
@@ -1025,6 +1061,17 @@ int32_t rt_random_trit(void) {
 void rt_print_str(const void *p) {
     if (!p) return;
     printf("%s\n", _cstr(p));
+}
+
+/* 打印整数（含三态值） */
+void rt_print_int(int32_t v) {
+    printf("%d\n", v);
+}
+
+/* 打印三态值 */
+void rt_print_trit(int32_t v, double conf) {
+    if (conf >= 0.999) printf("%d\n", v);
+    else printf("%d(信度:%.2f)\n", v, conf);
 }
 
 /* 打印浮点数 */
