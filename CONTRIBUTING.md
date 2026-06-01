@@ -7,7 +7,7 @@
 pip install -e .[dev]
 
 # 运行全部测试（15 套）
-python tests/test_core.py          # 78 项
+python tests/test_core.py          # 100 项
 python tests/test_commands.py      # 18 项
 python tests/test_parser.py        # 28 项
 python tests/test_ops.py           # 92 项
