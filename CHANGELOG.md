@@ -104,7 +104,7 @@
 ## [v3.16.0] — 2026-05-28
 
 ### 新增
-- **自举 .bin 文件**: sugar.san 和 llvmgen.san 可编译为独立 .bin 文件在 VM 上运行（`stdlib/sugar.bin` ~10KB、`stdlib/llvmgen.bin` ~72KB），通过 `compile_llvmgen.py` 注入 28 个辅助函数替代 Python 专有命令
+- **自举 .bin 文件**: sugar.san 和 llvmgen.san 可编译为独立 .bin 文件在 VM 上运行（`stdlib/sugar.bin` ~10KB、`stdlib/llvmgen.bin` ~72KB），V5 辅助函数已内联到源码中，无需 Python 注入
 - **自举验证测试**: `tests/test_self_host.py` 验证字节码编译器自举一致性（SHA256 校验）
 - **字节码格式升级**: 代码大小字段从 16 位扩展到 32 位（`vm.py`、`bytecode_compiler.san`、`csrc/runtime.c`、`compile_bytecode.py`），支持 >64KB 字节码
 - **OP映射双语覆盖**: 补充 20+ 个 Python 注册命令的中英文别名映射（`新字典`→`DICT`、`新列表`→`LIST_NEW`、`列表取`→`GET` 等），覆盖全部 51 个 VM 操作码

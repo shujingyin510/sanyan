@@ -466,7 +466,8 @@ sanyan/
 │   ├── arithmetic_ops.py      # 算术运算
 │   ├── comparison_ops.py      # 比较运算
 │   ├── concurrent_ops.py      # 并发与锁
-│   ├── container_ops.py       # 列表/数组/字典/高阶函数
+│   ├── list_ops.py            # 列表/数组/通用容器操作
+│   ├── dict_ops.py            # 字典操作
 │   ├── control_ops.py         # 控制流
 │   ├── crypto_ops.py          # 哈希与编解码
 │   ├── device_registry.py     # IoT 设备注册表

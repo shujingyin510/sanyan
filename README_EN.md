@@ -163,7 +163,7 @@ Register virtual devices, read/write sensors with ternary values. Perfect for sm
 | **Import Static Linking** | Compile-time recursive dependency compilation, `san_{mod}__{fn}` name mangling |
 | **try/catch** | `@g_error` LLVM visible global + manual stack unwinding |
 | **Arena Allocator** | 64KB init, auto-grow, pointer bump替代 malloc |
-| **Self-Hosted LLVM Compiler** | `llvmgen.san` compiled to .bin, via `compile_llvmgen.py` helper injection |
+| **Self-Hosted LLVM Compiler** | `llvmgen.san` compiled to .bin, V5 with all helpers inlined |
 
 ### Standard Library & Tools
 

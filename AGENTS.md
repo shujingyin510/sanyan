@@ -121,11 +121,11 @@ compiler = e.eval(['import', 'stdlib/bytecode_compiler.san'])
 compiler.call(e, ['编译字节码', ['do']+fixed, 'stdlib/sugar.bin', {}])
 "
 
-# llvmgen.san（通过 compile_llvmgen.py 注入辅助函数后编译）
+# llvmgen.san（直接编译，V5 辅助函数已内联）
 python -X utf8 compile_llvmgen.py
 ```
 
-注：llvmgen.san 的 LLVM IR 代码生成仍需 Python evaluator 执行（依赖 `compile_llvmgen.py` 注入的 28 个辅助函数）。
+注：llvmgen.san 的 LLVM IR 代码生成通过 Python evaluator 运行 .san 文件实现自举（V5 辅助函数已内联，无需 Python 注入）。
 
 ## 环境
 
@@ -246,7 +246,7 @@ python -X utf8 tests/run_all.py           # 集成测试 46 项
 - VM from_bin：导出表边界检查（不完整文件不崩溃）
 - VM 所有操作码处理：栈下溢保护 + 类型安全比较/算术
 - Python 求值器 dict ops 中 list→tuple 键转换
-- Python 求值器 container_ops.generic_get 越界返回 0 替代抛异常
+- Python 求值器 list_ops.generic_get 越界返回 0 替代抛异常
 - test_http_get：改用 unittest.mock.patch 替代外网请求（去掉 skip）
 - test_import_resolves / test_text_analysis：取消 skip，import 系统实际已可用（去掉 2 个 skip）
 - LLVM codegen `_normalize_fn_format`：多语句函数体被截断为仅第一条语句，修复为将 `node[3:]` 包装为 `do` 块

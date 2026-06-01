@@ -42,8 +42,6 @@ _NO_CACHE_OPS = frozenset(
         '新寄存器',
         '新标签',
         '新槽',
-        'container_ops_next_reg',
-        'container_ops_next_label',
     }
 )
 

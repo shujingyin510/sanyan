@@ -70,7 +70,9 @@ sanyan/
 │   ├── arithmetic_ops.py # 算术运算
 │   ├── comparison_ops.py # 比较运算
 │   ├── control_ops.py    # 控制流
-│   ├── container_ops.py  # 容器操作
+│   ├── list_ops.py       # 列表/数组操作
+│   ├── dict_ops.py       # 字典操作
+│   ├── iter_ops.py       # Lambda/map/filter/reduce
 │   ├── string_ops.py     # 字符串操作
 │   └── ...               # 其他操作模块
 ├── sugar/                # 糖语法
