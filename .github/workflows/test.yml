@@ -57,6 +57,10 @@ jobs:
       - run: python -X utf8 tests/test_dp_python.py -v
       - run: python -X utf8 tests/test_self_host.py -v
       - run: python -X utf8 tests/test_vm.py -v
+      - run: python -X utf8 tests/test_sanfmt.py -v
+      - run: python -X utf8 tests/test_io_ops.py -v
+      - run: python -X utf8 tests/test_concurrent_ops.py -v
+      - run: python -X utf8 tests/test_dispatcher.py -v
       - run: python -X utf8 tests/run_all.py
       - run: python -X utf8 doc_sync.py
 
@@ -103,3 +107,20 @@ jobs:
       - run: pip install --no-cache-dir .[dev]
       - name: Run benchmark
         run: python benchmark/run_benchmark.py --quick
+
+  formal-verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Coq
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq coq
+      - name: Verify ternary logic (Trit.v)
+        run: coqc -R formal SanyanFormal formal/Trit.v
+      - name: Verify agent mapping (AgentMap.v)
+        run: coqc -R formal SanyanFormal formal/AgentMap.v
+      - name: Verify tagged pointer model (TaggedPtr.v)
+        run: coqc -R formal SanyanFormal formal/TaggedPtr.v
+      - name: All formal proofs complete
+        run: echo "=== 三言形式化验证完成: 20+ 条定理全部通过 ==="
