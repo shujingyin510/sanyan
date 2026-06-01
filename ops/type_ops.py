@@ -561,7 +561,58 @@ def _trit_decompress(evaluator, args):
             result.append(TritValue(digit - 1))
     return result
 
-register('trit_decompress', _trit_decompress)
+
+
+def _parse_hex(evaluator, args):
+    """解析十六进制(\"0xFF\" 或 \"FF\"): 字符串转整数"""
+    if len(args) != 1:
+        raise SanyanSyntaxError('解析十六进制 需要一个字符串')
+    s = evaluator.eval(args[0])
+    if isinstance(s, TritValue) and s.is_string():
+        s = s.to_payload()
+    s = str(s).replace('0x', '').replace('0X', '')
+    return TritValue(int(s, 16))
+
+
+def _parse_bin(evaluator, args):
+    """解析二进制(\"0b1010\" 或 \"1010\"): 字符串转整数"""
+    if len(args) != 1:
+        raise SanyanSyntaxError('解析二进制 需要一个字符串')
+    s = evaluator.eval(args[0])
+    if isinstance(s, TritValue) and s.is_string():
+        s = s.to_payload()
+    s = str(s).replace('0b', '').replace('0B', '')
+    return TritValue(int(s, 2))
+
+
+register('parse_hex', _parse_hex)
+register('parse_bin', _parse_bin)
+
+
+# ── 枚举与结构体 ──
+
+def _enum_op(evaluator, args):
+    """枚举(红=1, 绿=2, 蓝=3): 键值对字典，键自动转字符串"""
+    result = {}
+    for a in args:
+        val = evaluator.eval(a)
+        if isinstance(val, dict):
+            result.update(val)
+        elif isinstance(val, str) and '=' in val:
+            k, v = val.split('=', 1)
+            k = k.strip()
+            v = v.strip()
+            result[k] = int(v) if v.lstrip('-').isdigit() else v
+    return result
+
+
+def _struct_op(evaluator, args):
+    """结构体(x=1, y=2, name=\"老王\"): 命名字段字典"""
+    return _enum_op(evaluator, args)  # 同枚举，共用实现
+
+
+register('enum', _enum_op)
+register('struct', _struct_op)
 
 
 def _belief_op(evaluator, args):

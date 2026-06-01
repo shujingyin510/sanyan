@@ -247,6 +247,48 @@ class ControlOps:
     def export_op(evaluator, args):
         return TritValue(0)
 
+    @staticmethod
+    def assert_op(evaluator, args):
+        """断言(条件, 消息): 条件为假时抛 SanyanValueError"""
+        if len(args) < 1:
+            raise SanyanSyntaxError('断言 需要条件 [, 消息]')
+        cond = evaluator.eval(args[0])
+        ok = False
+        if isinstance(cond, TritValue):
+            ok = cond.to_int() == 1
+        elif isinstance(cond, int):
+            ok = cond != 0
+        elif isinstance(cond, str):
+            ok = len(cond) > 0
+        elif isinstance(cond, list):
+            ok = len(cond) > 0
+        if not ok:
+            msg = evaluator.eval(args[1]) if len(args) >= 2 else '断言失败'
+            if isinstance(msg, TritValue) and msg.is_string():
+                msg = msg.to_payload()
+            raise SanyanValueError(str(msg))
+        return TritValue(0)
+
+    @staticmethod
+    def do_while_op(evaluator, args):
+        """做-直到: (做-直到 body cond) 先执行体再检查条件，至少执行一次"""
+        if len(args) != 2:
+            raise SanyanSyntaxError('做-直到 需要体和条件')
+        body = args[0]
+        cond_expr = args[1]
+        result = None
+        while True:
+            result = evaluator.eval(body)
+            cond = evaluator.eval(cond_expr)
+            ok = False
+            if isinstance(cond, TritValue):
+                ok = cond.to_int() == 1
+            elif isinstance(cond, int):
+                ok = cond != 0
+            if ok:
+                break
+        return result if result is not None else TritValue(0)
+
 
 # 注册控制流操作
 register('if', ControlOps.if_op)
@@ -264,3 +306,5 @@ register('try', ControlOps.try_catch)
 register('judge', ControlOps.judge_op)
 register('set', ControlOps.define_var)
 register('export', ControlOps.export_op)
+register('assert', ControlOps.assert_op)
+register('do_while', ControlOps.do_while_op)
