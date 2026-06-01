@@ -36,7 +36,7 @@
 - **API 健康检测** — 超时 ≠ 宕机；二态聚合会触发误告警
 - **游戏 NPC** — 犹豫是合法行为；二态需要额外状态变量
 
-详见 [为什么是三进制](docs/why-ternary.md)。
+详见 [为什么是三进制](docs/ternary-logic.md)。
 
 ---
 
@@ -589,12 +589,8 @@ sanyan/
 │   └── run_all.py             # 集成测试（46 项）
 ├── docs/                      # 文档
 │   ├── manual.md              # 用户手册
-│   ├── syntax.md              # 语法文档
-│   ├── commands.md            # 命令参考
-│   ├── errors.md              # 错误说明
 │   ├── llvm.md                # LLVM 文档
-│   ├── why-ternary.md         # 三值逻辑论证
-│   ├── three_value_comparison.md # 三值 vs 二值对比（IoT 案例）
+│   ├── ternary-logic.md        # 三值逻辑深度解析
 │   └── package_development.md # 包开发指南
 ├── benchmark/                 # 性能基准测试
 ├── ternary_agent/             # 三言 Agent（可读决策 DSL）
@@ -662,7 +658,7 @@ sanyan/
 - [x] 标准库扩充（network/hardware/math 矩阵统计）
 - [x] 三值逻辑 IoT 案例（传感器融合/容错控制/状态机）
 - [x] 三值 vs 二值对比文档
-- [x] 快速入门指南 docs/GETTING_STARTED.md
+- [x] 文档整合：22→10 个 md
 - [x] Agent 子系统测试（17 项）
 - [x] #include 预处理全链路支持（Python + C VM）
 - [ ] GPIO 真实硬件控制

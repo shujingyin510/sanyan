@@ -38,7 +38,7 @@ Sanyan's native three-valued logic (`true` / `maybe` / `false`) is not a gimmick
 - **API health checks** — timeout ≠ down; binary aggregation triggers false alerts
 - **Game NPCs** — hesitation is a legitimate behavior; binary needs extra state variables
 
-See [Why Ternary](docs/why-ternary.md) for the full comparison.
+See [Why Ternary](docs/ternary-logic.md) for the full comparison.
 
 ---
 
@@ -271,10 +271,7 @@ sanyan/
 ├── tests/                     # Automated tests (351 tests)
 ├── docs/                      # Documentation
 │   ├── manual.md              # User manual
-│   ├── syntax.md              # Syntax guide
-│   ├── commands.md            # Command reference
 │   ├── llvm.md                # LLVM documentation
-│   ├── three_value_comparison.md # Three-value vs two-value comparison
 │   └── package_development.md # Package development guide
 └── benchmark/                 # Performance benchmarks
 ```
