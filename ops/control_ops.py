@@ -167,46 +167,43 @@ class ControlOps:
 
     @staticmethod
     def judge_op(evaluator, args):
-        if len(args) == 4:
-            expr_node, true_body, maybe_body, false_body = args
-        elif len(args) == 7:
-            expr_node = args[0]
-            true_body = maybe_body = false_body = None
-            for i in range(1, len(args), 2):
-                label = args[i]
-                if isinstance(label, list):
-                    label = str(label[0]) if len(label) > 0 else ''
-                body = args[i + 1]
-                matched = False
-                if label in ('真', 'true'):
-                    true_body = body
-                    matched = True
-                elif label in ('可能', 'maybe'):
-                    maybe_body = body
-                    matched = True
-                elif label in ('假', 'false'):
-                    false_body = body
-                    matched = True
-                if not matched and hasattr(evaluator, 'skin_manager') and evaluator.skin_manager:
-                    state = evaluator.skin_manager.is_ternary_word(label)
-                    if state == 1:
-                        true_body = body
-                    elif state == 0:
-                        maybe_body = body
-                    elif state == -1:
-                        false_body = body
-            if true_body is None or maybe_body is None or false_body is None:
-                raise SanyanSyntaxError('判 需要 真/可能/假 三个分支')
-        else:
-            raise SanyanSyntaxError('判 需要一个表达式和三个分支体')
-        val = evaluator.eval(expr_node)
-        int_val = val.to_int()
-        if int_val == 1:
-            return evaluator.eval(true_body)
-        elif int_val == 0:
-            return evaluator.eval(maybe_body)
-        else:
-            return evaluator.eval(false_body)
+        """判: 三态分支(len=4) 或 多值匹配(len>=4, label是字符串)"""
+        if len(args) < 2:
+            raise SanyanSyntaxError('判 需要一个表达式和分支体')
+
+        # 经典三态分支: (判 值 真分支 可能分支 假分支) — 刚好4个参数且无字符串label
+        if len(args) == 4 and not any(
+            isinstance(args[i], str) and args[i] in ('真', '可能', '假', 'true', 'maybe', 'false', '默认')
+            for i in range(1, 4)
+        ):
+            val = evaluator.eval(args[0])
+            int_val = val.to_int() if isinstance(val, TritValue) else int(val)
+            if int_val == 1:
+                return evaluator.eval(args[1])
+            elif int_val == 0:
+                return evaluator.eval(args[2])
+            else:
+                return evaluator.eval(args[3])
+
+        # 多值匹配: (判 val 'a' body1 'b' body2 ... '默认' default)
+        val = evaluator.eval(args[0])
+        for i in range(1, len(args), 2):
+            if i + 1 >= len(args):
+                break
+            label = args[i]
+            body = args[i + 1]
+            if isinstance(label, str) and label == '默认':
+                return evaluator.eval(body)
+            label_val = evaluator.eval(label)
+            match = False
+            if isinstance(val, TritValue):
+                lv = label_val.to_int() if isinstance(label_val, TritValue) else label_val
+                match = val.to_int() == lv
+            else:
+                match = str(val) == str(label_val)
+            if match:
+                return evaluator.eval(body)
+        return TritValue(0)
 
     @staticmethod
     def continue_op(evaluator, args):

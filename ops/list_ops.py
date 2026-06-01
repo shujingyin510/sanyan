@@ -273,4 +273,31 @@ register('contains', _list_contains)
 register('unique', _list_unique)
 register('slice', _list_slice)
 register('sum', _list_sum)
+
+# ── 二分查找 ──
+
+def _binary_search(evaluator, args):
+    """二分查找(有序列表, 目标): 返回索引，未找到返回 -1"""
+    if len(args) != 2:
+        raise SanyanSyntaxError('二分查找 需要列表和目标值')
+    lst = evaluator.eval(args[0])
+    target = evaluator.eval(args[1])
+    if not isinstance(lst, list):
+        raise SanyanTypeError('二分查找 需要有序列表')
+    tv = target.to_int() if isinstance(target, TritValue) else target
+
+    lo, hi = 0, len(lst) - 1
+    while lo <= hi:
+        mid = (lo + hi) // 2
+        item = lst[mid]
+        iv = item.to_int() if isinstance(item, TritValue) else item
+        if iv == tv:
+            return TritValue(mid)
+        elif iv < tv:
+            lo = mid + 1
+        else:
+            hi = mid - 1
+    return TritValue(-1)
+
+register('binary_search', _binary_search)
 register('join', _list_join)

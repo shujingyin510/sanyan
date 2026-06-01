@@ -253,3 +253,65 @@ register('div', _op_div)
 register('mod', _op_mod)
 register('pow', _op_pow)
 register('digit', _op_digit)
+
+# ── 位运算 ──
+
+def _op_bitwise_and(evaluator, args):
+    """按位与：a & b"""
+    if len(args) < 2:
+        raise SanyanSyntaxError('按位与 需要至少两个参数')
+    vals = [_to_tritvalue(evaluator.eval(arg)) for arg in args]
+    nums = [v.to_int() if isinstance(v, TritValue) else int(v) for v in vals]
+    result = nums[0]
+    for n in nums[1:]:
+        result = result & n
+    return _to_tritvalue(result)
+
+def _op_bitwise_or(evaluator, args):
+    """按位或：a | b"""
+    if len(args) < 2:
+        raise SanyanSyntaxError('按位或 需要至少两个参数')
+    vals = [_to_tritvalue(evaluator.eval(arg)) for arg in args]
+    nums = [v.to_int() if isinstance(v, TritValue) else int(v) for v in vals]
+    result = nums[0]
+    for n in nums[1:]:
+        result = result | n
+    return _to_tritvalue(result)
+
+def _op_bitwise_xor(evaluator, args):
+    """按位异或：a ^ b"""
+    if len(args) != 2:
+        raise SanyanSyntaxError('按位异或 需要两个参数')
+    a = _to_tritvalue(evaluator.eval(args[0]))
+    b = _to_tritvalue(evaluator.eval(args[1]))
+    return _to_tritvalue(a.to_int() ^ b.to_int())
+
+def _op_bitwise_not(evaluator, args):
+    """按位非：~a"""
+    if len(args) != 1:
+        raise SanyanSyntaxError('按位非 需要一个参数')
+    a = _to_tritvalue(evaluator.eval(args[0]))
+    return _to_tritvalue(~a.to_int())
+
+def _op_shift_left(evaluator, args):
+    """左移：a << n"""
+    if len(args) != 2:
+        raise SanyanSyntaxError('左移 需要值和位数')
+    a = _to_tritvalue(evaluator.eval(args[0]))
+    n = _to_tritvalue(evaluator.eval(args[1]))
+    return _to_tritvalue(a.to_int() << n.to_int())
+
+def _op_shift_right(evaluator, args):
+    """右移：a >> n"""
+    if len(args) != 2:
+        raise SanyanSyntaxError('右移 需要值和位数')
+    a = _to_tritvalue(evaluator.eval(args[0]))
+    n = _to_tritvalue(evaluator.eval(args[1]))
+    return _to_tritvalue(a.to_int() >> n.to_int())
+
+register('bit_and', _op_bitwise_and)
+register('bit_or', _op_bitwise_or)
+register('bit_xor', _op_bitwise_xor)
+register('bit_not', _op_bitwise_not)
+register('shift_left', _op_shift_left)
+register('shift_right', _op_shift_right)
