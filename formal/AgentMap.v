@@ -1,4 +1,4 @@
-Require Import SanyanFormal.Trit.
+Require Import Trit.
 
 Inductive CognitiveState : Set :=
   | AFFIRM | NEGATE | UNCERT | CONFLICTED | UNKNOWN.
