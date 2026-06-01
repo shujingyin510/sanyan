@@ -92,10 +92,115 @@ def _compile_ir_to_exe(ir_text: str, suffix: str, gcc_env: dict | None = None) -
     return out_exe
 
 
+def _parse_file(code_str):
+    """解析源码为 AST：先 Sugar 后 S-表达式。返回 (ast, None) 或 (None, error_msg)。"""
+    from sugar import SugarConverter
+    from skin import SkinManager
+
+    skin_mgr = SkinManager('chinese')
+    try:
+        return SugarConverter.convert(code_str, skin_mgr), None
+    except SyntaxError as e:
+        from lexer import tokenize
+        from parser import parse
+
+        try:
+            tokens = tokenize(code_str)
+            return parse(tokens), str(e)
+        except SyntaxError as e2:
+            return None, f'{e2}\n  (sugar 语法解析也失败: {e})'
+
+
+def _run_evaluator(code, profiling):
+    """Python 求值器模式：解析 → 求值 → 返回 (env, result, ast)。"""
+    from evaluator import SanyanEvaluator
+    from skin import SkinManager
+
+    skin_mgr = SkinManager('chinese')
+    env = SanyanEvaluator(skin_manager=skin_mgr)
+    if profiling:
+        env.profile_start()
+
+    ast, sugar_error = _parse_file(code)
+    if ast is None:
+        print(f'语法错误: {sugar_error}')
+        sys.exit(1)
+
+    try:
+        result = env.eval(ast)
+    except (SanyanError, SyntaxError, RecursionError) as e:
+        import traceback
+        traceback.print_exc()
+        print(f'执行错误: {e}')
+        sys.exit(1)
+
+    if profiling:
+        print(env.profile_report())
+    return env, result, ast
+
+
+def _auto_print_result(ast, result, env):
+    """如果 AST 没有显式输出语句，自动打印最终结果。"""
+    if result is None:
+        return
+    _output_op_names = {'print', '输出', 'debug', '调试', 'query', '查'}
+    if skin_mgr := getattr(env, 'skin_manager', None):
+        for internal in ('print', 'debug', 'query'):
+            kw = skin_mgr.get_keyword(internal) or skin_mgr.get_op(internal)
+            if kw:
+                _output_op_names.add(kw)
+                if isinstance(kw, list):
+                    _output_op_names.update(kw)
+
+    def _has_output_like(node):
+        if isinstance(node, list) and len(node) > 0:
+            if node[0] in _output_op_names:
+                return True
+            for child in node[1:]:
+                if _has_output_like(child):
+                    return True
+        return False
+
+    if not _has_output_like(ast):
+        if isinstance(result, TritValue):
+            if result.is_float():
+                print(f'结果: {result.to_float()}')
+            else:
+                print(f'结果: {result.to_int()}')
+        else:
+            print(f'结果: {result}')
+
+
+def _run_native(code, mode, filepath):
+    """原生编译模式（--san 或 --pycc）。返回 exit code。"""
+    if mode == 'pycc':
+        from skin import SkinManager
+        from sugar import SugarConverter
+        from llvmgen.codegen import compile_top_level
+
+        skin_mgr = SkinManager('chinese')
+        ast = SugarConverter.convert(code, skin_mgr)
+        cg = compile_top_level(ast)
+        out_exe = _compile_ir_to_exe(str(cg.module), 'pycc')
+    else:
+        from llvmgen.compiler import self_hosted_compile
+        ir_text = self_hosted_compile(code)
+        out_exe = _compile_ir_to_exe(ir_text, 'san')
+
+    result = subprocess.run([out_exe], capture_output=True, text=True)
+    print(result.stdout, end='')
+    if result.stderr:
+        print(result.stderr, end='', file=sys.stderr)
+    sys.exit(result.returncode)
+
+
 def main():
+    """三言入口：根据标志分派到不同运行模式。
+    --eval: Python 求值器    --vm: 字节码 VM
+    --profile: 性能剖析    --san/--pycc: 原生编译
+    默认: 字节码编译 + VM 执行"""
     args = sys.argv[1:]
 
-    # --ast-json 标志：输出 AST JSON 并退出
     if '--ast-json' in args:
         idx = args.index('--ast-json')
         if idx + 1 >= len(args):
@@ -112,167 +217,63 @@ def main():
         ast = parse(tokens)
 
         def _ast_to_json(node):
-            if isinstance(node, list):
-                return [_ast_to_json(n) for n in node]
-            return node
+            return [_ast_to_json(n) for n in node] if isinstance(node, list) else node
 
         print(json.dumps(_ast_to_json(ast), ensure_ascii=False, indent=2))
         sys.exit(0)
 
-    # --profile 标志
     profiling = '--profile' in args
-    # --eval 标志：使用 Python 求值器（调试模式，较慢）
     use_eval = '--eval' in args
-    # --san 标志：使用自举编译器（sugar.san + llvmgen.san）生成原生可执行文件
     use_san = '--san' in args
-    # --pycc 标志：使用 Python codegen（SugarConverter 解析 + Python LLVM codegen）生成原生可执行文件
     use_pycc = '--pycc' in args
     positional = [a for a in args if not a.startswith('--')]
 
-    if positional:
-        filepath = positional[0]
-        try:
-            with open(filepath, 'r', encoding='utf-8') as f:
-                code = f.read()
-        except FileNotFoundError:
-            print(f'错误: 文件不存在 - {filepath}')
-            sys.exit(1)
-        except UnicodeDecodeError:
-            print(f'错误: 文件编码不是UTF-8 - {filepath}')
-            sys.exit(1)
-
-        if use_pycc and not profiling:
-            # ── Python 原生编译路径：SugarConverter 解析 + Python codegen 生成 IR → 原生可执行文件 ──
-            skin_mgr = SkinManager('chinese')
-            ast = SugarConverter.convert(code, skin_mgr)
-            from llvmgen.codegen import compile_top_level
-
-            cg = compile_top_level(ast)
-            out_exe = _compile_ir_to_exe(str(cg.module), 'pycc')
-            result = subprocess.run([out_exe], capture_output=True, text=True)
-            print(result.stdout, end='')
-            if result.stderr:
-                print(result.stderr, end='', file=sys.stderr)
-            sys.exit(result.returncode)
-
-        if use_san and not profiling:
-            # ── 自举编译路径：sugar.san 解析 + llvmgen.san 生成 IR → 原生可执行文件 ──
-            from llvmgen.compiler import self_hosted_compile
-
-            ir_text = self_hosted_compile(code)
-            out_exe = _compile_ir_to_exe(ir_text, 'san')
-            result = subprocess.run([out_exe], capture_output=True, text=True)
-            print(result.stdout, end='')
-            if result.stderr:
-                print(result.stderr, end='', file=sys.stderr)
-            sys.exit(result.returncode)
-
-        if not code.strip():
-            sys.exit(0)
-
-        from preprocess import preprocess_includes
-
-        code = preprocess_includes(code)
-
-        # ── 字节码缓存检查（默认模式，--eval 时跳过）──
-        bin_path = os.path.join('build', os.path.basename(filepath).replace('.san', '.bin'))
-        if not use_eval and not profiling:
-            if not os.path.exists(bin_path) or os.path.getmtime(bin_path) < os.path.getmtime(filepath):
-                os.makedirs('build', exist_ok=True)
-                from compile_bytecode import compile_san
-
-                compile_san(filepath, bin_path)
-            from vm import VM as SanyanVM
-
-            SanyanVM.from_bin(bin_path)
-            sys.exit(0)
-
-        # ── Python 求值器模式（--eval 或 --profile）──
-
-        skin_mgr = SkinManager('chinese')
-        env: SanyanEvaluator = SanyanEvaluator(skin_manager=skin_mgr)
-        if profiling:
-            env.profile_start()
-
-        ast = None
-        sugar_error = None
-        try:
-            ast = SugarConverter.convert(code, skin_mgr)
-        except SyntaxError as e:
-            sugar_error = str(e)
-
-        if ast is None:
-            from lexer import tokenize
-            from parser import parse
-
-            try:
-                tokens = tokenize(code)
-                ast = parse(tokens)
-            except SyntaxError as e:
-                msg = str(e)
-                if sugar_error:
-                    msg = f'{msg}\n  (sugar 语法解析也失败: {sugar_error})'
-                print(f'语法错误: {msg}')
-                import traceback
-
-                traceback.print_exc()
-                sys.exit(1)
-
-        try:
-            result = env.eval(ast)
-        except (SanyanError, SyntaxError, RecursionError) as e:
-            import traceback
-
-            traceback.print_exc()
-            print(f'执行错误: {e}')
-            sys.exit(1)
-
-        # ── 保存字节码缓存 ──
-        os.makedirs('build', exist_ok=True)
-        try:
-            from compile_bytecode import compile_san
-
-            compile_san(filepath, bin_path)
-        except (SanyanError, SyntaxError, OSError):
-            pass
-
-        if profiling:
-            print(env.profile_report())
-
-         if result is not None:
-            # 输出相关操作名（从 BUILTIN_OPS 和皮肤动态获取）
-            _output_op_names: set = {'print', '输出', 'debug', '调试', 'query', '查'}
-            if skin_mgr := getattr(evaluator, 'skin_manager', None):
-                for internal in ('print', 'debug', 'query'):
-                    kw = skin_mgr.get_keyword(internal) or skin_mgr.get_op(internal)
-                    if kw:
-                        _output_op_names.add(kw)
-                        if isinstance(kw, list):
-                            _output_op_names.update(kw)
-
-            def _has_output_like(node):
-                if isinstance(node, list) and len(node) > 0:
-                    if node[0] in _output_op_names:
-                        return True
-                    for child in node[1:]:
-                        if _has_output_like(child):
-                            return True
-                return False
-
-            if not _has_output_like(ast):
-                if isinstance(result, TritValue):
-                    if result.is_float():
-                        print(f'结果: {result.to_float()}')
-                    else:
-                        print(f'结果: {result.to_int()}')
-                else:
-                    print(f'结果: {result}')
+    if not positional:
+        print(__doc__)
         sys.exit(0)
-    else:
-        print(f'欢迎来到「三言 v{VERSION}」—— 母语可定制的三进制编程语言')
-        print('=' * 50)
-        demo(SkinManager('chinese'))
-        repl()
+
+    filepath = positional[0]
+    try:
+        with open(filepath, 'r', encoding='utf-8') as f:
+            code = f.read()
+    except FileNotFoundError:
+        print(f'错误: 文件不存在 - {filepath}')
+        sys.exit(1)
+
+    if use_pycc and not profiling:
+        _run_native(code, 'pycc', filepath)
+    if use_san and not profiling:
+        _run_native(code, 'san', filepath)
+    if not code.strip():
+        sys.exit(0)
+
+    from preprocess import preprocess_includes
+    code = preprocess_includes(code)
+
+    # 字节码缓存 + VM 执行（默认模式）
+    if not use_eval and not profiling:
+        bin_path = os.path.join('build', os.path.basename(filepath).replace('.san', '.bin'))
+        if not os.path.exists(bin_path) or os.path.getmtime(bin_path) < os.path.getmtime(filepath):
+            os.makedirs('build', exist_ok=True)
+            from compile_bytecode import compile_san
+            compile_san(filepath, bin_path)
+        from vm import VM as SanyanVM
+        SanyanVM.from_bin(bin_path)
+        sys.exit(0)
+
+    # Python 求值器模式
+    env, result, ast = _run_evaluator(code, profiling)
+
+    # 保存字节码缓存（加速下次运行）
+    bin_path = os.path.join('build', os.path.basename(filepath).replace('.san', '.bin'))
+    os.makedirs('build', exist_ok=True)
+    try:
+        from compile_bytecode import compile_san
+        compile_san(filepath, bin_path)
+    except (SanyanError, SyntaxError, OSError):
+        pass
+
+    _auto_print_result(ast, result, env)
 
 
 if __name__ == '__main__':

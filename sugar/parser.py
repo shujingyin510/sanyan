@@ -408,6 +408,9 @@ class _Parser:
         # 列表推导式 / 列表字面量
         if tok.value == '[':
             saved_pos = self.pos
+            # 预览: 看是否是 [expr for ... 推导式，而非退回到 try/except
+            is_comprehension = False
+            inner_expr = None
             try:
                 inner_expr = self.parse_expression()
             except SanyanSyntaxError:
