@@ -16,19 +16,28 @@ if TYPE_CHECKING:
     from evaluator import SanyanEvaluator
 
 
-def _parse_params(raw_params: list) -> tuple[list, dict]:
-    """解析参数列表，提取默认值。
+def _parse_params(raw_params: list) -> tuple[list, dict, str]:
+    """解析参数列表，提取默认值和可变参数。
 
-    输入: ['x', 'y', '=', '10'] 或 ['x', 'y']
-    输出: (['x', 'y'], {'y': '10'})  — 参数名列表 + 默认值字典
+    输入: ['x', 'y', '=', '10'] 或 ['x', 'y'] 或 ['值...']
+    输出: (['x', 'y'], {'y': '10'}, '')  — 参数名列表 + 默认值字典 + 可变参数名
+    可变参数: 参数名以 ... 结尾，如 '值...' → rest_param = '值'
     """
     params: list[str] = []
     defaults: dict[str, Any] = {}
+    rest_param = ''
     i = 0
     while i < len(raw_params):
         p = raw_params[i]
-        if p == '=':
-            # 前一个参数有默认值
+        if isinstance(p, str) and p.endswith('...'):
+            rest_param = p[:-3]
+            i += 1
+        elif isinstance(p, str) and p == '...':
+            # 独立 ... 标记：前一个参数是 rest
+            if params:
+                rest_param = params.pop()
+            i += 1
+        elif p == '=':
             if params and i + 1 < len(raw_params):
                 defaults[params[-1]] = raw_params[i + 1]
                 i += 2
@@ -39,7 +48,7 @@ def _parse_params(raw_params: list) -> tuple[list, dict]:
             i += 1
         else:
             i += 1
-    return params, defaults
+    return params, defaults, rest_param
 
 
 class Commands:
@@ -60,9 +69,9 @@ class Commands:
         else:
             body = args[2:]
         return_type = param_types.pop('__return__', None) if param_types else None
-        # 解析参数列表，提取默认值
-        params, defaults = _parse_params(raw_params)
-        evaluator.commands[cmd_name] = (params, body, param_types, return_type, defaults)
+        # 解析参数列表，提取默认值和可变参数
+        params, defaults, rest_param = _parse_params(raw_params)
+        evaluator.commands[cmd_name] = (params, body, param_types, return_type, defaults, rest_param)
         return TritValue(0)
 
     @staticmethod
@@ -90,8 +99,11 @@ class Commands:
             raise SanyanRuntimeError('命令调用超过了最大递归深度')
         evaluator.call_stack.append((op, args))
         try:
-            params, body, param_types, return_type, defaults = resolve_command(evaluator, op)
-            args = match_params(params, op, args, defaults)
+            params, body, param_types, return_type, defaults, rest_param = resolve_command(evaluator, op)
+            args = match_params(params, op, args, defaults, rest_param)
+            # 可变参数: 如果 rest_param 存在且 args 有 bundle，加到 params 列表末尾
+            if rest_param and len(args) > len(params):
+                params = list(params) + [rest_param]
             evaluated_args = evaluate_args(evaluator, params, args, param_types)
             tail_body, last_expr, is_tco = detect_tail_call(body, op, params, evaluated_args)
             if is_tco:

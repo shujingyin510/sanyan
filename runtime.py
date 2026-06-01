@@ -51,7 +51,7 @@ class SanyanRuntime:
         if max_loop_steps is None:
             max_loop_steps = int(os.environ.get('MAX_LOOP_STEPS', '500'))
         self.max_loop_steps: int = max_loop_steps
-        self.commands: Dict[str, Tuple[list, list, dict, Any, dict]] = {}
+        self.commands: Dict[str, Tuple[list, list, dict, Any, dict, str]] = {}
         self.call_depth: int = 0
         self.max_call_depth: int = 200
         self.skin_manager: Any = skin_manager
