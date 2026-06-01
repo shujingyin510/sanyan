@@ -100,13 +100,15 @@ def _watch_files():
 
 
 def run_interactive(evaluator, api_key):
-    print('三言 Agent v0.2.0 - 多轮对话（最多10轮，输入 exit 退出）')
+    print('三言 Agent v0.3.0 - 多轮对话（输入 exit 退出）')
     print('  /解释 → 查看最近决策解释')
     print('  /解释 N → 查看第N轮决策解释')
     print('  修改 agent_policy.san 后自动重载')
     print()
     mtimes = _watch_files()
-    for round_num in range(1, 11):
+    round_num = 0
+    while True:
+        round_num += 1
         # 热重载检查：策略文件是否变更
         try:
             new_mtimes = _watch_files()
@@ -118,7 +120,7 @@ def run_interactive(evaluator, api_key):
             pass
 
         try:
-            q = input(f'[{round_num}/10] > ').strip()
+            q = input(f'[{round_num}] > ').strip()
         except (EOFError, KeyboardInterrupt):
             print('\n再见')
             break
