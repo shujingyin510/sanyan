@@ -2,7 +2,11 @@
 // 修改此文件后运行 agent 会自动生效
 
 // === LLM 连接配置 ===
-// API密钥 优先从环境变量 SANYAN_API_KEY 读取
+// 模型提供商: "deepseek"(默认) / "openai" / "anthropic" / "custom"
+// DeepSeek: https://api.deepseek.com/v1/chat/completions
+// OpenAI:  https://api.openai.com/v1/chat/completions
+// Ollama:  http://localhost:11434/v1/chat/completions
+设 模型提供商 = "deepseek"
 设 模型URL = "https://api.deepseek.com/v1/chat/completions"
 设 API密钥 = 环境变量("SANYAN_API_KEY")
 若 (等于(API密钥, 假)) { 设 API密钥 = "sk-你的key" }
