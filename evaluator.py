@@ -5,7 +5,7 @@ ops 模块在 SanyanEvaluator 首次实例化时延迟加载，避免模块导�
 
 from __future__ import annotations
 import time
-from typing import Any, Dict, Optional, cast
+from typing import Any, Dict, Optional
 from ternary_core import TritValue, ArrayValue
 from runtime import SanyanRuntime
 from commands import Commands
@@ -181,15 +181,15 @@ class SanyanEvaluator(SanyanRuntime):
             return f'第 {node.line} 行，第 {node.col} 列: '  # type: ignore[attr-defined]
         return ''
 
-    def _apply(self, op: str, args: list) -> TritValue:
-        """执行操作：解析操作名、分派、性能分析。"""
+    def _apply(self, op: str, args: list) -> Any:
+        """执行操作：分派到注册的处理函数。返回类型由具体操作决定（TritValue/FunctionValue/ModuleValue/str/list 等）。"""
         from ops.dispatcher import apply
 
         self._debug_before(op, op, args)
         if self._profiling:
             t0 = time.perf_counter()
         try:
-            return cast(TritValue, apply(self, op, args))
+            return apply(self, op, args)
         finally:
             if self._profiling:
                 dt = time.perf_counter() - t0

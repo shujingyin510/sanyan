@@ -78,7 +78,12 @@ class ContinueException(Exception):
 
 
 class SrcNode(list):
-    """带源码位置的 AST 节点。isinstance(node, list) 依然为 True。"""
+    """带源码位置的 AST 节点。
+
+    设计说明：继承 list 以兼容所有期望 list 的代码路径（求值、遍历），
+    同时通过 line/col 属性携带源码位置信息。
+    isinstance(node, SrcNode) 可以区分代码节点与数据列表。
+    """
 
     __slots__ = ('line', 'col')
 
@@ -87,6 +92,12 @@ class SrcNode(list):
         obj.line = line  # type: ignore[attr-defined]
         obj.col = col  # type: ignore[attr-defined]
         return obj
+
+    def __repr__(self) -> str:
+        items = super().__repr__()
+        if self.line or self.col:
+            return f'<SrcNode L{self.line}:C{self.col} {items}>'
+        return f'<SrcNode {items}>'
 
 
 def _get_type_name(value: Any) -> str:
@@ -175,6 +186,7 @@ class FunctionValue:
                 except ReturnException as ret:
                     result = ret.value
                     break
+            # 无返回语句或空函数体 → 默认返回中性值 0（三态约定）
             result = result if result is not None else TritValue(0)
             if self.return_type:
                 check_type(result, self.return_type, '返回值')

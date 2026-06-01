@@ -36,7 +36,9 @@ def resolve_op_name(evaluator: Any, op: str) -> str:
     return internal
 
 
-# 不可缓存的函数：有副作用，每次调用必须重新查找
+# 不可缓存的函数：每次调用必须重新查找。
+# ⚠ 抽象泄漏：'新寄存器'/'新标签'/'新槽' 是 LLVM 代码生成内部操作，
+#   它们不应该出现在通用分派器。应迁移到 llvmgen/ 模块的独立注册表。
 _NO_CACHE_OPS = frozenset(
     {
         '新寄存器',
