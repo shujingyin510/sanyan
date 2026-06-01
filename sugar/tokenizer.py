@@ -251,7 +251,8 @@ def tokenize(code: str) -> list[Token]:
             tokens.append(Token('WORD', word, line, start_col))
             continue
 
-        # Unknown character - skip
+        # Unknown character → 生成错误 token
+        tokens.append(Token('ERROR', c, line, col))
         i += 1
         col += 1
 

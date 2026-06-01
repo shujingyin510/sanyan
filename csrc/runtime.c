@@ -4,6 +4,14 @@
  * 值系统: void* 栈值，LSB=1 为标记整数，LSB=0 为堆对象（带类型标签）。
  * 编译:   gcc -o runtime runtime.c && ./runtime firmware.bin
  * STM32:  arm-none-eabi-gcc -mcpu=cortex-m4 -mthumb -Os ...
+ *
+ * ⚠ 已知限制:
+ *   - 无堆对象释放 (no free): 字符串/列表/字典分配后不回收。
+ *     批处理场景可接受 (程序退出时OS回收)，嵌入式长期运行需改进。
+ *   - snprintf 固定 1024 字节缓冲区: 超长路径/字符串可能截断。
+ *     改进方向: 使用 snprintf(NULL, 0, ...) 动态计算长度。
+ *   - CALL opcode: 参数计数依赖扫描函数入口连续 STORE 指令。
+ *     非标准函数格式（STORE 中间插入其他指令）会误计算。
  */
 #include <stdint.h>
 #include <stdlib.h>

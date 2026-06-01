@@ -143,21 +143,26 @@ class ControlOps:
             return evaluator.eval(try_body)
         except SanyanError as e:
             # 只捕获语言层异常
-            saved = None
-            if error_var in evaluator.scope_vars:
-                saved = evaluator.scope_vars[error_var]
-            evaluator.scope_vars[error_var] = str(e)
+            # 如果错误变量是 _（discard 模式），跳过作用域赋值
+            if error_var != '_':
+                saved = None
+                if error_var in evaluator.scope_vars:
+                    saved = evaluator.scope_vars[error_var]
+                evaluator.scope_vars[error_var] = str(e)
+            else:
+                saved = None
             try:
                 result = None
                 for expr in catch_body:
                     result = evaluator.eval(expr)
                 return result if result is not None else TritValue(0)
             finally:
-                if saved is not None:
-                    evaluator.scope_vars[error_var] = saved
-                else:
-                    if error_var in evaluator.scope_vars:
-                        del evaluator.scope_vars[error_var]
+                if error_var != '_':
+                    if saved is not None:
+                        evaluator.scope_vars[error_var] = saved
+                    else:
+                        if error_var in evaluator.scope_vars:
+                            del evaluator.scope_vars[error_var]
         # 其他异常（如 AttributeError）不捕获，直接向上抛出
 
     @staticmethod
