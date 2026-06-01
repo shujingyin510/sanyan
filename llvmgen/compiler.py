@@ -7,40 +7,6 @@ import sys
 from typing import TYPE_CHECKING, Any, cast
 
 from llvmgen.codegen import compile_top_level
-from llvmgen.helpers import (
-    OPCODE_MAP,
-    box_py,
-    dict_get_safe,
-    dict_keys,
-    dict_len,
-    dict_new_empty,
-    env_pop,
-    env_push,
-    escape_llvm_str,
-    get_func_name,
-    get_merge_label,
-    is_terminated,
-    list_append,
-    list_contains,
-    list_get_safe,
-    list_len,
-    list_new_empty,
-    loop_pop,
-    loop_push,
-    loop_top,
-    next_label,
-    next_reg,
-    register_all_helpers,
-    register_func_name,
-    set_module_id,
-    str_bytelen,
-    str_contains,
-    str_endswith,
-    tag_op,
-    unbox_py,
-)
-from ops.registry import get_op as _get_op
-from ops.registry import register as _register
 from llvmgen.ir_fixes import (
     _fix_missing_constants,
     _fix_rt_list_get_null_safe,
@@ -49,10 +15,6 @@ from llvmgen.ir_fixes import (
 
 if TYPE_CHECKING:
     from llvmgen.codegen import CodegenContext
-
-
-# 向后兼容：保留模块级引用
-_OPMAP = OPCODE_MAP
 
 
 def _is_paren_sexpr(source: str) -> bool:
@@ -190,81 +152,17 @@ def compile_source(source: str, module_name: str = 'main') -> tuple[str, 'Codege
 
 
 def self_hosted_compile(source: str, module_name: str = 'main') -> str:
-    """自举编译：sugar.san 解析 + llvmgen.san 生成 IR。零 Python codegen。"""
+    """自举编译：sugar.san 解析 + llvmgen.san 生成 IR。
+
+    V5: 辅助函数已内联到 llvmgen.san，无需 Python 注入。
+    直接加载 .san 文件，用 Python evaluator 运行即可。
+    """
     from evaluator import SanyanEvaluator
     from skin import SkinManager
     from ops.file_ops import clear_cache
-    from ops.registry import _OP_DISPATCH
-    from ops.container_ops import ContainerOps
 
     clear_cache()
     evaluator = SanyanEvaluator(skin_manager=SkinManager('chinese'))
-
-    # 强制覆盖 box/unbox 派发 + 清所有缓存
-    _OP_DISPATCH['box'] = (box_py, None)
-    _OP_DISPATCH['unbox'] = (unbox_py, None)
-    evaluator._op_cache.clear()
-
-    # 注册辅助函数
-    register_all_helpers()
-
-    evaluator.commands['新字典'] = ([], [['return', ['container_ops_dict_new_empty']]], {}, None)
-    _register('container_ops_dict_new_empty', dict_new_empty)
-    evaluator.commands['存变量'] = (['d', 'k', 'v'], [['container_ops_dict_set', 'd', 'k', 'v']], {}, None)
-    evaluator.commands['新列表'] = ([], [['return', ['container_ops_list_new_empty']]], {}, None)
-    _register('container_ops_list_new_empty', list_new_empty)
-    evaluator.commands['取字长'] = (['s'], [['container_ops_str_bytelen', 's']], {}, None)
-    _register('container_ops_str_bytelen', str_bytelen)
-    evaluator.commands['转义LLVM字符串'] = (['s'], [['container_ops_str_escape_llvm', 's']], {}, None)
-    _register('container_ops_str_escape_llvm', escape_llvm_str)
-    evaluator.commands['后缀'] = (['s', 'suffix'], [['container_ops_str_endswith', 's', 'suffix']], {}, None)
-    _register('container_ops_str_endswith', str_endswith)
-    evaluator.commands['设置模块ID'] = (['mid'], [['container_ops_set_module_id', 'mid']], {}, None)
-    _register('container_ops_set_module_id', set_module_id)
-    evaluator.commands['字符串包含'] = (['s', 'sub'], [['container_ops_str_contains', 's', 'sub']], {}, None)
-    _register('container_ops_str_contains', str_contains)
-    evaluator.commands['注册函数名'] = (['name'], [['container_ops_register_func_name', 'name']], {}, None)
-    _register('container_ops_register_func_name', register_func_name)
-    evaluator.commands['取函数名'] = (['name'], [['container_ops_get_func_name', 'name']], {}, None)
-    _register('container_ops_get_func_name', get_func_name)
-
-    _register('container_ops_dict_set', ContainerOps.dict_set)
-    evaluator.commands['查键'] = (['d', 'k'], [['container_ops_dict_get_safe', 'd', 'k']], {}, None)
-    _register('container_ops_dict_get_safe', dict_get_safe)
-    evaluator.commands['包含'] = (['lst', 'item'], [['container_ops_list_contains', 'lst', 'item']], {}, None)
-    evaluator.commands['列表取长'] = (['lst'], [['container_ops_list_len', 'lst']], {}, None)
-    _register('container_ops_list_len', list_len)
-    evaluator.commands['字典取长'] = (['d'], [['container_ops_dict_len', 'd']], {}, None)
-    _register('container_ops_dict_len', dict_len)
-    evaluator.commands['列表取'] = (['lst', 'idx'], [['container_ops_list_get_safe', 'lst', 'idx']], {}, None)
-    evaluator.commands['列表追加'] = (['lst', 'item'], [['container_ops_list_append', 'lst', 'item']], {}, None)
-    _register('container_ops_list_append', list_append)
-    evaluator.commands['进栈'] = (['stack'], [['container_ops_env_push', 'stack']], {}, None)
-    evaluator.commands['出栈'] = (['stack'], [['container_ops_env_pop', 'stack']], {}, None)
-    _register('container_ops_env_push', env_push)
-    _register('container_ops_env_pop', env_pop)
-    evaluator.commands['字典键列表'] = (['d'], [['container_ops_dict_keys', 'd']], {}, None)
-    _register('container_ops_dict_keys', dict_keys)
-    evaluator.commands['进入合并上下文'] = (['label'], [['container_ops_set_merge_label', 'label']], {}, None)
-    evaluator.commands['退出合并上下文'] = ([], [['container_ops_clear_merge_label']], {}, None)
-    evaluator.commands['取合并标签'] = ([], [['return', ['container_ops_get_merge_label']]], {}, None)
-    _register('container_ops_get_merge_label', get_merge_label)
-    _register('container_ops_list_get_safe', list_get_safe)
-
-    evaluator.commands['新标签ID'] = ([], [['return', ['container_ops_next_label']]], {}, None)
-    _register('container_ops_next_label', next_label)
-    evaluator.commands['新寄存器ID'] = ([], [['return', ['container_ops_next_reg']]], {}, None)
-    _register('container_ops_next_reg', next_reg)
-
-    evaluator.commands['循环进栈'] = (['label'], [['container_ops_loop_push', 'label']], {}, None)
-    evaluator.commands['循环出栈'] = ([], [['container_ops_loop_pop']], {}, None)
-    evaluator.commands['循环栈顶'] = ([], [['return', ['container_ops_loop_top']]], {}, None)
-    _register('container_ops_loop_push', loop_push)
-    _register('container_ops_loop_pop', loop_pop)
-    _register('container_ops_loop_top', loop_top)
-
-    evaluator.commands['是终止指令'] = (['s'], [['container_ops_is_terminated', 's']], {}, None)
-    _register('container_ops_is_terminated', is_terminated)
 
     stdlib_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'stdlib')
 
@@ -296,7 +194,7 @@ def self_hosted_compile(source: str, module_name: str = 'main') -> str:
         raise SyntaxError(f'sugar.san 解析失败: {ast}')
 
     # 4. llvmgen.san 生成 IR（只编译用户代码）
-    evaluator._op_cache.clear()  # 编译前清空
+    evaluator._op_cache.clear()
     ir_text = evaluator.eval(['编译顶层', ast])
     if not isinstance(ir_text, str):
         raise RuntimeError(f'llvmgen.san 生成失败: {type(ir_text).__name__}')
@@ -305,85 +203,19 @@ def self_hosted_compile(source: str, module_name: str = 'main') -> str:
 
 
 def compile_module_test(module_name: str) -> str:
-    """编译单个 .san 模块到 LLVM IR（测试用）。"""
+    """编译单个 .san 模块到 LLVM IR（测试用）。
+
+    V5: 辅助函数已内联到 llvmgen.san，无需 Python 注入。
+    """
     from evaluator import SanyanEvaluator
     from skin import SkinManager
     from ops.file_ops import clear_cache
-    from ops.container_ops import ContainerOps
-    import os
 
     clear_cache()
     evaluator = SanyanEvaluator(skin_manager=SkinManager('chinese'))
-    # 强制覆盖 box/unbox 派发 + 清所有缓存
-    from ops.registry import _OP_DISPATCH
-
-    _OP_DISPATCH['box'] = (box_py, None)
-    _OP_DISPATCH['unbox'] = (unbox_py, None)
-    evaluator._op_cache.clear()
-    evaluator.commands['新字典'] = ([], [['return', ['container_ops_dict_new_empty']]], {}, None)
-    evaluator.commands['存变量'] = (['d', 'k', 'v'], [['container_ops_dict_set', 'd', 'k', 'v']], {}, None)
-    evaluator.commands['新列表'] = ([], [['return', ['container_ops_list_new_empty']]], {}, None)
-    _register('container_ops_dict_new_empty', dict_new_empty)
-    _register('container_ops_list_new_empty', list_new_empty)
-    _register('container_ops_dict_set', ContainerOps.dict_set)
-    _register('container_ops_dict_get_safe', dict_get_safe)
-    _register('container_ops_list_len', list_len)
-    _register('container_ops_dict_len', dict_len)
-    _register('container_ops_list_get_safe', list_get_safe)
-    _register('container_ops_list_append', list_append)
-    _register('container_ops_env_push', env_push)
-    _register('container_ops_env_pop', env_pop)
-    _register('container_ops_dict_keys', dict_keys)
-    _register('container_ops_list_contains', list_contains)
-    _register('container_ops_str_bytelen', str_bytelen)
-    _register('container_ops_str_escape_llvm', escape_llvm_str)
-    _register('container_ops_register_func_name', register_func_name)
-    _register('container_ops_get_func_name', get_func_name)
-    _register('container_ops_set_module_id', set_module_id)
-    _register('container_ops_str_endswith', str_endswith)
-    _register('container_ops_str_contains', str_contains)
-    evaluator.commands['查键'] = (['d', 'k'], [['container_ops_dict_get_safe', 'd', 'k']], {}, None)
-    evaluator.commands['包含'] = (['lst', 'item'], [['container_ops_list_contains', 'lst', 'item']], {}, None)
-    evaluator.commands['列表取长'] = (['lst'], [['container_ops_list_len', 'lst']], {}, None)
-    evaluator.commands['字典取长'] = (['d'], [['container_ops_dict_len', 'd']], {}, None)
-    evaluator.commands['列表取'] = (['lst', 'idx'], [['container_ops_list_get_safe', 'lst', 'idx']], {}, None)
-    # tag_op: Python 命令，AST 节点头部查字典得 opcode（避免自举 IR 中的字符串比较）
-    evaluator.commands['tag_op'] = (['ast'], [['container_ops_tag_op', 'ast']], {}, None)
-    _register('container_ops_tag_op', tag_op)
-    assert _get_op('container_ops_tag_op') is not None, 'tag_op registration failed!'
-    evaluator.commands['列表追加'] = (['lst', 'item'], [['container_ops_list_append', 'lst', 'item']], {}, None)
-    evaluator.commands['进栈'] = (['stack'], [['container_ops_env_push', 'stack']], {}, None)
-    evaluator.commands['出栈'] = (['stack'], [['container_ops_env_pop', 'stack']], {}, None)
-    evaluator.commands['字典键列表'] = (['d'], [['container_ops_dict_keys', 'd']], {}, None)
-    evaluator.commands['取字长'] = (['s'], [['container_ops_str_bytelen', 's']], {}, None)
-    evaluator.commands['转义LLVM字符串'] = (['s'], [['container_ops_str_escape_llvm', 's']], {}, None)
-    evaluator.commands['注册函数名'] = (['name'], [['container_ops_register_func_name', 'name']], {}, None)
-    evaluator.commands['取函数名'] = (['name'], [['container_ops_get_func_name', 'name']], {}, None)
-    evaluator.commands['设置模块ID'] = (['mid'], [['container_ops_set_module_id', 'mid']], {}, None)
-    evaluator.commands['后缀'] = (['s', 'suffix'], [['container_ops_str_endswith', 's', 'suffix']], {}, None)
-    evaluator.commands['字符串包含'] = (['s', 'sub'], [['container_ops_str_contains', 's', 'sub']], {}, None)
-    evaluator.commands['进入合并上下文'] = (['label'], [['container_ops_set_merge_label', 'label']], {}, None)
-    evaluator.commands['退出合并上下文'] = ([], [['container_ops_clear_merge_label']], {}, None)
-    evaluator.commands['取合并标签'] = ([], [['return', ['container_ops_get_merge_label']]], {}, None)
-    _register('container_ops_get_merge_label', get_merge_label)
-
-    evaluator.commands['新标签ID'] = ([], [['return', ['container_ops_next_label']]], {}, None)
-    _register('container_ops_next_label', next_label)
-
-    evaluator.commands['新寄存器ID'] = ([], [['return', ['container_ops_next_reg']]], {}, None)
-    _register('container_ops_next_reg', next_reg)
-
-    evaluator.commands['循环进栈'] = (['label'], [['container_ops_loop_push', 'label']], {}, None)
-    evaluator.commands['循环出栈'] = ([], [['container_ops_loop_pop']], {}, None)
-    evaluator.commands['循环栈顶'] = ([], [['return', ['container_ops_loop_top']]], {}, None)
-    _register('container_ops_loop_push', loop_push)
-    _register('container_ops_loop_pop', loop_pop)
-    _register('container_ops_loop_top', loop_top)
-
-    evaluator.commands['是终止指令'] = (['s'], [['container_ops_is_terminated', 's']], {}, None)
-    _register('container_ops_is_terminated', is_terminated)
 
     stdlib_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'stdlib')
+
     # Load llvmgen.san
     with open(os.path.join(stdlib_dir, 'llvmgen.san'), encoding='utf-8') as f:
         llvmgen_code = f.read()
@@ -408,8 +240,6 @@ def compile_module_test(module_name: str) -> str:
     ir = evaluator.eval(['编译顶层', module_ast])
     ir = _fix_terminators(ir) if isinstance(ir, str) else ''
     ir = _fix_missing_constants(ir) if isinstance(ir, str) else ''
-    # _fix_param_unbox 会导致 comp_env 中的 alloca 寄存器与 IR 不一致——暂时跳过
-    # ir = _fix_param_unbox(ir) if isinstance(ir, str) else ''
     ir = _fix_rt_list_get_null_safe(ir) if isinstance(ir, str) else ''
     return ir if isinstance(ir, str) else ''
 
