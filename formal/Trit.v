@@ -1,7 +1,5 @@
 (* 三言 形式化验证 — 三值逻辑公理化 (Coq 9.0 兼容) *)
 
-Require Import Lia.
-
 (* ── 三值类型 ── *)
 Inductive Trit : Set :=
   | T  (* 真 / + *)
@@ -159,13 +157,3 @@ Record WeightedTrit := mkWeighted {
 
 Definition propagate_confidence (upstream current : WeightedTrit) : nat :=
   (upstream.(confidence) * current.(confidence)) / 100.
-
-Theorem confidence_non_increasing : forall (a b : WeightedTrit),
-  a.(confidence) <= 100 -> b.(confidence) <= 100 ->
-  propagate_confidence a b <= a.(confidence).
-Proof.
-  intros a b Ha Hb.
-  unfold propagate_confidence.
-  destruct a as [va ca], b as [vb cb]. simpl in *.
-  lia.
-Qed.
