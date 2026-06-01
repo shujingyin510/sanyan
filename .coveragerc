@@ -1,0 +1,32 @@
+[run]
+omit =
+    build_combined.py
+    build_exe.py
+    compile_llvmgen.py
+    compile_bytecode.py
+    doc_sync.py
+    run_agent.py
+    run_v2.py
+    run_v2_demo.py
+    run_village_demo.py
+    utils/*
+    llvmgen/helpers.py
+    llvmgen/build.py
+    llvmgen/ir_fixes.py
+    llvmgen/compiler.py
+    gui.py
+    dap_server.py
+    lsp_server.py
+    main.py
+    setup.py
+    sanyancc.py
+    sanfmt.py
+    debug_eval.py
+    lsp/*
+    benchmark/*
+    scripts/*
+    examples/*
+    csrc/*
+
+[report]
+fail_under = 75
