@@ -123,4 +123,5 @@ jobs:
       - name: Verify tagged pointer model (TaggedPtr.v)
         run: coqc -R formal SanyanFormal formal/TaggedPtr.v
       - name: All formal proofs complete
-        run: echo "=== 三言形式化验证完成: 20+ 条定理全部通过 ==="
+        run: |
+          echo "=== All formal proofs passed ==="
