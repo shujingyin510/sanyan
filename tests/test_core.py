@@ -644,6 +644,55 @@ class TestTernaryDeep(unittest.TestCase):
         r = e.eval(['concat', a, b])
         self.assertEqual(r, "hello world")
 
+    def test_detect_conflict(self):
+        """检测冲突: 两个高信度矛盾值 → 标记冲突"""
+        from evaluator import SanyanEvaluator
+
+        e = SanyanEvaluator()
+        a = e.eval(['ternary_value', 1, 0.9, '"传感器A"'])
+        b = e.eval(['ternary_value', -1, 0.85, '"传感器B"'])
+        r = e.eval(['detect_conflict', a, b])
+        self.assertEqual(r['冲突'], 1)
+
+    def test_detect_conflict_no_conflict(self):
+        """检测冲突: 两个一致值 → 无冲突"""
+        from evaluator import SanyanEvaluator
+
+        e = SanyanEvaluator()
+        a = e.eval(['ternary_value', 1, 0.9])
+        b = e.eval(['ternary_value', 1, 0.8])
+        r = e.eval(['detect_conflict', a, b])
+        self.assertEqual(r['冲突'], 0)
+
+    def test_decide_passes_threshold(self):
+        """判定: 信度 ≥ 阈值 → 通过"""
+        from evaluator import SanyanEvaluator
+
+        e = SanyanEvaluator()
+        v = e.eval(['ternary_value', 1, 0.95])
+        r = e.eval(['decide', v, 0.9])
+        self.assertEqual(r.to_int(), 1)
+
+    def test_decide_below_threshold(self):
+        """判定: 信度 < 阈值 → 降为可能态"""
+        from evaluator import SanyanEvaluator
+
+        e = SanyanEvaluator()
+        v = e.eval(['ternary_value', 1, 0.3])
+        r = e.eval(['decide', v, 0.5])
+        self.assertEqual(r.to_int(), 0)  # 降为可能
+
+    def test_fuse_weighted(self):
+        """融合: 多源加权平均"""
+        from evaluator import SanyanEvaluator
+
+        e = SanyanEvaluator()
+        s1 = e.eval(['ternary_value', 1, 0.9])
+        s2 = e.eval(['ternary_value', 0, 0.4])
+        s3 = e.eval(['ternary_value', 1, 0.7])
+        r = e.eval(['fuse', s1, s2, s3])
+        self.assertEqual(r.to_int(), 1)  # 加权后偏真
+
 
 if __name__ == '__main__':
     unittest.main()

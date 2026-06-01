@@ -189,5 +189,118 @@ def _source_chain_op(evaluator, args):
 
 register('source', _source_op)
 register('source_chain', _source_chain_op)
+
+# ── 冲突模型 ──
+
+def _detect_conflict(evaluator, args):
+    """检测冲突(a, b) — 两个值矛盾且信度都高→标记冲突。
+    返回字典: {冲突: 1/-1/0, 差异度: 0-1, a信度, b信度}"""
+    if len(args) < 2:
+        raise SanyanSyntaxError('检测冲突 需要至少两个参数')
+    vals = [evaluator.eval(a) for a in args]
+    # 检查两两矛盾
+    for i in range(len(vals)):
+        for j in range(i + 1, len(vals)):
+            a, b = vals[i], vals[j]
+            ai = a.to_int() if isinstance(a, TritValue) else a
+            bi = b.to_int() if isinstance(b, TritValue) else b
+            ac = a.confidence if isinstance(a, TritValue) else 1.0
+            bc = b.confidence if isinstance(b, TritValue) else 1.0
+            # 高信度矛盾: 真(+1) vs 假(-1), 且双方信度 > 0.7
+            if ai * bi == -1 and ac > 0.7 and bc > 0.7:
+                return {'冲突': 1, '差异度': min(ac, bc), 'a信度': ac, 'b信度': bc}
+    return {'冲突': 0, '差异度': 0, 'a信度': 0, 'b信度': 0}
+
+register('detect_conflict', _detect_conflict)
+
+
+def _conflict_merge(evaluator, args):
+    """冲突合并(a, b, 策略) — 两个矛盾值按策略合并。
+    策略: "保守" → 返回可能(0); "优先级" → 保持第一个; "投票" → 信度高者胜; "新鲜度" → 信度×值"""
+    if len(args) < 2:
+        raise SanyanSyntaxError('冲突合并 需要至少两个值')
+    vals = [evaluator.eval(a) for a in args[:-1]] if len(args) > 2 else [evaluator.eval(args[0]), evaluator.eval(args[1])]
+    strategy = evaluator.eval(args[-1])
+    if isinstance(strategy, TritValue) and strategy.is_string():
+        strategy = strategy.to_payload()
+    elif isinstance(strategy, TritValue):
+        strategy = str(strategy.to_int())
+    else:
+        strategy = str(strategy)
+
+    if strategy == '保守' or strategy == 'conservative':
+        return TritValue(0, confidence=0.5, source='冲突合并(保守)')
+    elif strategy == '优先级' or strategy == 'priority':
+        v = vals[0]
+        return v.with_confidence(v.confidence * 0.5) if isinstance(v, TritValue) else \
+               TritValue(v if isinstance(v, int) else 0, confidence=0.5, source='冲突合并(优先级)')
+    elif strategy == '投票' or strategy == 'vote':
+        best, best_c = TritValue(0), 0
+        for v in vals:
+            c = v.confidence if isinstance(v, TritValue) else 1.0
+            if c > best_c:
+                best_c = c
+                best = v if isinstance(v, TritValue) else TritValue(v)
+        return best.with_confidence(best_c * 0.7)
+    # 默认: 返回可能
+    return TritValue(0, confidence=0, source='冲突合并(默认)')
+
+register('conflict_merge', _conflict_merge)
+
+
+def _decide(evaluator, args):
+    """判定(v, 阈值) — 硬判定: 置信度≥阈值→输出确定态，<阈值→强制输出可能(0)。
+    工业控制默认 0.95，游戏 NPC 默认 0.5。"""
+    if len(args) < 1:
+        raise SanyanSyntaxError('判定 需要至少 1 个参数')
+    val = evaluator.eval(args[0])
+    threshold = 0.5
+    if len(args) >= 2:
+        t = evaluator.eval(args[1])
+        if isinstance(t, TritValue):
+            threshold = t.to_float()
+        elif isinstance(t, (int, float)):
+            threshold = float(t)
+    if not isinstance(val, TritValue):
+        return TritValue(val if isinstance(val, int) else 0)
+
+    c = val.confidence
+    if c >= threshold:
+        return val  # 确定态，保持原值
+    # 信度不足 → 强制可能态
+    return TritValue(0, confidence=c, source=val._source or '硬判定降级')
+
+register('decide', _decide)
+
+
+def _fuse(evaluator, args):
+    """融合(列表) — 多源加权融合。信度高的源权重大。
+    融合([三态(真,0.9), 三态(可能,0.4), 三态(真,0.7)])
+    → 加权结果 with 融合信度 = 加权和 / 总权重"""
+    if len(args) == 0:
+        return TritValue(0)
+    vals = [evaluator.eval(a) for a in args]
+    total_weight = 0.0
+    weighted_sum = 0.0
+    sources = []
+    for v in vals:
+        if isinstance(v, TritValue):
+            w = v.confidence
+            total_weight += w
+            weighted_sum += v.to_int() * w
+            if v._source:
+                sources.append(v._source)
+        elif isinstance(v, (int, float)):
+            total_weight += 1.0
+            weighted_sum += float(v)
+    if total_weight == 0:
+        return TritValue(0, confidence=0)
+    result = int(round(weighted_sum / total_weight))
+    result = max(-1, min(1, result))
+    fused_c = total_weight / len(vals)
+    merged_src = '+'.join(sources) if sources else '融合'
+    return TritValue(result, confidence=fused_c, source=merged_src)
+
+register('fuse', _fuse)
 register('to_string', TypeOps.to_string)
 register('to_number', TypeOps.to_number)
