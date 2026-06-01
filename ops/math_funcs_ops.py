@@ -171,9 +171,9 @@ class MathFuncsOps:
 
     @staticmethod
     def math_pow(evaluator, args):
-        from ops.arithmetic_ops import ArithmeticOps
+        from ops.arithmetic_ops import _op_pow
 
-        return ArithmeticOps.arithmetic(evaluator, 'pow', args)
+        return _op_pow(evaluator, args)
 
     @staticmethod
     def ternary_parse(evaluator, args):

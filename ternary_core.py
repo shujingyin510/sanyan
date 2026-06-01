@@ -360,6 +360,9 @@ class ArrayValue:
     def __setitem__(self, index, value):
         self.set(index, value)
 
+    def __iter__(self):
+        return iter(self.data)
+
     def __repr__(self):
         return '[' + ', '.join(str(x) for x in self.data) + ']'
 
