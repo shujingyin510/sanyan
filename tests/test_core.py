@@ -365,17 +365,20 @@ class TestEvaluatorEdge(unittest.TestCase):
 
     def test_eval_simple_add(self):
         from evaluator import SanyanEvaluator
+
         e = SanyanEvaluator()
         self.assertEqual(e.eval(['add', 1, 2]).to_int(), 3)
 
     def test_eval_var_set_get(self):
         from evaluator import SanyanEvaluator
+
         e = SanyanEvaluator()
         e.eval(['set', 'x', 42])
         self.assertEqual(e.eval('x').to_int(), 42)
 
     def test_eval_function_call(self):
         from evaluator import SanyanEvaluator
+
         e = SanyanEvaluator()
         e.eval(['fn', 'double', ['n'], ['do', ['return', ['mul', 'n', 2]]]])
         result = e.eval(['double', 5])
@@ -384,6 +387,7 @@ class TestEvaluatorEdge(unittest.TestCase):
     def test_eval_nested_scope(self):
         from evaluator import SanyanEvaluator
         from ternary_core import TritValue
+
         e = SanyanEvaluator()
         e.push_scope()
         e.set_var('x', TritValue(100))
@@ -392,6 +396,7 @@ class TestEvaluatorEdge(unittest.TestCase):
 
     def test_eval_if_expression(self):
         from evaluator import SanyanEvaluator
+
         e = SanyanEvaluator()
         e.eval(['set', 'x', 0])
         e.eval(['if', ['gt', 5, 3], ['do', ['set', 'x', 1]], ['do', ['set', 'x', -1]]])
@@ -399,17 +404,20 @@ class TestEvaluatorEdge(unittest.TestCase):
 
     def test_eval_simple_expression(self):
         from evaluator import SanyanEvaluator
+
         e = SanyanEvaluator()
         result = e.eval(['add', 10, 20])
         self.assertEqual(result.to_int(), 30)
 
     def test_has_var_undefined(self):
         from evaluator import SanyanEvaluator
+
         e = SanyanEvaluator()
         self.assertFalse(e.has_var('undefined_xyz'))
 
     def test_all_scoped_vars(self):
         from evaluator import SanyanEvaluator
+
         e = SanyanEvaluator()
         e.set_var('a', 1)
         e.set_var('b', 2)
@@ -419,11 +427,13 @@ class TestEvaluatorEdge(unittest.TestCase):
 
     def test_module_cache(self):
         from evaluator import SanyanEvaluator
+
         e = SanyanEvaluator()
         self.assertIsInstance(e._module_cache, dict)
 
     def test_max_loop_steps_default(self):
         from evaluator import SanyanEvaluator
+
         e = SanyanEvaluator()
         self.assertGreater(e.max_loop_steps, 0)
 
@@ -433,57 +443,68 @@ class TestValuesExtended(unittest.TestCase):
 
     def test_sanyan_error_base(self):
         from values import SanyanError
-        e = SanyanError("通用错误")
-        self.assertEqual(str(e), "通用错误")
+
+        e = SanyanError('通用错误')
+        self.assertEqual(str(e), '通用错误')
 
     def test_sanyan_syntax_error(self):
         from values import SanyanSyntaxError
-        e = SanyanSyntaxError("语法错误")
-        self.assertEqual(str(e), "语法错误")
+
+        e = SanyanSyntaxError('语法错误')
+        self.assertEqual(str(e), '语法错误')
 
     def test_sanyan_type_error(self):
         from values import SanyanTypeError
-        e = SanyanTypeError("类型错误")
-        self.assertEqual(str(e), "类型错误")
+
+        e = SanyanTypeError('类型错误')
+        self.assertEqual(str(e), '类型错误')
 
     def test_sanyan_value_error(self):
         from values import SanyanValueError
-        e = SanyanValueError("值错误")
-        self.assertEqual(str(e), "值错误")
+
+        e = SanyanValueError('值错误')
+        self.assertEqual(str(e), '值错误')
 
     def test_sanyan_runtime_error(self):
         from values import SanyanRuntimeError
-        e = SanyanRuntimeError("运行时错误")
-        self.assertEqual(str(e), "运行时错误")
+
+        e = SanyanRuntimeError('运行时错误')
+        self.assertEqual(str(e), '运行时错误')
 
     def test_sanyan_name_error(self):
         from values import SanyanNameError
-        e = SanyanNameError("名称错误")
-        self.assertEqual(str(e), "名称错误")
+
+        e = SanyanNameError('名称错误')
+        self.assertEqual(str(e), '名称错误')
 
     def test_sanyan_key_error(self):
         from values import SanyanKeyError
-        e = SanyanKeyError("键错误")
-        self.assertIn("键错误", str(e))
+
+        e = SanyanKeyError('键错误')
+        self.assertIn('键错误', str(e))
 
     def test_sanyan_attribute_error(self):
         from values import SanyanAttributeError
-        e = SanyanAttributeError("属性错误")
-        self.assertEqual(str(e), "属性错误")
+
+        e = SanyanAttributeError('属性错误')
+        self.assertEqual(str(e), '属性错误')
 
     def test_sanyan_io_error(self):
         from values import SanyanIOError
-        e = SanyanIOError("IO错误")
-        self.assertEqual(str(e), "IO错误")
+
+        e = SanyanIOError('IO错误')
+        self.assertEqual(str(e), 'IO错误')
 
     def test_return_exception(self):
         from values import ReturnException
         from ternary_core import TritValue
+
         ret = ReturnException(TritValue(42))
         self.assertEqual(ret.value.to_int(), 42)
 
     def test_break_exception(self):
         from values import BreakException
+
         b = BreakException()
         self.assertIsNotNone(b)
 

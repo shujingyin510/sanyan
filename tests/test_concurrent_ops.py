@@ -24,12 +24,7 @@ class TestConcurrentRun(unittest.TestCase):
         self.assertEqual(result.get(0).to_int() if isinstance(result.get(0), TritValue) else result.get(0), 42)
 
     def test_concurrent_multiple_tasks(self):
-        result = self.env.eval([
-            '并发',
-            ['add', 1, 2],
-            ['mul', 3, 4],
-            ['sub', 10, 5]
-        ])
+        result = self.env.eval(['并发', ['add', 1, 2], ['mul', 3, 4], ['sub', 10, 5]])
         self.assertIsInstance(result, ArrayValue)
         self.assertEqual(len(result.data), 3)
         self.assertEqual(result.get(0).to_int(), 3)
@@ -37,10 +32,7 @@ class TestConcurrentRun(unittest.TestCase):
         self.assertEqual(result.get(2).to_int(), 5)
 
     def test_concurrent_with_side_effects(self):
-        result = self.env.eval(['并发',
-                                ['add', 1, 2],
-                                ['add', 3, 4],
-                                ['add', 5, 6]])
+        result = self.env.eval(['并发', ['add', 1, 2], ['add', 3, 4], ['add', 5, 6]])
         self.assertIsInstance(result, ArrayValue)
         nums = [result.get(i).to_int() for i in range(3)]
         self.assertIn(3, nums)
@@ -60,6 +52,7 @@ class TestDelayedRun(unittest.TestCase):
 
     def test_delay_simple(self):
         import time
+
         self.env.eval(['set', 'x', 0])
         t0 = time.time()
         result = self.env.eval(['延迟', 50, ['set', 'x', 99]])
@@ -70,6 +63,7 @@ class TestDelayedRun(unittest.TestCase):
 
     def test_delay_expression(self):
         import time
+
         self.env.eval(['set', 'y', 100])
         t0 = time.time()
         result = self.env.eval(['延迟', 30, ['add', 'y', 1]])
@@ -121,10 +115,7 @@ class TestMutexOps(unittest.TestCase):
     def test_lock_multiple_names(self):
         self.env.eval(['锁', '"L1"'])
         self.env.eval(['锁', '"L2"'])
-        self.assertNotEqual(
-            self.env.eval(['锁', '"L1"']),
-            self.env.eval(['锁', '"L2"'])
-        )
+        self.assertNotEqual(self.env.eval(['锁', '"L1"']), self.env.eval(['锁', '"L2"']))
 
     def test_lock_variable_name(self):
         self.env.eval(['set', 'name', '"dynamic_lock"'])
@@ -167,6 +158,7 @@ class TestConcurrentAliases(unittest.TestCase):
 
     def test_delay_alias(self):
         import time
+
         t0 = time.time()
         result = self.env.eval(['delay', 30, ['add', 5, 5]])
         dt = time.time() - t0

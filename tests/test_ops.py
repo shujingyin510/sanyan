@@ -510,11 +510,9 @@ class TestControlOpsExtended(unittest.TestCase):
 
     def test_loop_and_break(self):
         self.env.eval(['set', 'x', 0])
-        self.env.eval([
-            'loop', ['lt', 'x', 100],
-            ['do', ['set', 'x', ['add', 'x', 1]],
-             ['if', ['gt', 'x', 5], ['do', ['break']]]]
-        ])
+        self.env.eval(
+            ['loop', ['lt', 'x', 100], ['do', ['set', 'x', ['add', 'x', 1]], ['if', ['gt', 'x', 5], ['do', ['break']]]]]
+        )
         self.assertEqual(self.env.get_var('x').to_int(), 6)
 
     def test_for_range(self):

@@ -29,7 +29,7 @@ class TestResolveOpName(unittest.TestCase):
         self.env = SanyanEvaluator(skin_manager=SkinManager('chinese'))
 
     def test_no_skin_returns_original(self):
-        from skin import SkinManager
+
         e = SanyanEvaluator(skin_manager=None)
         self.assertEqual(resolve_op_name(e, 'add'), 'add')
 
@@ -74,7 +74,8 @@ class TestDispatchOp(unittest.TestCase):
         self.assertIsNone(result)
 
     def test_dispatch_with_extra(self):
-        from ops.registry import register, register_alias
+        from ops.registry import register
+
         called = []
 
         def mock_op(e, extra, args):
@@ -92,6 +93,7 @@ class TestDispatchOp(unittest.TestCase):
 
     def test_no_cache_op_always_lookup(self):
         from ops.registry import register
+
         counter = [0]
 
         def counting_op(e, args):
@@ -164,7 +166,7 @@ class TestDotAccess(unittest.TestCase):
             handle_dot_access(self.env, 'lst.99', [])
 
     def test_array_value_index_access(self):
-        from ternary_core import ArrayValue
+
         arr = ArrayValue(3, TritValue(0))
         arr.set(0, TritValue(5))
         arr.set(1, TritValue(10))
@@ -247,6 +249,7 @@ class TestApply(unittest.TestCase):
     def test_apply_sandbox_blocked(self):
         """测试沙箱限制：沙箱激活后受保护操作被拦截"""
         from sandbox import restrict, unblock, is_active
+
         restrict(ops=['debug'])
         self.assertTrue(is_active())
         unblock()

@@ -167,20 +167,19 @@ class TestFormatIf(unittest.TestCase):
         self.assertIn('输出("正数")', result)
 
     def test_if_else(self):
-        ast = ['if', ['gt', 'x', 0],
-               ['do', ['print', '"正数"']],
-               ['do', ['print', '"非正"']]]
+        ast = ['if', ['gt', 'x', 0], ['do', ['print', '"正数"']], ['do', ['print', '"非正"']]]
         result = _fmt_if(ast, 0)
         self.assertIn('若 (x 大于 0)', result)
         self.assertIn('否则', result)
         self.assertIn('输出("非正")', result)
 
     def test_if_elif_else(self):
-        ast = ['if', ['gt', 'x', 0],
-               ['do', ['print', '"正值"']],
-               ['if', ['eq', 'x', 0],
-                ['do', ['print', '"零"']],
-                ['do', ['print', '"负值"']]]]
+        ast = [
+            'if',
+            ['gt', 'x', 0],
+            ['do', ['print', '"正值"']],
+            ['if', ['eq', 'x', 0], ['do', ['print', '"零"']], ['do', ['print', '"负值"']]],
+        ]
         result = _fmt_if(ast, 0)
         self.assertIn('若 (x 大于 0)', result)
         self.assertIn('再若 (x 等于 0)', result)
@@ -188,10 +187,7 @@ class TestFormatIf(unittest.TestCase):
         self.assertIn('输出("负值")', result)
 
     def test_if_elif_no_else(self):
-        ast = ['if', ['gt', 'x', 0],
-               ['do', ['print', '"A"']],
-               ['if', ['lt', 'x', 0],
-                ['do', ['print', '"B"']]]]
+        ast = ['if', ['gt', 'x', 0], ['do', ['print', '"A"']], ['if', ['lt', 'x', 0], ['do', ['print', '"B"']]]]
         result = _fmt_if(ast, 0)
         self.assertIn('再若', result)
         self.assertNotIn('否则', result)
@@ -259,9 +255,7 @@ class TestFormatStmt(unittest.TestCase):
         self.assertIn('循环 (i 小于 10)', result)
 
     def test_fn_statement(self):
-        ast = ['fn', 'add', ['a', 'b'],
-               {'a': 'int', 'b': 'int'},
-               ['do', ['return', ['add', 'a', 'b']]]]
+        ast = ['fn', 'add', ['a', 'b'], {'a': 'int', 'b': 'int'}, ['do', ['return', ['add', 'a', 'b']]]]
         result = _fmt_stmt(ast)
         self.assertIn('定义 add(a: int, b: int)', result)
         self.assertIn('返回(a 加 b)', result)
@@ -342,13 +336,12 @@ class TestFormatCode(unittest.TestCase):
         self.assertIn('// 打招呼', result)
 
     def test_full_program(self):
-        ast = ['do',
-               ['set', 'x', 10],
-               ['if', ['gt', 'x', 0],
-                ['do', ['print', '"正数"']],
-                ['do', ['print', '"非正"']]],
-               ['fn', 'sqr', ['n'],
-                ['do', ['return', ['mul', 'n', 'n']]]]]
+        ast = [
+            'do',
+            ['set', 'x', 10],
+            ['if', ['gt', 'x', 0], ['do', ['print', '"正数"']], ['do', ['print', '"非正"']]],
+            ['fn', 'sqr', ['n'], ['do', ['return', ['mul', 'n', 'n']]]],
+        ]
         result = format_code(ast)
         self.assertIn('设 x = 10', result)
         self.assertIn('若 (x 大于 0)', result)

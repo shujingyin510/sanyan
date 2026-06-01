@@ -3,7 +3,6 @@
 import unittest
 from evaluator import SanyanEvaluator
 from ternary_core import TritValue, ArrayValue
-from values import FunctionValue, ModuleValue, SanyanValueError
 from ops.io_ops import IOOps
 
 
@@ -103,6 +102,7 @@ class TestIOOpsEdgeCases(unittest.TestCase):
     def test_input_op_no_prompt(self):
         import io
         import sys
+
         saved = sys.stdin
         try:
             sys.stdin = io.StringIO('42\n')
@@ -115,6 +115,7 @@ class TestIOOpsEdgeCases(unittest.TestCase):
     def test_input_op_with_prompt(self):
         import io
         import sys
+
         saved = sys.stdin
         try:
             sys.stdin = io.StringIO('-1\n')
@@ -127,6 +128,7 @@ class TestIOOpsEdgeCases(unittest.TestCase):
     def test_input_trit_state(self):
         import io
         import sys
+
         saved = sys.stdin
         try:
             sys.stdin = io.StringIO('真\n')
@@ -140,6 +142,7 @@ class TestIOOpsEdgeCases(unittest.TestCase):
     def test_input_plain_string(self):
         import io
         import sys
+
         saved = sys.stdin
         try:
             sys.stdin = io.StringIO('hello\n')
@@ -169,6 +172,7 @@ class TestDebugOps(unittest.TestCase):
     def test_debug_breakpoint_cancelled(self):
         import io
         import sys
+
         saved = sys.stdin
         try:
             sys.stdin = io.StringIO('c\n')
