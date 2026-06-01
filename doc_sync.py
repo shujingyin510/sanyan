@@ -10,17 +10,14 @@ import re
 
 MANUAL_PATH = 'docs/manual.md'
 COMMANDS_PATH = 'docs/commands.md'
-ERRORS_PATH = 'docs/errors.md'
+ERRORS_PATH = 'docs/manual.md'  # 错误表已合并到统一手册
 
 # 需要检查版本号的文件及其版本号所在行的正则模式
 VERSION_FILES = {
     'README.md': r'# 三言 Sanyan v([\d.]+)',
     'README_EN.md': r'# Sanyan v([\d.]+)',
     'docs/manual.md': r'# 三言 v([\d.]+) 语言手册',
-    'docs/commands.md': r'# 三言 v([\d.]+) 内置命令速查表',
-    'docs/errors.md': r'# 三言 v([\d.]+) 错误信息说明',
     'docs/llvm.md': r'# 三言 LLVM 代码生成器 v([\d.]+)',
-    'docs/syntax.md': r'v([\d.]+)',
 }
 
 
