@@ -13,8 +13,10 @@ from values import ReturnException
 
 
 def _tv(val):
-    """将 TritValue 转为 Python int（用于断言比较）"""
+    """将 TritValue 转为 Python int（用于断言比较）。字符串保持原样。"""
     if isinstance(val, TritValue):
+        if val.is_string() or val.is_list() or val.is_dict():
+            return val.to_payload()
         return val.to_int()
     if isinstance(val, list):
         return [_tv(v) for v in val]

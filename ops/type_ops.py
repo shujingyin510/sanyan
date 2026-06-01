@@ -91,6 +91,29 @@ class TypeOps:
             return f'{val:.4f}'.rstrip('0').rstrip('.')
         return str(val)
 
+    @staticmethod
+    def ternary_value(evaluator, args):
+        """构造显式三态值：三态值(v, confidence=1.0) — 返回带置信度的 TritValue。
+        三态值("hello", 0.8) 创建一个置信度 0.8 的字符串值。
+        三态值(42, 0.9) 创建一个置信度 0.9 的数值。"""
+        if len(args) < 1 or len(args) > 2:
+            raise SanyanSyntaxError('三态值 需要 1-2 个参数: 值 [, 置信度]')
+        val = evaluator.eval(args[0])
+        confidence = 1.0
+        if len(args) >= 2:
+            c = evaluator.eval(args[1])
+            if isinstance(c, TritValue):
+                confidence = c.to_float()
+            elif isinstance(c, (int, float)):
+                confidence = float(c)
+        if isinstance(val, TritValue):
+            return val.with_confidence(confidence)
+        if isinstance(val, str):
+            return TritValue(val, confidence=confidence)
+        if isinstance(val, (int, float)):
+            return TritValue(val, confidence=confidence)
+        raise SanyanTypeError(f'三态值 不支持类型: {type(val).__name__}')
+
 
 # 注册类型操作
 register('is_number', TypeOps.is_number)
@@ -98,5 +121,6 @@ register('is_string', TypeOps.is_string)
 register('is_list', TypeOps.is_list)
 register('is_dict', TypeOps.is_dict)
 register('str_equals', TypeOps.str_equals)
+register('ternary_value', TypeOps.ternary_value)
 register('to_string', TypeOps.to_string)
 register('to_number', TypeOps.to_number)

@@ -148,6 +148,22 @@ def _make_closure_value(evaluator: SanyanEvaluator, cmd_name: str) -> Any:
     return FunctionValue(params, body, evaluator, closure_vars, param_types)
 
 
+def unwrap_trit(value: Any) -> Any:
+    """从 TritValue 中提取原始值（字符串→str，数值→int，列表/字典→原值）。
+    非 TritValue 原样返回。用于 ops 中统一处理三态值。
+    """
+    from ternary_core import TritValue
+    if isinstance(value, TritValue):
+        if value.is_string():
+            return value.to_payload()
+        if value.is_list():
+            return value.to_payload()
+        if value.is_dict():
+            return value.to_payload()
+        return value.to_int()
+    return value
+
+
 def eval_symbol(evaluator: SanyanEvaluator, symbol: str) -> Any:
     """求值符号：变量 → 字面量 → 三态词 → IoT 设备 → 上下文对象"""
     if evaluator.has_var(symbol):

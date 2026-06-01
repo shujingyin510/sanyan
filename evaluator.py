@@ -112,14 +112,13 @@ class SanyanEvaluator(SanyanRuntime):
         - dict → 直接返回（数据字典）
         - list → 区分：首元素为字符串 → AST 代码节点求值；否则 → 数据列表直接返回
         - int/float → 包装为 TritValue
-        - str → 符号解析或字面量
+        - str → 符号解析或字面量（保持原始 Python 类型以兼容现有 ops）
         """
         if isinstance(node, (TritValue, ArrayValue, FunctionValue, ModuleValue)):
             return node
         if isinstance(node, dict):
             return node
         if isinstance(node, list):
-            # 空列表或首元素非字符串 → 数据列表，直接返回
             if len(node) == 0 or not isinstance(node[0], str):
                 return node
             if isinstance(node[0], str) and self._is_numeric_string(node[0]):
