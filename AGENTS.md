@@ -428,7 +428,8 @@ arm-none-eabi-objcopy -O binary firmware.elf firmware.bin
 
 ```bash
 # 必须通过 MSYS2 bash 调用 gcc（直接调用 gcc.exe 无法输出文件）
-D:/msys64/usr/bin/bash.exe -lc "gcc /d/Test/sanyan/csrc/runtime.c -o /d/Test/sanyan/csrc/runtime.exe -std=c99 -Wall"
+# 设置环境变量 MSYS2_PATH 指向 MSYS2 安装路径，或直接使用完整路径
+${MSYS2_PATH:-D:/msys64}/usr/bin/bash.exe -lc "gcc ${PROJECT_PATH:-/d/Test/sanyan}/csrc/runtime.c -o ${PROJECT_PATH:-/d/Test/sanyan}/csrc/runtime.exe -std=c99 -Wall"
 ./csrc/runtime.exe firmware.bin
 ```
 
@@ -462,13 +463,13 @@ LLVM IR → 原生代码管线依赖 `llc` + `gcc`：
 
 ```bash
 # llc：IR → .o（可直接调用）
-D:/msys64/ucrt64/bin/llc.exe input.ll -filetype=obj -o output.o
+${MSYS2_PATH:-D:/msys64}/ucrt64/bin/llc.exe input.ll -filetype=obj -o output.o
 
 # gcc：编译 C（必须通过 MSYS2 bash）
-D:/msys64/usr/bin/bash.exe -lc "gcc -c /d/path/to/source.c -o /d/path/to/output.o -std=c99 -O2"
+${MSYS2_PATH:-D:/msys64}/usr/bin/bash.exe -lc "gcc -c /d/path/to/source.c -o /d/path/to/output.o -std=c99 -O2"
 
 # gcc：链接（必须通过 MSYS2 bash）
-D:/msys64/usr/bin/bash.exe -lc "gcc /d/path/to/obj1.o /d/path/to/obj2.o -o /d/path/to/output.exe -lm"
+${MSYS2_PATH:-D:/msys64}/usr/bin/bash.exe -lc "gcc /d/path/to/obj1.o /d/path/to/obj2.o -o /d/path/to/output.exe -lm"
 ```
 
 ### llvmgen/runtime.c 已知问题

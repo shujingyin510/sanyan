@@ -11,6 +11,11 @@ from runtime import SanyanRuntime
 from commands import Commands
 from values import FunctionValue, ModuleValue, SrcNode, SanyanError
 
+
+def _is_data_list(node: Any) -> bool:
+    """区分数据列表（如字面量 [1,2,3]）和 AST 代码节点（SrcNode）。"""
+    return isinstance(node, list) and not isinstance(node, SrcNode)
+
 from eval_helpers import (
     parse_string_literal,
     parse_numeric_literal,
@@ -100,12 +105,21 @@ class SanyanEvaluator(SanyanRuntime):
         return t.isdigit()
 
     def eval(self, node: Any) -> Any:
-        """求值 AST 节点，返回三言值。"""
+        """求值 AST 节点，返回三言值。
+
+        分派规则：
+        - TritValue/FunctionValue/ModuleValue → 直接返回
+        - dict → 直接返回（数据字典）
+        - list → 区分：首元素为字符串 → AST 代码节点求值；否则 → 数据列表直接返回
+        - int/float → 包装为 TritValue
+        - str → 符号解析或字面量
+        """
         if isinstance(node, (TritValue, ArrayValue, FunctionValue, ModuleValue)):
             return node
         if isinstance(node, dict):
             return node
         if isinstance(node, list):
+            # 空列表或首元素非字符串 → 数据列表，直接返回
             if len(node) == 0 or not isinstance(node[0], str):
                 return node
             if isinstance(node[0], str) and self._is_numeric_string(node[0]):
