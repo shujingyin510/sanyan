@@ -125,11 +125,18 @@ static rt_list_t *rt_list_new(void) {
 static void rt_list_push(rt_list_t *l, void *v) {
     if (!l) return;
     if (l->len >= l->cap) {
-        l->cap *= 2;
-        l->items = (void**)realloc(l->items, (size_t)l->cap * sizeof(void*));
+        int32_t new_cap = l->cap * 2;
+        void **new_items = (void**)realloc(l->items, (size_t)new_cap * sizeof(void*));
+        if (!new_items) return;  /* realloc 失败：保留旧 items，不泄漏 */
+        l->items = new_items;
+        l->cap = new_cap;
     }
     l->items[l->len++] = v;
 }
+
+/* ── 字典类型（csrc 专用：void* 键，开放寻址）── */
+typedef struct { void *k; void *v; } rt_entry_t;
+typedef struct { OBJ_HDR; int32_t n; int32_t cap; rt_entry_t *entries; } rt_dict_t;
 
 /* ── 字典操作 ───────────────────────────────── */
 
@@ -159,8 +166,11 @@ static int key_eq(void *a, void *b) {
 static void rt_dict_rehash(rt_dict_t *d) {
     int32_t old_cap = d->cap;
     rt_entry_t *old = d->entries;
-    d->cap = old_cap * 2;
-    d->entries = (rt_entry_t*)calloc((size_t)d->cap, sizeof(rt_entry_t));
+    int32_t new_cap = old_cap * 2;
+    rt_entry_t *new_entries = (rt_entry_t*)calloc((size_t)new_cap, sizeof(rt_entry_t));
+    if (!new_entries) return;  /* 分配失败：保留旧表，不泄漏 */
+    d->cap = new_cap;
+    d->entries = new_entries;
     for (int32_t i = 0; i < old_cap; i++) {
         if (old[i].k != NULL) {
             uint32_t h = hash_key(old[i].k);
