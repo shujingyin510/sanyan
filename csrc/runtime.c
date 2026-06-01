@@ -418,14 +418,22 @@ static int find_export(Module *mod, const char *name) {
     return -1;
 }
 
-/* ── 验证 .bin 头部（接受 SAN0 或字节码编译器变体头部）── */
+/* ── .bin 字节码版本号（与 vm.py BIN_VERSION 一致）── */
+#define BIN_VERSION 1
+
+/* ── 验证 .bin 头部（严格匹配 SAN0 + 版本号检查）── */
 static int check_bin_header(const uint8_t *hdr, const char *path) {
-    /* 标准格式：SAN0 + ver(1) + var_cnt(1) + code_size(4) */
-    if (memcmp(hdr, "SAN0", 4) == 0) return 0;
-    /* 变体格式：首字节 0x53(S)、第4字节 0x30(0)、ver=1 */
-    if (hdr[0] == 0x53 && hdr[3] == 0x30 && hdr[4] == 0x01) return 0;
-    if (path) fprintf(stderr, "非法模块格式: %s\n", path);
-    return 1;
+    /* 格式：magic "SAN0"(4) + ver(1) + var_cnt(1) + code_size(4) */
+    if (memcmp(hdr, "SAN0", 4) != 0) {
+        if (path) fprintf(stderr, "非法模块格式: %s\n", path);
+        return 1;
+    }
+    if (hdr[4] != BIN_VERSION) {
+        if (path) fprintf(stderr, "字节码版本不兼容: %s (期望 v%d, 实际 v%d)\n",
+                          path, BIN_VERSION, hdr[4]);
+        return 1;
+    }
+    return 0;
 }
 
 /* ═══════════════════════════════════════════════════
