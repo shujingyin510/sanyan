@@ -239,11 +239,20 @@ def main():
         if profiling:
             print(env.profile_report())
 
-        if result is not None:
+         if result is not None:
+            # 输出相关操作名（从 BUILTIN_OPS 和皮肤动态获取）
+            _output_op_names: set = {'print', '输出', 'debug', '调试', 'query', '查'}
+            if skin_mgr := getattr(evaluator, 'skin_manager', None):
+                for internal in ('print', 'debug', 'query'):
+                    kw = skin_mgr.get_keyword(internal) or skin_mgr.get_op(internal)
+                    if kw:
+                        _output_op_names.add(kw)
+                        if isinstance(kw, list):
+                            _output_op_names.update(kw)
 
             def _has_output_like(node):
                 if isinstance(node, list) and len(node) > 0:
-                    if node[0] in ('print', 'concat', 'query', 'debug', '输出', '连接', '查', '调试'):
+                    if node[0] in _output_op_names:
                         return True
                     for child in node[1:]:
                         if _has_output_like(child):
