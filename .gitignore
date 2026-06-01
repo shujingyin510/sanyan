@@ -243,3 +243,5 @@ tests/*.bin
 
 # Generated API docs
 docs/api/
+sanyan-vscode/node_modules/
+sanyan-vscode/package-lock.json
