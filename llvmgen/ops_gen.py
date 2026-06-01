@@ -68,6 +68,15 @@ def compile_node(node, cg: CodegenContext) -> ir.Value | None:
     return result
 
 
+def _compile_raw(node, cg: CodegenContext):
+    """编译节点，保留原始类型信息（RawValue 不装箱）。
+
+    用于算术/比较/逻辑的内部操作数——避免 装箱→拆箱 的来回。
+    调用方需自行处理可能返回的 RawValue 或指针值。
+    """
+    return _compile_node_inner(node, cg)
+
+
 def _compile_node_inner(node, cg: CodegenContext) -> ir.Value | None:
     """递归编译 AST 节点，返回 i8* 值。"""
 
@@ -129,8 +138,8 @@ def _compile_node_inner(node, cg: CodegenContext) -> ir.Value | None:
                 v = cg._to_raw(_compile_node_inner(args[0], cg)).ll_val
                 return RawValue(cg.builder.sub(_ZERO, v, name='neg_tmp'))
             raise SyntaxError(f'{op} 需要两个参数')
-        lv = compile_node(args[0], cg)
-        rv = compile_node(args[1], cg)
+        lv = _compile_raw(args[0], cg)
+        rv = _compile_raw(args[1], cg)
         l_is_float = _is_float_call(lv)
         r_is_float = _is_float_call(rv)
         if l_is_float or r_is_float:
@@ -163,8 +172,8 @@ def _compile_node_inner(node, cg: CodegenContext) -> ir.Value | None:
     if cmp_op is not None:
         if len(args) < 2:
             raise SyntaxError(f'{op} 需要两个参数')
-        l_raw = cg._to_raw(compile_node(args[0], cg)).ll_val
-        r_raw = cg._to_raw(compile_node(args[1], cg)).ll_val
+        l_raw = cg._to_raw(_compile_raw(args[0], cg)).ll_val
+        r_raw = cg._to_raw(_compile_raw(args[1], cg)).ll_val
         cond = cg.builder.icmp_signed(cmp_op, l_raw, r_raw, name=f'{op}_tmp')
         return RawValue(cg.builder.zext(cond, _INT, name=f'{op}_bool'))
 
@@ -173,8 +182,8 @@ def _compile_node_inner(node, cg: CodegenContext) -> ir.Value | None:
     if logic_op is not None:
         if len(args) < 2:
             raise SyntaxError(f'{op} 需要两个参数')
-        l_bool = cg._to_bool_i1(compile_node(args[0], cg))
-        r_bool = cg._to_bool_i1(compile_node(args[1], cg))
+        l_bool = cg._to_bool_i1(_compile_raw(args[0], cg))
+        r_bool = cg._to_bool_i1(_compile_raw(args[1], cg))
         res = cg.builder.and_(l_bool, r_bool) if logic_op == 'and' else cg.builder.or_(l_bool, r_bool)
         return RawValue(cg.builder.zext(res, _INT, name=f'{op}_bool'))
 
@@ -182,7 +191,7 @@ def _compile_node_inner(node, cg: CodegenContext) -> ir.Value | None:
     if op in ('非', 'not'):
         if len(args) < 1:
             raise SyntaxError(f'{op} 需要至少一个参数')
-        b = cg._to_bool_i1(compile_node(args[0], cg))
+        b = cg._to_bool_i1(_compile_raw(args[0], cg))
         return RawValue(cg.builder.zext(cg.builder.not_(b), _INT, name='not_bool'))
 
     # ── 判 三态分支 ──
