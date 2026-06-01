@@ -36,7 +36,9 @@ def _init_ops() -> None:
     import ops.arithmetic_ops
     import ops.math_funcs_ops
     import ops.string_ops
-    import ops.container_ops
+    import ops.list_ops
+    import ops.dict_ops
+    import ops.iter_ops
     import ops.io_ops
     import ops.file_ops
     import ops.type_ops
