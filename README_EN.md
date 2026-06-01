@@ -308,7 +308,7 @@ sanyan/
 
 ## Limitations
 
-- **Performance**: Python-based tree-walking interpreter. Use PyPy for 5-10x speedup.
+- **Performance**: Python tree-walking interpreter. Use `--vm` (bytecode VM) or PyPy for speedups.
 - **No stdin piping**: `input()` only supports interactive input, not pipe redirection.
 - **Ternary is simulated**: The ternary arithmetic runs on Python integers, not hardware ternary logic.
 
