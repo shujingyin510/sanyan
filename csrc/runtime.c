@@ -104,6 +104,21 @@ typedef enum {
     STR_STARTSWITH = 0x38,
     STR_CONTAINS = 0x39,
     DICT_LEN = 0x3A,
+    /* 位运算与字节操作 */
+    BIT_AND = 0x3B,
+    BIT_OR  = 0x3C,
+    BIT_XOR = 0x3D,
+    BIT_NOT = 0x3E,
+    SHIFT_L = 0x3F,
+    SHIFT_R = 0x40,
+    BIT_SET = 0x41,
+    BIT_CLR = 0x42,
+    BIT_TGL = 0x43,
+    BIT_TST = 0x44,
+    LO_BYTE = 0x45,
+    HI_BYTE = 0x46,
+    MRG_BYT = 0x47,
+    /* 终止 */
     HALT     = 0xFF,
 } Opcode;
 
@@ -506,6 +521,49 @@ static int trit_is_trit(void *v) { return !is_int_val(v) && ((rt_str_t*)v)->h_ty
             ib = to_int(b); { int r = ib ? to_int(a)%ib : 0;
               push(vm, trit_is_trit(a) || trit_is_trit(b) ?
                    (void*)rt_trit_new(r, trit_propagate_conf(a,b)/100.0) : tag_i(r)); } break;
+        /* ── 位运算 ── */
+        case BIT_AND: b = pop(vm); a = pop(vm);
+            { int r = to_int(a) & to_int(b);
+              push(vm, trit_is_trit(a) || trit_is_trit(b) ?
+                   (void*)rt_trit_new(r, trit_propagate_conf(a,b)/100.0) : tag_i(r)); } break;
+        case BIT_OR: b = pop(vm); a = pop(vm);
+            { int r = to_int(a) | to_int(b);
+              push(vm, trit_is_trit(a) || trit_is_trit(b) ?
+                   (void*)rt_trit_new(r, trit_propagate_conf(a,b)/100.0) : tag_i(r)); } break;
+        case BIT_XOR: b = pop(vm); a = pop(vm);
+            { int r = to_int(a) ^ to_int(b);
+              push(vm, trit_is_trit(a) || trit_is_trit(b) ?
+                   (void*)rt_trit_new(r, trit_propagate_conf(a,b)/100.0) : tag_i(r)); } break;
+        case BIT_NOT: a = pop(vm);
+            { int r = ~to_int(a);
+              push(vm, trit_is_trit(a) ?
+                   (void*)rt_trit_new(r, rt_trit_confidence(a)) : tag_i(r)); } break;
+        case SHIFT_L: b = pop(vm); a = pop(vm);
+            { int r = to_int(a) << to_int(b);
+              push(vm, trit_is_trit(a) || trit_is_trit(b) ?
+                   (void*)rt_trit_new(r, trit_propagate_conf(a,b)/100.0) : tag_i(r)); } break;
+        case SHIFT_R: b = pop(vm); a = pop(vm);
+            { int r = to_int(a) >> to_int(b);
+              push(vm, trit_is_trit(a) || trit_is_trit(b) ?
+                   (void*)rt_trit_new(r, trit_propagate_conf(a,b)/100.0) : tag_i(r)); } break;
+        case BIT_SET: b = pop(vm); a = pop(vm);
+            { int r = to_int(a) | (1 << to_int(b));
+              push(vm, tag_i(r)); } break;
+        case BIT_CLR: b = pop(vm); a = pop(vm);
+            { int r = to_int(a) & ~(1 << to_int(b));
+              push(vm, tag_i(r)); } break;
+        case BIT_TGL: b = pop(vm); a = pop(vm);
+            { int r = to_int(a) ^ (1 << to_int(b));
+              push(vm, tag_i(r)); } break;
+        case BIT_TST: b = pop(vm); a = pop(vm);
+            { int r = (to_int(a) >> to_int(b)) & 1;
+              push(vm, tag_i(r)); } break;
+        case LO_BYTE: a = pop(vm);
+              push(vm, tag_i(to_int(a) & 0xFF)); break;
+        case HI_BYTE: a = pop(vm);
+              push(vm, tag_i((to_int(a) >> 8) & 0xFF)); break;
+        case MRG_BYT: b = pop(vm); a = pop(vm);
+              push(vm, tag_i(((to_int(a) & 0xFF) << 8) | (to_int(b) & 0xFF))); break;
 
         /* ── 比较（三值逻辑 + 三态传播）── */
         case EQ:  b = pop(vm); a = pop(vm);

@@ -79,6 +79,21 @@ STR_CONTAINS = 0x39
 DICT_LEN = 0x3A
 HALT = 0xFF
 
+# ── 扩展操作码（位运算/字节操作）──
+BIT_AND = 0x3B
+BIT_OR  = 0x3C
+BIT_XOR = 0x3D
+BIT_NOT = 0x3E
+SHIFT_L = 0x3F
+SHIFT_R = 0x40
+BIT_SET = 0x41
+BIT_CLR = 0x42
+BIT_TGL = 0x43
+BIT_TST = 0x44
+LO_BYTE = 0x45
+HI_BYTE = 0x46
+MRG_BYT = 0x47
+
 # 最大执行步数上限，防止无限循环
 VM_MAX_STEPS = 5_000_000
 
@@ -348,6 +363,65 @@ class VM:
         elif op == MOD:
             if isinstance(a, int) and isinstance(b, int) and b:
                 self.stack.append(self._ternary_result(a % b, a, b))
+            else:
+                self.stack.append(0)
+        elif op == BIT_AND:
+            if isinstance(a, int) and isinstance(b, int):
+                self.stack.append(self._ternary_result(a & b, a, b))
+            else:
+                self.stack.append(0)
+        elif op == BIT_OR:
+            if isinstance(a, int) and isinstance(b, int):
+                self.stack.append(self._ternary_result(a | b, a, b))
+            else:
+                self.stack.append(0)
+        elif op == BIT_XOR:
+            if isinstance(a, int) and isinstance(b, int):
+                self.stack.append(self._ternary_result(a ^ b, a, b))
+            else:
+                self.stack.append(0)
+        elif op == BIT_NOT:
+            if isinstance(a, int):
+                self.stack.append(self._ternary_result(~a, a) if isinstance(a, TritValue) else ~a)
+        elif op == SHIFT_L:
+            if isinstance(a, int) and isinstance(b, int):
+                self.stack.append(self._ternary_result(a << b, a, b))
+            else:
+                self.stack.append(0)
+        elif op == SHIFT_R:
+            if isinstance(a, int) and isinstance(b, int):
+                self.stack.append(self._ternary_result(a >> b, a, b))
+            else:
+                self.stack.append(0)
+        elif op == BIT_SET:
+            if isinstance(a, int) and isinstance(b, int):
+                self.stack.append(self._ternary_result(a | (1 << b), a, b))
+            else:
+                self.stack.append(0)
+        elif op == BIT_CLR:
+            if isinstance(a, int) and isinstance(b, int):
+                self.stack.append(self._ternary_result(a & ~(1 << b), a, b))
+            else:
+                self.stack.append(0)
+        elif op == BIT_TGL:
+            if isinstance(a, int) and isinstance(b, int):
+                self.stack.append(self._ternary_result(a ^ (1 << b), a, b))
+            else:
+                self.stack.append(0)
+        elif op == BIT_TST:
+            if isinstance(a, int) and isinstance(b, int):
+                self.stack.append(self._ternary_result(1 if (a >> b) & 1 else 0, a, b))
+            else:
+                self.stack.append(0)
+        elif op == LO_BYTE:
+            if isinstance(a, int):
+                self.stack.append(self._ternary_result(a & 0xFF, a) if isinstance(a, TritValue) else a & 0xFF)
+        elif op == HI_BYTE:
+            if isinstance(a, int):
+                self.stack.append(self._ternary_result((a >> 8) & 0xFF, a) if isinstance(a, TritValue) else (a >> 8) & 0xFF)
+        elif op == MRG_BYT:
+            if isinstance(a, int) and isinstance(b, int):
+                self.stack.append(self._ternary_result(((a & 0xFF) << 8) | (b & 0xFF), a, b))
             else:
                 self.stack.append(0)
         return True
@@ -748,6 +822,20 @@ _DISPATCH: dict[int, 'Callable'] = {
     MUL: VM._exec_arithmetic,
     DIV: VM._exec_arithmetic,
     MOD: VM._exec_arithmetic,
+    # 位运算与字节操作
+    BIT_AND: VM._exec_arithmetic,
+    BIT_OR: VM._exec_arithmetic,
+    BIT_XOR: VM._exec_arithmetic,
+    BIT_NOT: VM._exec_arithmetic,
+    SHIFT_L: VM._exec_arithmetic,
+    SHIFT_R: VM._exec_arithmetic,
+    BIT_SET: VM._exec_arithmetic,
+    BIT_CLR: VM._exec_arithmetic,
+    BIT_TGL: VM._exec_arithmetic,
+    BIT_TST: VM._exec_arithmetic,
+    LO_BYTE: VM._exec_arithmetic,
+    HI_BYTE: VM._exec_arithmetic,
+    MRG_BYT: VM._exec_arithmetic,
     # 比较与逻辑
     GT: VM._exec_comparison,
     LT: VM._exec_comparison,
