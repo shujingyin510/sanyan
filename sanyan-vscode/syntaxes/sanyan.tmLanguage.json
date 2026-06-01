@@ -1,4 +1,5 @@
 {
+  "$schema": "https://raw.githubusercontent.com/martinring/tmlanguage/master/tmlanguage.json",
   "scopeName": "source.sanyan",
   "name": "Sanyan",
   "fileTypes": [".san"],
@@ -6,13 +7,15 @@
     { "include": "#comments" },
     { "include": "#strings" },
     { "include": "#keywords" },
+    { "include": "#constants" },
     { "include": "#numbers" },
-    { "include": "#operators" }
+    { "include": "#operators" },
+    { "include": "#functions" }
   ],
   "repository": {
     "comments": {
       "patterns": [
-        { "match": "(//|#|／／).*", "name": "comment.line.sanyan" }
+        { "match": "(//|#|／／).*$", "name": "comment.line.sanyan" }
       ]
     },
     "strings": {
@@ -25,19 +28,86 @@
     },
     "keywords": {
       "patterns": [
-        { "match": "\\b(设|若|再若|否则|循环|遍历|定义|返回|跳出|继续|尝试|捕获|判|函数|λ|在|导入|输出|加载|导出|注册设备|对|置|读|查|调试|等待|从|到)\\b", "name": "keyword.control.sanyan" },
-        { "match": "\\b(加|减|乘|除|余|幂|取位|大于|小于|等于|不等于|大于等于|小于等于|不大于|不小于|且|或|非|同)\\b", "name": "keyword.operator.sanyan" },
-        { "match": "\\b(真|假|可能|开|关|守)\\b", "name": "constant.language.sanyan" }
+        {
+          "match": "(?<![\\w])设(?![\\w])",
+          "name": "keyword.control.sanyan"
+        },
+        {
+          "match": "(?<![\\w])(若|再若|否则)(?![\\w])",
+          "name": "keyword.control.conditional.sanyan"
+        },
+        {
+          "match": "(?<![\\w])(循环|遍历|跳出|继续)(?![\\w])",
+          "name": "keyword.control.loop.sanyan"
+        },
+        {
+          "match": "(?<![\\w])(定义|返回|函数|λ)(?![\\w])",
+          "name": "keyword.control.function.sanyan"
+        },
+        {
+          "match": "(?<![\\w])(尝试|捕获|判)(?![\\w])",
+          "name": "keyword.control.exception.sanyan"
+        },
+        {
+          "match": "(?<![\\w])(在|导入|输出|加载|导出)(?![\\w])",
+          "name": "keyword.control.import.sanyan"
+        },
+        {
+          "match": "(?<![\\w])(注册设备|对|置|读|查|调试|等待|从|到)(?![\\w])",
+          "name": "keyword.control.sanyan"
+        },
+        {
+          "match": "(?<![\\w])(加|减|乘|除|余|幂)(?![\\w])",
+          "name": "keyword.operator.arithmetic.sanyan"
+        },
+        {
+          "match": "(?<![\\w])(大于|小于|等于|不等于|大于等于|小于等于|不大于|不小于)(?![\\w])",
+          "name": "keyword.operator.comparison.sanyan"
+        },
+        {
+          "match": "(?<![\\w])(且|或|非|同)(?![\\w])",
+          "name": "keyword.operator.logical.sanyan"
+        },
+        {
+          "match": "(?<![\\w])取位(?![\\w])",
+          "name": "keyword.operator.sanyan"
+        }
+      ]
+    },
+    "constants": {
+      "patterns": [
+        {
+          "match": "(?<![\\w])(真|假|可能|开|关|守)(?![\\w])",
+          "name": "constant.language.sanyan"
+        }
       ]
     },
     "numbers": {
       "patterns": [
-        { "match": "\\b[0-9]+(\\.[0-9]+)?\\b", "name": "constant.numeric.sanyan" }
+        {
+          "match": "\\b[0-9]+(\\.[0-9]+)?\\b",
+          "name": "constant.numeric.sanyan"
+        }
       ]
     },
     "operators": {
       "patterns": [
-        { "match": "==|!=|>=|<=|!>|!<|>|<|=|\\+|-|\\*|/|%|\\^", "name": "keyword.operator.sanyan" }
+        {
+          "match": "==|!=|>=|<=|!>|!<|>|<|=|\\+|-|\\*|/|%|\\^",
+          "name": "keyword.operator.sanyan"
+        }
+      ]
+    },
+    "functions": {
+      "patterns": [
+        {
+          "match": "(?<![\\w])(绝对值|平方根|最大值|最小值|随机数|随机态|连接|取长|字列|子串|替换|分割|查找|去空白|大写|小写|前缀|后缀|排序|反转|包含|去重|切片|求和|合并|计数|列表|数组|字典|映射|过滤|归并|取键|置键|含键|字典键列表|删除键|列表合|表长|取|置元素)(?![\\w])",
+          "name": "support.function.sanyan"
+        },
+        {
+          "match": "(?<![\\w])(当前时间|三进制|读文件|写文件|写二进制|是数字|是字符串|是列表|是字典|字符串相等|字符串包含|转JSON|解析JSON|应用)(?![\\w])",
+          "name": "support.function.sanyan"
+        }
       ]
     }
   }
