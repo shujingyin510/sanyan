@@ -420,7 +420,7 @@ static int _mod_cnt;
 
 /* ── 从已打开的文件指针读取导出表（文件指针必须在代码数据之后）── */
 static int read_export_table(FILE *fp, Module *mod) {
-    uint8_t buf[2];
+    uint8_t buf[4];
     if (fread(buf, 1, 2, fp) != 2) { mod->export_count = 0; return 0; }
     uint16_t count;
     memcpy(&count, buf, 2);
@@ -481,7 +481,7 @@ int vm_run(VM *vm) {
         }
         uint8_t op = rd_u8(vm->code, &vm->pc);
         void *a, *b;
-        int32_t ia, ib;
+        int32_t ib;
 
         switch (op) {
 
@@ -1480,13 +1480,13 @@ int main(int argc, char **argv) {
         const char *clang = llc ? NULL : find_tool("clang");
         int obj_ok = 0;
         if (llc) {
-            char cmd[512];
+            char cmd[1024];
             snprintf(cmd, sizeof(cmd), "%s -filetype=obj %s -o %s", llc, ll_path, o_path);
             fprintf(stderr, "[4/5] llc → .o\n");
             obj_ok = (run_cmd(cmd) == 0);
         }
         if (!obj_ok && clang) {
-            char cmd[512];
+            char cmd[1024];
             snprintf(cmd, sizeof(cmd), "%s -c %s -o %s", clang, ll_path, o_path);
             fprintf(stderr, "[4/5] clang → .o\n");
             obj_ok = (run_cmd(cmd) == 0);
