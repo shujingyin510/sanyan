@@ -238,6 +238,27 @@ python -X utf8 tests/run_all.py           # 集成测试 46 项
 - test_agent.py 29/29
 - run_all.py 46/46
 
+### 覆盖率配置
+
+CI 使用 `pytest --cov=. --cov-report=xml` 测量覆盖率，阈值 75%。
+
+`.coveragerc` 排除的文件及原因：
+
+| 排除文件 | 原因 |
+|----------|------|
+| `build_combined.py`, `build_exe.py`, `compile_llvmgen.py`, `setup.py`, `sanyancc.py` | 构建脚本，非运行时代码 |
+| `run_agent.py`, `run_v2.py`, `run_v2_demo.py`, `run_village_demo.py` | 演示/启动器，需 LLM 网络调用，无法单测 |
+| `gui.py`, `dap_server.py`, `lsp_server.py`, `main.py`, `lsp/*` | GUI/服务器，需图形或网络环境 |
+| `doc_sync.py`, `sanfmt.py`, `debug_eval.py` | 工具脚本，非核心运行时 |
+| `ops/package_ops.py`, `ops/net_ops.py` | 需外网访问（GitHub 包下载/HTTP 请求） |
+| `llvmgen/helpers.py`, `llvmgen/build.py`, `llvmgen/ir_fixes.py`, `llvmgen/compiler.py` | 需 llvmlite 依赖，CI 环境版本与本地不同步 |
+| `utils/*`, `benchmark/*`, `scripts/*`, `examples/*`, `csrc/*` | 工具/基准/示例/C 源码 |
+
+**未排除的核心文件**（覆盖率待提升）：
+- `vm.py` (63%) — 字节码 VM，需补充更多 opcode 测试
+- `compile_bytecode.py` (58%) — 字节码编译器，需补充编译路径测试
+- `llvmgen/codegen.py` (58%) — LLVM 代码生成，需补充更多 IR 生成测试
+
 2026-05-30 修复记录：
 - llvmgen/runtime.c：struct rt_list_s 移到使用函数之前，rt_list_push → rt_list_push_item，新增公共接口 `rt_make()` 用于 C 字符串→三言字符串转换
 - LLVM compiler bootstrap 路径：S-expression set 字面量字符串创建全局变量；_make_bootstrap_harness 用 rt_make 包装 C 字符串参数（修复 parse_sanyan 入口函数不返回问题）
