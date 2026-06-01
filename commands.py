@@ -22,8 +22,8 @@ def _parse_params(raw_params: list) -> tuple[list, dict]:
     输入: ['x', 'y', '=', '10'] 或 ['x', 'y']
     输出: (['x', 'y'], {'y': '10'})  — 参数名列表 + 默认值字典
     """
-    params = []
-    defaults = {}
+    params: list[str] = []
+    defaults: dict[str, Any] = {}
     i = 0
     while i < len(raw_params):
         p = raw_params[i]
