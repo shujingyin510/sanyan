@@ -2,6 +2,35 @@
 
 ---
 
+## [v3.24.0] — 2026-06
+
+### 新增
+- **位运算 VM 支持**: 13 个新操作码 (0x3B-0x47) — BIT_AND/OR/XOR/NOT, SHIFT_L/R, BIT_SET/CLR/TGL/TST, LO_BYTE/HI_BYTE/MRG_BYT（`vm.py`, `csrc/runtime.c`）
+- **C 语言对标**: 枚举() 结构体() 断言() 做-直到() 可变参数 ...（`ops/type_ops.py`, `ops/control_ops.py`, `commands.py`, `param_matcher.py`）
+- **嵌入式底层**: 置位/清位/翻位/测位 低位字节/高位字节/合并字节/取字节/取字（`ops/arithmetic_ops.py`）
+- **进制转换**: 十六进制/二进制/八进制 + 解析十六进制/解析二进制（`ops/arithmetic_ops.py`）
+- **二分查找**: 二分查找(有序列表, 目标)（`ops/list_ops.py`）
+- **判 多值匹配**: 判 val 'a' body1 'b' body2 默认 default — 对标 C switch/case（`ops/control_ops.py`）
+- **可变参数**: 定义 fn (值...) — rest params 打包为列表（`commands.py`, `param_matcher.py`）
+- **LLVM 多提供商**: DeepSeek/OpenAI/千问/小米MIMO/Gemini/Ollama 6 家 + Gemini 专用格式（`agent_policy.san`, `agent.san`）
+- **Agent 信念持久化**: 信念保存()/信念加载() + 自动衰减（`agent.san`）
+- **Agent 多轮推理**: Plan-Act-Observe 循环（`agent.san`）
+- **Agent 检索记忆**: 关键词匹配记忆表（`agent.san`）
+- **Agent 保护门控**: 可能次数/增益/风险 接入主循环（`agent.san`）
+- **Agent 元认知反思**: 规则性能追踪 + 自动调权（`agent.san`）
+
+### 变更
+- **sugar parser**: 前缀操作符仅在跟合法表达式时激活（修复 `查询` 作为函数参数误匹配）（`sugar/parser.py`）
+- **VM opcode 表**: 从 52 扩展到 65（新增 13 个位运算）
+
+### 文档
+- **docs/ternary-truth-table.md**: Kleene+Bayesian 扩展真值表
+- **docs/roadmap.md**: 扩展路线图更新
+- **docs/migration.md**: v3.22 迁移指南
+- **sugar parser 修复**: 前缀操作符误匹配函数参数
+
+---
+
 ## [v3.23.0] — 2026-06
 
 ### 新增
