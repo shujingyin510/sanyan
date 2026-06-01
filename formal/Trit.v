@@ -11,6 +11,8 @@
      F ∧ U = F    F ∨ U = U    ¬U = U
 *)
 
+From Coq Require Import Lia.
+
 Inductive Trit : Set :=
   | T  (* 真 / + *)
   | F  (* 假 / - *)
@@ -165,7 +167,9 @@ Theorem kleene_extends_boolean : forall (a b : Trit),
   (trit_or a b = F <-> (a = F /\ b = F)).
 Proof.
   intros a b Ha Hb.
-  destruct a, b; try contradiction; split; intros H; split; auto.
+  destruct a, b; try contradiction;
+  unfold trit_and, trit_or;
+  tauto.
 Qed.
 
 (* ── 唯一 U 保留性质: 任何含 U 的 and/or 保持 U ── *)
@@ -225,8 +229,6 @@ Theorem confidence_non_increasing : forall (a b : WeightedTrit),
 Proof.
   intros a b Ha Hb.
   unfold propagate_confidence.
-  destruct a as [va ca], b as [vb cb]. simpl.
-  (* ca * cb / 100 <= ca *)
-  apply Nat.div_le_upper_bound; auto.
-  apply Nat.mul_le_mono_l; auto.
+  destruct a as [va ca], b as [vb cb]. simpl in *.
+  lia.
 Qed.
