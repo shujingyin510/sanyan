@@ -187,7 +187,27 @@ class TernaryALU:
 
 
 class TritValue:
-    __slots__ = ('value', 'symbol', 'float_val', '_initialized', 'precision', 'confidence')
+    """三言值对象：统一承载数字、字符串、列表、字典等类型。
+
+    值类型枚举 (_val_type):
+        0 — 数值 (int/float/trits，通过 .value 访问)
+        1 — 字符串 (str，通过 ._payload 访问)
+        2 — 数据列表 (list，通过 ._payload 访问)
+        3 — 数据字典 (dict，通过 ._payload 访问)
+
+    to_int() / to_float() / symbol 仅对数值类型有效。
+    非数值类型的表示由 __repr__ 处理。
+    """
+    __slots__ = (
+        'value', 'symbol', 'float_val', '_initialized', 'precision', 'confidence',
+        '_val_type', '_payload',
+    )
+
+    # ── 值类型常量 ──
+    TYPE_NUMERIC = 0
+    TYPE_STRING  = 1
+    TYPE_LIST    = 2
+    TYPE_DICT    = 3
 
     STATE_MAP = {
         '开': 1,
@@ -229,14 +249,17 @@ class TritValue:
             obj.precision = 0
             obj.float_val = None
             obj.confidence = 1.0
+            obj._val_type = cls.TYPE_NUMERIC
+            obj._payload = None
             obj.value = BT.from_int(i)
             obj.symbol = BT.to_str(obj.value)
             cls._SMALL_INT_CACHE[i] = obj
         cls._SMALL_INT_BUILT = True
 
     def __new__(
-        cls, value: Union[int, float, list], precision: Optional[int] = None, confidence: float = 1.0
+        cls, value: Union[int, float, list, str, dict], precision: Optional[int] = None, confidence: float = 1.0
     ) -> 'TritValue':
+        # 小整数缓存（仅数值类型）
         if isinstance(value, int) and precision is None and confidence == 1.0:
             cls._build_small_cache()
             cached = cls._SMALL_INT_CACHE.get(value)
@@ -265,15 +288,41 @@ class TritValue:
             cls._pool[key] = obj
             return obj
 
-    def __init__(self, value: Union[int, float, list], precision: Optional[int] = None, confidence: float = 1.0):
+    def __init__(self, value: Union[int, float, list, str, dict], precision: Optional[int] = None, confidence: float = 1.0):
         if hasattr(self, '_initialized'):
             return
         self._initialized = True
         self.precision = precision if precision is not None else 0
         self.float_val = None
         self.confidence = max(0.0, min(1.0, confidence))
-        if isinstance(value, int):
+        self._payload = None
+        self._val_type = self.TYPE_NUMERIC
+
+        if isinstance(value, str):
+            # 字符串类型
+            self._val_type = self.TYPE_STRING
+            self._payload = value
+            self.value = []
+            self.symbol = ''
+        elif isinstance(value, dict):
+            # 字典类型
+            self._val_type = self.TYPE_DICT
+            self._payload = value
+            self.value = []
+            self.symbol = ''
+        elif isinstance(value, list) and value and isinstance(value[0], int):
+            # trit 列表（已经解析的）
+            self.value = value
+            self.symbol = BT.to_str(value)
+        elif isinstance(value, list):
+            # 数据列表
+            self._val_type = self.TYPE_LIST
+            self._payload = value
+            self.value = []
+            self.symbol = ''
+        elif isinstance(value, int):
             self.value = BT.from_int(value)
+            self.symbol = BT.to_str(self.value)
         elif isinstance(value, float):
             self.float_val = value
             if precision is None:
@@ -281,19 +330,22 @@ class TritValue:
             else:
                 self.precision = precision
             self.value = BT.from_float(value, self.precision)
+            self.symbol = BT.to_str(self.value)
         else:
             self.value = value
-        self.symbol = BT.to_str(self.value)
+            self.symbol = BT.to_str(self.value)
 
     @staticmethod
     def from_string(word: str) -> 'TritValue':
+        """从三态词创建 TritValue。非三态词返回带该字符串的 TritValue。"""
         if word in TritValue.STATE_MAP:
             return TritValue(TritValue.STATE_MAP[word])
-        from values import SanyanValueError
-
-        raise SanyanValueError(f'未知的三态词: {word}')
+        return TritValue(word)  # 回退为字符串值
 
     def to_int(self) -> int:
+        """返回整数值。非数值类型返回 0（三态中性值）。"""
+        if self._val_type != self.TYPE_NUMERIC:
+            return 0
         if self.float_val is not None:
             return int(round(self.float_val))
         if self.precision > 0:
@@ -301,6 +353,9 @@ class TritValue:
         return BT.to_int(self.value)
 
     def to_float(self) -> float:
+        """返回浮点值。非数值类型返回 0.0。"""
+        if self._val_type != self.TYPE_NUMERIC:
+            return 0.0
         if self.float_val is not None:
             return self.float_val
         if self.precision > 0:
@@ -308,12 +363,34 @@ class TritValue:
         return float(self.to_int())
 
     def is_float(self) -> bool:
-        return self.float_val is not None or self.precision > 0
+        return self._val_type == self.TYPE_NUMERIC and (self.float_val is not None or self.precision > 0)
+
+    def is_string(self) -> bool:
+        return self._val_type == self.TYPE_STRING
+
+    def is_list(self) -> bool:
+        return self._val_type == self.TYPE_LIST
+
+    def is_dict(self) -> bool:
+        return self._val_type == self.TYPE_DICT
+
+    def is_numeric(self) -> bool:
+        return self._val_type == self.TYPE_NUMERIC
+
+    def to_payload(self) -> Any:
+        """返回实际载荷（字符串、列表、字典或 None）。"""
+        return self._payload
 
     def __repr__(self) -> str:
+        if self._val_type == self.TYPE_STRING:
+            return self._payload  # type: ignore[return-value]
+        if self._val_type == self.TYPE_LIST:
+            return str(self._payload)
+        if self._val_type == self.TYPE_DICT:
+            return str(self._payload)
         if self.float_val is not None:
             return f'{self.float_val}'
-        return str(self.to_int())  # 只返回整数，如 "3"
+        return str(self.to_int())
 
     def with_confidence(self, confidence: float) -> 'TritValue':
         """返回同值但不同置信度的新 TritValue。"""
