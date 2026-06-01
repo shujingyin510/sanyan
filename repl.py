@@ -65,6 +65,54 @@ def _color_value(value) -> str:
 
 # REPL 历史记录
 _history_file = os.path.expanduser(os.path.join(os.path.expanduser('~'), '.sanyan_history'))
+_state_file = os.path.expanduser(os.path.join(os.path.expanduser('~'), '.sanyan_state.json'))
+
+# 加载 REPL 持久化状态（变量和命令）
+def _load_state(env):
+    """从文件恢复 REPL 状态（变量和命令定义）。"""
+    if not os.path.exists(_state_file):
+        return
+    try:
+        import json
+        with open(_state_file, 'r', encoding='utf-8') as f:
+            state = json.load(f)
+        # 只恢复简单值（int/float/str），跳过函数和对象
+        for k, v in state.get('vars', {}).items():
+            try:
+                from ternary_core import TritValue
+                if isinstance(v, float) or (isinstance(v, int) and not isinstance(v, bool)):
+                    env.set_var(k, TritValue(v))
+                elif isinstance(v, str):
+                    env.set_var(k, v)
+            except Exception:
+                pass
+        print(f'[已恢复 {len(state.get("vars", {}))} 个变量]')
+    except Exception:
+        pass
+
+
+def _save_state(env):
+    """保存 REPL 状态到文件（仅保存简单值变量）。"""
+    try:
+        import json
+        state = {'vars': {}}
+        for k, v in env.all_scoped_vars().items():
+            if k.startswith('_'):
+                continue
+            from ternary_core import TritValue
+            if isinstance(v, TritValue):
+                if v.is_float():
+                    state['vars'][k] = v.to_float()
+                else:
+                    state['vars'][k] = v.to_int()
+            elif isinstance(v, (int, float)):
+                state['vars'][k] = v
+            elif isinstance(v, str) and len(v) < 1000:
+                state['vars'][k] = v
+        with open(_state_file, 'w', encoding='utf-8') as f:
+            json.dump(state, f, ensure_ascii=False, indent=2)
+    except Exception:
+        pass
 readline: Any = None
 try:
     import readline as _rl
@@ -200,6 +248,7 @@ def repl() -> None:
     print('输入 :lang english 切换英文，:lang chinese 切换中文')
     print('输入 :step 单步调试  :break <函数名> 添加断点  :watch <变量> 监视变量')
     print('输入 :profile 查看性能  exit/退出 离开，Tab 键自动补全')
+    _load_state(env)  # 恢复上次会话的变量
     while True:
         try:
             code = input('三言> ').strip()
@@ -367,3 +416,4 @@ def repl() -> None:
             readline.write_history_file(_history_file)
         except (IOError, OSError):
             pass
+    _save_state(env)  # 保存当前变量到文件
