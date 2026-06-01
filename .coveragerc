@@ -11,13 +11,13 @@ omit =
     run_v2.py
     run_v2_demo.py
     run_village_demo.py
-    # GUI/服务器（需图形/网络环境）
+    # GUI/服务器（需图形或网络环境）
     gui.py
     dap_server.py
     lsp_server.py
     main.py
     lsp/*
-    # 工具脚本
+    # 工具脚本（非核心运行时）
     doc_sync.py
     sanfmt.py
     debug_eval.py
@@ -27,9 +27,16 @@ omit =
     examples/*
     csrc/*
     # 网络依赖（需外网访问）
+    #   package_ops.py: GitHub 包下载/索引，需外网
+    #   net_ops.py: HTTP 请求，需外网
     ops/package_ops.py
     ops/net_ops.py
-    # LLVM 辅助（需 llvmlite 依赖，CI 环境差异）
+    # LLVM 辅助（需 llvmlite 依赖）
+    #   CI 环境 pip install llvmlite 版本与本地可能不同步（ABI 不兼容）
+    #   helpers.py: 反射/类型工具，llvmlite 0.4x 专用
+    #   build.py: 完整编译管线（gcc + llc 外部调用）
+    #   compiler.py: 自举编译入口，依赖 sugar.san→bytecode_compiler→llvmgen.bin 链
+    #   ir_fixes.py: IR 后处理，CI 安装版本与本地代码不兼容
     llvmgen/helpers.py
     llvmgen/build.py
     llvmgen/ir_fixes.py
