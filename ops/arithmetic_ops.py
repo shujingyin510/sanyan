@@ -1,12 +1,13 @@
 """算术操作：纯三进制加减乘除余幂取位
-
 每个操作独立注册，消除 if/elif 二次分发。
+所有运算自动传播 TritValue 置信度（贝叶斯累积）。
 """
 
 from ternary_core import BT, TernaryALU, TritValue
 from ternary_core import _int_at_precision, ternary_log, ternary_exp
 from values import SanyanSyntaxError, SanyanValueError, SanyanTypeError
 from ops.registry import register
+from eval_helpers import propagated_confidence
 
 _DEFAULT_PRECISION = 16
 
@@ -85,7 +86,7 @@ def _op_add(evaluator, args):
         precs_list = [v.precision for v in vals]
         aligned, prec = _align_trits(trits_list, precs_list)
         result = _fold_ternary('add', aligned)
-        return TritValue(result, prec)
+        return TritValue(result, prec, confidence=propagated_confidence(*vals))
     parts = []
     for val in vals:
         if isinstance(val, TritValue):
@@ -106,7 +107,7 @@ def _op_sub(evaluator, args):
     precs_list = [v.precision for v in vals]
     aligned, prec = _align_trits(trits_list, precs_list)
     result = _fold_ternary('sub', aligned)
-    return TritValue(result, prec)
+    return TritValue(result, prec, confidence=propagated_confidence(*vals))
 
 
 def _op_mul(evaluator, args):
@@ -119,11 +120,11 @@ def _op_mul(evaluator, args):
     aligned, prec = _align_trits(trits_list, precs_list)
     if prec == 0:
         result = _fold_ternary('mul', aligned)
-        return TritValue(result, 0)
+        return TritValue(result, 0, confidence=propagated_confidence(*vals))
     result = aligned[0]
     for t in aligned[1:]:
         result = TernaryALU.fixed_mul(result, t, prec)
-    return TritValue(result, prec)
+    return TritValue(result, prec, confidence=propagated_confidence(*vals))
 
 
 def _op_div(evaluator, args):
@@ -142,9 +143,10 @@ def _op_div(evaluator, args):
         result = TernaryALU.div(a_trits, b_trits, _DEFAULT_PRECISION)
         val = BT.to_int(result)
         scale = 3**_DEFAULT_PRECISION
+        c = propagated_confidence(a, b)
         if val % scale == 0:
-            return TritValue(val // scale)
-        return TritValue(result, _DEFAULT_PRECISION)
+            return TritValue(val // scale, confidence=c)
+        return TritValue(result, _DEFAULT_PRECISION, confidence=c)
     prec = max(a_prec, b_prec)
     if a_prec != b_prec:
         aligned, _ = _align_trits([a_trits, b_trits], [a_prec, b_prec])
@@ -152,9 +154,10 @@ def _op_div(evaluator, args):
     result = TernaryALU.fixed_div(a_trits, b_trits, prec)
     val = BT.to_int(result)
     scale = 3**prec
+    c = propagated_confidence(a, b)
     if val % scale == 0:
-        return TritValue(val // scale)
-    return TritValue(result, prec)
+        return TritValue(val // scale, confidence=c)
+    return TritValue(result, prec, confidence=c)
 
 
 def _op_mod(evaluator, args):

@@ -164,6 +164,22 @@ def unwrap_trit(value: Any) -> Any:
     return value
 
 
+def propagated_confidence(*values: Any) -> float:
+    """计算贝叶斯传播置信度：所有 TritValue 输入置信度的乘积。
+    
+    传播规则: C_result = C_a × C_b × C_c × ...
+    独立贝叶斯更新: 每个不确定源独立贡献，置信度累积衰减。
+    纯 Python 值（非 TritValue）视为置信度 1.0。
+    用于所有算术/比较/逻辑运算的自动置信度级联。
+    """
+    c = 1.0
+    for v in values:
+        from ternary_core import TritValue
+        if isinstance(v, TritValue):
+            c *= v.confidence
+    return max(0.0, min(1.0, c))
+
+
 def eval_symbol(evaluator: SanyanEvaluator, symbol: str) -> Any:
     """求值符号：变量 → 字面量 → 三态词 → IoT 设备 → 上下文对象"""
     if evaluator.has_var(symbol):

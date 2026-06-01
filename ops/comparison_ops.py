@@ -1,12 +1,12 @@
 """比较操作：等于、大于、小于等
 
-每个比较操作独立注册，消除 if/elif 二次分发。
-TritValue 比较直接使用 Python 数值比较（平衡三进制到整数的转换是保序的）。
+每个比较操作独立注册。比较结果自动传播 TritValue 置信度。
 """
 
 from ternary_core import TritValue
 from values import SanyanSyntaxError, SanyanTypeError
 from ops.registry import register
+from eval_helpers import propagated_confidence
 
 
 def _to_num(v, skin_manager=None):
@@ -53,10 +53,10 @@ def _compare(evaluator, op, args):
             truth = a <= b
         elif op == 'nlt':
             truth = a >= b
-        return TritValue(1 if truth else -1)
+        return TritValue(1 if truth else -1, confidence=propagated_confidence(a_val, b_val))
     if op in ('eq', 'ne'):
         result = (a_val == b_val) if op == 'eq' else (a_val != b_val)
-        return TritValue(1 if result else -1)
+        return TritValue(1 if result else -1, confidence=propagated_confidence(a_val, b_val))
     raise SanyanTypeError(f"无法将 '{a_val if a is None else b_val}' 转换为数值用于比较")
 
 
