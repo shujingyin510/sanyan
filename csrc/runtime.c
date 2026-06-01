@@ -107,17 +107,21 @@ typedef enum {
     HALT     = 0xFF,
 } Opcode;
 
-/* ── 标记指针值 ───────────────────────────────── */
-static inline void *tag_i(int32_t val) {
-    return (void*)((intptr_t)(((int64_t)val << 1) | 1));
+/* ── 标记指针值 ─────────────────────────────────
+ * 位模式:  (value << 1) | 1  →  整数标记
+ *          (heap_ptr)         →  堆对象指针 (LSB=0)
+ * 使用 intptr_t 保证 32/64 位兼容：32 位平台 4 字节，64 位平台 8 字节。
+ * ─────────────────────────────────────────────── */
+static inline void *tag_i(intptr_t val) {
+    return (void*)((intptr_t)((val << 1) | 1));
 }
-static inline int32_t untag_i(void *p) {
-    return (int32_t)((intptr_t)p >> 1);
+static inline intptr_t untag_i(void *p) {
+    return (intptr_t)((intptr_t)p >> 1);
 }
 static inline int is_int_val(void *p) {
     return ((intptr_t)p & 1) != 0;
 }
-static inline int32_t to_int(void *p) {
+static inline intptr_t to_int(void *p) {
     return is_int_val(p) ? untag_i(p) : 0;
 }
 
@@ -182,7 +186,7 @@ typedef struct { OBJ_HDR; int32_t n; int32_t cap; rt_entry_t *entries; } rt_dict
 /* 键哈希函数：整数用 FNV-1a 混合，字符串用 djb2 */
 static uint32_t hash_key(void *k) {
     if (is_int_val(k)) {
-        uint32_t h = (uint32_t)untag_i(k);
+        uint32_t h = (uint32_t)(uintptr_t)untag_i(k);
         h = ((h >> 16) ^ h) * 0x45d9f3b;
         h = ((h >> 16) ^ h) * 0x45d9f3b;
         return (h >> 16) ^ h;
@@ -276,7 +280,7 @@ static int rt_dict_has(rt_dict_t *d, void *k) {
 /* ── 递归值打印 ──────────────────────────────── */
 static void print_value(void *v) {
     if (!v) { printf("0"); return; }
-    if (is_int_val(v)) { printf("%d", untag_i(v)); return; }
+    if (is_int_val(v)) { printf("%lld", (long long)untag_i(v)); return; }
     switch (*(ObjType*)v) {
     case TYPE_STR: printf("%s", rt_str_c(v)); break;
     case TYPE_LIST: {
@@ -481,7 +485,7 @@ int vm_run(VM *vm) {
         }
         uint8_t op = rd_u8(vm->code, &vm->pc);
         void *a, *b;
-        int32_t ib;
+        intptr_t ib;
 
         switch (op) {
 
@@ -527,7 +531,7 @@ int vm_run(VM *vm) {
         case LTE: b = pop(vm); a = pop(vm);
             push(vm, tag_i(to_int(a) <= to_int(b) ? 1 : -1)); break;
         case NOT: a = pop(vm);
-            { int32_t v = to_int(a); push(vm, tag_i(v > 0 ? -1 : 1)); } break;
+            { intptr_t v = to_int(a); push(vm, tag_i(v > 0 ? -1 : 1)); } break;
 
         case LOAD: {
             uint8_t idx = rd_u8(vm->code, &vm->pc);
@@ -657,10 +661,10 @@ int vm_run(VM *vm) {
         case STRLEN: {
             a = pop(vm);
             if (is_int_val(a)) {
-                char buf[16];
-                snprintf(buf, sizeof(buf), "%d", untag_i(a));
-                push(vm, tag_i((int32_t)strlen(buf)));
-            } else push(vm, tag_i((int32_t)strlen(rt_str_c(a))));
+                char buf[24];
+                snprintf(buf, sizeof(buf), "%lld", (long long)untag_i(a));
+                push(vm, tag_i((intptr_t)strlen(buf)));
+            } else push(vm, tag_i((intptr_t)strlen(rt_str_c(a))));
             break;
         }
         case STRSUB: {

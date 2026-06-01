@@ -1240,10 +1240,10 @@ void rt_throw(void *msg) {
 /* 前向声明 */
 void *rt_import(void *path);
 
-/* 标记指针 */
-#define _TAG_I(v)  ((void*)(intptr_t)(((int64_t)(v) << 1) | 1))
+/* 标记指针 ── 用 intptr_t 实现 32/64 位兼容 */
+#define _TAG_I(v)  ((void*)(intptr_t)(((intptr_t)(v) << 1) | 1))
 #define _IS_INT(p) (((intptr_t)(p) & 1) != 0)
-#define _UNTAG(p)  ((int32_t)((intptr_t)(p) >> 1))
+#define _UNTAG(p)  ((intptr_t)((intptr_t)(p) >> 1))
 #define _TO_INT(p) (_IS_INT(p) ? _UNTAG(p) : 0)
 
 /* 字节码 VM 结构 */
@@ -1373,7 +1373,7 @@ static int _bvm_run(_BVM *vm) {
         if (++steps > 50000000) { fprintf(stderr, "[rt_import] 超时\n"); return 1; }
         uint8_t op = _brd_u8(vm->code, &vm->pc);
         void *a, *b;
-        int32_t ib;
+        intptr_t ib;
 
         switch (op) {
         case 0x00: break; /* NOP */
@@ -1425,7 +1425,7 @@ static int _bvm_run(_BVM *vm) {
         case 0x14: b = _bpop(vm); a = _bpop(vm); _bpush(vm, _TAG_I(_TO_INT(a) < _TO_INT(b) ? 1 : -1)); break;
         case 0x15: b = _bpop(vm); a = _bpop(vm); _bpush(vm, _TAG_I(_TO_INT(a) >= _TO_INT(b) ? 1 : -1)); break;
         case 0x16: b = _bpop(vm); a = _bpop(vm); _bpush(vm, _TAG_I(_TO_INT(a) <= _TO_INT(b) ? 1 : -1)); break;
-        case 0x17: a = _bpop(vm); { int32_t v = _TO_INT(a); _bpush(vm, _TAG_I(v > 0 ? -1 : 1)); } break;
+        case 0x17: a = _bpop(vm); { intptr_t v = _TO_INT(a); _bpush(vm, _TAG_I(v > 0 ? -1 : 1)); } break;
 
         /* 字符串 */
         case 0x19: { /* CONCAT */
@@ -1476,7 +1476,7 @@ static int _bvm_run(_BVM *vm) {
 
         /* 输出 */
         case 0x0E: { a = _bpop(vm); /* PRINT - print to stderr for diagnostics */
-            if (_IS_INT(a)) fprintf(stderr, "%d\n", _UNTAG(a));
+            if (_IS_INT(a)) fprintf(stderr, "%lld\n", (long long)_UNTAG(a));
             else if (a) fprintf(stderr, "%s\n", ((rt_str_t*)a)->data);
             else fprintf(stderr, "null\n");
             break;
