@@ -726,6 +726,41 @@ class TestTernaryDeep(unittest.TestCase):
         # 强证据矛盾 → 值可能翻转
         self.assertIn(r.to_int(), [1, -1])
 
+    def test_trit_list_ops(self):
+        """三态列: 创建/取/置/列长"""
+        from evaluator import SanyanEvaluator
+
+        e = SanyanEvaluator()
+        s1 = e.eval(['ternary_value', 1, 0.9])
+        s2 = e.eval(['ternary_value', -1, 0.7])
+        lst = e.eval(['trit_list', s1, s2])
+        self.assertEqual(len(lst), 2)
+
+        item = e.eval(['trit_get', lst, 0])
+        self.assertEqual(item.to_int(), 1)
+        self.assertAlmostEqual(item.confidence, 0.9)
+
+        e.eval(['trit_set', lst, 1, e.eval(['ternary_value', 1, 0.5])])
+        item2 = e.eval(['trit_get', lst, 1])
+        self.assertAlmostEqual(item2.confidence, 0.5)
+
+        l = e.eval(['trit_list_len', lst])
+        self.assertEqual(l.to_int(), 2)
+
+    def test_trit_dict_ops(self):
+        """三态字典: 创建/取键/置键"""
+        from evaluator import SanyanEvaluator
+
+        e = SanyanEvaluator()
+        v1 = e.eval(['ternary_value', 1, 0.9, '"传感器A"'])
+        v2 = e.eval(['ternary_value', -1, 0.6, '"传感器B"'])
+        d = e.eval(['trit_dict', '"红外"', v1, '"温度"', v2])
+        self.assertIsInstance(d, dict)
+
+        r = e.eval(['trit_key_get', d, '"红外"'])
+        self.assertEqual(r.to_int(), 1)
+        self.assertAlmostEqual(r.confidence, 0.9)
+
 
 if __name__ == '__main__':
     unittest.main()

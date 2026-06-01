@@ -62,6 +62,7 @@ def _init_ops() -> None:
     import ops.system_ops  # noqa: F401
     import ops.unicode_ops  # noqa: F401
     import ops.ternary_time_ops  # noqa: F401
+    import ops.ternary_container_ops  # noqa: F401
 
 
 class SanyanEvaluator(SanyanRuntime):
