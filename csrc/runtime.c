@@ -1,11 +1,6 @@
 /**
  * runtime.c — 三言字节码 C 解释器（52 指令完整版）
  *
- * 用途：执行 .bin 字节码文件（离线 VM）
- * 与 llvmgen/runtime.c 的关系：两者都实现了标记指针值系统、字符串/列表/字典操作。
- *   但 API 有差异（如 rt_list_push vs rt_list_push_item），暂未合并。
- *   如需统一，建议先抽取公共值系统头文件 csrc/runtime_types.h。
- *
  * 值系统: void* 栈值，LSB=1 为标记整数，LSB=0 为堆对象（带类型标签）。
  * 编译:   gcc -o runtime runtime.c && ./runtime firmware.bin
  * STM32:  arm-none-eabi-gcc -mcpu=cortex-m4 -mthumb -Os ...
@@ -24,6 +19,8 @@
 #include <sys/stat.h>
 #endif
 
+#include "runtime_common.h"
+
 /* ── 配置 ── */
 #ifndef VAR_MAX
 #define VAR_MAX 256
@@ -37,11 +34,6 @@
 #ifndef NATIVE_DEV_MAX
 #define NATIVE_DEV_MAX 16
 #endif
-
-/* ── 堆对象类型标签 ── */
-typedef enum { TYPE_STR = 0x535452, TYPE_LIST = 0x4C4953, TYPE_DICT = 0x444943 } ObjType;
-
-#define OBJ_HDR ObjType type
 
 /* ── 指令码 ── */
 typedef enum {
@@ -107,62 +99,24 @@ typedef enum {
     HALT     = 0xFF,
 } Opcode;
 
-/* ── 标记指针值 ─────────────────────────────────
- * 位模式:  (value << 1) | 1  →  整数标记
- *          (heap_ptr)         →  堆对象指针 (LSB=0)
- * 使用 intptr_t 保证 32/64 位兼容：32 位平台 4 字节，64 位平台 8 字节。
- * ─────────────────────────────────────────────── */
-static inline void *tag_i(intptr_t val) {
-    return (void*)((intptr_t)((val << 1) | 1));
-}
-static inline intptr_t untag_i(void *p) {
-    return (intptr_t)((intptr_t)p >> 1);
-}
-static inline int is_int_val(void *p) {
-    return ((intptr_t)p & 1) != 0;
-}
-static inline intptr_t to_int(void *p) {
-    return is_int_val(p) ? untag_i(p) : 0;
-}
 
-/* ── 字符串 ───────────────────────────────────── */
-typedef struct { OBJ_HDR; int32_t len; char data[]; } rt_str_t;
-
+/* ── 字符串操作 ───────────────────────────────── */
 static rt_str_t *rt_str_new(const char *s) {
     if (!s) return NULL;
     int32_t n = (int32_t)strlen(s);
     rt_str_t *r = (rt_str_t*)malloc(sizeof(rt_str_t) + n + 1);
     if (!r) return NULL;
-    r->type = TYPE_STR;
+    r->h_type = OBJ_STRING;
     r->len = n;
     memcpy(r->data, s, n + 1);
     return r;
 }
 
-/* 检查指针是否为堆对象（type 值在已知范围内） */
-static inline int is_heap_obj(void *p) {
-    if (!p || is_int_val(p)) return 0;
-    ObjType t = ((rt_str_t *)p)->type;
-    return (t == TYPE_STR || t == TYPE_LIST || t == TYPE_DICT);
-}
-
-static const char *rt_str_c(void *p) {
-    if (!p || is_int_val(p)) return "";
-    if (is_heap_obj(p)) {
-        /* type 匹配已知对象类型 → 从 data 字段提取 */
-        return ((rt_str_t *)p)->data;
-    }
-    /* 非堆对象：按原始 C 字符串返回 */
-    return (const char *)p;
-}
-
-/* ── 列表 ───────────────────────────────────── */
-typedef struct { OBJ_HDR; int32_t len; int32_t cap; void **items; } rt_list_t;
-
+/* ── 列表操作 ───────────────────────────────── */
 static rt_list_t *rt_list_new(void) {
     rt_list_t *l = (rt_list_t*)calloc(1, sizeof(rt_list_t));
     if (!l) return NULL;
-    l->type = TYPE_LIST;
+    l->h_type = OBJ_LIST;
     l->cap = 4;
     l->items = (void**)calloc(4, sizeof(void*));
     return l;
@@ -177,11 +131,7 @@ static void rt_list_push(rt_list_t *l, void *v) {
     l->items[l->len++] = v;
 }
 
-/* ── 字典（哈希表：开放寻址 + 线性探测，O(1) 查找）─────── */
-#define DICT_INIT_CAP 16
-#define DICT_LOAD_FACTOR 70  /* 负载因子阈值（百分比），超过时触发 rehash */
-typedef struct { void *k; void *v; } rt_entry_t;
-typedef struct { OBJ_HDR; int32_t n; int32_t cap; rt_entry_t *entries; } rt_dict_t;
+/* ── 字典操作 ───────────────────────────────── */
 
 /* 键哈希函数：整数用 FNV-1a 混合，字符串用 djb2 */
 static uint32_t hash_key(void *k) {
@@ -226,9 +176,9 @@ static void rt_dict_rehash(rt_dict_t *d) {
 static rt_dict_t *rt_dict_new(void) {
     rt_dict_t *d = (rt_dict_t*)calloc(1, sizeof(rt_dict_t));
     if (!d) return NULL;
-    d->type = TYPE_DICT;
-    d->cap = DICT_INIT_CAP;
-    d->entries = (rt_entry_t*)calloc(DICT_INIT_CAP, sizeof(rt_entry_t));
+    d->h_type = OBJ_DICT;
+    d->cap = RT_DICT_INIT_CAP;
+    d->entries = (rt_entry_t*)calloc(RT_DICT_INIT_CAP, sizeof(rt_entry_t));
     if (!d->entries) { free(d); return NULL; }
     return d;
 }
@@ -249,7 +199,7 @@ static int rt_dict_find(rt_dict_t *d, void *k) {
 
 static void rt_dict_set(rt_dict_t *d, void *k, void *v) {
     if (!d) return;
-    if (d->n >= (d->cap * DICT_LOAD_FACTOR) / 100)
+    if (d->n >= (d->cap * RT_DICT_LOAD_FACTOR) / 100)
         rt_dict_rehash(d);
     uint32_t h = hash_key(k);
     uint32_t idx = h & ((uint32_t)d->cap - 1);
@@ -281,7 +231,7 @@ static int rt_dict_has(rt_dict_t *d, void *k) {
 static void print_value(void *v) {
     if (!v) { printf("0"); return; }
     if (is_int_val(v)) { printf("%lld", (long long)untag_i(v)); return; }
-    switch (*(ObjType*)v) {
+    switch ((san_obj_type_t)((rt_str_t*)v)->h_type) {
     case TYPE_STR: printf("%s", rt_str_c(v)); break;
     case TYPE_LIST: {
         rt_list_t *l = (rt_list_t*)v;
@@ -312,14 +262,6 @@ static void print_value(void *v) {
     default: printf("0"); break;
     }
 }
-
-/* ── 类型检查 ── */
-static int is_obj_type(void *p, ObjType t) {
-    return p && !is_int_val(p) && ((rt_str_t*)p)->type == t;
-}
-static int is_str(void *p)  { return is_obj_type(p, TYPE_STR); }
-static int is_list(void *p) { return is_obj_type(p, TYPE_LIST); }
-static int is_dict(void *p) { return is_obj_type(p, TYPE_DICT); }
 
 /* ── UTF-16LE → UTF-8 ── */
 static char *utf16le_to_utf8(const uint8_t *src, int codepoints) {
@@ -646,7 +588,7 @@ int vm_run(VM *vm) {
             }
             rt_str_t *r = (rt_str_t*)malloc(sizeof(rt_str_t) + total + 1);
             if (!r) { free(lens); free(strs); push(vm, rt_str_new("")); break; }
-            r->type = TYPE_STR;
+            r->h_type = OBJ_STRING;
             r->len = total;
             char *dst = r->data;
             for (int32_t i = 0; i < n; i++) {

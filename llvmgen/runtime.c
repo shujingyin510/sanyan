@@ -62,27 +62,10 @@ static void *_arena_alloc(san_arena_t *a, size_t size) {
 }
 
 /* ═══════════════════════════════════════════════════════════
- * 堆对象头部
- * 所有堆对象（字符串/列表/字典/浮点）共用 h_type 标签。
+ * 堆对象头部 + 字符串/列表/字典类型定义
+ * 已统一到 csrc/runtime_common.h
  * ═══════════════════════════════════════════════════════════ */
-typedef enum {
-    OBJ_STRING = 1,
-    OBJ_LIST   = 2,
-    OBJ_DICT   = 3,
-    OBJ_FLOAT  = 4,
-} san_obj_type_t;
-
-#define SAN_HEADER uint32_t h_type
-
-/* ═══════════════════════════════════════════════════════════
- * 字符串类型 (rt_str_t)
- * 格式: [h_type][len][data...]，flexible array member。
- * ═══════════════════════════════════════════════════════════ */
-typedef struct {
-    SAN_HEADER;
-    int32_t len;
-    char data[];
-} rt_str_t;
+#include "../csrc/runtime_common.h"
 
 /* 从 C 字符串创建 rt_str_t（arena 分配） */
 static rt_str_t *_rt_make(const char *s) {
@@ -101,35 +84,6 @@ static rt_str_t *_rt_make(const char *s) {
 /* 公共接口：从 C 字符串创建三言字符串 */
 void *rt_make(const char *s) {
     return _rt_make(s);
-}
-
-/* ═══════════════════════════════════════════════════════════
- * 统一字符串访问
- * 所有运行时字符串以 rt_str_t 格式传递。
- * _cstr() 通过校验 h_type（取值 1-4）区分 rt_str_t* 与原始 C 字符串。
- * 防御性设计：若 h_type 不在 1-4 区间内，按原始 C 字符串返回。
- *   伪正概率：4 / 2^32 ≈ 10^(-9)，远低于旧版启发式探测。
- *   安全性：仅读取 ptr[0..3] 判断，不会触发越界 Page Fault。
- * ═══════════════════════════════════════════════════════════ */
-static const char *_cstr(const void *p) {
-    if (!p) return NULL;
-    uint32_t h = ((const rt_str_t *)p)->h_type;
-    if (h >= 1 && h <= 4) {
-        /* h_type 合法 → 确认是堆对象，使用 data 字段 */
-        return ((const rt_str_t *)p)->data;
-    }
-    /* h_type 不在对象类型范围内，按原始 C 字符串返回 */
-    return (const char *)p;
-}
-
-static int32_t _cstr_len(const void *p) {
-    if (!p) return 0;
-    uint32_t h = ((const rt_str_t *)p)->h_type;
-    if (h >= 1 && h <= 4) {
-        return ((const rt_str_t *)p)->len;
-    }
-    /* 原始 C 字符串：用 strlen() 计算长度 */
-    return (int32_t)strlen((const char *)p);
 }
 
 /* ═══════════════════════════════════════════════════════════
@@ -153,7 +107,7 @@ void *rt_str_concat(const void *a, const void *b) {
 }
 
 /* 字符串长度（字符数） */
-int32_t rt_str_len(const void *s) { return _cstr_len(s); }
+/* rt_str_len 已在 runtime_common.h 中定义 */
 
 /* 子串提取 [start, start+len) */
 void *rt_str_substr(const void *s, int32_t start, int32_t len) {
@@ -199,17 +153,6 @@ void *rt_int_to_str(uintptr_t tagged) {
     snprintf(buf, sizeof(buf), "%lld", (long long)val);
     return _rt_make(buf);
 }
-
-/* 前置声明 */
-typedef struct rt_list_s rt_list_t;
-
-/* 列表类型 — 必须在使用其成员的函数之前定义 */
-struct rt_list_s {
-    SAN_HEADER;
-    int32_t len;
-    int32_t cap;
-    void **items;
-};
 
 rt_list_t *rt_list_new(void);
 void rt_list_push_item(void *lstp, void *item);
@@ -715,8 +658,7 @@ void *rt_str_to_list(void *s) {
 /* ═══════════════════════════════════════════════════════════
  * 字典类型（FNV-1a 哈希 + 开放寻址）
  * ═══════════════════════════════════════════════════════════ */
-#define RT_DICT_INIT_CAP 16
-#define RT_DICT_LOAD_FACTOR 70  /* 百分比 */
+/* RT_DICT_INIT_CAP 和 RT_DICT_LOAD_FACTOR 已在 runtime_common.h 中定义 */
 
 typedef struct {
     char *key;
