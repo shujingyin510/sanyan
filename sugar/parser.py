@@ -110,12 +110,7 @@ class _Parser:
         return ['do'] + stmts if len(stmts) > 1 else stmts[0]
 
     def parse_statement(self) -> Any:
-        """分派语句解析：根据首 token 的关键字类型 dispatch。
-
-        支持：赋值、set、write、if、loop、for、fn、return、
-        break、continue、try、judge、context、export、register_device。
-        非关键字开头则回退到表达式语句。
-        """
+        """分派语句解析：字典调度简单分支 + if-elif 复杂分支。"""
         tok = self.peek()
         if tok is None:
             return None
@@ -124,208 +119,213 @@ class _Parser:
         # 裸赋值（无关键字，形如 `x = 1`）
         if _is_ident(tok.value) and self.pos + 1 < len(self.tokens) and self.tokens[self.pos + 1].value == '=':
             var_name = self.advance()
-            self.advance()  # skip '='
-            expr = self.parse_expression()
-            if self.peek() and self.peek().value == ';':
-                self.advance()
-            return ['set', var_name.value, expr]
-
-        if kw == 'set':
             self.advance()
-            var_name = self.advance()
-            if self.peek() and self.peek().value == '=':
-                self.advance()
             expr = self.parse_expression()
             if self.peek() and self.peek().value == ';':
                 self.advance()
             return ['set', var_name.value, expr]
 
+        # 简单分支调度
+        simple = {
+            'set': lambda: self._parse_set(),
+            'loop': lambda: self._parse_loop(),
+            'return': lambda: self._parse_return(),
+            'break': lambda: self._parse_break_continue('break'),
+            'continue': lambda: self._parse_break_continue('continue'),
+            'context': lambda: self._parse_context(),
+            'export': lambda: self._parse_export(),
+            'import': lambda: self._parse_import(),
+        }
+        if kw in simple:
+            return simple[kw]()
+
+        # 复杂分支保留 if-elif
         if kw == 'write':
-            # 检查是否是函数调用风格 置(对象, 值)
-            next_tok = self.tokens[self.pos + 1] if self.pos + 1 < len(self.tokens) else None
-            if next_tok and next_tok.value == '(':
-                # 退回到表达式解析
-                self.pos -= 1
-                expr = self.parse_expression()
-                return expr
-            self.advance()
-            target = self.advance()
-            if self.peek() and self.peek().value == '=':
-                self.advance()
-            value = self.parse_expression()
-            if self.peek() and self.peek().value == ';':
-                self.advance()
-            return ['write', target.value, value]
-
+            return self._parse_write()
         if kw == 'if':
             return self.parse_if()
-
-        if kw == 'loop':
-            self.advance()
-            cond = self.parse_expression()
-            body = self.parse_block()
-            return ['loop', cond, body]
-
         if kw == 'for':
-            self.advance()
-            var = self.advance()
-            next_tok = self.peek()
-            next_kw = self._kw(next_tok)
-            if next_kw == 'from':
-                self.advance()
-                start_val = self.parse_expression()
-                if self.peek() and self._kw(self.peek()) == 'to':
-                    self.advance()
-                end_val = self.parse_expression()
-                body = self.parse_block()
-                return ['for', var.value, start_val, end_val, body]
-            else:
-                if next_kw == 'in':
-                    self.advance()
-                lst = self.parse_expression()
-                body = self.parse_block()
-                return ['forin', var.value, lst, body]
-
+            return self._parse_for()
         if kw == 'fn':
-            self.advance()
-            name = self.advance()
-            params = []
-            param_types = {}
-            if self.peek() and self.peek().value == '(':
-                self.advance()
-                while self.peek() and self.peek().value != ')':
-                    p = self.advance()
-                    if self.peek() and self.peek().value == ':':
-                        self.advance()
-                        t = self.advance()
-                        param_types[p.value] = t.value
-                    params.append(p.value)
-                    if self.peek() and self.peek().value == ',':
-                        self.advance()
-                self._expect(')')
-            return_type = None
-            if self.peek() and self.peek().value == '->':
-                self.advance()
-                return_type = self.advance().value
-            if return_type:
-                param_types['__return__'] = return_type
-            body = self.parse_block()
-            if param_types:
-                return ['fn', name.value, params, param_types, body]
-            return ['fn', name.value, params, body]
-
-        if kw == 'return':
-            self.advance()
-            expr = self.parse_expression()
-            if self.peek() and self.peek().value == ';':
-                self.advance()
-            return ['return', expr]
-
-        if kw == 'break':
-            self.advance()
-            if self.peek() and self.peek().value == ';':
-                self.advance()
-            return ['break']
-
-        if kw == 'continue':
-            self.advance()
-            if self.peek() and self.peek().value == ';':
-                self.advance()
-            return ['continue']
-
+            return self._parse_fn()
         if kw == 'try':
-            self.advance()
-            try_body = self.parse_block()
-            # 验证下一个 token 是 '捕获' 或 'catch'
-            catch_tok = self.peek()
-            if catch_tok:
-                catch_kw = KEYWORD_MAP.get(catch_tok.value, catch_tok.value)
-                if catch_kw != 'catch':
-                    raise SanyanSyntaxError(f"行 {catch_tok.line}: 期望 'catch'，但得到 '{catch_tok.value}'")
-            self.advance()
-            err_var = '_'
-            if self.peek() and self.peek().value == '(':
-                self.advance()
-                err_var_tok = self.advance()
-                err_var = err_var_tok.value if err_var_tok else '_'
-                self._expect(')')
-            catch_body = self.parse_block()
-            if not isinstance(catch_body, list) or (
-                isinstance(catch_body, list) and len(catch_body) > 0 and catch_body[0] != 'do'
-            ):
-                catch_body_list = [catch_body]
-            else:
-                catch_body_list = (
-                    catch_body[1:]
-                    if isinstance(catch_body, list) and len(catch_body) > 0 and catch_body[0] == 'do'
-                    else [catch_body]
-                )
-            return ['try', try_body, ['捕获', err_var] + catch_body_list]
-
+            return self._parse_try()
         if kw == 'judge':
-            self.advance()
-            val = self.parse_expression()
-            self._expect('{')
-            cases = []
-            while self.peek() and self.peek().value != '}':
-                cases.append(self.parse_expression())
-                cases.append(self.parse_block())
-            self._expect('}')
-            return ['judge', val] + cases
-
-        if kw == 'context':
-            self.advance()
-            obj = self.parse_expression()
-            body = self.parse_block()
-            return ['context', obj, body]
-
-        if kw == 'export':
-            self.advance()
-            names = []
-            while self.peek() and self.peek().value not in (';', '{', '}'):
-                name_tok = self.advance()
-                names.append(name_tok.value)
-                if self.peek() and self.peek().value == ',':
-                    self.advance()
-            if self.peek() and self.peek().value == ';':
-                self.advance()
-            return ['export'] + names
-
-        if kw == 'import':
-            self.advance()
-            path = self.parse_expression()
-            # 支持 import as 别名：导入 "path" 为 alias
-            if self.peek() and self.peek().value in ('为', 'as'):
-                self.advance()
-                alias = self.advance()
-                return ['import', path, '为', alias.value if alias else '']
-            return ['import', path]
-
+            return self._parse_judge()
         if kw == 'register_device':
-            self.advance()
-            name_tok = self.advance()
-            name = name_tok.value if name_tok else ''
-            # 跳过 '为' / 'as'
-            if self.peek() and self.peek().value in ('为', 'as'):
-                self.advance()
-            # 读取设备类型和参数
-            type_tok = self.advance()
-            device_type = type_tok.value if type_tok else 'mock'
-            params = []
-            if self.peek() and self.peek().value == '(':
-                self.advance()
-                while self.peek() and self.peek().value != ')':
-                    params.append(self.parse_expression())
-                    if self.peek() and self.peek().value == ',':
-                        self.advance()
-                self._expect(')')
-            return ['register_device', name, device_type] + params
+            return self._parse_register_device()
 
         # 表达式语句
         expr = self.parse_expression()
         if self.peek() and self.peek().value == ';':
             self.advance()
         return expr
+
+    # ── 语句解析辅助方法（被 parse_statement 字典 dispatch 调用）──
+
+    def _parse_set(self):
+        self.advance()
+        var_name = self.advance()
+        if self.peek() and self.peek().value == '=':
+            self.advance()
+        expr = self.parse_expression()
+        if self.peek() and self.peek().value == ';':
+            self.advance()
+        return ['set', var_name.value, expr]
+
+    def _parse_loop(self):
+        self.advance()
+        cond = self.parse_expression()
+        body = self.parse_block()
+        return ['loop', cond, body]
+
+    def _parse_return(self):
+        self.advance()
+        expr = self.parse_expression()
+        if self.peek() and self.peek().value == ';':
+            self.advance()
+        return ['return', expr]
+
+    def _parse_break_continue(self, kind):
+        self.advance()
+        if self.peek() and self.peek().value == ';':
+            self.advance()
+        return [kind]
+
+    def _parse_context(self):
+        self.advance()
+        obj = self.parse_expression()
+        body = self.parse_block()
+        return ['context', obj, body]
+
+    def _parse_export(self):
+        self.advance()
+        names = []
+        while self.peek() and self.peek().value not in (';', '{', '}'):
+            name_tok = self.advance()
+            names.append(name_tok.value)
+            if self.peek() and self.peek().value == ',':
+                self.advance()
+        if self.peek() and self.peek().value == ';':
+            self.advance()
+        return ['export'] + names
+
+    def _parse_import(self):
+        self.advance()
+        path = self.parse_expression()
+        if self.peek() and self.peek().value in ('为', 'as'):
+            self.advance()
+            alias = self.advance()
+            return ['import', path, '为', alias.value if alias else '']
+        return ['import', path]
+
+    def _parse_write(self):
+        next_tok = self.tokens[self.pos + 1] if self.pos + 1 < len(self.tokens) else None
+        if next_tok and next_tok.value == '(':
+            self.pos -= 1
+            return self.parse_expression()
+        self.advance()
+        target = self.advance()
+        if self.peek() and self.peek().value == '=':
+            self.advance()
+        value = self.parse_expression()
+        if self.peek() and self.peek().value == ';':
+            self.advance()
+        return ['write', target.value, value]
+
+    def _parse_for(self):
+        self.advance()
+        var = self.advance()
+        next_tok = self.peek()
+        next_kw = self._kw(next_tok)
+        if next_kw == 'from':
+            self.advance()
+            start_val = self.parse_expression()
+            if self.peek() and self._kw(self.peek()) == 'to':
+                self.advance()
+            end_val = self.parse_expression()
+            body = self.parse_block()
+            return ['for', var.value, start_val, end_val, body]
+        else:
+            if next_kw == 'in':
+                self.advance()
+            lst = self.parse_expression()
+            body = self.parse_block()
+            return ['forin', var.value, lst, body]
+
+    def _parse_fn(self):
+        self.advance()
+        name = self.advance()
+        params = []
+        param_types = {}
+        if self.peek() and self.peek().value == '(':
+            self.advance()
+            while self.peek() and self.peek().value != ')':
+                p = self.advance()
+                if self.peek() and self.peek().value == ':':
+                    self.advance()
+                    t = self.advance()
+                    param_types[p.value] = t.value
+                params.append(p.value)
+                if self.peek() and self.peek().value == ',':
+                    self.advance()
+            self._expect(')')
+        return_type = None
+        if self.peek() and self.peek().value == '->':
+            self.advance()
+            return_type = self.advance().value
+        if return_type:
+            param_types['__return__'] = return_type
+        body = self.parse_block()
+        if param_types:
+            return ['fn', name.value, params, param_types, body]
+        return ['fn', name.value, params, body]
+
+    def _parse_try(self):
+        self.advance()
+        try_body = self.parse_block()
+        if self.peek() and self._kw(self.peek()) == 'catch':
+            self.advance()
+            err_var = self.advance()
+            catch_body = self.parse_block()
+            if isinstance(catch_body, list) and len(catch_body) > 0 and catch_body[0] == 'do':
+                catch_body_list = catch_body[1:] if len(catch_body) > 1 else [TritValue(0)]
+            else:
+                catch_body_list = (
+                    [catch_body]
+                    if isinstance(catch_body, list) and len(catch_body) > 0 and catch_body[0] == 'do'
+                    else [catch_body]
+                )
+            return ['try', try_body, ['捕获', err_var.value] + catch_body_list]
+
+    def _parse_judge(self):
+        self.advance()
+        val = self.parse_expression()
+        self._expect('{')
+        cases = []
+        while self.peek() and self.peek().value != '}':
+            cases.append(self.parse_expression())
+            cases.append(self.parse_block())
+        self._expect('}')
+        return ['judge', val] + cases
+
+    def _parse_register_device(self):
+        self.advance()
+        name_tok = self.advance()
+        name = name_tok.value if name_tok else ''
+        if self.peek() and self.peek().value in ('为', 'as'):
+            self.advance()
+        type_tok = self.advance()
+        device_type = type_tok.value if type_tok else 'mock'
+        params = []
+        if self.peek() and self.peek().value == '(':
+            self.advance()
+            while self.peek() and self.peek().value != ')':
+                params.append(self.parse_expression())
+                if self.peek() and self.peek().value == ',':
+                    self.advance()
+            self._expect(')')
+        return ['register_device', name, device_type] + params
 
     def parse_if(self, advance_kw: bool = True) -> Any:
         if advance_kw:
