@@ -76,6 +76,12 @@ STR_CONTAINS = 0x39
 DICT_LEN = 0x3A
 HALT = 0xFF
 
+# 最大执行步数上限，防止无限循环
+VM_MAX_STEPS = 5_000_000
+
+# .bin 字节码格式版本号（破坏性升级时递增）
+BIN_VERSION = 1
+
 OP_NAMES = {v: k for k, v in vars().items() if isinstance(v, int) and k.isupper()}
 
 
@@ -588,9 +594,17 @@ class VM:
     #   5. 循环内的 CALL/RET 不干扰 JMP 跳转目标（call_stack 独立管理）
     # ═══════════════════════════════════════════════════════════
     def _run_inner(self) -> None:
-        """内部执行循环。通过分派表将操作码路由到对应的执行方法。"""
+        """内部执行循环。通过分派表将操作码路由到对应的执行方法。
+
+        设置最大步数上限（VM_MAX_STEPS），防止字节码无限循环导致挂死。
+        """
         dispatch = _DISPATCH
+        max_steps = VM_MAX_STEPS
+        steps = 0
         while not self.halted and self.pc < len(self.code):
+            if steps >= max_steps:
+                raise VMError(f'VM 执行超过最大步数 ({max_steps})，疑似无限循环')
+            steps += 1
             op = self.code[self.pc]
             self.pc += 1
 
@@ -609,11 +623,11 @@ class VM:
     #
     # .bin 文件结构:
     #   [0..3]   magic  "SAN0"
-    #   [4]      ver    版本号
+    #   [4]      ver    版本号（BIN_VERSION）
     #   [5]      vc     变量数
-    #   [6..7]   sz     代码大小（小端 u16）
-    #   [8..]    code   字节码
-    #   [8+sz..]        导出表（count + entries）
+    #   [6..9]   sz     代码大小（小端 u32，支持 >64KB）
+    #   [10..]   code   字节码
+    #   [10+sz..]       导出表（count + entries）
     #
     # 加载后自动执行模块初始化代码（填充全局变量）。
     # ═══════════════════════════════════════════════════════════
@@ -621,10 +635,15 @@ class VM:
     def from_bin(cls, path: str) -> 'VM':
         with open(path, 'rb') as f:
             data = f.read()
+        if len(data) < 10:
+            raise VMError(f'字节码文件过小: {len(data)} 字节')
         magic, ver, vc, sz = struct.unpack_from('<4sBBI', data, 0)
-        # 接受 SAN0 标准格式或字节码编译器变体格式（首字节 S、第4字节 0、ver=1）
-        if magic != b'SAN0' and not (magic[0:1] == b'S' and magic[3:4] == b'0' and ver == 1):
+        # 接受 SAN0 标准格式或字节码编译器变体格式（首字节 S、第4字节 0）
+        if magic != b'SAN0' and not (magic[0:1] == b'S' and magic[3:4] == b'0'):
             raise VMError(f'无效的字节码文件: magic={magic!r}')
+        # 版本号检查：当前仅支持 BIN_VERSION=1，未来破坏性升级时在此拦截
+        if ver != BIN_VERSION:
+            raise VMError(f'字节码版本不兼容: 文件版本={ver}, 支持版本={BIN_VERSION}')
         pos = 10
         code = bytearray(data[pos : pos + sz])
         pos += sz

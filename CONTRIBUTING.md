@@ -6,12 +6,12 @@
 # 安装开发依赖
 pip install -e .[dev]
 
-# 运行全部测试（14 套）
-python tests/test_core.py          # 52 项
+# 运行全部测试（15 套）
+python tests/test_core.py          # 78 项
 python tests/test_commands.py      # 18 项
 python tests/test_parser.py        # 28 项
-python tests/test_ops.py           # 78 项
-python tests/test_ops_ext.py       # 26 项
+python tests/test_ops.py           # 92 项
+python tests/test_ops_ext.py       # 64 项
 python tests/test_lsp.py           # 6 项
 python tests/test_package.py       # 6 项
 python tests/test_iot.py           # 25 项
@@ -19,8 +19,10 @@ python tests/test_sugar_san.py     # 45 项
 python tests/test_llvmgen.py       # 53 项
 python tests/test_dp_python.py     # 10 项
 python tests/test_self_host.py     # 1 项
+python tests/test_sugar_self_host.py # 3 项
 python tests/test_vm.py            # 73 项
-python tests/test_c_vm.py          # 1 项（需 C 编译器）
+python tests/test_c_vm.py          # 14 项（需 C 编译器）
+python tests/test_agent.py         # 29 项
 
 # 集成测试
 python tests/run_all.py

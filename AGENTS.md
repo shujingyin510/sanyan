@@ -216,15 +216,15 @@ python -X utf8 tests/test_self_host.py -v # 自举验证测试 1 项
 python -X utf8 tests/test_sugar_self_host.py -v # sugar.bin 自举验证 3 项
 python -X utf8 tests/test_vm.py -v        # VM 字节码测试 73 项
 python -X utf8 tests/test_c_vm.py -v      # C VM 测试 1 项（需 gcc）
-python -X utf8 tests/test_agent.py -v     # Agent 测试 19 项
+python -X utf8 tests/test_agent.py -v     # Agent 测试 29 项
 python -X utf8 tests/run_all.py           # 集成测试 46 项
 
 全部通过才算成功：
-- test_core.py 52/52
+- test_core.py 78/78（含闭包+import as 测试）
 - test_commands.py 18/18
 - test_parser.py 28/28
-- test_ops.py 78/78
-- test_ops_ext.py 26/26（skip=0）
+- test_ops.py 92/92
+- test_ops_ext.py 64/64
 - test_lsp.py 6/6
 - test_package.py 6/6
 - test_iot.py 25/25
@@ -234,10 +234,9 @@ python -X utf8 tests/run_all.py           # 集成测试 46 项
 - test_self_host.py 1/1
 - test_sugar_self_host.py 3/3
 - test_vm.py 73/73
-- test_c_vm.py 1/1（需 C 编译器）
-- test_agent.py 19/19
-- test_llvm_native.py 2/3（dp_harness 测试需完整 LLVM→原生管线，parse_sanyan 已修复返回正确 AST）
-- run_all.py 43/43
+- test_c_vm.py 14/14（含交叉验证，需 gcc）
+- test_agent.py 29/29
+- run_all.py 46/46
 
 2026-05-30 修复记录：
 - llvmgen/runtime.c：struct rt_list_s 移到使用函数之前，rt_list_push → rt_list_push_item，新增公共接口 `rt_make()` 用于 C 字符串→三言字符串转换

@@ -112,6 +112,9 @@ typedef struct rt_list_s {
 
 #define RT_DICT_INIT_CAP    16
 #define RT_DICT_LOAD_FACTOR 70  /* 负载因子阈值（百分比） */
+#ifndef RT_DICT_MAX_CAP
+#define RT_DICT_MAX_CAP     65536  /* 字典最大容量，防止嵌入式系统内存溢出 */
+#endif
 
 
 /* ═══════════════════════════════════════════════════════════

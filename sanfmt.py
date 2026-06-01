@@ -359,6 +359,26 @@ def _reinsert_inline_comments(formatted: str, source: str) -> str:
     return '\n'.join(lines)
 
 
+def _normalize_blank_lines(text: str) -> str:
+    """规范化空行：连续空行压缩为最多 1 个空行，移除尾部空行。"""
+    lines = text.split('\n')
+    result = []
+    prev_blank = False
+    for line in lines:
+        is_blank = line.strip() == ''
+        if is_blank:
+            if not prev_blank:
+                result.append(line)
+            prev_blank = True
+        else:
+            result.append(line)
+            prev_blank = False
+    # 移除尾部空行
+    while result and result[-1].strip() == '':
+        result.pop()
+    return '\n'.join(result)
+
+
 def format_code(ast, source=None):
     """将 AST 格式化为漂亮的源码。
 
@@ -369,6 +389,7 @@ def format_code(ast, source=None):
     result = _fmt_stmt(ast, 0) + '\n'
     if source:
         result = _reinsert_inline_comments(result, source)
+    result = _normalize_blank_lines(result)
     return result
 
 

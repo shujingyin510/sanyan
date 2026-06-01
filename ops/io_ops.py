@@ -1,7 +1,8 @@
-"""输入/输出、调试、值格式化"""
+"""输入/输出、调试、值格式化、等待"""
 
+import time
 from ternary_core import TritValue
-from values import FunctionValue, ModuleValue, SanyanValueError, SanyanSyntaxError
+from values import FunctionValue, ModuleValue, SanyanValueError, SanyanSyntaxError, SanyanTypeError
 from ops.registry import register
 
 
@@ -165,8 +166,26 @@ class IOOps:
 
         return TritValue(0)
 
+    @staticmethod
+    def wait_op(evaluator, args):
+        """等待指定毫秒数：等待 1000"""
+        if len(args) == 0:
+            raise SanyanSyntaxError('等待 需要一个参数（毫秒数）')
+        ms = evaluator.eval(args[0])
+        if isinstance(ms, TritValue):
+            ms = ms.to_int()
+        elif isinstance(ms, (int, float)):
+            ms = int(ms)
+        else:
+            raise SanyanTypeError(f'等待 参数必须是数字，但得到: {type(ms).__name__}')
+        if ms < 0:
+            raise SanyanValueError(f'等待 参数不能为负数: {ms}')
+        time.sleep(ms / 1000.0)
+        return TritValue(0)
+
 
 # 注册 IO 操作
 register('print', IOOps.output)
 register('input', IOOps.input_op)
 register('debug', IOOps.debug_op)
+register('wait', IOOps.wait_op)

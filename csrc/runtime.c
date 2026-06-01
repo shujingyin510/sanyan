@@ -162,11 +162,15 @@ static int key_eq(void *a, void *b) {
     return a == b;
 }
 
-/* 哈希表扩容：重新哈希所有条目到 2 倍容量 */
+/* 哈希表扩容：重新哈希所有条目到 2 倍容量（不超过 RT_DICT_MAX_CAP） */
 static void rt_dict_rehash(rt_dict_t *d) {
     int32_t old_cap = d->cap;
-    rt_entry_t *old = d->entries;
     int32_t new_cap = old_cap * 2;
+    if (new_cap > RT_DICT_MAX_CAP) {
+        if (old_cap >= RT_DICT_MAX_CAP) return;  /* 已达上限，不扩容 */
+        new_cap = RT_DICT_MAX_CAP;
+    }
+    rt_entry_t *old = d->entries;
     rt_entry_t *new_entries = (rt_entry_t*)calloc((size_t)new_cap, sizeof(rt_entry_t));
     if (!new_entries) return;  /* 分配失败：保留旧表，不泄漏 */
     d->cap = new_cap;

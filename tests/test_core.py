@@ -509,5 +509,89 @@ class TestValuesExtended(unittest.TestCase):
         self.assertIsNotNone(b)
 
 
+class TestClosure(unittest.TestCase):
+    """闭包/第一类函数测试 — 验证函数作为值传递和返回"""
+
+    def test_function_return_as_value(self):
+        """函数名作为独立表达式求值时返回 FunctionValue"""
+        from evaluator import SanyanEvaluator
+        from sugar.parser import parse_code
+
+        e = SanyanEvaluator(max_loop_steps=500)
+        ast, _ = parse_code('定义 add10 (x) { 返回 x 加 10 }')
+        e.eval(ast)
+        # 函数名作为变量求值应返回 FunctionValue
+        result = e.eval('add10')
+        self.assertIsInstance(result, FunctionValue)
+
+    def test_closure_basic(self):
+        """基本闭包：内部函数捕获外部变量"""
+        from evaluator import SanyanEvaluator
+        from sugar.parser import parse_code
+
+        e = SanyanEvaluator(max_loop_steps=500)
+        code = '''
+        定义 outer (x) {
+            定义 inner (y) { 返回 x 加 y }
+            返回 inner
+        }
+        设 f = outer(10)
+        输出 f(5)
+        '''
+        ast, _ = parse_code(code)
+        for stmt in ast:
+            result = e.eval(stmt)
+        self.assertEqual(result.to_int(), 15)
+
+    def test_closure_counter(self):
+        """计数器闭包：多次调用共享可变状态"""
+        from evaluator import SanyanEvaluator
+        from sugar.parser import parse_code
+
+        e = SanyanEvaluator(max_loop_steps=500)
+        code = '''
+        定义 mkcounter () {
+            设 n = 0
+            定义 tick () { 设 n = n 加 1 返回 n }
+            返回 tick
+        }
+        设 c = mkcounter()
+        '''
+        ast, _ = parse_code(code)
+        for stmt in ast:
+            e.eval(stmt)
+        self.assertEqual(e.eval(['c']).to_int(), 1)
+        self.assertEqual(e.eval(['c']).to_int(), 2)
+        self.assertEqual(e.eval(['c']).to_int(), 3)
+
+    def test_closure_preserves_outer_scope(self):
+        """闭包不污染外部作用域"""
+        from evaluator import SanyanEvaluator
+        from sugar.parser import parse_code
+
+        e = SanyanEvaluator(max_loop_steps=500)
+        code = '''
+        设 x = 100
+        定义 add_x (y) { 返回 x 加 y }
+        设 result = add_x(5)
+        '''
+        ast, _ = parse_code(code)
+        for stmt in ast:
+            e.eval(stmt)
+        self.assertEqual(e.get_var('result').to_int(), 105)
+        # 外部 x 应保持不变
+        self.assertEqual(e.get_var('x').to_int(), 100)
+
+    def test_import_as_alias(self):
+        """import as 别名功能"""
+        from evaluator import SanyanEvaluator
+
+        e = SanyanEvaluator(max_loop_steps=500)
+        e.eval(['import', '"stdlib/math.san"', '为', 'm'])
+        self.assertTrue(e.has_var('m'))
+        m = e.get_var('m')
+        self.assertIsInstance(m, ModuleValue)
+
+
 if __name__ == '__main__':
     unittest.main()

@@ -1,4 +1,4 @@
-# 三言 Sanyan v3.20.0
+# 三言 Sanyan v3.22.0
 
 [![VS Code Marketplace](https://img.shields.io/badge/VS%20Code-Marketplace-%23007ACC?logo=visualstudiocode)](https://marketplace.visualstudio.com/items?itemName=sanyan-lang.sanyan-language)
 [![CI](https://github.com/shujingyin510/sanyan/actions/workflows/test.yml/badge.svg)](https://github.com/shujingyin510/sanyan/actions)
@@ -415,6 +415,7 @@ sanyan/
 ├── README.md                  # 项目说明（中文）
 ├── README_EN.md               # 项目说明（英文）
 ├── build_combined.py          # 构建脚本：展开 #include 生成合并 .san
+├── build_exe.py               # PyInstaller 打包脚本
 ├── sanyan/                    # 包命名空间（模块化入口）
 │   └── __init__.py
 ├── commands.py                # 自定义命令调用
@@ -425,6 +426,7 @@ sanyan/
 ├── doc_sync.py                # 文档同步检查
 ├── eval_helpers.py            # 求值辅助模块
 ├── evaluator.py               # 求值器
+├── gui.py                     # 可视化编译器 GUI
 ├── lexer.py                   # S 表达式词法
 ├── lsp_server.py              # LSP 服务器
 ├── main.py                    # 入口（支持 --vm 字节码缓存）
@@ -433,11 +435,16 @@ sanyan/
 ├── preprocess.py              # #include 预处理器
 ├── pyproject.toml             # 项目配置
 ├── repl.py                    # REPL 交互环境
+├── run_agent.py               # Agent 启动器
+├── run_v2.py                  # v2 演示启动器
+├── run_v2_demo.py             # v2 演示脚本
+├── run_village_demo.py        # 村庄演示脚本
 ├── runtime.py                 # 运行环境
 ├── runtime_components.py      # 运行组件（作用域/IoT/调试/性能）
 ├── sandbox.py                 # 沙箱安全机制
 ├── sanfmt.py                  # 源码格式化器
 ├── sanyancc.py                # STM32 交叉编译器
+├── setup.py                   # 安装脚本
 ├── skin.py                    # 皮肤管理器
 ├── tail_call.py               # 尾递归优化
 ├── ternary_core.py            # 平衡三进制算术（模拟）

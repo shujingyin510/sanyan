@@ -13,40 +13,50 @@ import os
 
 os.chdir(os.path.dirname(os.path.abspath(__file__)) or '.')
 
-from ops.registry import register_alias
-
-register_alias('转字符串', 'to_string')
-register_alias('转JSON', 'to_json')
-register_alias('解析JSON', 'from_json')
-register_alias('时间戳', 'timestamp')
-register_alias('字符串包含', 'str_contains')
-register_alias('表长', 'list_len')
-register_alias('字符串相等', 'str_equals')
-register_alias('是字典', 'is_dict')
-register_alias('是列表', 'is_list')
-register_alias('是字符串', 'is_string')
-register_alias('连接', 'concat')
-register_alias('取长', 'length')
-register_alias('子串', 'substring')
-register_alias('查找', 'find')
-register_alias('分割', 'split')
-register_alias('包含', 'contains')
-register_alias('字典键列表', 'dict_keys')
-register_alias('含键', 'dict_contains')
-register_alias('置键', 'set_key')
-register_alias('取键', 'get_key')
-register_alias('删除键', 'delete_key')
-register_alias('列表合', 'list_concat')
-register_alias('取', 'get')
-register_alias('不', 'not')
-register_alias('读文件', 'read_file')
-register_alias('写文件', 'write_file')
-register_alias('转数字', 'to_number')
-
 from sugar.parser import parse_code
 from evaluator import SanyanEvaluator
 from ops.file_ops import clear_cache
 from preprocess import preprocess_includes
+
+
+def _register_aliases():
+    """注册中文别名（必须在 SanyanEvaluator 实例化之后调用）"""
+    from ops.registry import register_alias
+
+    aliases = {
+        '转字符串': 'to_string',
+        '转JSON': 'to_json',
+        '解析JSON': 'from_json',
+        '时间戳': 'timestamp',
+        '字符串包含': 'str_contains',
+        '表长': 'list_len',
+        '字符串相等': 'str_equals',
+        '是字典': 'is_dict',
+        '是列表': 'is_list',
+        '是字符串': 'is_string',
+        '连接': 'concat',
+        '取长': 'length',
+        '子串': 'substring',
+        '查找': 'find',
+        '分割': 'split',
+        '包含': 'contains',
+        '字典键列表': 'dict_keys',
+        '含键': 'dict_contains',
+        '置键': 'set_key',
+        '取键': 'get_key',
+        '删除键': 'delete_key',
+        '列表合': 'list_concat',
+        '取': 'get',
+        '不': 'not',
+        '读文件': 'read_file',
+        '写文件': 'write_file',
+        '转数字': 'to_number',
+    }
+    for alias, target in aliases.items():
+        try:
+            register_alias(alias, target)
+        except Exception:
+            pass  # 目标尚未注册时静默跳过
 
 
 def load_api_key():
@@ -70,10 +80,12 @@ def load_api_key():
 def init_evaluator(api_key):
     clear_cache()
     evaluator = SanyanEvaluator(max_loop_steps=500000)
+    _register_aliases()  # 注册中文别名（必须在 evaluator 实例化之后）
 
     agent_path = os.path.join('ternary_agent', 'agent.san')
     src = open(agent_path, encoding='utf-8').read()
     # 预处理 #include 展开 + API key 注入
+    # 注入是必要的：agent_policy.san 中的 API密钥 默认值为 "sk-你的key"
     src = preprocess_includes(src)
     src = src.replace('sk-你的key', api_key)
     ast, _ = parse_code(src)

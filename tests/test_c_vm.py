@@ -102,11 +102,14 @@ class TestCVM(unittest.TestCase):
 class TestCVMCrossValidation(unittest.TestCase):
     """C VM 与 Python VM 交叉验证测试"""
 
+    _cvm_exe: str | None = None  # 类级缓存：编译一次复用
+
     @classmethod
     def setUpClass(cls):
-        """检查 C 编译器是否可用"""
+        """检查 C 编译器是否可用，并编译 C VM（仅一次）"""
         if find_cc() is None:
             raise unittest.SkipTest('需要 C 编译器 (gcc/clang)')
+        cls._cvm_exe = _compile_cvm()
 
     def _compile_and_compare(self, source: str, expected_output: str):
         """编译源码并在 C VM 和 Python VM 上运行，比较输出"""
@@ -127,8 +130,20 @@ class TestCVMCrossValidation(unittest.TestCase):
             py_output = sys.stdout.getvalue().strip()
             sys.stdout = old_stdout
 
-            # C VM
-            cvm_output = _run_cvm(bin_path)
+            # C VM（复用已编译的可执行文件）
+            cvm_output = None
+            if self._cvm_exe and os.path.exists(self._cvm_exe):
+                try:
+                    res = subprocess.run(
+                        [self._cvm_exe, bin_path, '--run'],
+                        capture_output=True,
+                        text=True,
+                        timeout=10,
+                    )
+                    if res.returncode == 0:
+                        cvm_output = res.stdout.strip()
+                except subprocess.TimeoutExpired:
+                    pass
 
             # 比较
             self.assertEqual(py_output, expected_output, 'Python VM 输出不匹配')

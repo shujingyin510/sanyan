@@ -1,4 +1,8 @@
-"""求值辅助模块：从 evaluator.py 提取的符号解析和字面量处理方法"""
+"""求值辅助模块：从 evaluator.py 提取的符号解析和字面量处理方法
+
+提供字面量解析、标识符求值、符号解析等辅助函数。
+闭包支持：当标识符是已注册的命令名时，返回 FunctionValue 并捕获当前作用域。
+"""
 
 from __future__ import annotations
 from typing import Any, Optional, TYPE_CHECKING
@@ -92,7 +96,12 @@ def resolve_identifier(evaluator: SanyanEvaluator, node: str) -> Any:
 
 
 def eval_str(evaluator: SanyanEvaluator, node: str) -> Any:
-    """求值字符串节点"""
+    """求值字符串节点。
+
+    解析顺序：引号字符串 → 数值字面量 → 皮肤关键字 → 变量/命令 → 字面量。
+    当标识符是已注册的命令名时，返回 FunctionValue 并捕获当前作用域作为闭包环境，
+    使函数可以作为第一类值传递和返回。
+    """
     if len(node) >= 2 and node[0] in ('"', '\u201c', '\u2018', "'"):
         return parse_string_literal(node[1:-1])
     numeric = parse_numeric_literal(node)
@@ -112,8 +121,31 @@ def eval_str(evaluator: SanyanEvaluator, node: str) -> Any:
         try:
             return resolve_identifier(evaluator, node)
         except SanyanNameError:
+            # 检查是否为已注册的命令（函数），返回 FunctionValue 支持第一类函数
+            if hasattr(evaluator, 'commands') and node in evaluator.commands:
+                return _make_closure_value(evaluator, node)
             pass  # not a variable, treat as literal string
     return node
+
+
+def _make_closure_value(evaluator: SanyanEvaluator, cmd_name: str) -> Any:
+    """将已注册的命令包装为 FunctionValue，捕获当前作用域作为闭包环境。
+
+    当函数名作为独立表达式求值时（如 返回 inner、设 f = inner），
+    创建 FunctionValue 并快照当前所有可见变量，使函数返回后仍能访问外层变量。
+    """
+    from values import FunctionValue
+
+    cmd_def = evaluator.commands[cmd_name]
+    params = cmd_def[0]
+    body = cmd_def[1]
+    param_types = dict(cmd_def[2]) if len(cmd_def) > 2 and cmd_def[2] else {}
+    return_type = cmd_def[3] if len(cmd_def) > 3 else None
+    if return_type:
+        param_types['__return__'] = return_type
+    # 捕获当前所有可见变量作为闭包环境
+    closure_vars = dict(evaluator.all_scoped_vars())
+    return FunctionValue(params, body, evaluator, closure_vars, param_types)
 
 
 def eval_symbol(evaluator: SanyanEvaluator, symbol: str) -> Any:

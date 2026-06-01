@@ -2,6 +2,58 @@
 
 ---
 
+## [v3.22.0] — 2026-06-01
+
+### 新增
+- **Agent 启动器修复**: 4 个启动器（`run_agent.py`, `run_v2.py`, `run_v2_demo.py`, `run_village_demo.py`）的 `register_alias` 调用移到 `SanyanEvaluator` 实例化之后，解决 `SanyanKeyError` 启动崩溃
+- **Agent 缺失函数补全**: 新增 `构建系统提示()`、`规则降级()`、`最近决策()`、`解释原因()`、`策略概览()` 5 个函数（`ternary_agent/agent.san`）
+- **village_game.san 单元测试**: 8 个测试覆盖时间流逝、天气刷新、关系查找、传播速度、声望变化、NPC 好感、心情映射、记忆系统（`tests/test_agent.py`）
+- **npc_game.san 单元测试**: 2 个测试覆盖 NPC 数据加载、记忆强度分级（`tests/test_agent.py`）
+
+### 修复
+- **agent.san 缺失闭合括号**: `加载记忆()` 函数缺少 `}`，导致解析失败（`ternary_agent/agent.san`）
+- **demo_compress.san 英文 op**: `output(connect(..., to_string(...)))` 改为 `输出(连接(..., 转字符串(...)))`（`ternary_agent/demo_compress.san`）
+- **test_agent_run_mock 空壳断言**: 增强异常检查，区分 API 密钥/计算错误与意外异常（`tests/test_agent.py`）
+- **test_match_rule_borrow_negated 断言空过**: 移除条件分支，直接验证否定句风险不为高（`tests/test_agent.py`）
+- **冲突统计每轮打印**: 改为仅在有冲突时打印（`ternary_agent/agent.san`）
+- **记忆加载失败静默**: 添加日志输出（`ternary_agent/agent.san`）
+
+### 文档
+- **prompts.san**: 标注为未使用死代码（`ternary_agent/prompts.san`）
+- **memory.san**: 标注为未使用死代码（`ternary_agent/memory.san`）
+- **run_agent.py**: 添加 API 密钥注入必要性注释
+
+---
+
+## [v3.21.0] — 2026-06-01
+
+### 新增
+- **闭包/第一类函数支持**: `eval_helpers.py` 新增 `_make_closure_value()`，函数名作为独立表达式求值时返回 `FunctionValue` 并捕获当前作用域（`eval_helpers.py`）
+- **import as 别名**: `导入 "path" 为 alias` 语法，模块自动绑定到别名变量（`ops/file_ops.py`, `sugar/parser.py`, `language/chinese.json`）
+- **默认参数**: `定义 foo (x, y = 10) { ... }` 语法，调用时可省略有默认值的参数（`commands.py`, `param_matcher.py`）
+- **等待操作**: `等待(毫秒)` 阻塞执行指定时间（`ops/io_ops.py`）
+- **VM 最大步数保护**: `VM_MAX_STEPS=5_000_000` 防止字节码无限循环（`vm.py`）
+- **VM 版本号检查**: `from_bin` 加载时检查 `BIN_VERSION`，不兼容时报错（`vm.py`）
+- **C VM 字典容量上限**: `RT_DICT_MAX_CAP=65536` 可编译时配置，防止嵌入式内存溢出（`csrc/runtime_common.h`, `csrc/runtime.c`）
+- **闭包单元测试**: 5 个新测试覆盖基本闭包、计数器闭包、作用域隔离、import as（`tests/test_core.py`）
+
+### 变更
+- **C VM 测试优化**: `setUpClass` 编译一次 C VM 复用，测试时间从 116s 降至 33s（`tests/test_c_vm.py`）
+- **sugar parser 缓存保留**: `clear_cache()` 不再清除 `_sugar_parser_module`，避免重复加载 938 行 sugar.san（`ops/file_ops.py`）
+
+### 修复
+- **闭包返回字符串而非函数**: `返回 inner` 将命令名当字符串返回，而非返回 `FunctionValue`（`eval_helpers.py`）
+- **stdlib/*.san 源码路径全坏**: sugar parser 的 `lambda` 关键字误解析变量名 `lambda`，改为仅后跟 `(` 时激活（`sugar/parser.py`）
+- **C VM 测试卡死**: `clear_cache` 清除 sugar parser 缓存导致重复加载超限（`ops/file_ops.py`）
+- **VM 无最大步数**: 字节码无限循环导致挂死（`vm.py`）
+- **loop 错误消息英文**: `loop 需要条件和体` 改为 `循环 需要条件和体`（`ops/control_ops.py`）
+
+### 文档
+- **docs/manual.md**: 补充三进制 API 附录（`BT`, `to_trit`, `to_int`, `TritValue` 方法）
+- **README.md**: 项目结构补充 `gui.py`
+
+---
+
 ## [v3.20.0] — 2026-05-31
 
 ### 新增

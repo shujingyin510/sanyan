@@ -51,11 +51,13 @@ TEMP_ENV_MAX_LOOP = 50000
 
 
 def clear_cache():
-    """清理模块缓存，用于测试隔离。"""
+    """清理模块缓存，用于测试隔离。
+
+    保留 _sugar_parser_module 缓存：sugar.san 解析器加载开销大（938 行），
+    且无状态副作用，跨调用复用安全。
+    """
     _module_cache.clear()
     _import_stack.clear()
-    global _sugar_parser_module
-    _sugar_parser_module = None
 
 
 def _get_cache(evaluator) -> tuple[dict, set]:
@@ -294,12 +296,22 @@ class FileOps:
 
     @staticmethod
     def import_module(evaluator, args):
-        if len(args) != 1:
+        """导入模块，支持可选别名：导入 "path" 或 导入 "path" 为 alias"""
+        if len(args) < 1:
             raise SanyanSyntaxError('导入 需要一个文件路径')
         path = evaluator.eval(args[0])
         if hasattr(path, 'to_int'):
             path = str(path.to_int())
         path = _resolve_path(path)
+
+        # 解析别名：导入 "path" 为 alias
+        alias = None
+        if len(args) >= 3:
+            # args[1] 可能是 '为' 或 'as'（关键字），args[2] 是别名
+            alias_arg = args[2] if isinstance(args[1], str) and args[1] in ('为', 'as') else args[-1]
+            alias = evaluator.eval(alias_arg) if not isinstance(alias_arg, str) else alias_arg
+            if isinstance(alias, str) and alias in ('为', 'as'):
+                alias = None  # 关键字不是别名
 
         abs_path = os.path.abspath(path)
 
@@ -311,7 +323,10 @@ class FileOps:
             raise SanyanValueError(f'循环依赖检测: {path} 已在导入链中')
 
         if abs_path in cache:
-            return cache[abs_path]
+            module = cache[abs_path]
+            if alias:
+                evaluator.scope_vars[alias] = module
+            return module
 
         try:
             with open(path, 'r', encoding='utf-8') as f:
@@ -319,7 +334,10 @@ class FileOps:
         except (IOError, OSError) as e:
             raise SanyanIOError(f'导入文件失败: {e}')
         if not code.strip():
-            return ModuleValue({}, {})
+            module = ModuleValue({}, {})
+            if alias:
+                evaluator.scope_vars[alias] = module
+            return module
 
         from evaluator import SanyanEvaluator
 
@@ -338,6 +356,8 @@ class FileOps:
 
         module = ModuleValue(module_env.scope_vars, module_env.commands, exports)
         cache[abs_path] = module
+        if alias:
+            evaluator.scope_vars[alias] = module
         return module
 
     # 注册文件操作

@@ -291,6 +291,16 @@ class _Parser:
                 self.advance()
             return ['export'] + names
 
+        if kw == 'import':
+            self.advance()
+            path = self.parse_expression()
+            # 支持 import as 别名：导入 "path" 为 alias
+            if self.peek() and self.peek().value in ('为', 'as'):
+                self.advance()
+                alias = self.advance()
+                return ['import', path, '为', alias.value if alias else '']
+            return ['import', path]
+
         if kw == 'register_device':
             self.advance()
             name_tok = self.advance()
@@ -443,8 +453,8 @@ class _Parser:
             self._expect(')')
             return [kw] + args
 
-        # lambda
-        if kw == 'lambda':
+        # lambda（仅当后跟 ( 时才作为 lambda 关键字，否则降级为标识符）
+        if kw == 'lambda' and self.peek() and self.peek().value == '(':
             self._expect('(')
             params = []
             while self.peek() and self.peek().value != ')':

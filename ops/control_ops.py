@@ -75,7 +75,7 @@ class ControlOps:
     @staticmethod
     def loop_op(evaluator, args):
         if len(args) < 2:
-            raise SanyanSyntaxError('loop 需要条件和体')
+            raise SanyanSyntaxError('循环 需要条件和体')
         body = args[1:]
         result = TritValue(0)
         local_count = 0
