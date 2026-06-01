@@ -591,5 +591,59 @@ class TestClosure(unittest.TestCase):
         self.assertIsInstance(m, ModuleValue)
 
 
+class TestTernaryDeep(unittest.TestCase):
+    """三态深化测试 — TritValue 多类型 + 置信度传播"""
+
+    def test_tritvalue_string(self):
+        """TritValue 可以承载字符串"""
+        from ternary_core import TritValue
+
+        tv = TritValue("hello")
+        self.assertTrue(tv.is_string())
+        self.assertEqual(tv.to_payload(), "hello")
+        self.assertEqual(tv.confidence, 1.0)
+
+    def test_tritvalue_string_confidence(self):
+        """三态字符串带置信度"""
+        from ternary_core import TritValue
+
+        tv = TritValue("unknown", confidence=0.5)
+        self.assertTrue(tv.is_string())
+        self.assertEqual(tv.confidence, 0.5)
+
+    def test_ternary_value_op(self):
+        """三态值() 构造函数"""
+        from evaluator import SanyanEvaluator
+
+        e = SanyanEvaluator()
+        # 三态值("hello", 0.8) → TritValue 字符串
+        r = e.eval(['ternary_value', '"hello"', 0.8])
+        self.assertIsInstance(r, TritValue)
+        self.assertTrue(r.is_string())
+        self.assertEqual(r.to_payload(), "hello")
+        self.assertAlmostEqual(r.confidence, 0.8)
+
+    def test_ternary_propagate(self):
+        """传递() 贝叶斯置信度传播"""
+        from evaluator import SanyanEvaluator
+
+        e = SanyanEvaluator()
+        # 上游 0.9 × 当前 0.8 = 0.72
+        a = e.eval(['ternary_value', '"hello"', 0.9])
+        b = e.eval(['ternary_value', '"world"', 0.8])
+        r = e.eval(['ternary_propagate', a, b])
+        self.assertAlmostEqual(r.confidence, 0.72)
+
+    def test_concat_unwrap_trit(self):
+        """连接() 自动解包三态字符串"""
+        from evaluator import SanyanEvaluator
+
+        e = SanyanEvaluator()
+        a = e.eval(['ternary_value', '"hello"', 0.9])
+        b = e.eval(['ternary_value', '" world"', 0.8])
+        r = e.eval(['concat', a, b])
+        self.assertEqual(r, "hello world")
+
+
 if __name__ == '__main__':
     unittest.main()

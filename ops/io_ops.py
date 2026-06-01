@@ -36,6 +36,12 @@ class IOOps:
         elif isinstance(val, dict):
             return str(val)
         elif isinstance(val, TritValue):
+            if val.is_string():
+                # 三态字符串：显示载荷 + 置信度
+                s = val.to_payload()
+                if val.confidence < 1.0:
+                    return f'"{s}"（置信度: {val.confidence:.2f})'
+                return s
             if val.is_float():
                 return f'{val.to_float()}（三进制: {val.symbol}）'
             return f'{val.to_int()}（三进制: {val.symbol}）'

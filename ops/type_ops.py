@@ -80,6 +80,8 @@ class TypeOps:
         if isinstance(val, str):
             return val
         if isinstance(val, TritValue):
+            if val.is_string():
+                return val.to_payload()
             if val.is_float():
                 return f'{val.to_float():.4f}'.rstrip('0').rstrip('.')
             return str(val.to_int())
@@ -114,6 +116,28 @@ class TypeOps:
             return TritValue(val, confidence=confidence)
         raise SanyanTypeError(f'三态值 不支持类型: {type(val).__name__}')
 
+    @staticmethod
+    def ternary_propagate(evaluator, args):
+        """贝叶斯置信度传播：传递(上游, 当前) → 新 TritValue with 传播后的置信度。
+        传播置信度 = 上游置信度 × 当前置信度（独立贝叶斯更新）。
+        用于不确定推理管线中的概率累积。"""
+        if len(args) != 2:
+            raise SanyanSyntaxError('传递 需要 2 个参数: (传递 上游值 当前值)')
+        upstream = evaluator.eval(args[0])
+        current = evaluator.eval(args[1])
+
+        uc = upstream.confidence if isinstance(upstream, TritValue) else 1.0
+        cc = current.confidence if isinstance(current, TritValue) else 1.0
+        propagated = max(0.0, min(1.0, uc * cc))
+
+        if isinstance(current, TritValue):
+            return current.with_confidence(propagated)
+        if isinstance(current, str):
+            return TritValue(current, confidence=propagated)
+        if isinstance(current, (int, float)):
+            return TritValue(current, confidence=propagated)
+        return TritValue(0, confidence=propagated)
+
 
 # 注册类型操作
 register('is_number', TypeOps.is_number)
@@ -122,5 +146,6 @@ register('is_list', TypeOps.is_list)
 register('is_dict', TypeOps.is_dict)
 register('str_equals', TypeOps.str_equals)
 register('ternary_value', TypeOps.ternary_value)
+register('ternary_propagate', TypeOps.ternary_propagate)
 register('to_string', TypeOps.to_string)
 register('to_number', TypeOps.to_number)
