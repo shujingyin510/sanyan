@@ -761,6 +761,36 @@ class TestTernaryDeep(unittest.TestCase):
         self.assertEqual(r.to_int(), 1)
         self.assertAlmostEqual(r.confidence, 0.9)
 
+    def test_assert_confidence_passes(self):
+        """断言信度: 信度≥阈值→通过"""
+        from evaluator import SanyanEvaluator
+
+        e = SanyanEvaluator()
+        v = e.eval(['ternary_value', 1, 0.95])
+        r = e.eval(['assert_confidence', v, 0.9])
+        self.assertEqual(r.to_int(), 1)
+
+    def test_assert_confidence_fails(self):
+        """断言信度: 信度<阈值→抛异常"""
+        from evaluator import SanyanEvaluator
+        from values import SanyanValueError
+
+        e = SanyanEvaluator()
+        v = e.eval(['ternary_value', 1, 0.3])
+        with self.assertRaises(SanyanValueError):
+            e.eval(['assert_confidence', v, 0.5, '"信度不足"'])
+
+    def test_quantize_roundtrip(self):
+        """量化/反量化: 字节往返保持值不变"""
+        from evaluator import SanyanEvaluator
+
+        e = SanyanEvaluator()
+        v = e.eval(['ternary_value', 1, 0.9])
+        q = e.eval(['quantize', v])
+        d = e.eval(['dequantize', q])
+        self.assertEqual(d.to_int(), 1)
+        self.assertAlmostEqual(d.confidence, 0.9, places=1)
+
 
 if __name__ == '__main__':
     unittest.main()

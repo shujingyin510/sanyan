@@ -399,5 +399,79 @@ def _bayes_update(evaluator, args):
     return TritValue(new_val, confidence=new_c, source=src if src != '贝叶斯(先验=?→证据=?)' else '')
 
 register('bayes_update', _bayes_update)
+
+
+def _assert_confidence(evaluator, args):
+    """断言信度(v, 阈值, [消息]) — 运行时置信度门限检查。
+    信度 < 阈值 → 抛出 SanyanValueError，阻止不确定性数据进入安全关键路径。
+    编译期等价功能: 在安全关键函数签名中声明 {信度 >= 0.95} 约束。"""
+    if len(args) < 2:
+        raise SanyanSyntaxError('断言信度 需要值、阈值 [, 消息]')
+    val = evaluator.eval(args[0])
+    threshold_v = evaluator.eval(args[1])
+    threshold = threshold_v.to_float() if isinstance(threshold_v, TritValue) else float(threshold_v)
+    msg = ''
+    if len(args) >= 3:
+        m = evaluator.eval(args[2])
+        msg = m.to_payload() if isinstance(m, TritValue) and m.is_string() else str(m)
+
+    c = val.confidence if isinstance(val, TritValue) else 1.0
+    if c < threshold:
+        from values import SanyanValueError
+        raise SanyanValueError(msg or f'信度不足: {c:.3f} < {threshold} (门限)')
+    return val
+
+register('assert_confidence', _assert_confidence)
+
+
+def _quantize(evaluator, args):
+    """量化(v) — 将 TritValue 打包为 1 字节整数。
+    编码: [bit7-2: 6-bit 信度(0-63)] [bit1-0: 值(00=0,01=1,10=-1)]
+    用于嵌入式/网络传输的紧凑存储。"""
+    if len(args) != 1:
+        raise SanyanSyntaxError('量化 需要一个参数')
+    val = evaluator.eval(args[0])
+    if not isinstance(val, TritValue):
+        return TritValue(0)
+
+    v = val.to_int() if val.is_numeric() else 0
+    c = val.confidence
+
+    # 2-bit value encoding
+    if v == 1:
+        v_bits = 1
+    elif v == -1:
+        v_bits = 2
+    else:
+        v_bits = 0
+
+    # 6-bit confidence (0-63)
+    c_bits = min(63, max(0, int(round(c * 63))))
+    byte_val = (c_bits << 2) | v_bits
+    return TritValue(byte_val)
+
+
+def _dequantize(evaluator, args):
+    """反量化(b) — 从 1 字节整数恢复 TritValue。"""
+    if len(args) != 1:
+        raise SanyanSyntaxError('反量化 需要一个参数')
+    val = evaluator.eval(args[0])
+    byte_val = val.to_int() if isinstance(val, TritValue) else int(val)
+
+    v_bits = byte_val & 3
+    c_bits = (byte_val >> 2) & 63
+
+    if v_bits == 1:
+        v = 1
+    elif v_bits == 2:
+        v = -1
+    else:
+        v = 0
+
+    c = c_bits / 63.0
+    return TritValue(v, confidence=c)
+
+register('quantize', _quantize)
+register('dequantize', _dequantize)
 register('to_string', TypeOps.to_string)
 register('to_number', TypeOps.to_number)
