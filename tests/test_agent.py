@@ -243,7 +243,6 @@ class TestAgentDecision(unittest.TestCase):
 
 def _load_village():
     """加载 village_game.san 并返回 evaluator"""
-    from preprocess import preprocess_includes
     from sugar.parser import parse_code
     import ops.registry as reg
 
@@ -270,7 +269,7 @@ def _load_village():
     ]:
         try:
             reg.register_alias(a, t)
-        except:
+        except Exception:
             pass
     src = open('ternary_agent/runtime_v2/village_game.san', encoding='utf-8').read()
     ast, _ = parse_code(src)
@@ -279,7 +278,7 @@ def _load_village():
             continue
         try:
             e.eval(stmt)
-        except:
+        except Exception:
             pass
     return e
 
@@ -359,7 +358,6 @@ class TestVillageGame(unittest.TestCase):
 
 def _load_npc():
     """加载 npc_game.san 并返回 evaluator"""
-    from preprocess import preprocess_includes
     from sugar.parser import parse_code
     import ops.registry as reg
 
@@ -389,7 +387,7 @@ def _load_npc():
     ]:
         try:
             reg.register_alias(a, t)
-        except:
+        except Exception:
             pass
     src = open('ternary_agent/runtime_v2/npc_game.san', encoding='utf-8').read()
     ast, _ = parse_code(src)
@@ -398,7 +396,7 @@ def _load_npc():
             continue
         try:
             e.eval(stmt)
-        except:
+        except Exception:
             pass
     return e
 

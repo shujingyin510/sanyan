@@ -25,7 +25,6 @@ def match_params(params: list, op: str, args: list, defaults: dict | None = None
             return sole.split('：', 1)
     # 默认参数填充：args 不足时用 defaults 补齐
     if len(args) < len(params):
-        missing_count = len(params) - len(args)
         missing_params = params[len(args) :]
         # 检查缺失的参数是否有默认值
         can_fill = all(p in defaults for p in missing_params)
