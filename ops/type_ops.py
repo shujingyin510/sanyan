@@ -473,5 +473,94 @@ def _dequantize(evaluator, args):
 
 register('quantize', _quantize)
 register('dequantize', _dequantize)
+
+
+def _majority_vote(evaluator, args):
+    """表决(a,b,c) — 多数表决: 取出现次数最多的值，信度=多数占比。"""
+    vals = [evaluator.eval(a) for a in args]
+    pos, neg, zero = 0, 0, 0
+    total_c = 0.0
+    for v in vals:
+        iv = v.to_int() if isinstance(v, TritValue) else int(v)
+        c = v.confidence if isinstance(v, TritValue) else 1.0
+        total_c += c
+        if iv == 1: pos += 1
+        elif iv == -1: neg += 1
+        else: zero += 1
+    n = len(vals)
+    if n == 0:
+        return TritValue(0)
+    if pos >= neg and pos >= zero:
+        return TritValue(1, confidence=pos / n)
+    elif neg >= pos and neg >= zero:
+        return TritValue(-1, confidence=neg / n)
+    return TritValue(0, confidence=zero / n)
+
+register('majority_vote', _majority_vote)
+
+
+def _trit_shift(evaluator, args):
+    """三态移位(x, n) — trit 位左移 n 位 (×3^n 等价)"""
+    if len(args) != 2:
+        raise SanyanSyntaxError('三态移位 需要值和位数')
+    val = evaluator.eval(args[0])
+    n = evaluator.eval(args[1])
+    n = n.to_int() if isinstance(n, TritValue) else int(n)
+    v = val.to_int() if isinstance(val, TritValue) else int(val)
+    c = val.confidence if isinstance(val, TritValue) else 1.0
+    result = v * (3 ** n)
+    return TritValue(result, confidence=c)
+
+register('trit_shift', _trit_shift)
+
+
+def _trit_flip(evaluator, args):
+    """三态翻转(x) — 所有 trit 翻转: 真↔假, 可能不变"""
+    if len(args) != 1:
+        raise SanyanSyntaxError('三态翻转 需要一个值')
+    val = evaluator.eval(args[0])
+    v = val.to_int() if isinstance(val, TritValue) else int(val)
+    c = val.confidence if isinstance(val, TritValue) else 1.0
+    return TritValue(-v, confidence=c)
+
+register('trit_flip', _trit_flip)
+
+
+def _trit_compress(evaluator, args):
+    """三态压缩(...) — 多个 trit 打包为字节列表。每字节存 3 trit (0-26)。
+    三态压缩(+,-,0,+,-,0) → [15] (3^2×1 + 3^1×(-1) + 3^0×0 = 8, ...)"""
+    vals = [evaluator.eval(a) for a in args]
+    result = []
+    buf = []
+    for v in vals:
+        iv = v.to_int() if isinstance(v, TritValue) else int(v)
+        iv = max(-1, min(1, iv)) + 1  # -1→0, 0→1, 1→2
+        buf.append(iv)
+        if len(buf) == 3:
+            byte_val = buf[0] * 9 + buf[1] * 3 + buf[2] * 1
+            result.append(TritValue(byte_val))
+            buf = []
+    if buf:
+        while len(buf) < 3:
+            buf.append(1)  # 补 0 (可能)
+        byte_val = buf[0] * 9 + buf[1] * 3 + buf[2] * 1
+        result.append(TritValue(byte_val))
+    return result
+
+register('trit_compress', _trit_compress)
+
+
+def _trit_decompress(evaluator, args):
+    """三态解压(字节列表) → 展开为 trit 值列表"""
+    bytes_list = [evaluator.eval(a) for a in args]
+    result = []
+    for b in bytes_list:
+        bv = b.to_int() if isinstance(b, TritValue) else int(b)
+        for shift in (9, 3, 1):
+            digit = (bv // shift) % 3
+            result.append(TritValue(digit - 1))
+    return result
+
+register('trit_decompress', _trit_decompress)
 register('to_string', TypeOps.to_string)
 register('to_number', TypeOps.to_number)

@@ -15,6 +15,7 @@ from ternary_core import (
 from ternary_core import _int_at_precision
 from values import SanyanSyntaxError, SanyanTypeError, SanyanValueError
 from ops.registry import register
+from eval_helpers import propagated_confidence
 
 _DEFAULT_PRECISION = 32
 
@@ -74,7 +75,7 @@ class MathFuncsOps:
         if n < 0:
             raise SanyanValueError('负数不能开平方根')
         result = ternary_sqrt(trits, prec)
-        return TritValue(result, prec)
+        return TritValue(result, prec, confidence=propagated_confidence(val))
 
     @staticmethod
     def math_random(evaluator, args):
@@ -100,7 +101,7 @@ class MathFuncsOps:
             raise SanyanSyntaxError('正弦 需要一个参数')
         val = evaluator.eval(args[0])
         trits, prec = _ensure_trits(val)
-        return TritValue(ternary_sin(trits, prec), prec)
+        return TritValue(ternary_sin(trits, prec), prec, confidence=propagated_confidence(val))
 
     @staticmethod
     def math_cos(evaluator, args):
@@ -108,7 +109,7 @@ class MathFuncsOps:
             raise SanyanSyntaxError('余弦 需要一个参数')
         val = evaluator.eval(args[0])
         trits, prec = _ensure_trits(val)
-        return TritValue(ternary_cos(trits, prec), prec)
+        return TritValue(ternary_cos(trits, prec), prec, confidence=propagated_confidence(val))
 
     @staticmethod
     def math_tan(evaluator, args):
@@ -116,24 +117,19 @@ class MathFuncsOps:
             raise SanyanSyntaxError('正切 需要一个参数')
         val = evaluator.eval(args[0])
         trits, prec = _ensure_trits(val)
-        return TritValue(ternary_tan(trits, prec), prec)
+        return TritValue(ternary_tan(trits, prec), prec, confidence=propagated_confidence(val))
 
     @staticmethod
     def math_log(evaluator, args):
         if len(args) < 1 or len(args) > 2:
-            raise SanyanSyntaxError('对数 需要一个或两个参数')
+            raise SanyanSyntaxError('对数 需要 1-2 个参数')
         val = evaluator.eval(args[0])
         trits, prec = _ensure_trits(val)
-        x_int = BT.to_int(trits)
-        if x_int <= 0:
-            raise SanyanValueError('对数的参数必须为正数')
         if len(args) == 2:
             base = evaluator.eval(args[1])
-            base_trits, base_prec = _ensure_trits(base, prec)
-            ln_x = ternary_log(trits, prec)
-            ln_b = ternary_log(base_trits, base_prec)
-            return TritValue(TernaryALU.fixed_div(ln_x, ln_b, prec), prec)
-        return TritValue(ternary_log(trits, prec), prec)
+            b, bp = _ensure_trits(base)
+            return TritValue(TernaryALU.fixed_div(ternary_log(trits, prec), ternary_log(b, bp), prec), prec, confidence=propagated_confidence(val))
+        return TritValue(ternary_log(trits, prec), prec, confidence=propagated_confidence(val))
 
     @staticmethod
     def math_log10(evaluator, args):
@@ -141,9 +137,7 @@ class MathFuncsOps:
             raise SanyanSyntaxError('常用对数 需要一个参数')
         val = evaluator.eval(args[0])
         trits, prec = _ensure_trits(val)
-        if BT.to_int(trits) <= 0:
-            raise SanyanValueError('常用对数的参数必须为正数')
-        return TritValue(ternary_log10(trits, prec), prec)
+        return TritValue(ternary_log10(trits, prec), prec, confidence=propagated_confidence(val))
 
     @staticmethod
     def math_floor(evaluator, args):
