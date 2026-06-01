@@ -2,11 +2,12 @@
 // 修改此文件后运行 agent 会自动生效
 
 // === LLM 连接配置 ===
-// 模型提供商: "deepseek" / "openai" / "qwen"(千问) / "gemini"(Google) / "ollama" / "custom"
+// 模型提供商: "deepseek" / "openai" / "qwen"(千问) / "gemini"(Google) / "mimo"(小米) / "ollama" / "custom"
 // DeepSeek: https://api.deepseek.com/v1/chat/completions
 // OpenAI:  https://api.openai.com/v1/chat/completions
 // 千问:    https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions
 // Gemini:  https://generativelanguage.googleapis.com/v1beta/models/
+// 小米MIMO: https://api.xiaomimimo.com/v1/chat/completions
 // Ollama:  http://localhost:11434/v1/chat/completions
 设 模型提供商 = "deepseek"
 设 模型URL = "https://api.deepseek.com/v1/chat/completions"
