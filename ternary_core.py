@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 import os
+import time
 import threading
 from collections import OrderedDict
 from typing import Any, Optional, Union
@@ -200,7 +201,7 @@ class TritValue:
     """
     __slots__ = (
         'value', 'symbol', 'float_val', '_initialized', 'precision', 'confidence',
-        '_val_type', '_payload', '_source',
+        '_val_type', '_payload', '_source', '_timestamp',
     )
 
     # ── 值类型常量 ──
@@ -252,6 +253,7 @@ class TritValue:
             obj._val_type = cls.TYPE_NUMERIC
             obj._payload = None
             obj._source = ''
+            obj._timestamp = 0.0
             obj.value = BT.from_int(i)
             obj.symbol = BT.to_str(obj.value)
             cls._SMALL_INT_CACHE[i] = obj
@@ -297,6 +299,7 @@ class TritValue:
         self.float_val = None
         self.confidence = max(0.0, min(1.0, confidence))
         self._source = source
+        self._timestamp = time.time()
         self._payload = None
         self._val_type = self.TYPE_NUMERIC
 
@@ -396,10 +399,12 @@ class TritValue:
         return str(self.to_int())
 
     def with_confidence(self, confidence: float) -> 'TritValue':
-        """返回同值、同来源但不同置信度的新 TritValue。"""
-        if self.is_string():
-            return TritValue(self._payload, confidence=confidence, source=self._source)
-        return TritValue(self.to_int(), self.precision, confidence, source=self._source)
+        """返回同值、同来源、同时间戳但不同置信度的新 TritValue。"""
+        result = (TritValue(self.to_payload(), confidence=confidence, source=self._source)
+                  if self.is_string()
+                  else TritValue(self.to_int(), self.precision, confidence, source=self._source))
+        result._timestamp = self._timestamp
+        return result
 
     def confidence_str(self) -> str:
         """返回带置信度的字符串表示，如 '真(0.9)' 或 '真'（默认 1.0）。"""

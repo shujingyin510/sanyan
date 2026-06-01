@@ -10,16 +10,21 @@ def _decay_op(evaluator, args):
     """衰减(v, rate, elapsed, ...) — 置信度随时间线性衰减。
     C_new = C_old × (1 - rate × elapsed/86400)
     rate: 每天衰减率 (0.0-1.0)
-    elapsed: 经过时间（秒），省略则用系统时间 - 创建时间"""
+    elapsed: 经过时间（秒），省略则用现在 - 值._timestamp 自动计算"""
     if len(args) < 2:
         raise SanyanSyntaxError('衰减 需要至少 2 个参数: 值, 衰减率 [, 经过秒数]')
     val = evaluator.eval(args[0])
     rate_v = evaluator.eval(args[1])
     rate = rate_v.to_float() if isinstance(rate_v, TritValue) else float(rate_v)
-    elapsed = 86400  # 默认一天
     if len(args) >= 3:
         e = evaluator.eval(args[2])
         elapsed = e.to_int() if isinstance(e, TritValue) else int(e)
+    else:
+        # 自动: 从值的创建时间到现在
+        if isinstance(val, TritValue) and val._timestamp > 0:
+            elapsed = int(time.time() - val._timestamp)
+        else:
+            elapsed = 86400  # 默认一天
     if not isinstance(val, TritValue):
         return val
     new_c = val.confidence * (1.0 - rate * elapsed / 86400.0)

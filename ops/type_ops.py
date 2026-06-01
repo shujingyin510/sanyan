@@ -562,5 +562,57 @@ def _trit_decompress(evaluator, args):
     return result
 
 register('trit_decompress', _trit_decompress)
+
+
+def _belief_op(evaluator, args):
+    """信念(命题, 信度, 来源, 时间) — 创建一个结构化信念。
+    返回字典: {命题: str, 值: TritValue, 信度: float, 来源: str, 时间: float}
+    是 Agent 记忆的基本单元。"""
+    if len(args) < 1:
+        raise SanyanSyntaxError('信念 需要命题 [, 信度, 来源]')
+    statement = evaluator.eval(args[0])
+    if isinstance(statement, TritValue) and statement.is_string():
+        statement = statement.to_payload()
+    statement = str(statement)
+
+    val = TritValue(1)  # 默认肯定命题
+    confidence = 1.0
+    source = ''
+    ts = time.time()
+
+    if len(args) >= 2:
+        v = evaluator.eval(args[1])
+        if isinstance(v, TritValue):
+            confidence = v.confidence
+            val = v
+        else:
+            confidence = float(v)
+    if len(args) >= 3:
+        s = evaluator.eval(args[2])
+        source = s.to_payload() if (isinstance(s, TritValue) and s.is_string()) else str(s)
+    if len(args) >= 4:
+        t = evaluator.eval(args[3])
+        ts = t.to_float() if isinstance(t, TritValue) else float(t)
+
+    return {
+        '命题': statement,
+        '值': val,
+        '信度': confidence,
+        '来源': source,
+        '时间': ts
+    }
+
+
+def _belief_set_op(evaluator, args):
+    """信念集(b1, b2, ...) — 创建信念列表。Agent 记忆容器。"""
+    beliefs = []
+    for a in args:
+        val = evaluator.eval(a)
+        beliefs.append(val)
+    return beliefs
+
+
+register('belief', _belief_op)
+register('belief_set', _belief_set_op)
 register('to_string', TypeOps.to_string)
 register('to_number', TypeOps.to_number)
