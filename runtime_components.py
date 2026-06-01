@@ -66,7 +66,7 @@ class ScopeManager:
 class IoTManager:
     """传感器、执行器、设备注册表管理。"""
 
-    def __init__(self):
+    def __init__(self) -> None:
         from ops.device_registry import DeviceRegistry, MockDevice
 
         self.sensors: Dict[str, TritValue] = {
@@ -90,7 +90,7 @@ class IoTManager:
 class DebugManager:
     """断点调试管理：断点、监视变量、调试模式。"""
 
-    def __init__(self):
+    def __init__(self) -> None:
         self.debug_mode: bool = False
         self._break_all: bool = False
         self._break_ops: set = set()
@@ -122,7 +122,7 @@ class DebugManager:
 class ProfileManager:
     """性能分析追踪管理。"""
 
-    def __init__(self):
+    def __init__(self) -> None:
         self._profiling: bool = False
         self._profile: Dict[str, dict] = {}
 

@@ -4,7 +4,7 @@ from __future__ import annotations
 import os
 import threading
 from collections import OrderedDict
-from typing import Optional, Union
+from typing import Any, Optional, Union
 
 
 class BT:
@@ -102,7 +102,7 @@ class TernaryALU:
         return res
 
     @staticmethod
-    def sub(a: list, b: list):
+    def sub(a: list, b: list) -> list:
         return TernaryALU.add(a, [-x for x in b])
 
     @staticmethod
@@ -220,7 +220,7 @@ class TritValue:
     _SMALL_INT_BUILT = False
 
     @classmethod
-    def _build_small_cache(cls):
+    def _build_small_cache(cls) -> None:
         if cls._SMALL_INT_BUILT:
             return
         for i in range(-256, 257):
@@ -234,14 +234,14 @@ class TritValue:
             cls._SMALL_INT_CACHE[i] = obj
         cls._SMALL_INT_BUILT = True
 
-    def __new__(cls, value, precision: Optional[int] = None, confidence: float = 1.0):
+    def __new__(cls, value: Union[int, float, list], precision: Optional[int] = None, confidence: float = 1.0) -> 'TritValue':
         if isinstance(value, int) and precision is None and confidence == 1.0:
             cls._build_small_cache()
             cached = cls._SMALL_INT_CACHE.get(value)
             if cached is not None:
-                return cached
+                return cached  # type: ignore[no-any-return]
 
-        def _hashable(v):
+        def _hashable(v: Any) -> Any:
             if isinstance(v, list):
                 return tuple(_hashable(x) for x in v)
             return v
@@ -256,7 +256,7 @@ class TritValue:
         with cls._pool_lock:
             if key in cls._pool:
                 cls._pool.move_to_end(key)
-                return cls._pool[key]
+                return cls._pool[key]  # type: ignore[no-any-return]
             if len(cls._pool) >= cls._MAX_POOL_SIZE:
                 cls._pool.popitem(last=False)
             obj = super().__new__(cls)
@@ -308,7 +308,7 @@ class TritValue:
     def is_float(self) -> bool:
         return self.float_val is not None or self.precision > 0
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         if self.float_val is not None:
             return f'{self.float_val}'
         return str(self.to_int())  # 只返回整数，如 "3"
@@ -354,16 +354,16 @@ class ArrayValue:
     def to_list(self) -> list:
         return self.data[:]
 
-    def __getitem__(self, index):
+    def __getitem__(self, index: int) -> Any:
         return self.get(index)
 
-    def __setitem__(self, index, value):
+    def __setitem__(self, index: int, value: Any) -> None:
         self.set(index, value)
 
-    def __iter__(self):
+    def __iter__(self) -> Any:
         return iter(self.data)
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return '[' + ', '.join(str(x) for x in self.data) + ']'
 
 

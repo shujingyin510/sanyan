@@ -308,9 +308,9 @@ sanyan/
 
 ## Limitations
 
-- **Performance**: Python tree-walking interpreter. Use `--vm` (bytecode VM) or PyPy for speedups.
+- **Performance**: Python tree-walking interpreter. Use `--vm` (bytecode VM) or PyPy for speedups. LLVM backend compiles arithmetic directly to native instructions (`add i64`), achieving near-C performance on hot paths.
 - **No stdin piping**: `input()` only supports interactive input, not pipe redirection.
-- **Ternary is simulated**: The ternary arithmetic runs on Python integers, not hardware ternary logic.
+- **Ternary is simulated**: The ternary arithmetic runs on Python integers, not hardware ternary logic. The LLVM backend bypasses this by generating native integer IR directly.
 
 ---
 
