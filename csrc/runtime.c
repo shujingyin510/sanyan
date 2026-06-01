@@ -477,27 +477,53 @@ int vm_run(VM *vm) {
             break;
         }
 
-        /* ── 算术 ── */
-        case ADD: b = pop(vm); a = pop(vm);
-            push(vm, tag_i(to_int(a) + to_int(b))); break;
-        case SUB: b = pop(vm); a = pop(vm);
-            push(vm, tag_i(to_int(a) - to_int(b))); break;
-        case MUL: b = pop(vm); a = pop(vm);
-            push(vm, tag_i(to_int(a) * to_int(b))); break;
-        case DIV: b = pop(vm); a = pop(vm);
-            ib = to_int(b); push(vm, ib ? tag_i(to_int(a) / ib) : tag_i(0)); break;
-        case MOD: b = pop(vm); a = pop(vm);
-            ib = to_int(b); push(vm, ib ? tag_i(to_int(a) % ib) : tag_i(0)); break;
+        /* ── 三态传播辅助：如果 a 或 b 是 OBJ_TRIT，返回传播后的信度 ×100 ── */
+static int trit_propagate_conf(void *a, void *b) {
+    double ca = is_int_val(a) ? 1.0 : (((rt_trit_t*)a)->h_type == OBJ_TRIT ? ((rt_trit_t*)a)->confidence / 100.0 : 1.0);
+    double cb = is_int_val(b) ? 1.0 : (((rt_trit_t*)b)->h_type == OBJ_TRIT ? ((rt_trit_t*)b)->confidence / 100.0 : 1.0);
+    return (int)(ca * cb * 100.0);
+}
+static int trit_is_trit(void *v) { return !is_int_val(v) && ((rt_str_t*)v)->h_type == OBJ_TRIT; }
 
-        /* ── 比较（三值逻辑：1=真，-1=假）── */
+/* ── 算术 ── */
+        case ADD: b = pop(vm); a = pop(vm);
+            { int r = to_int(a) + to_int(b);
+              push(vm, trit_is_trit(a) || trit_is_trit(b) ?
+                   (void*)rt_trit_new(r, trit_propagate_conf(a,b)/100.0) : tag_i(r)); } break;
+        case SUB: b = pop(vm); a = pop(vm);
+            { int r = to_int(a) - to_int(b);
+              push(vm, trit_is_trit(a) || trit_is_trit(b) ?
+                   (void*)rt_trit_new(r, trit_propagate_conf(a,b)/100.0) : tag_i(r)); } break;
+        case MUL: b = pop(vm); a = pop(vm);
+            { int r = to_int(a) * to_int(b);
+              push(vm, trit_is_trit(a) || trit_is_trit(b) ?
+                   (void*)rt_trit_new(r, trit_propagate_conf(a,b)/100.0) : tag_i(r)); } break;
+        case DIV: b = pop(vm); a = pop(vm);
+            ib = to_int(b); { int r = ib ? to_int(a)/ib : 0;
+              push(vm, trit_is_trit(a) || trit_is_trit(b) ?
+                   (void*)rt_trit_new(r, trit_propagate_conf(a,b)/100.0) : tag_i(r)); } break;
+        case MOD: b = pop(vm); a = pop(vm);
+            ib = to_int(b); { int r = ib ? to_int(a)%ib : 0;
+              push(vm, trit_is_trit(a) || trit_is_trit(b) ?
+                   (void*)rt_trit_new(r, trit_propagate_conf(a,b)/100.0) : tag_i(r)); } break;
+
+        /* ── 比较（三值逻辑 + 三态传播）── */
         case EQ:  b = pop(vm); a = pop(vm);
-            push(vm, tag_i(to_int(a) == to_int(b) ? 1 : -1)); break;
+            { int r = to_int(a) == to_int(b) ? 1 : -1;
+              push(vm, trit_is_trit(a) || trit_is_trit(b) ?
+                   (void*)rt_trit_new(r, trit_propagate_conf(a,b)/100.0) : tag_i(r)); } break;
         case NE:  b = pop(vm); a = pop(vm);
-            push(vm, tag_i(to_int(a) != to_int(b) ? 1 : -1)); break;
+            { int r = to_int(a) != to_int(b) ? 1 : -1;
+              push(vm, trit_is_trit(a) || trit_is_trit(b) ?
+                   (void*)rt_trit_new(r, trit_propagate_conf(a,b)/100.0) : tag_i(r)); } break;
         case GT:  b = pop(vm); a = pop(vm);
-            push(vm, tag_i(to_int(a) > to_int(b) ? 1 : -1)); break;
+            { int r = to_int(a) > to_int(b) ? 1 : -1;
+              push(vm, trit_is_trit(a) || trit_is_trit(b) ?
+                   (void*)rt_trit_new(r, trit_propagate_conf(a,b)/100.0) : tag_i(r)); } break;
         case LT:  b = pop(vm); a = pop(vm);
-            push(vm, tag_i(to_int(a) < to_int(b) ? 1 : -1)); break;
+            { int r = to_int(a) < to_int(b) ? 1 : -1;
+              push(vm, trit_is_trit(a) || trit_is_trit(b) ?
+                   (void*)rt_trit_new(r, trit_propagate_conf(a,b)/100.0) : tag_i(r)); } break;
         case GTE: b = pop(vm); a = pop(vm);
             push(vm, tag_i(to_int(a) >= to_int(b) ? 1 : -1)); break;
         case LTE: b = pop(vm); a = pop(vm);
@@ -573,8 +599,17 @@ int vm_run(VM *vm) {
 
         /* ── 输出 ── */
         case PRINT: {
-            print_value(pop(vm));
-            printf("\n");
+            a = pop(vm);
+            if (trit_is_trit(a)) {
+                rt_trit_t *t = (rt_trit_t*)a;
+                printf("%d", t->value);
+                if (t->confidence < 100)
+                    printf("(信度:%.2f)", t->confidence / 100.0);
+                printf("\n");
+            } else {
+                print_value(a);
+                printf("\n");
+            }
             break;
         }
 

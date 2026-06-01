@@ -65,6 +65,7 @@ typedef enum {
     OBJ_LIST   = 2,
     OBJ_DICT   = 3,
     OBJ_FLOAT  = 4,
+    OBJ_TRIT   = 5,  /* 三态对象: value + confidence */
 } san_obj_type_t;
 
 /* csrc 兼容：旧版 ObjType 魔数 */
@@ -115,6 +116,27 @@ typedef struct rt_list_s {
 #ifndef RT_DICT_MAX_CAP
 #define RT_DICT_MAX_CAP     65536  /* 字典最大容量，防止嵌入式系统内存溢出 */
 #endif
+
+
+/* ═══════════════════════════════════════════════════════════
+ * 三态值类型 — 紧凑存储: value(1/0/-1) + confidence(0-100)
+ * ═══════════════════════════════════════════════════════════ */
+
+typedef struct {
+    SAN_HEADER;
+    int32_t value;
+    uint8_t confidence;  /* 0-100, 100 = 1.0 */
+} rt_trit_t;
+
+static inline rt_trit_t *rt_trit_new(int32_t val, double conf) {
+    rt_trit_t *t = (rt_trit_t *)calloc(1, sizeof(rt_trit_t));
+    if (!t) return NULL;
+    t->h_type = OBJ_TRIT;
+    t->value = (val > 0) ? 1 : ((val < 0) ? -1 : 0);
+    t->confidence = (uint8_t)(conf * 100.0);
+    if (t->confidence > 100) t->confidence = 100;
+    return t;
+}
 
 
 /* ═══════════════════════════════════════════════════════════

@@ -5,12 +5,15 @@
     from vm import VM
     vm = VM.from_bin('firmware.bin')
     vm.run()
+
+三态支持: 算术/比较/逻辑 ops 自动传播 TritValue 置信度。
 """
 
 from __future__ import annotations
 import os
 import struct
-from typing import Callable
+from typing import Callable, Any
+from ternary_core import TritValue
 
 # ═══════════════════════════════════════════════════════════════
 # 指令集（与 sanyancc.py / runtime_stm32.c 一致）
@@ -264,6 +267,18 @@ class VM:
                 self.pc = addr
         return True
 
+    def _ternary_result(self, result: int, *inputs: Any) -> Any:
+        """如果任意输入是 TritValue，用传播信度包装结果。否则返回纯 int。"""
+        conf = 1.0
+        has_trit = False
+        for v in inputs:
+            if isinstance(v, TritValue):
+                has_trit = True
+                conf *= v.confidence
+        if has_trit:
+            return TritValue(result, confidence=conf)
+        return result
+
     def _exec_stack_ops(self, op: int) -> bool:
         """栈操作指令：PUSH_I, PUSH_STR, LOAD, STORE, PRINT"""
         if op == PUSH_I:
@@ -292,7 +307,16 @@ class VM:
                     self.vars[idx] = 0
         elif op == PRINT:
             if self.stack:
-                print(self.stack.pop())
+                val = self.stack.pop()
+                if isinstance(val, TritValue):
+                    if val.is_string():
+                        print(val.to_payload())
+                    elif val.confidence < 1.0:
+                        print(f'{val.to_int()}（信度:{val.confidence:.2f}）')
+                    else:
+                        print(val.to_int())
+                else:
+                    print(val)
         return True
 
     def _exec_arithmetic(self, op: int) -> bool:
@@ -303,70 +327,80 @@ class VM:
             if isinstance(a, str) and isinstance(b, str):
                 self.stack.append(a + b)
             elif isinstance(a, (int, float)) and isinstance(b, (int, float)):
-                self.stack.append(a + b)
+                self.stack.append(self._ternary_result(a + b, a, b))
             else:
                 self.stack.append(str(a) + str(b) if isinstance(a, str) or isinstance(b, str) else 0)
         elif op == SUB:
             if isinstance(a, (int, float)) and isinstance(b, (int, float)):
-                self.stack.append(a - b)
+                self.stack.append(self._ternary_result(a - b, a, b))
             else:
                 self.stack.append(0)
         elif op == MUL:
             if isinstance(a, (int, float)) and isinstance(b, (int, float)):
-                self.stack.append(a * b)
+                self.stack.append(self._ternary_result(a * b, a, b))
             else:
                 self.stack.append(0)
         elif op == DIV:
             if isinstance(a, (int, float)) and isinstance(b, (int, float)) and b:
-                self.stack.append(a // b)
+                self.stack.append(self._ternary_result(a // b, a, b))
             else:
                 self.stack.append(0)
         elif op == MOD:
             if isinstance(a, int) and isinstance(b, int) and b:
-                self.stack.append(a % b)
+                self.stack.append(self._ternary_result(a % b, a, b))
             else:
                 self.stack.append(0)
         return True
 
     def _exec_comparison(self, op: int) -> bool:
-        """比较与逻辑运算指令：GT, LT, GTE, LTE, EQ, NE, NOT, OR, AND
-        三值逻辑：1=真，-1=假（与 C VM 和 Python 求值器一致）"""
+        """比较与逻辑运算指令：三值逻辑 + 三态传播"""
         if op == NOT:
             a = self.stack.pop()
-            # NOT: >0 为真 → -1（假），否则 → 1（真）
-            self.stack.append(-1 if isinstance(a, int) and a > 0 else 1)
+            r = -1 if isinstance(a, int) and a > 0 else 1
+            self.stack.append(self._ternary_result(r, a) if isinstance(a, TritValue) else r)
         elif op == OR:
             b = self.stack.pop()
             a = self.stack.pop()
-            # OR: 任一 >0 为真
-            a_true = isinstance(a, int) and a > 0
-            b_true = isinstance(b, int) and b > 0
-            self.stack.append(1 if a_true or b_true else -1)
+            r = 1 if (isinstance(a, int) and a > 0) or (isinstance(b, int) and b > 0) else -1
+            # 或: 取 max 信度
+            if isinstance(a, TritValue) and isinstance(b, TritValue):
+                self.stack.append(TritValue(r, confidence=max(a.confidence, b.confidence)))
+            elif isinstance(a, TritValue) or isinstance(b, TritValue):
+                c = (a.confidence if isinstance(a, TritValue) else 1.0)
+                c = max(c, b.confidence if isinstance(b, TritValue) else 1.0)
+                self.stack.append(TritValue(r, confidence=c))
+            else:
+                self.stack.append(r)
         elif op == AND:
             b = self.stack.pop()
             a = self.stack.pop()
-            # AND: 两者都 >0 才为真
-            a_true = isinstance(a, int) and a > 0
-            b_true = isinstance(b, int) and b > 0
-            self.stack.append(1 if a_true and b_true else -1)
+            r = 1 if (isinstance(a, int) and a > 0) and (isinstance(b, int) and b > 0) else -1
+            # 且: 取 min 信度
+            if isinstance(a, TritValue) and isinstance(b, TritValue):
+                self.stack.append(TritValue(r, confidence=min(a.confidence, b.confidence)))
+            elif isinstance(a, TritValue) or isinstance(b, TritValue):
+                c = (a.confidence if isinstance(a, TritValue) else 1.0)
+                c = min(c, b.confidence if isinstance(b, TritValue) else 1.0)
+                self.stack.append(TritValue(r, confidence=c))
+            else:
+                self.stack.append(r)
         else:
             b = self.stack.pop()
             a = self.stack.pop()
-            # 比较运算：类型不同时返回假；真=1，假=-1
             if not isinstance(a, type(b)) and not (isinstance(a, int) and isinstance(b, int)):
                 self.stack.append(-1)
             elif op == GT:
-                self.stack.append(1 if a > b else -1)
+                self.stack.append(self._ternary_result(1 if a > b else -1, a, b))
             elif op == LT:
-                self.stack.append(1 if a < b else -1)
+                self.stack.append(self._ternary_result(1 if a < b else -1, a, b))
             elif op == GTE:
-                self.stack.append(1 if a >= b else -1)
+                self.stack.append(self._ternary_result(1 if a >= b else -1, a, b))
             elif op == LTE:
-                self.stack.append(1 if a <= b else -1)
+                self.stack.append(self._ternary_result(1 if a <= b else -1, a, b))
             elif op == EQ:
-                self.stack.append(1 if a == b else -1)
+                self.stack.append(self._ternary_result(1 if a == b else -1, a, b))
             elif op == NE:
-                self.stack.append(1 if a != b else -1)
+                self.stack.append(self._ternary_result(1 if a != b else -1, a, b))
         return True
 
     def _exec_type_check(self, op: int) -> bool:
