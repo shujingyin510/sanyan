@@ -135,9 +135,21 @@ static rt_str_t *rt_str_new(const char *s) {
     return r;
 }
 
+/* 检查指针是否为堆对象（type 值在已知范围内） */
+static inline int is_heap_obj(void *p) {
+    if (!p || is_int_val(p)) return 0;
+    ObjType t = ((rt_str_t *)p)->type;
+    return (t == TYPE_STR || t == TYPE_LIST || t == TYPE_DICT);
+}
+
 static const char *rt_str_c(void *p) {
     if (!p || is_int_val(p)) return "";
-    return ((rt_str_t*)p)->data;
+    if (is_heap_obj(p)) {
+        /* type 匹配已知对象类型 → 从 data 字段提取 */
+        return ((rt_str_t *)p)->data;
+    }
+    /* 非堆对象：按原始 C 字符串返回 */
+    return (const char *)p;
 }
 
 /* ── 列表 ───────────────────────────────────── */

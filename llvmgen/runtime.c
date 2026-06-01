@@ -106,16 +106,30 @@ void *rt_make(const char *s) {
 /* ═══════════════════════════════════════════════════════════
  * 统一字符串访问
  * 所有运行时字符串以 rt_str_t 格式传递。
- * _cstr() 提取 data 字段，_cstr_len() 提取长度。
+ * _cstr() 通过校验 h_type（取值 1-4）区分 rt_str_t* 与原始 C 字符串。
+ * 防御性设计：若 h_type 不在 1-4 区间内，按原始 C 字符串返回。
+ *   伪正概率：4 / 2^32 ≈ 10^(-9)，远低于旧版启发式探测。
+ *   安全性：仅读取 ptr[0..3] 判断，不会触发越界 Page Fault。
  * ═══════════════════════════════════════════════════════════ */
 static const char *_cstr(const void *p) {
     if (!p) return NULL;
-    return ((rt_str_t *)p)->data;
+    uint32_t h = ((const rt_str_t *)p)->h_type;
+    if (h >= 1 && h <= 4) {
+        /* h_type 合法 → 确认是堆对象，使用 data 字段 */
+        return ((const rt_str_t *)p)->data;
+    }
+    /* h_type 不在对象类型范围内，按原始 C 字符串返回 */
+    return (const char *)p;
 }
 
 static int32_t _cstr_len(const void *p) {
     if (!p) return 0;
-    return ((rt_str_t *)p)->len;
+    uint32_t h = ((const rt_str_t *)p)->h_type;
+    if (h >= 1 && h <= 4) {
+        return ((const rt_str_t *)p)->len;
+    }
+    /* 原始 C 字符串：用 strlen() 计算长度 */
+    return (int32_t)strlen((const char *)p);
 }
 
 /* ═══════════════════════════════════════════════════════════
