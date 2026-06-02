@@ -56,7 +56,13 @@ def llm_call(prompt):
     try:
         with urllib.request.urlopen(req, timeout=10) as r:
             data = json.loads(r.read())
-            return data['choices'][0]['message']['content'].strip()
+            text = data['choices'][0]['message']['content'].strip()
+            # 去掉 LLM 自带的引号
+            while text and text[0] in '\'"\u201c\u2018':
+                text = text[1:]
+            while text and text[-1] in '\'"\u201d\u2019':
+                text = text[:-1]
+            return text.strip()
     except urllib.error.HTTPError as e:
         body = e.read().decode('utf-8', errors='replace')
         print(f'[LLM] HTTP {e.code}: {body[:200]}')
