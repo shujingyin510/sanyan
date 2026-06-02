@@ -1,7 +1,10 @@
-"""桃花村 观察模式 — NPC 自主生活，LLM 驱动对话，输出 village_log.txt"""
-import os, sys, json, urllib.request, urllib.error, time, signal
+"""桃花村 观察模式 — NPC 自主生活，LLM 驱动对话，输出 village_log.txt
+   --verbose: 显示三态置信度推理链"""
+import os, sys, json, urllib.request, urllib.error, time, signal, random
 
 os.chdir(os.path.dirname(os.path.abspath(__file__)) or '.')
+
+_verbose = '--verbose' in sys.argv
 
 def _stop(sig, frame):
     os._exit(0)
@@ -97,6 +100,20 @@ def _gen_dialogue(ev, args):
         p2 = f'{n2}是{role2}。{n1}说：{line1}。随口回句大白话，10-20字。只输出这句话。'
         line2 = llm_call(p2)
         if line2: cache[n2] = line2
+
+    # 三态置信度注解（verbose模式）
+    if _verbose and line1 and line2:
+        fav1 = npc_data.get(n1,{}).get('好感',50)
+        fav2 = npc_data.get(n2,{}).get('好感',50)
+        # NPC间信度：基于关系类型 + 随机波动模拟互动影响
+        trust_map = {'夫妻':0.95, '朋友':0.75, '邻居':0.55, '熟人':0.35, '陌生人':0.10}
+        base_trust = trust_map.get(rel, 0.10)
+        delta = (random.random() - 0.5) * 0.04  # -0.02 ~ +0.02 波动
+        trust = max(0, min(1, base_trust + delta))
+        cache['_trit'] = f'  ◈ {n1}↔{n2} 互信={trust:.3f}({rel}) δ={delta:+.3f}'
+    if _verbose and not line1:
+        cache['_trit'] = f'  ◈ {n1}↔{n2} LLM调用失败，降级为默认对话 [信度=0]'
+
     ev.scope_vars['对话缓存'] = cache
     return TritValue(0)
 
