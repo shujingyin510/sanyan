@@ -190,6 +190,25 @@ void *rt_trit_propagate(int32_t result, void *a, void *b) {
     return (void*)rt_trit_new(result, ca * cb);
 }
 
+/* ── r_ternary_trit arithmetic runtime functions ── */
+void *rt_trit_add(void *a, void *b) {
+    return rt_trit_propagate(rt_trit_value(a) + rt_trit_value(b), a, b);
+}
+void *rt_trit_sub(void *a, void *b) {
+    return rt_trit_propagate(rt_trit_value(a) - rt_trit_value(b), a, b);
+}
+void *rt_trit_mul(void *a, void *b) {
+    return rt_trit_propagate(rt_trit_value(a) * rt_trit_value(b), a, b);
+}
+void *rt_trit_div(void *a, void *b) {
+    int32_t bv = rt_trit_value(b);
+    return rt_trit_propagate(bv ? rt_trit_value(a) / bv : 0, a, b);
+}
+void *rt_trit_mod(void *a, void *b) {
+    int32_t bv = rt_trit_value(b);
+    return rt_trit_propagate(bv ? rt_trit_value(a) % bv : 0, a, b);
+}
+
 rt_list_t *rt_list_new(void);
 void rt_list_push_item(void *lstp, void *item);
 

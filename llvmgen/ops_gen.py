@@ -158,12 +158,10 @@ def _compile_node_inner(node, cg: CodegenContext) -> ir.Value | None:
         l_raw = cg._to_raw(lv).ll_val
         r_raw = cg._to_raw(rv).ll_val
         if op in ('除', 'div', '余', 'mod'):
-            # AST 级别常量检测：若除数恒为 0，跳过 div-zero 检查和 sdiv
             div_by_const_zero = isinstance(args[1], (int, str)) and str(args[1]) == '0'
             if not div_by_const_zero:
                 _check_div_zero(l_raw, r_raw, cg)
                 return RawValue(getattr(cg.builder, arith)(l_raw, r_raw, name=f'{op}_tmp'))
-            # 常量除零：返回 0（此路径不应被到达）
             return RawValue(_ZERO)
         return RawValue(getattr(cg.builder, arith)(l_raw, r_raw, name=f'{op}_tmp'))
 
