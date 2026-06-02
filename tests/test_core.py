@@ -834,5 +834,168 @@ class TestTernaryDeep(unittest.TestCase):
         self.assertLess(r.confidence, 0.8)
 
 
+class TestTypeChecker(unittest.TestCase):
+    """type_checker.py 类型检查"""
+
+    def test_type_of_int(self):
+        from type_checker import _type_of
+        self.assertEqual(_type_of(42), 'int')
+        self.assertEqual(_type_of(0), 'int')
+
+    def test_type_of_str(self):
+        from type_checker import _type_of
+        self.assertEqual(_type_of('hello'), 'str')
+
+    def test_type_of_float(self):
+        from type_checker import _type_of
+        self.assertEqual(_type_of(3.14), 'float')
+
+    def test_type_of_list(self):
+        from type_checker import _type_of
+        self.assertEqual(_type_of([1, 2]), 'list')
+
+    def test_type_of_dict(self):
+        from type_checker import _type_of
+        self.assertEqual(_type_of({'a': 1}), 'dict')
+
+    def test_type_of_trit(self):
+        from ternary_core import TritValue
+        from type_checker import _type_of
+        self.assertEqual(_type_of(TritValue(1)), 'trit')
+
+    def test_matches_num(self):
+        from type_checker import _matches
+        self.assertTrue(_matches('int', 'num'))
+        self.assertTrue(_matches('float', 'num'))
+        self.assertTrue(_matches('trit', 'num'))
+        self.assertFalse(_matches('str', 'num'))
+
+    def test_matches_any(self):
+        from type_checker import _matches
+        self.assertTrue(_matches('str', 'any'))
+        self.assertTrue(_matches('int', 'any'))
+
+    def test_check_add_valid(self):
+        from type_checker import check_types
+        self.assertIsNone(check_types('add', [3, 4], [3, 4]))
+
+    def test_check_add_invalid(self):
+        from type_checker import check_types
+        err = check_types('add', ['x', 4], ['hello', 4])
+        self.assertIsNotNone(err)
+        self.assertIn('类型错误', err)
+
+    def test_check_concat(self):
+        from type_checker import check_types
+        self.assertIsNone(check_types('concat', ['a', 'b'], ['a', 'b']))
+        err = check_types('concat', [1, 'b'], [1, 'b'])
+        self.assertIsNotNone(err)
+
+    def test_check_list_ops(self):
+        from type_checker import check_types
+        self.assertIsNone(check_types('get', [[1, 2], 0], [[1, 2], 0]))
+        self.assertIsNone(check_types('list_len', [[1]], [[1]]))
+        err = check_types('list_len', ['not_list'], ['not_list'])
+        self.assertIsNotNone(err)
+
+    def test_check_dict_ops(self):
+        from type_checker import check_types
+        self.assertIsNone(check_types('get_key', [{'a': 1}, 'a'], [{'a': 1}, 'a']))
+        err = check_types('get_key', ['not_dict', 'a'], ['not_dict', 'a'])
+        self.assertIsNotNone(err)
+
+    def test_check_unknown_op(self):
+        from type_checker import check_types
+        self.assertIsNone(check_types('my_custom_op', [1, 2], [1, 2]))
+
+
+class TestEvalUtils(unittest.TestCase):
+    """eval_utils.py 工具函数"""
+
+    def test_ensure_trit_int(self):
+        from eval_utils import ensure_trit
+        from ternary_core import TritValue
+        r = ensure_trit(42)
+        self.assertIsInstance(r, TritValue)
+        self.assertEqual(r.to_int(), 42)
+
+    def test_ensure_trit_str(self):
+        from eval_utils import ensure_trit
+        from ternary_core import TritValue
+        r = ensure_trit('hello')
+        self.assertIsInstance(r, TritValue)
+
+    def test_ensure_trit_already(self):
+        from eval_utils import ensure_trit
+        from ternary_core import TritValue
+        t = TritValue(1)
+        r = ensure_trit(t)
+        self.assertIs(r, t)  # 相同对象
+
+    def test_ensure_trit_list(self):
+        from eval_utils import ensure_trit
+        lst = [1, 2, 3]
+        r = ensure_trit(lst)
+        self.assertIs(r, lst)  # 列表保持原样
+
+    def test_parse_numeric_int(self):
+        from eval_utils import parse_numeric_literal
+        from ternary_core import TritValue
+        r = parse_numeric_literal('42')
+        self.assertIsInstance(r, TritValue)
+        self.assertEqual(r.to_int(), 42)
+
+    def test_parse_numeric_hex(self):
+        from eval_utils import parse_numeric_literal
+        from ternary_core import TritValue
+        r = parse_numeric_literal('0xFF')
+        self.assertIsInstance(r, TritValue)
+        self.assertEqual(r.to_int(), 255)
+
+
+class TestConstantFolding(unittest.TestCase):
+    """compile_bytecode.py 常量折叠"""
+
+    def test_fold_add(self):
+        from compile_bytecode import _fold_constants
+        r = _fold_constants(['add', 1, 2])
+        self.assertEqual(r, 3)
+
+    def test_fold_sub(self):
+        from compile_bytecode import _fold_constants
+        r = _fold_constants(['sub', 10, 3])
+        self.assertEqual(r, 7)
+
+    def test_fold_mul(self):
+        from compile_bytecode import _fold_constants
+        r = _fold_constants(['mul', 4, 5])
+        self.assertEqual(r, 20)
+
+    def test_fold_div(self):
+        from compile_bytecode import _fold_constants
+        r = _fold_constants(['div', 10, 3])
+        self.assertEqual(r, 3)  # 整数除法
+
+    def test_fold_chinese_op(self):
+        from compile_bytecode import _fold_constants
+        r = _fold_constants(['加', 1, 2])
+        self.assertEqual(r, 3)
+
+    def test_fold_nested(self):
+        from compile_bytecode import _fold_constants
+        r = _fold_constants(['add', ['mul', 2, 3], 4])
+        self.assertEqual(r, 10)  # (2*3) + 4
+
+    def test_fold_skip_nonconst(self):
+        from compile_bytecode import _fold_constants
+        r = _fold_constants(['add', 'x', 2])
+        self.assertEqual(r, ['add', 'x', 2])  # 变量不能折叠
+
+    def test_fold_div_zero(self):
+        from compile_bytecode import _fold_constants
+        r = _fold_constants(['div', 5, 0])
+        self.assertEqual(r, 0)  # 除零返回 0
+
+
 if __name__ == '__main__':
     unittest.main()
