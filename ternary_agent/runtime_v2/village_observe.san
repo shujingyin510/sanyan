@@ -1,5 +1,6 @@
 // 桃花村 观察模式 — 空间+去重+夜间事件
 #include "ternary_agent/runtime_v2/village_config.san"
+#include "ternary_agent/runtime_v2/village_operators.san"
 
 设 观察速度 = 0
 设 最大天数 = 30
