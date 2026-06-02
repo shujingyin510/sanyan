@@ -90,8 +90,8 @@ cfg['model'] = cfg['model'] or os.environ.get('LLM_MODEL', 'deepseek-chat')
 cfg['key'] = cfg['key'] or os.environ.get('LLM_KEY', '')
 has_llm = cfg['key'] and len(cfg['key']) > 10 and '你的' not in cfg['key'] and cfg['key'] != 'sk-你的key'
 
-_llm_calls = 0  # LLM 调用计数
-_llm_times = {}  # {类别: [总次数, 总耗时]}
+_llm_calls: int = 0  # LLM 调用计数
+_llm_times: dict = {}  # {类别: [总次数, 总耗时]}
 _t_start = time.time()
 
 
@@ -542,10 +542,10 @@ _neg_events = [
         {0: ['老农', '农妇'], 1: ['老农', '农妇']},
     ),  # 地界纠纷只有种地的之间有
 ]
-_event_memory = {}  # {day: [事件描述, ...], 跨天因果链}
-_social_activity = {}  # {NPC名: [互动次数, 净Δ]}
-_npc_daily = {}  # {NPC名: 今日互动次数} 用于出场均衡
-_npc_names_cache = []  # 缓存 NPC 名列表
+_event_memory: dict = {}  # {day: [事件描述, ...], 跨天因果链}
+_social_activity: dict = {}  # {NPC名: [互动次数, 净Δ]}
+_npc_daily: dict = {}  # {NPC名: 今日互动次数} 用于出场均衡
+_npc_names_cache: list = []  # 缓存 NPC 名列表
 
 
 def _night_events(ev, args):
@@ -613,7 +613,7 @@ def _night_events(ev, args):
             delta_e = event[2]
             behav = event[1]
             mult_p_night = 1.0
-            mult_parts = []
+            mult_parts: list = []
             for n in [n1, n2]:
                 nd = npc_data.get(n, {}) if isinstance(npc_data, dict) else {}
                 pers = nd.get('性格', '') if isinstance(nd, dict) else ''
@@ -892,12 +892,12 @@ finally:
             for k in sorted(gone_keys):
                 print(f'  {k:<{max_k_len}} 消失 (原{_to_f(first[k]):.3f})')
         # 统计：仅按 common 键计算总变动
-        days = len(_trust_timeline)
+        total_days = len(_trust_timeline)
         total_delta = sum(_to_f(last.get(k, 0)) - _to_f(first.get(k, 0)) for k in common)
         warm = sum(1 for v in last.values() if _to_f(v) >= 0.6)
         cold = sum(1 for v in last.values() if _to_f(v) < 0.3)
         print(
-            f'  共 {days} 天，{len(common)} 组持续关系'
+            f'  共 {total_days} 天，{len(common)} 组持续关系'
             + (f'（+{len(new_keys)} 新增/-{len(gone_keys)} 消失）' if (new_keys or gone_keys) else '')
         )
         print(f'  总互信变动: {total_delta:+.3f}')
@@ -919,7 +919,7 @@ finally:
                     print(f'  第{d}天  {evt}')
             # 因果链：同对 NPC 跨天重复出现
             chain = _event_memory.get('_链', [])
-            pairs = {}
+            pairs: dict = {}
             for c in chain:
                 k = f'{min(c["n1"], c["n2"])}_{max(c["n1"], c["n2"])}'
                 pairs.setdefault(k, []).append(c)
@@ -980,18 +980,18 @@ finally:
                     print(row)
                 print('════════════')
         # ── 互信演化图（纯 HTML+SVG，零依赖）──
-        pairs = {}  # {pair_name: [day_values]}
+        chart_pairs: dict = {}  # {pair_name: [day_values]}
         all_days = set()
         for entry in json_out:
             all_days.add(entry['day'])
             for k, v in entry['trust'].items():
-                pairs.setdefault(k, []).append(v)
-        if len(all_days) >= 2 and pairs:
+                chart_pairs.setdefault(k, []).append(v)
+        if len(all_days) >= 2 and chart_pairs:
             days = sorted(all_days)
             n_days = len(days)
             # 筛选有变化的 pair，按末值排序
             active_pairs = []
-            for pair, vals in sorted(pairs.items()):
+            for pair, vals in sorted(chart_pairs.items()):
                 if len(vals) < 2 or max(vals) - min(vals) < 0.002:
                     continue
                 active_pairs.append((pair, vals))

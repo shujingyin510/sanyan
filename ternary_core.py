@@ -326,12 +326,19 @@ class TritValue:
             # 字符串类型
             self._val_type = self.TYPE_STRING
             self._payload = value
-            self.value = []
+            self.value: Any = []
             self.symbol = ''
         elif isinstance(value, dict):
-            # 字典类型
             self._val_type = self.TYPE_DICT
-            self._payload = value
+            self._payload = value  # type: ignore[assignment]
+            self.value = []
+            self.symbol = ''
+        elif isinstance(value, list) and value and isinstance(value[0], int):
+            self.value = value
+            self.symbol = BT.to_str(value)
+        elif isinstance(value, list):
+            self._val_type = self.TYPE_LIST
+            self._payload = value  # type: ignore[assignment]
             self.value = []
             self.symbol = ''
         elif isinstance(value, list) and value and isinstance(value[0], int):

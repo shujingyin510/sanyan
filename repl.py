@@ -99,7 +99,7 @@ def _save_state(env):
     try:
         import json
 
-        state = {'vars': {}}
+        state: dict = {'vars': {}}
         for k, v in env.all_scoped_vars().items():
             if k.startswith('_'):
                 continue
