@@ -749,8 +749,8 @@ class TestTernaryDeep(unittest.TestCase):
         item2 = e.eval(['trit_get', lst, 1])
         self.assertAlmostEqual(item2.confidence, 0.5)
 
-        l = e.eval(['trit_list_len', lst])
-        self.assertEqual(l.to_int(), 2)
+        lst_len = e.eval(['trit_list_len', lst])
+        self.assertEqual(lst_len.to_int(), 2)
 
     def test_trit_dict_ops(self):
         """三态字典: 创建/取键/置键"""

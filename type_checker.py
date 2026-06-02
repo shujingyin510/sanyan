@@ -60,10 +60,15 @@ _TYPE_SIGS: dict[str, tuple[list[str], str]] = {
     'eq': (['any', 'any'], 'trit'),
     '等于': (['any', 'any'], 'trit'),
     'ne': (['any', 'any'], 'trit'),
+    '不等于': (['any', 'any'], 'trit'),
     'gt': (['num', 'num'], 'trit'),
+    '大于': (['num', 'num'], 'trit'),
     'lt': (['num', 'num'], 'trit'),
+    '小于': (['num', 'num'], 'trit'),
     'gte': (['num', 'num'], 'trit'),
+    '大于等于': (['num', 'num'], 'trit'),
     'lte': (['num', 'num'], 'trit'),
+    '小于等于': (['num', 'num'], 'trit'),
     # 逻辑
     'and': (['trit', 'trit'], 'trit'),
     '与': (['trit', 'trit'], 'trit'),
@@ -114,6 +119,7 @@ _TYPE_SIGS: dict[str, tuple[list[str], str]] = {
     'is_string': (['any'], 'trit'),
     '是字符串': (['any'], 'trit'),
     'is_number': (['any'], 'trit'),
+    '是数字': (['any'], 'trit'),
     # IO
     'read_file': (['str'], 'str'),
     '读文件': (['str'], 'str'),
@@ -131,7 +137,6 @@ _TYPE_SIGS: dict[str, tuple[list[str], str]] = {
     '时间戳': ([], 'int'),
     'sleep': (['num'], 'none'),
     '等待': (['num'], 'none'),
-    'sleep': (['num'], 'none'),
     'delay': (['num'], 'none'),
     # 随机
     'random': (['int', 'int'], 'int'),

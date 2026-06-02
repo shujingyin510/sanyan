@@ -15,6 +15,7 @@ os.chdir(os.path.dirname(os.path.abspath(__file__)) or '.')
 from sugar.parser import parse_code
 from evaluator import SanyanEvaluator
 from ops.file_ops import clear_cache
+from values import ReturnException
 
 clear_cache()
 
@@ -138,6 +139,7 @@ def run_manual():
     except ReturnException:
         pass
 
+    key = os.environ.get('LLM_KEY', '')
     has_llm = key and '你的key' not in key
     print()
     print('  ══════════════════════════════════════')

@@ -28,10 +28,10 @@ def _stop(sig, frame):
 
 signal.signal(signal.SIGINT, _stop)
 
-from sugar.parser import parse_code
-from evaluator import SanyanEvaluator
-from ops.file_ops import clear_cache
-from values import ReturnException, TritValue
+from sugar.parser import parse_code  # noqa: E402
+from evaluator import SanyanEvaluator  # noqa: E402
+from ops.file_ops import clear_cache  # noqa: E402
+from values import ReturnException, TritValue  # noqa: E402
 
 clear_cache()
 
@@ -132,7 +132,7 @@ def llm_call(prompt):
                     text = text.split(sep, 1)[1].strip()
                     break
             return text.strip()
-    except:
+    except Exception:
         return None
 
 
@@ -148,7 +148,7 @@ def _gen_dialogue(ev, args):
         if isinstance(ev.eval(args[1]), TritValue):
             v = ev.eval(args[1])
             n2 = v.to_payload() if v.is_string() else str(v.to_int())
-    except:
+    except Exception:
         return TritValue(0)
 
     # ── #6 NPC出场均衡：跟踪每日出场 ──
@@ -184,7 +184,7 @@ def _gen_dialogue(ev, args):
     try:
         act1 = str(ev.eval(['取NPC行为', n1]))
         act2 = str(ev.eval(['取NPC行为', n2]))
-    except:
+    except Exception:
         act1 = '在忙'
         act2 = '在忙'
     cache['_scene'] = f'{scene_hdr}{n1}{act1}，{n2}{act2}。'
@@ -195,7 +195,7 @@ def _gen_dialogue(ev, args):
     pers2 = d2.get('性格', '')
     # 根据天气和关系决定对话语气方向
     rel_str = str(rel) if rel else '陌生人'
-    tone_hint = {'夫妻': '家常', '朋友': '随意', '邻居': '寒暄', '熟人': '客套', '陌生人': '客气'}.get(rel_str, '客气')
+    # tone_hint = {'夫妻': '家常', '朋友': '随意', '邻居': '寒暄', '熟人': '客套', '陌生人': '客气'}.get(rel_str, '客气')
     # 两步：先定语气，再生成（区分调侃/抱怨和真正冲突）
     tone = llm_call(
         f'{n1}({role1},{pers1})和{n2}({role2},{pers2})在{period}{weather}天相遇。'
@@ -235,7 +235,7 @@ def _gen_dialogue(ev, args):
                 loc_mult = 1.2
             elif p1 and p2:
                 loc_mult = 0.6
-    except:
+    except Exception:
         pass
     # #1 事件记忆：注入近期事件到对话提示
     event_ctx = ''
@@ -442,7 +442,7 @@ def _gen_dialogue(ev, args):
         try:
             pos1 = str(ev.eval(['取键', ['取', 'NPC位置', n1]]))
             pos2 = str(ev.eval(['取键', ['取', 'NPC位置', n2]]))
-        except:
+        except Exception:
             pos1 = '村中'
             pos2 = '村中'
         loc = pos1 if pos1 == pos2 else f'{pos1}↔{pos2}'
@@ -508,7 +508,7 @@ def _gen_dialogue(ev, args):
     return TritValue(0)
 
 
-from ops.registry import register
+from ops.registry import register  # noqa: E402
 
 register('生成对话', _gen_dialogue)
 
@@ -644,7 +644,7 @@ def _night_events(ev, args):
                 rel = '邻居'
                 try:
                     rel = str(ev.eval(['取关系', n1, n2]))
-                except:
+                except Exception:
                     pass
                 if new >= 0.7:
                     zone = '真 ●●●'
@@ -658,7 +658,7 @@ def _night_events(ev, args):
                     if hasattr(_v, 'is_dict') and hasattr(_v, 'to_payload') and _v.is_dict():
                         _v = _v.to_payload()
                     weather = _v.get('天气', '') if isinstance(_v, dict) else ''
-                except:
+                except Exception:
                     period = '深夜'
                     weather = ''
                 print(f'  ┌─ 第{_v["天数"]}天 {period} {weather} 夜间事件')
@@ -801,7 +801,7 @@ try:
         for v in td_now.values():
             try:
                 vals.append(float(v.to_int()) if hasattr(v, 'to_int') else float(v))
-            except:
+            except Exception:
                 pass
         if vals:
             avg = sum(vals) / len(vals)
@@ -831,7 +831,7 @@ try:
                                 v_raw = td_now.get(k, 0)
                                 try:
                                     v = float(v_raw.to_int()) if hasattr(v_raw, 'to_int') else float(v_raw)
-                                except:
+                                except Exception:
                                     v = 0.0
                                 row += _vpad(f'{v:.2f}', 7)
                         print(row)
@@ -854,7 +854,7 @@ finally:
                 if hasattr(v, 'to_int'):
                     return float(v.to_int())
                 return float(v)
-            except:
+            except Exception:
                 return 0.0
 
         print()

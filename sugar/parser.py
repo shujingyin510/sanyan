@@ -415,7 +415,7 @@ class _Parser:
         if tok.value == '[':
             saved_pos = self.pos
             # 预览: 看是否是 [expr for ... 推导式，而非退回到 try/except
-            is_comprehension = False
+            is_comprehension = False  # noqa: F841
             inner_expr = None
             try:
                 inner_expr = self.parse_expression()

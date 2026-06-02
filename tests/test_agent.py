@@ -537,7 +537,7 @@ class TestVillageE2E(unittest.TestCase):
         ]:
             try:
                 ops.registry.register_alias(a, t)
-            except:
+            except Exception:
                 pass
 
         for fname in ['ternary_agent/runtime_v2/village_game.san', 'ternary_agent/runtime_v2/village_observe.san']:

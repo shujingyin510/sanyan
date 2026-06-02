@@ -51,7 +51,7 @@ class TestFuzzParser(unittest.TestCase):
             s = ''.join(random.choice(string.printable) for _ in range(random.randint(1, 100)))
             try:
                 tokens = tokenize(f'"{s}"')
-                ast = parse(tokens)
+                parse(tokens)  # noqa: F841
             except Exception as e:
                 if not isinstance(e, (SystemExit, KeyboardInterrupt, SyntaxError)):
                     self.fail(f'随机字符串崩溃: {e}')
