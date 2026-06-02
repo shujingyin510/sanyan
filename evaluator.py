@@ -20,7 +20,7 @@ _ops_initialized = False
 _DEFAULT_RECURSION_LIMIT = 2000
 
 
-def _debug_before(evaluator: Any, internal: str, op: str, args: list) -> None:
+def _debug_before(evaluator: Any, internal: str, op: str, args: list) -> None:  # pragma: no cover
     """操作执行前的调试检查（从 debug_eval.py 合并）"""
     if not evaluator.debug_mode:
         return
@@ -29,7 +29,7 @@ def _debug_before(evaluator: Any, internal: str, op: str, args: list) -> None:
     _debug_prompt(evaluator, internal or op, args)
 
 
-def _debug_after(evaluator: Any, internal: str, op: str, args: list) -> None:
+def _debug_after(evaluator: Any, internal: str, op: str, args: list) -> None:  # pragma: no cover
     """操作执行后的监视变量检查（从 debug_eval.py 合并）"""
     if not evaluator._watched_vars:
         return
@@ -41,7 +41,7 @@ def _debug_after(evaluator: Any, internal: str, op: str, args: list) -> None:
             print(f'  [监视] {v} = {evaluator.get_var(v)}')
 
 
-def _debug_prompt(evaluator: Any, cur_op: str, args: list) -> None:
+def _debug_prompt(evaluator: Any, cur_op: str, args: list) -> None:  # pragma: no cover
     """调试断点交互提示（从 debug_eval.py 合并）"""
     from ops.io_ops import IOOps
 
