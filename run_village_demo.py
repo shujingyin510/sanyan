@@ -85,6 +85,10 @@ def run_auto():
     e = SanyanEvaluator(max_loop_steps=999999)
     _register_aliases()
     src = open('ternary_agent/runtime_v2/village_game.san', encoding='utf-8').read()
+    # 注入 API 密钥
+    key = os.environ.get('LLM_KEY', '')
+    if key:
+        src = src.replace('sk-你的key', key)
     ast, _ = parse_code(src)
     fixed = [s for s in ast[1:] if not (isinstance(s, list) and s[0] == 'export')]
     from values import ReturnException
