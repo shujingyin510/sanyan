@@ -114,12 +114,21 @@ def _get_type_name(value: Any) -> str:
 
 def check_type(value: Any, expected_type: str, param_name: str = '') -> None:
     type_checks: Dict[str, Callable[[Any], bool]] = {
+        # 中文名
         '数字': lambda v: isinstance(v, TritValue),
         '字符串': lambda v: isinstance(v, str),
         '列表': lambda v: isinstance(v, list),
         '字典': lambda v: isinstance(v, dict),
         '布尔': lambda v: isinstance(v, TritValue) and v.to_int() in (1, -1),
         '三态': lambda v: isinstance(v, TritValue),
+        # 英文别名（糖解析器产生）
+        'int': lambda v: isinstance(v, (int, TritValue)),
+        'float': lambda v: isinstance(v, (int, float, TritValue)),
+        'str': lambda v: isinstance(v, str),
+        'list': lambda v: isinstance(v, list),
+        'dict': lambda v: isinstance(v, dict),
+        'num': lambda v: isinstance(v, (int, float, TritValue)),
+        'any': lambda v: True,
     }
 
     is_optional = expected_type.startswith('?')
