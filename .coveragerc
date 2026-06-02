@@ -11,6 +11,7 @@ omit =
     run_v2.py
     run_v2_demo.py
     run_village_demo.py
+    run_village_observe.py
     # GUI/服务器（需图形或网络环境）
     gui.py
     dap_server.py
@@ -20,7 +21,6 @@ omit =
     # 工具脚本（非核心运行时）
     doc_sync.py
     sanfmt.py
-    debug_eval.py
     utils/*
     benchmark/*
     scripts/*

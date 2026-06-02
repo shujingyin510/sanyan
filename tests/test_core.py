@@ -996,6 +996,64 @@ class TestConstantFolding(unittest.TestCase):
         r = _fold_constants(['div', 5, 0])
         self.assertEqual(r, 0)  # 除零返回 0
 
+    def test_type_of_unknown(self):
+        """_type_of 对未知类型返回 'any'"""
+        from type_checker import _type_of
+        self.assertEqual(_type_of(object()), 'any')
+
+    def test_check_to_string(self):
+        from type_checker import check_types
+        self.assertIsNone(check_types('to_string', [42], [42]))
+        self.assertIsNone(check_types('转字符串', ['x'], ['x']))
+
+    def test_check_io_ops(self):
+        from type_checker import check_types
+        self.assertIsNone(check_types('read_file', ['f.txt'], ['f.txt']))
+        self.assertIsNone(check_types('write_file', ['f.txt', 'data'], ['f.txt', 'data']))
+
+    def test_check_type_ops(self):
+        from type_checker import check_types
+        self.assertIsNone(check_types('is_dict', [{}], [{}]))
+        self.assertIsNone(check_types('is_list', [[]], [[]]))
+
+    def test_matches_exact(self):
+        from type_checker import _matches
+        self.assertTrue(_matches('str', 'str'))
+        self.assertTrue(_matches('int', 'int'))
+        self.assertFalse(_matches('str', 'int'))
+
+    def test_propagated_confidence_mixed(self):
+        from eval_utils import propagated_confidence
+        from ternary_core import TritValue
+        t = TritValue(1)
+        t.confidence = 0.5
+        self.assertEqual(propagated_confidence(t, 42), 0.5)  # 混合 TritValue 和 raw
+        self.assertEqual(propagated_confidence(42, 42), 1.0)  # 全 raw
+
+    def test_unwrap_trit_raw(self):
+        from eval_utils import unwrap_trit
+        self.assertEqual(unwrap_trit(42), 42)
+        self.assertEqual(unwrap_trit('hello'), 'hello')
+
+    def test_unwrap_trit_list(self):
+        from eval_utils import unwrap_trit
+        from ternary_core import TritValue
+        tv = TritValue(0)  # 基础三态值
+        self.assertEqual(unwrap_trit(tv), 0)
+        td = TritValue(1)
+        self.assertEqual(unwrap_trit(td), 1)
+
+    def test_parse_numeric_float(self):
+        from eval_utils import parse_numeric_literal
+        r = parse_numeric_literal('3.14')
+        self.assertIsNotNone(r)
+
+    def test_ensure_trit_float(self):
+        from eval_utils import ensure_trit
+        from ternary_core import TritValue
+        r = ensure_trit(3.14)
+        self.assertIsInstance(r, TritValue)
+
 
 if __name__ == '__main__':
     unittest.main()
