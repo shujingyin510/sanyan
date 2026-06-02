@@ -93,6 +93,7 @@ BIT_TST = 0x44
 LO_BYTE = 0x45
 HI_BYTE = 0x46
 MRG_BYT = 0x47
+PUSH_FLOAT = 0x48  # 浮点常量：操作码 + IEEE 754 double (8 字节)
 
 # 最大执行步数上限，防止无限循环
 VM_MAX_STEPS = 5_000_000
@@ -295,9 +296,14 @@ class VM:
         return result
 
     def _exec_stack_ops(self, op: int) -> bool:
-        """栈操作指令：PUSH_I, PUSH_STR, LOAD, STORE, PRINT"""
+        """栈操作指令：PUSH_I, PUSH_STR, PUSH_FLOAT, LOAD, STORE, PRINT"""
         if op == PUSH_I:
             self.stack.append(self._read_i32())
+        elif op == PUSH_FLOAT:
+            import struct
+            raw = bytes(self.code[self.pc:self.pc + 8])
+            self.pc += 8
+            self.stack.append(struct.unpack('<d', raw)[0])
         elif op == PUSH_STR:
             length = self.code[self.pc]
             self.pc += 1
@@ -813,6 +819,7 @@ _DISPATCH: dict[int, 'Callable'] = {
     # 栈操作
     PUSH_I: VM._exec_stack_ops,
     PUSH_STR: VM._exec_stack_ops,
+    PUSH_FLOAT: VM._exec_stack_ops,
     LOAD: VM._exec_stack_ops,
     STORE: VM._exec_stack_ops,
     PRINT: VM._exec_stack_ops,

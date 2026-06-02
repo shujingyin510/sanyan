@@ -118,6 +118,7 @@ typedef enum {
     LO_BYTE = 0x45,
     HI_BYTE = 0x46,
     MRG_BYT = 0x47,
+    PUSH_FLOAT = 0x48,  /* IEEE 754 double (8 bytes) */
     /* 终止 */
     HALT     = 0xFF,
 } Opcode;
@@ -528,6 +529,15 @@ int vm_run(VM *vm) {
         case PUSH_I:
             push(vm, tag_i(rd_i32(vm->code, &vm->pc)));
             break;
+
+        case PUSH_FLOAT: {
+            /* 读取 8 字节 IEEE 754 double（little-endian）*/
+            double fval;
+            memcpy(&fval, vm->code + vm->pc, 8);
+            vm->pc += 8;
+            push(vm, rt_float_new(fval));
+            break;
+        }
 
         case PUSH_STR: {
             int len = rd_u8(vm->code, &vm->pc);

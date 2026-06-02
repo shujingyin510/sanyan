@@ -140,6 +140,24 @@ static inline rt_trit_t *rt_trit_new(int32_t val, double conf) {
 
 
 /* ═══════════════════════════════════════════════════════════
+ * 浮点类型 (rt_float_t) — IEEE 754 double
+ * ═══════════════════════════════════════════════════════════ */
+
+typedef struct {
+    SAN_HEADER;
+    double value;
+} rt_float_t;
+
+static inline rt_float_t *rt_float_new(double v) {
+    rt_float_t *f = (rt_float_t *)calloc(1, sizeof(rt_float_t));
+    if (!f) return NULL;
+    f->h_type = OBJ_FLOAT;
+    f->value = v;
+    return f;
+}
+
+
+/* ═══════════════════════════════════════════════════════════
  * 堆对象类型检查辅助
  * ═══════════════════════════════════════════════════════════ */
 
