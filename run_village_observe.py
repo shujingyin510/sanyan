@@ -49,19 +49,15 @@ def llm_call(prompt):
     try:
         with urllib.request.urlopen(req,timeout=10) as r:
             text = json.loads(r.read())['choices'][0]['message']['content'].strip()
-            for c in '\'"\u201c\u2018': text = text.lstrip(c)
-            for c in '\'"\u201d\u2019': text = text.rstrip(c)
-            # 去掉名字前缀 "张三：" 或 "张三:"
-            if '：' in text and len(text.split('：')[0]) <= 6:
-                text = text.split('：',1)[1].strip()
-            elif ':' in text and len(text.split(':')[0]) <= 6:
-                text = text.split(':',1)[1].strip()
+            # 去所有引号
+            for c in '\'"\u201c\u2018\u201d\u2019\u300c\u300d\u300e\u300f': text = text.replace(c, '')
+            # 去名字前缀（仅当后面是冒号且前缀 <= 4字）
+            for sep in ['：', ':']:
+                if sep in text and len(text.split(sep)[0]) <= 4:
+                    text = text.split(sep,1)[1].strip()
+                    break
             return text.strip()
     except: return None
-
-def llm_narrate(period, weather, n1, n2, d1, d2):
-    w = '【强制】下雨，地面湿，天阴' if weather=='下雨' else '【强制】阴天，没有太阳' if weather=='阴天' else '晴天'
-    return llm_call(f'{w}。桃花村{period}。{n1}和{n2}碰面。一句话描述此场景，15字内。')
 
 def _gen_dialogue(ev, args):
     if not has_llm: return TritValue(0)
@@ -88,16 +84,17 @@ def _gen_dialogue(ev, args):
     rel = ev.eval(['取关系',n1,n2])
     cache = ev.get_var('对话缓存') if ev.has_var('对话缓存') else {}
 
-    # 裁判 LLM：只生成 NPC 动作，天气由 Python 拼接
-    sd = llm_call(f'{n1}({d1.get("角色","")})和{n2}({d2.get("角色","")})在桃花村。一句话描述他们在做什么，15字以内。')
+    # 裁判 LLM：角色+动作（加角色名避免错位老王打铁）
+    role1 = d1.get('角色','村民'); role2 = d2.get('角色','村民')
+    sd = llm_call(f'{n1}是{role1}，{n2}是{role2}。只说此刻两人各在做什么，10字内。')
     if sd: cache['_scene'] = scene_hdr + sd.strip()
     else: cache['_scene'] = scene_hdr + f'{n1}和{n2}在村中相遇。'
 
-    p1 = f'{scene_hdr}{n1}是{d1.get("角色","")}，{n2}是{d2.get("角色","")}，他们{rel}。用大白话对{n2}说一句日常话，20字以内。'
+    p1 = f'{n1}是{role1}。对{n2}({role2})随口说句话，10-20字。只输出这句话。'
     line1 = llm_call(p1)
     if line1:
         cache[n1] = line1
-        p2 = f'{scene_hdr}{n2}是{d2.get("角色","")}，{n1}说：{line1}。用大白话回一句，20字以内。'
+        p2 = f'{n2}是{role2}。{n1}说：{line1}。随口回句大白话，10-20字。只输出这句话。'
         line2 = llm_call(p2)
         if line2: cache[n2] = line2
     ev.scope_vars['对话缓存'] = cache
