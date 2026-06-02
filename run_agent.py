@@ -58,6 +58,7 @@ def _register_aliases():
             register_alias(alias, target)
         except Exception:
             import sys
+
             print(f'  ⚠ 别名注册失败: {alias} → {target}', file=sys.stderr)
 
 

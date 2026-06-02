@@ -2,7 +2,9 @@
 运行方式：python tests/test_core.py
 """
 
-import os, sys
+import os
+import sys
+
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import unittest
@@ -601,16 +603,16 @@ class TestTernaryDeep(unittest.TestCase):
         """TritValue 可以承载字符串"""
         from ternary_core import TritValue
 
-        tv = TritValue("hello")
+        tv = TritValue('hello')
         self.assertTrue(tv.is_string())
-        self.assertEqual(tv.to_payload(), "hello")
+        self.assertEqual(tv.to_payload(), 'hello')
         self.assertEqual(tv.confidence, 1.0)
 
     def test_tritvalue_string_confidence(self):
         """三态字符串带置信度"""
         from ternary_core import TritValue
 
-        tv = TritValue("unknown", confidence=0.5)
+        tv = TritValue('unknown', confidence=0.5)
         self.assertTrue(tv.is_string())
         self.assertEqual(tv.confidence, 0.5)
 
@@ -623,7 +625,7 @@ class TestTernaryDeep(unittest.TestCase):
         r = e.eval(['ternary_value', '"hello"', 0.8])
         self.assertIsInstance(r, TritValue)
         self.assertTrue(r.is_string())
-        self.assertEqual(r.to_payload(), "hello")
+        self.assertEqual(r.to_payload(), 'hello')
         self.assertAlmostEqual(r.confidence, 0.8)
 
     def test_ternary_propagate(self):
@@ -645,7 +647,7 @@ class TestTernaryDeep(unittest.TestCase):
         a = e.eval(['ternary_value', '"hello"', 0.9])
         b = e.eval(['ternary_value', '" world"', 0.8])
         r = e.eval(['concat', a, b])
-        self.assertEqual(r, "hello world")
+        self.assertEqual(r, 'hello world')
 
     def test_detect_conflict(self):
         """检测冲突: 两个高信度矛盾值 → 标记冲突"""
@@ -839,32 +841,39 @@ class TestTypeChecker(unittest.TestCase):
 
     def test_type_of_int(self):
         from type_checker import _type_of
+
         self.assertEqual(_type_of(42), 'int')
         self.assertEqual(_type_of(0), 'int')
 
     def test_type_of_str(self):
         from type_checker import _type_of
+
         self.assertEqual(_type_of('hello'), 'str')
 
     def test_type_of_float(self):
         from type_checker import _type_of
+
         self.assertEqual(_type_of(3.14), 'float')
 
     def test_type_of_list(self):
         from type_checker import _type_of
+
         self.assertEqual(_type_of([1, 2]), 'list')
 
     def test_type_of_dict(self):
         from type_checker import _type_of
+
         self.assertEqual(_type_of({'a': 1}), 'dict')
 
     def test_type_of_trit(self):
         from ternary_core import TritValue
         from type_checker import _type_of
+
         self.assertEqual(_type_of(TritValue(1)), 'trit')
 
     def test_matches_num(self):
         from type_checker import _matches
+
         self.assertTrue(_matches('int', 'num'))
         self.assertTrue(_matches('float', 'num'))
         self.assertTrue(_matches('trit', 'num'))
@@ -872,27 +881,32 @@ class TestTypeChecker(unittest.TestCase):
 
     def test_matches_any(self):
         from type_checker import _matches
+
         self.assertTrue(_matches('str', 'any'))
         self.assertTrue(_matches('int', 'any'))
 
     def test_check_add_valid(self):
         from type_checker import check_types
+
         self.assertIsNone(check_types('add', [3, 4], [3, 4]))
 
     def test_check_add_invalid(self):
         from type_checker import check_types
+
         err = check_types('add', ['x', 4], ['hello', 4])
         self.assertIsNotNone(err)
         self.assertIn('类型错误', err)
 
     def test_check_concat(self):
         from type_checker import check_types
+
         self.assertIsNone(check_types('concat', ['a', 'b'], ['a', 'b']))
         err = check_types('concat', [1, 'b'], [1, 'b'])
         self.assertIsNotNone(err)
 
     def test_check_list_ops(self):
         from type_checker import check_types
+
         self.assertIsNone(check_types('get', [[1, 2], 0], [[1, 2], 0]))
         self.assertIsNone(check_types('list_len', [[1]], [[1]]))
         err = check_types('list_len', ['not_list'], ['not_list'])
@@ -900,12 +914,14 @@ class TestTypeChecker(unittest.TestCase):
 
     def test_check_dict_ops(self):
         from type_checker import check_types
+
         self.assertIsNone(check_types('get_key', [{'a': 1}, 'a'], [{'a': 1}, 'a']))
         err = check_types('get_key', ['not_dict', 'a'], ['not_dict', 'a'])
         self.assertIsNotNone(err)
 
     def test_check_unknown_op(self):
         from type_checker import check_types
+
         self.assertIsNone(check_types('my_custom_op', [1, 2], [1, 2]))
 
 
@@ -915,6 +931,7 @@ class TestEvalUtils(unittest.TestCase):
     def test_ensure_trit_int(self):
         from eval_utils import ensure_trit
         from ternary_core import TritValue
+
         r = ensure_trit(42)
         self.assertIsInstance(r, TritValue)
         self.assertEqual(r.to_int(), 42)
@@ -922,18 +939,21 @@ class TestEvalUtils(unittest.TestCase):
     def test_ensure_trit_str(self):
         from eval_utils import ensure_trit
         from ternary_core import TritValue
+
         r = ensure_trit('hello')
         self.assertIsInstance(r, TritValue)
 
     def test_ensure_trit_already(self):
         from eval_utils import ensure_trit
         from ternary_core import TritValue
+
         t = TritValue(1)
         r = ensure_trit(t)
         self.assertIs(r, t)  # 相同对象
 
     def test_ensure_trit_list(self):
         from eval_utils import ensure_trit
+
         lst = [1, 2, 3]
         r = ensure_trit(lst)
         self.assertIs(r, lst)  # 列表保持原样
@@ -941,6 +961,7 @@ class TestEvalUtils(unittest.TestCase):
     def test_parse_numeric_int(self):
         from eval_utils import parse_numeric_literal
         from ternary_core import TritValue
+
         r = parse_numeric_literal('42')
         self.assertIsInstance(r, TritValue)
         self.assertEqual(r.to_int(), 42)
@@ -948,6 +969,7 @@ class TestEvalUtils(unittest.TestCase):
     def test_parse_numeric_hex(self):
         from eval_utils import parse_numeric_literal
         from ternary_core import TritValue
+
         r = parse_numeric_literal('0xFF')
         self.assertIsInstance(r, TritValue)
         self.assertEqual(r.to_int(), 255)
@@ -958,66 +980,79 @@ class TestConstantFolding(unittest.TestCase):
 
     def test_fold_add(self):
         from compile_bytecode import _fold_constants
+
         r = _fold_constants(['add', 1, 2])
         self.assertEqual(r, 3)
 
     def test_fold_sub(self):
         from compile_bytecode import _fold_constants
+
         r = _fold_constants(['sub', 10, 3])
         self.assertEqual(r, 7)
 
     def test_fold_mul(self):
         from compile_bytecode import _fold_constants
+
         r = _fold_constants(['mul', 4, 5])
         self.assertEqual(r, 20)
 
     def test_fold_div(self):
         from compile_bytecode import _fold_constants
+
         r = _fold_constants(['div', 10, 3])
         self.assertEqual(r, 3)  # 整数除法
 
     def test_fold_chinese_op(self):
         from compile_bytecode import _fold_constants
+
         r = _fold_constants(['加', 1, 2])
         self.assertEqual(r, 3)
 
     def test_fold_nested(self):
         from compile_bytecode import _fold_constants
+
         r = _fold_constants(['add', ['mul', 2, 3], 4])
         self.assertEqual(r, 10)  # (2*3) + 4
 
     def test_fold_skip_nonconst(self):
         from compile_bytecode import _fold_constants
+
         r = _fold_constants(['add', 'x', 2])
         self.assertEqual(r, ['add', 'x', 2])  # 变量不能折叠
 
     def test_fold_div_zero(self):
         from compile_bytecode import _fold_constants
+
         r = _fold_constants(['div', 5, 0])
         self.assertEqual(r, 0)  # 除零返回 0
 
     def test_type_of_unknown(self):
         """_type_of 对未知类型返回 'any'"""
         from type_checker import _type_of
+
         self.assertEqual(_type_of(object()), 'any')
 
     def test_check_to_string(self):
         from type_checker import check_types
+
         self.assertIsNone(check_types('to_string', [42], [42]))
         self.assertIsNone(check_types('转字符串', ['x'], ['x']))
 
     def test_check_io_ops(self):
         from type_checker import check_types
+
         self.assertIsNone(check_types('read_file', ['f.txt'], ['f.txt']))
         self.assertIsNone(check_types('write_file', ['f.txt', 'data'], ['f.txt', 'data']))
 
     def test_check_type_ops(self):
         from type_checker import check_types
+
         self.assertIsNone(check_types('is_dict', [{}], [{}]))
         self.assertIsNone(check_types('is_list', [[]], [[]]))
 
     def test_matches_exact(self):
         from type_checker import _matches
+
         self.assertTrue(_matches('str', 'str'))
         self.assertTrue(_matches('int', 'int'))
         self.assertFalse(_matches('str', 'int'))
@@ -1025,6 +1060,7 @@ class TestConstantFolding(unittest.TestCase):
     def test_propagated_confidence_mixed(self):
         from eval_utils import propagated_confidence
         from ternary_core import TritValue
+
         t = TritValue(1)
         t.confidence = 0.5
         self.assertEqual(propagated_confidence(t, 42), 0.5)  # 混合 TritValue 和 raw
@@ -1032,12 +1068,14 @@ class TestConstantFolding(unittest.TestCase):
 
     def test_unwrap_trit_raw(self):
         from eval_utils import unwrap_trit
+
         self.assertEqual(unwrap_trit(42), 42)
         self.assertEqual(unwrap_trit('hello'), 'hello')
 
     def test_unwrap_trit_list(self):
         from eval_utils import unwrap_trit
         from ternary_core import TritValue
+
         tv = TritValue(0)  # 基础三态值
         self.assertEqual(unwrap_trit(tv), 0)
         td = TritValue(1)
@@ -1045,12 +1083,14 @@ class TestConstantFolding(unittest.TestCase):
 
     def test_parse_numeric_float(self):
         from eval_utils import parse_numeric_literal
+
         r = parse_numeric_literal('3.14')
         self.assertIsNotNone(r)
 
     def test_ensure_trit_float(self):
         from eval_utils import ensure_trit
         from ternary_core import TritValue
+
         r = ensure_trit(3.14)
         self.assertIsInstance(r, TritValue)
 

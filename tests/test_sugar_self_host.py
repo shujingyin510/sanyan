@@ -7,7 +7,9 @@
 4. 输出与参考 sugar.bin 比较
 """
 
-import os, sys
+import os
+import sys
+
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import os
 import hashlib

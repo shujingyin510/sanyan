@@ -10,24 +10,37 @@
 from __future__ import annotations
 from typing import Any
 
+
 # ── 类型推断辅助 ──
 def _type_of(v: Any) -> str:
     """推断 Python 值的类型名。"""
-    if isinstance(v, bool): return 'int'  # bool 归入 int
-    if isinstance(v, int): return 'int'
-    if isinstance(v, float): return 'float'
-    if isinstance(v, str): return 'str'
-    if isinstance(v, (list, tuple)): return 'list'
-    if isinstance(v, dict): return 'dict'
-    if hasattr(v, 'to_int'): return 'trit'  # TritValue
+    if isinstance(v, bool):
+        return 'int'  # bool 归入 int
+    if isinstance(v, int):
+        return 'int'
+    if isinstance(v, float):
+        return 'float'
+    if isinstance(v, str):
+        return 'str'
+    if isinstance(v, (list, tuple)):
+        return 'list'
+    if isinstance(v, dict):
+        return 'dict'
+    if hasattr(v, 'to_int'):
+        return 'trit'  # TritValue
     return 'any'
+
 
 def _matches(actual: str, expected: str) -> bool:
     """检查实际类型是否匹配预期类型。num 可匹配 int 或 float。"""
-    if expected == 'any': return True
-    if expected == 'num': return actual in ('int', 'float', 'trit')
-    if expected == actual: return True
+    if expected == 'any':
+        return True
+    if expected == 'num':
+        return actual in ('int', 'float', 'trit')
+    if expected == actual:
+        return True
     return False
+
 
 # ── 操作类型签名表 ──
 # 键 = 内部操作名（英文）。值 = (参数类型列表, 返回类型)
@@ -144,7 +157,6 @@ def check_types(op: str, args: list, evaluated: list) -> str | None:
     for i, (expected, actual_val) in enumerate(zip(param_types, evaluated)):
         actual = _type_of(actual_val)
         if not _matches(actual, expected):
-            return (f"操作 '{op}' 的第 {i+1} 个参数类型错误："
-                    f"预期 {expected}，实际 {actual}")
+            return f"操作 '{op}' 的第 {i + 1} 个参数类型错误：预期 {expected}，实际 {actual}"
 
     return None

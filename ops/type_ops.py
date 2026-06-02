@@ -3,6 +3,7 @@
 from ternary_core import TritValue
 from values import SanyanSyntaxError, SanyanTypeError
 from ops.registry import register
+import time
 
 
 class TypeOps:
@@ -116,9 +117,12 @@ class TypeOps:
             elif isinstance(s, str):
                 source = s
         if isinstance(val, TritValue):
-            return TritValue(val.to_int() if val.is_numeric() else val.to_payload(),
-                           val.precision if val.is_float() else 0,
-                           confidence=confidence, source=source or val._source)
+            return TritValue(
+                val.to_int() if val.is_numeric() else val.to_payload(),
+                val.precision if val.is_float() else 0,
+                confidence=confidence,
+                source=source or val._source,
+            )
         if isinstance(val, str):
             return TritValue(val, confidence=confidence, source=source)
         if isinstance(val, (int, float)):
@@ -145,9 +149,15 @@ class TypeOps:
         merged_source = ' → '.join(filter(None, [us, cs])) if (us or cs) else ''
 
         if isinstance(current, TritValue):
-            return current.with_confidence(propagated) if not merged_source else \
-                   TritValue(current.to_int() if current.is_numeric() else current.to_payload(),
-                            confidence=propagated, source=merged_source)
+            return (
+                current.with_confidence(propagated)
+                if not merged_source
+                else TritValue(
+                    current.to_int() if current.is_numeric() else current.to_payload(),
+                    confidence=propagated,
+                    source=merged_source,
+                )
+            )
         if isinstance(current, str):
             return TritValue(current, confidence=propagated, source=merged_source)
         if isinstance(current, (int, float)):
@@ -165,7 +175,7 @@ register('ternary_value', TypeOps.ternary_value)
 register('ternary_propagate', TypeOps.ternary_propagate)
 
 # ── 来源/证据链操作 ──
-from ternary_core import TritValue
+
 
 def _source_op(evaluator, args):
     """来源(x) — 查询三态值的来源/证据链。"""
@@ -175,6 +185,7 @@ def _source_op(evaluator, args):
     if isinstance(val, TritValue):
         return TritValue(val._source) if val._source else TritValue('')
     return TritValue('')
+
 
 def _source_chain_op(evaluator, args):
     """来源链(列表) — 合并多个来源为证据链 'A → B → C'。"""
@@ -187,10 +198,12 @@ def _source_chain_op(evaluator, args):
             sources.append(v)
     return TritValue(' → '.join(sources)) if sources else TritValue('')
 
+
 register('source', _source_op)
 register('source_chain', _source_chain_op)
 
 # ── 冲突模型 ──
+
 
 def _detect_conflict(evaluator, args):
     """检测冲突(a, b) — 两个值矛盾且信度都高→标记冲突。
@@ -211,6 +224,7 @@ def _detect_conflict(evaluator, args):
                 return {'冲突': 1, '差异度': min(ac, bc), 'a信度': ac, 'b信度': bc}
     return {'冲突': 0, '差异度': 0, 'a信度': 0, 'b信度': 0}
 
+
 register('detect_conflict', _detect_conflict)
 
 
@@ -219,7 +233,9 @@ def _conflict_merge(evaluator, args):
     策略: "保守" → 返回可能(0); "优先级" → 保持第一个; "投票" → 信度高者胜; "新鲜度" → 信度×值"""
     if len(args) < 2:
         raise SanyanSyntaxError('冲突合并 需要至少两个值')
-    vals = [evaluator.eval(a) for a in args[:-1]] if len(args) > 2 else [evaluator.eval(args[0]), evaluator.eval(args[1])]
+    vals = (
+        [evaluator.eval(a) for a in args[:-1]] if len(args) > 2 else [evaluator.eval(args[0]), evaluator.eval(args[1])]
+    )
     strategy = evaluator.eval(args[-1])
     if isinstance(strategy, TritValue) and strategy.is_string():
         strategy = strategy.to_payload()
@@ -232,8 +248,11 @@ def _conflict_merge(evaluator, args):
         return TritValue(0, confidence=0.5, source='冲突合并(保守)')
     elif strategy == '优先级' or strategy == 'priority':
         v = vals[0]
-        return v.with_confidence(v.confidence * 0.5) if isinstance(v, TritValue) else \
-               TritValue(v if isinstance(v, int) else 0, confidence=0.5, source='冲突合并(优先级)')
+        return (
+            v.with_confidence(v.confidence * 0.5)
+            if isinstance(v, TritValue)
+            else TritValue(v if isinstance(v, int) else 0, confidence=0.5, source='冲突合并(优先级)')
+        )
     elif strategy == '投票' or strategy == 'vote':
         best, best_c = TritValue(0), 0
         for v in vals:
@@ -244,6 +263,7 @@ def _conflict_merge(evaluator, args):
         return best.with_confidence(best_c * 0.7)
     # 默认: 返回可能
     return TritValue(0, confidence=0, source='冲突合并(默认)')
+
 
 register('conflict_merge', _conflict_merge)
 
@@ -269,6 +289,7 @@ def _decide(evaluator, args):
         return val  # 确定态，保持原值
     # 信度不足 → 强制可能态
     return TritValue(0, confidence=c, source=val._source or '硬判定降级')
+
 
 register('decide', _decide)
 
@@ -301,6 +322,7 @@ def _fuse(evaluator, args):
     merged_src = '+'.join(sources) if sources else '融合'
     return TritValue(result, confidence=fused_c, source=merged_src)
 
+
 register('fuse', _fuse)
 
 
@@ -312,7 +334,7 @@ def _consensus_op(evaluator, args):
       v=可能: b=0, d=0, u=1
     融合公式: bC = (bA*uB + bB*uA) / (uA + uB - uA*uB)
     返回融合后的 TritValue with 融合信度。
-    
+
     适用场景: 两个独立的传感器/Agent 对同一命题给出意见时融合。"""
     if len(args) < 2:
         raise SanyanSyntaxError('共识 需要至少两个三态值')
@@ -352,8 +374,10 @@ def _consensus_op(evaluator, args):
         result_val, result_c = -1, d_total
     else:
         result_val, result_c = 0, u_total
-    return TritValue(result_val, confidence=min(1.0, result_c / max(0.01, b_total + d_total + u_total)),
-                     source='主观逻辑共识')
+    return TritValue(
+        result_val, confidence=min(1.0, result_c / max(0.01, b_total + d_total + u_total)), source='主观逻辑共识'
+    )
+
 
 register('consensus', _consensus_op)
 
@@ -363,7 +387,7 @@ def _bayes_update(evaluator, args):
     先验: 当前信念 (TritValue)
     证据: 新观测 (TritValue)
     返回更新后的 TritValue。
-    
+
     如果证据与先验一致: 信度上升。
     如果证据与先验矛盾: 信度下降，值可能翻转。"""
     if len(args) != 2:
@@ -398,6 +422,7 @@ def _bayes_update(evaluator, args):
     src = f'贝叶斯(先验={prior._source or "?"}→证据={evidence._source or "?"})'
     return TritValue(new_val, confidence=new_c, source=src if src != '贝叶斯(先验=?→证据=?)' else '')
 
+
 register('bayes_update', _bayes_update)
 
 
@@ -418,8 +443,10 @@ def _assert_confidence(evaluator, args):
     c = val.confidence if isinstance(val, TritValue) else 1.0
     if c < threshold:
         from values import SanyanValueError
+
         raise SanyanValueError(msg or f'信度不足: {c:.3f} < {threshold} (门限)')
     return val
+
 
 register('assert_confidence', _assert_confidence)
 
@@ -471,6 +498,7 @@ def _dequantize(evaluator, args):
     c = c_bits / 63.0
     return TritValue(v, confidence=c)
 
+
 register('quantize', _quantize)
 register('dequantize', _dequantize)
 
@@ -484,9 +512,12 @@ def _majority_vote(evaluator, args):
         iv = v.to_int() if isinstance(v, TritValue) else int(v)
         c = v.confidence if isinstance(v, TritValue) else 1.0
         total_c += c
-        if iv == 1: pos += 1
-        elif iv == -1: neg += 1
-        else: zero += 1
+        if iv == 1:
+            pos += 1
+        elif iv == -1:
+            neg += 1
+        else:
+            zero += 1
     n = len(vals)
     if n == 0:
         return TritValue(0)
@@ -495,6 +526,7 @@ def _majority_vote(evaluator, args):
     elif neg >= pos and neg >= zero:
         return TritValue(-1, confidence=neg / n)
     return TritValue(0, confidence=zero / n)
+
 
 register('majority_vote', _majority_vote)
 
@@ -508,8 +540,9 @@ def _trit_shift(evaluator, args):
     n = n.to_int() if isinstance(n, TritValue) else int(n)
     v = val.to_int() if isinstance(val, TritValue) else int(val)
     c = val.confidence if isinstance(val, TritValue) else 1.0
-    result = v * (3 ** n)
+    result = v * (3**n)
     return TritValue(result, confidence=c)
+
 
 register('trit_shift', _trit_shift)
 
@@ -522,6 +555,7 @@ def _trit_flip(evaluator, args):
     v = val.to_int() if isinstance(val, TritValue) else int(val)
     c = val.confidence if isinstance(val, TritValue) else 1.0
     return TritValue(-v, confidence=c)
+
 
 register('trit_flip', _trit_flip)
 
@@ -547,6 +581,7 @@ def _trit_compress(evaluator, args):
         result.append(TritValue(byte_val))
     return result
 
+
 register('trit_compress', _trit_compress)
 
 
@@ -560,7 +595,6 @@ def _trit_decompress(evaluator, args):
             digit = (bv // shift) % 3
             result.append(TritValue(digit - 1))
     return result
-
 
 
 def _parse_hex(evaluator, args):
@@ -590,6 +624,7 @@ register('parse_bin', _parse_bin)
 
 
 # ── 枚举与结构体 ──
+
 
 def _enum_op(evaluator, args):
     """枚举(红=1, 绿=2, 蓝=3): 键值对字典，键自动转字符串"""
@@ -645,13 +680,7 @@ def _belief_op(evaluator, args):
         t = evaluator.eval(args[3])
         ts = t.to_float() if isinstance(t, TritValue) else float(t)
 
-    return {
-        '命题': statement,
-        '值': val,
-        '信度': confidence,
-        '来源': source,
-        '时间': ts
-    }
+    return {'命题': statement, '值': val, '信度': confidence, '来源': source, '时间': ts}
 
 
 def _belief_set_op(evaluator, args):

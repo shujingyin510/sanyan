@@ -1,6 +1,8 @@
 """IO 操作模块测试 — 覆盖 format_value、debug_op 等当前未测试的路径"""
 
-import os, sys
+import os
+import sys
+
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import unittest
 from evaluator import SanyanEvaluator

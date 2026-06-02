@@ -128,7 +128,11 @@ class MathFuncsOps:
         if len(args) == 2:
             base = evaluator.eval(args[1])
             b, bp = _ensure_trits(base)
-            return TritValue(TernaryALU.fixed_div(ternary_log(trits, prec), ternary_log(b, bp), prec), prec, confidence=propagated_confidence(val))
+            return TritValue(
+                TernaryALU.fixed_div(ternary_log(trits, prec), ternary_log(b, bp), prec),
+                prec,
+                confidence=propagated_confidence(val),
+            )
         return TritValue(ternary_log(trits, prec), prec, confidence=propagated_confidence(val))
 
     @staticmethod

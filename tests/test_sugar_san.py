@@ -1,6 +1,8 @@
 """sugar.san 专项测试：AST 兼容性 + 解析正确性"""
 
-import os, sys
+import os
+import sys
+
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import unittest

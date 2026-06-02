@@ -1,6 +1,8 @@
 """命令分发器测试 — 覆盖 resolve_op_name、dispatch_op、handle_dot_access、handle_variable_call 等"""
 
-import os, sys
+import os
+import sys
+
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import unittest
 from evaluator import SanyanEvaluator
@@ -73,6 +75,7 @@ class TestDispatchOp(unittest.TestCase):
 
     def test_dispatch_unknown(self):
         from ops.dispatcher import _DISPATCH_NOT_FOUND
+
         result = dispatch_op(self.env, '非存在', [1])
         self.assertIs(result, _DISPATCH_NOT_FOUND)
 

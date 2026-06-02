@@ -443,15 +443,19 @@ class TestVillageE2E(unittest.TestCase):
         from sugar.parser import parse_code
         from values import ReturnException
         import ops.file_ops
+
         ops.file_ops.clear_cache()
 
         e = SanyanEvaluator(max_loop_steps=100000)
         # Phase 1: 村庄世界
         src = open('ternary_agent/runtime_v2/village_game.san', encoding='utf-8').read()
         ast, _ = parse_code(src)
-        fixed = [s for s in ast[1:]
-                 if not (isinstance(s, list) and s[0] == 'export')
-                 and not (isinstance(s, list) and len(s) == 1 and s[0] == '游戏开始')]
+        fixed = [
+            s
+            for s in ast[1:]
+            if not (isinstance(s, list) and s[0] == 'export')
+            and not (isinstance(s, list) and len(s) == 1 and s[0] == '游戏开始')
+        ]
         try:
             e.eval(['do'] + fixed)
         except ReturnException:
@@ -473,50 +477,78 @@ class TestVillageE2E(unittest.TestCase):
         from evaluator import SanyanEvaluator
         from sugar.parser import parse_code
         from values import ReturnException, TritValue
-        import io, sys
-        import ops.file_ops, ops.registry
+        import io
+        import sys
+        import ops.file_ops
+        import ops.registry
+
         ops.file_ops.clear_cache()
 
         e = SanyanEvaluator(max_loop_steps=200000)
         # 注册 mock 生成对话（无 LLM）
         ops.registry.register('生成对话', lambda ev, args: TritValue(0))
+
         # 注册夜间冲突事件（无 LLM 模式下退化为基础氛围）
         def _mock_night(ev, args):
             import random
+
             r = random.randint(0, 100)
-            if r < 25: print('  远处传来几声狗叫。')
-            elif r < 4: print('  一只猫头鹰咕咕叫了几声。')
-            elif r < 2: print('  有人家的门吱呀响了一声。')
+            if r < 25:
+                print('  远处传来几声狗叫。')
+            elif r < 4:
+                print('  一只猫头鹰咕咕叫了几声。')
+            elif r < 2:
+                print('  有人家的门吱呀响了一声。')
             return TritValue(0)
+
         ops.registry.register('夜间冲突事件', _mock_night)
         ops.registry.register('夜间事件', _mock_night)
         # 清除求值器 op 缓存（确保注册被感知）
         e._op_cache.pop('夜间冲突事件', None)
         e._op_cache.pop('夜间事件', None)
         # 注册 .san 文件所需的别名
-        for a, t in [('转字符串', 'to_string'), ('转JSON', 'to_json'),
-                     ('字符串相等', 'str_equals'), ('表长', 'list_len'),
-                     ('连接', 'concat'), ('取长', 'length'),
-                     ('取键', 'get_key'), ('置键', 'set_key'),
-                     ('含键', 'dict_contains'), ('字典键列表', 'dict_keys'),
-                     ('不', 'not'), ('字符串包含', 'str_contains'),
-                     ('取', 'get'), ('列表合', 'list_concat'),
-                     ('是字典', 'is_dict'), ('切片', 'slice'),
-                     ('子串', 'substring'), ('删除键', 'delete_key'),
-                     ('列表', '列表'), ('随机数', 'random'),
-                     ('余', 'mod'), ('加', 'add'), ('减', 'sub'),
-                     ('字典', '新字典'), ('等于', 'equals'),
-                     ('继续', 'continue')]:
-            try: ops.registry.register_alias(a, t)
-            except: pass
+        for a, t in [
+            ('转字符串', 'to_string'),
+            ('转JSON', 'to_json'),
+            ('字符串相等', 'str_equals'),
+            ('表长', 'list_len'),
+            ('连接', 'concat'),
+            ('取长', 'length'),
+            ('取键', 'get_key'),
+            ('置键', 'set_key'),
+            ('含键', 'dict_contains'),
+            ('字典键列表', 'dict_keys'),
+            ('不', 'not'),
+            ('字符串包含', 'str_contains'),
+            ('取', 'get'),
+            ('列表合', 'list_concat'),
+            ('是字典', 'is_dict'),
+            ('切片', 'slice'),
+            ('子串', 'substring'),
+            ('删除键', 'delete_key'),
+            ('列表', '列表'),
+            ('随机数', 'random'),
+            ('余', 'mod'),
+            ('加', 'add'),
+            ('减', 'sub'),
+            ('字典', '新字典'),
+            ('等于', 'equals'),
+            ('继续', 'continue'),
+        ]:
+            try:
+                ops.registry.register_alias(a, t)
+            except:
+                pass
 
-        for fname in ['ternary_agent/runtime_v2/village_game.san',
-                       'ternary_agent/runtime_v2/village_observe.san']:
+        for fname in ['ternary_agent/runtime_v2/village_game.san', 'ternary_agent/runtime_v2/village_observe.san']:
             src = open(fname, encoding='utf-8').read()
             ast, _ = parse_code(src)
-            fixed = [s for s in ast[1:]
-                     if not (isinstance(s, list) and s[0] == 'export')
-                     and not (isinstance(s, list) and len(s) == 1 and s[0] == '游戏开始')]
+            fixed = [
+                s
+                for s in ast[1:]
+                if not (isinstance(s, list) and s[0] == 'export')
+                and not (isinstance(s, list) and len(s) == 1 and s[0] == '游戏开始')
+            ]
             try:
                 e.eval(['do'] + fixed)
             except ReturnException:

@@ -199,16 +199,25 @@ class TritValue:
     to_int() / to_float() / symbol 仅对数值类型有效。
     非数值类型的表示由 __repr__ 处理。
     """
+
     __slots__ = (
-        'value', 'symbol', 'float_val', '_initialized', 'precision', 'confidence',
-        '_val_type', '_payload', '_source', '_timestamp',
+        'value',
+        'symbol',
+        'float_val',
+        '_initialized',
+        'precision',
+        'confidence',
+        '_val_type',
+        '_payload',
+        '_source',
+        '_timestamp',
     )
 
     # ── 值类型常量 ──
     TYPE_NUMERIC = 0
-    TYPE_STRING  = 1
-    TYPE_LIST    = 2
-    TYPE_DICT    = 3
+    TYPE_STRING = 1
+    TYPE_LIST = 2
+    TYPE_DICT = 3
 
     STATE_MAP = {
         '开': 1,
@@ -260,7 +269,11 @@ class TritValue:
         cls._SMALL_INT_BUILT = True
 
     def __new__(
-        cls, value: Union[int, float, list, str, dict], precision: Optional[int] = None, confidence: float = 1.0, source: str = ''
+        cls,
+        value: Union[int, float, list, str, dict],
+        precision: Optional[int] = None,
+        confidence: float = 1.0,
+        source: str = '',
     ) -> 'TritValue':
         # 小整数缓存（仅数值类型，无来源）
         if isinstance(value, int) and precision is None and confidence == 1.0 and not source:
@@ -291,7 +304,13 @@ class TritValue:
             cls._pool[key] = obj
             return obj
 
-    def __init__(self, value: Union[int, float, list, str, dict], precision: Optional[int] = None, confidence: float = 1.0, source: str = ''):
+    def __init__(
+        self,
+        value: Union[int, float, list, str, dict],
+        precision: Optional[int] = None,
+        confidence: float = 1.0,
+        source: str = '',
+    ):
         if hasattr(self, '_initialized'):
             return
         self._initialized = True
@@ -346,6 +365,7 @@ class TritValue:
         if word in TritValue.STATE_MAP:
             return TritValue(TritValue.STATE_MAP[word])
         from values import SanyanValueError
+
         raise SanyanValueError(f'未知的三态词: {word}')
 
     def to_int(self) -> int:
@@ -400,9 +420,11 @@ class TritValue:
 
     def with_confidence(self, confidence: float) -> 'TritValue':
         """返回同值、同来源、同时间戳但不同置信度的新 TritValue。"""
-        result = (TritValue(self.to_payload(), confidence=confidence, source=self._source)
-                  if self.is_string()
-                  else TritValue(self.to_int(), self.precision, confidence, source=self._source))
+        result = (
+            TritValue(self.to_payload(), confidence=confidence, source=self._source)
+            if self.is_string()
+            else TritValue(self.to_int(), self.precision, confidence, source=self._source)
+        )
         result._timestamp = self._timestamp
         return result
 

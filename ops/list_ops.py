@@ -5,7 +5,6 @@ from typing import Any
 from ternary_core import TritValue, ArrayValue
 from values import SanyanSyntaxError, SanyanTypeError, SanyanValueError, SanyanKeyError, to_num
 from ops.registry import register
-from eval_utils import unwrap_trit
 
 
 def _as_list(val):
@@ -276,6 +275,7 @@ register('sum', _list_sum)
 
 # ── 二分查找 ──
 
+
 def _binary_search(evaluator, args):
     """二分查找(有序列表, 目标): 返回索引，未找到返回 -1"""
     if len(args) != 2:
@@ -298,6 +298,7 @@ def _binary_search(evaluator, args):
         else:
             hi = mid - 1
     return TritValue(-1)
+
 
 register('binary_search', _binary_search)
 register('join', _list_join)

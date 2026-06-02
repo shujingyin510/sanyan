@@ -54,10 +54,10 @@ sanyan = "main:main"
 [tool.setuptools]
 packages = ["sanyan", "ops", "sugar", "lsp", "llvmgen", "utils"]
 py-modules = [
-    "ternary_core", "evaluator", "values", "runtime", "runtime_components",
+    "ternary_core", "evaluator", "values", "runtime", "eval_utils",
     "commands", "param_matcher", "tail_call", "lexer", "parser", "preprocess",
     "skin", "sandbox", "compile_bytecode", "compile_llvmgen", "vm",
-    "eval_helpers", "debug_eval", "repl", "main", "lsp_server", "dap_server",
+    "type_checker", "debug_eval", "repl", "main", "lsp_server", "dap_server",
     "sanfmt", "sanyancc", "doc_sync",
 ]
 
@@ -107,7 +107,7 @@ module = [
     "evaluator",
     "values",
     "runtime",
-    "runtime_components",
+    "eval_utils",
     "ternary_core",
     "preprocess",
 ]

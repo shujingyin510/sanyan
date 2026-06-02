@@ -10,12 +10,6 @@ from ternary_core import TritValue, ArrayValue
 from runtime import SanyanRuntime
 from commands import Commands
 from values import FunctionValue, ModuleValue, SrcNode, SanyanError, SanyanNameError, SanyanSyntaxError, SanyanTypeError
-
-
-def _is_data_list(node: Any) -> bool:
-    """区分数据列表（如字面量 [1,2,3]）和 AST 代码节点（SrcNode）。"""
-    return isinstance(node, list) and not isinstance(node, SrcNode)
-
 from eval_utils import (
     parse_string_literal,
     parse_numeric_literal,
@@ -79,12 +73,15 @@ def _debug_prompt(evaluator, cur_op: str, args: list) -> None:
                 print(f'    at {oname}({fa})')
             print('  =============')
         elif cmd == 'q':
-            import sys; sys.exit(0)
+            import sys
+
+            sys.exit(0)
         else:
             print('  命令: [Enter]/n=下一步  c=继续  p 变量  bt=调用栈  q=退出')
 
 
 # ── 求值辅助函数（从 eval_helpers.py 合并）──
+
 
 def _resolve_identifier(evaluator, node: str) -> Any:
     """解析标识符：字典点号访问 → 符号求值 → 中文字符串降级"""
@@ -120,6 +117,7 @@ def _eval_str(evaluator, node: str) -> Any:
             resolved = evaluator.skin_manager.get_internal_keyword(node) or evaluator.skin_manager.get_internal_op(node)
             if resolved:
                 from ops.registry import has_op
+
                 if has_op(resolved):
                     try:
                         return evaluator._apply(node, [])
@@ -381,7 +379,8 @@ class SanyanEvaluator(SanyanRuntime):
 
         # 静态类型检查：对字面量参数做类型断言
         try:
-            from type_checker import check_types, _type_of
+            from type_checker import check_types
+
             simpl = []
             for a in args:
                 if isinstance(a, (int, float, str, list, dict)) and not isinstance(a, SrcNode):

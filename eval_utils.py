@@ -91,7 +91,7 @@ def unwrap_trit(value: Any) -> Any:
 
 def propagated_confidence(*values: Any) -> float:
     """计算贝叶斯传播置信度：所有 TritValue 输入置信度的乘积。
-    
+
     传播规则: C_result = C_a × C_b × C_c × ...
     独立贝叶斯更新: 每个不确定源独立贡献，置信度累积衰减。
     纯 Python 值（非 TritValue）视为置信度 1.0。

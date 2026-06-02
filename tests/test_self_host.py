@@ -110,7 +110,8 @@ class TestCompileBytecode(unittest.TestCase):
     def test_run_bin(self):
         """run_bin: 执行编译后的 bin"""
         from compile_bytecode import compile_source, run_bin
-        import io, sys
+        import io
+        import sys
 
         path = os.path.join(os.path.dirname(__file__), '..', 'build', '_test_run.bin')
         os.makedirs(os.path.dirname(path), exist_ok=True)

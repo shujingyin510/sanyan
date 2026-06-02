@@ -1,6 +1,8 @@
 """LLVM 代码生成器专项测试：验证 AST → LLVM IR 编译正确性"""
 
-import os, sys
+import os
+import sys
+
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import unittest

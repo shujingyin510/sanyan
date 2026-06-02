@@ -256,6 +256,7 @@ register('digit', _op_digit)
 
 # ── 位运算 ──
 
+
 def _op_bitwise_and(evaluator, args):
     """按位与：a & b"""
     if len(args) < 2:
@@ -266,6 +267,7 @@ def _op_bitwise_and(evaluator, args):
     for n in nums[1:]:
         result = result & n
     return _to_tritvalue(result)
+
 
 def _op_bitwise_or(evaluator, args):
     """按位或：a | b"""
@@ -278,6 +280,7 @@ def _op_bitwise_or(evaluator, args):
         result = result | n
     return _to_tritvalue(result)
 
+
 def _op_bitwise_xor(evaluator, args):
     """按位异或：a ^ b"""
     if len(args) != 2:
@@ -286,12 +289,14 @@ def _op_bitwise_xor(evaluator, args):
     b = _to_tritvalue(evaluator.eval(args[1]))
     return _to_tritvalue(a.to_int() ^ b.to_int())
 
+
 def _op_bitwise_not(evaluator, args):
     """按位非：~a"""
     if len(args) != 1:
         raise SanyanSyntaxError('按位非 需要一个参数')
     a = _to_tritvalue(evaluator.eval(args[0]))
     return _to_tritvalue(~a.to_int())
+
 
 def _op_shift_left(evaluator, args):
     """左移：a << n"""
@@ -301,6 +306,7 @@ def _op_shift_left(evaluator, args):
     n = _to_tritvalue(evaluator.eval(args[1]))
     return _to_tritvalue(a.to_int() << n.to_int())
 
+
 def _op_shift_right(evaluator, args):
     """右移：a >> n"""
     if len(args) != 2:
@@ -308,6 +314,7 @@ def _op_shift_right(evaluator, args):
     a = _to_tritvalue(evaluator.eval(args[0]))
     n = _to_tritvalue(evaluator.eval(args[1]))
     return _to_tritvalue(a.to_int() >> n.to_int())
+
 
 register('bit_and', _op_bitwise_and)
 register('bit_or', _op_bitwise_or)
@@ -318,6 +325,7 @@ register('shift_right', _op_shift_right)
 
 # ── 位操作（嵌入式/IoT 常用）──
 
+
 def _op_bit_set(evaluator, args):
     """置位(x, n): 把 x 的第 n 位置 1"""
     if len(args) != 2:
@@ -325,6 +333,7 @@ def _op_bit_set(evaluator, args):
     x = _to_tritvalue(evaluator.eval(args[0]))
     n = _to_tritvalue(evaluator.eval(args[1]))
     return _to_tritvalue(x.to_int() | (1 << n.to_int()))
+
 
 def _op_bit_clear(evaluator, args):
     """清位(x, n): 把 x 的第 n 位置 0"""
@@ -334,6 +343,7 @@ def _op_bit_clear(evaluator, args):
     n = _to_tritvalue(evaluator.eval(args[1]))
     return _to_tritvalue(x.to_int() & ~(1 << n.to_int()))
 
+
 def _op_bit_toggle(evaluator, args):
     """翻位(x, n): 翻转 x 的第 n 位"""
     if len(args) != 2:
@@ -341,6 +351,7 @@ def _op_bit_toggle(evaluator, args):
     x = _to_tritvalue(evaluator.eval(args[0]))
     n = _to_tritvalue(evaluator.eval(args[1]))
     return _to_tritvalue(x.to_int() ^ (1 << n.to_int()))
+
 
 def _op_bit_test(evaluator, args):
     """测位(x, n): 测试 x 的第 n 位, 返回 1/0"""
@@ -350,12 +361,14 @@ def _op_bit_test(evaluator, args):
     n = _to_tritvalue(evaluator.eval(args[1]))
     return _to_tritvalue(1 if (x.to_int() >> n.to_int()) & 1 else 0)
 
+
 register('bit_set', _op_bit_set)
 register('bit_clear', _op_bit_clear)
 register('bit_toggle', _op_bit_toggle)
 register('bit_test', _op_bit_test)
 
 # ── 字节/字操作 ──
+
 
 def _op_low_byte(evaluator, args):
     """低位字节(x): x & 0xFF"""
@@ -364,12 +377,14 @@ def _op_low_byte(evaluator, args):
     x = _to_tritvalue(evaluator.eval(args[0]))
     return _to_tritvalue(x.to_int() & 0xFF)
 
+
 def _op_high_byte(evaluator, args):
     """高位字节(x): (x >> 8) & 0xFF"""
     if len(args) != 1:
         raise SanyanSyntaxError('高位字节 需要一个值')
     x = _to_tritvalue(evaluator.eval(args[0]))
     return _to_tritvalue((x.to_int() >> 8) & 0xFF)
+
 
 def _op_merge_bytes(evaluator, args):
     """合并字节(hi, lo): (hi << 8) | (lo & 0xFF)"""
@@ -379,6 +394,7 @@ def _op_merge_bytes(evaluator, args):
     lo = _to_tritvalue(evaluator.eval(args[1]))
     return _to_tritvalue(((hi.to_int() & 0xFF) << 8) | (lo.to_int() & 0xFF))
 
+
 def _op_take_byte(evaluator, args):
     """取字节(x): x & 0xFF（截断到字节）"""
     if len(args) != 1:
@@ -386,12 +402,14 @@ def _op_take_byte(evaluator, args):
     x = _to_tritvalue(evaluator.eval(args[0]))
     return _to_tritvalue(x.to_int() & 0xFF)
 
+
 def _op_take_word(evaluator, args):
     """取字(x): x & 0xFFFF（截断到字）"""
     if len(args) != 1:
         raise SanyanSyntaxError('取字 需要一个值')
     x = _to_tritvalue(evaluator.eval(args[0]))
     return _to_tritvalue(x.to_int() & 0xFFFF)
+
 
 register('low_byte', _op_low_byte)
 register('high_byte', _op_high_byte)
@@ -401,12 +419,14 @@ register('take_word', _op_take_word)
 
 # ── 进制格式化 ──
 
+
 def _op_to_hex(evaluator, args):
     """十六进制(x): 格式化为 0x... 字符串"""
     if len(args) != 1:
         raise SanyanSyntaxError('十六进制 需要一个值')
     x = _to_tritvalue(evaluator.eval(args[0]))
     return '0x' + hex(x.to_int())[2:].upper()
+
 
 def _op_to_bin(evaluator, args):
     """二进制(x): 格式化为 0b... 字符串"""
@@ -415,12 +435,14 @@ def _op_to_bin(evaluator, args):
     x = _to_tritvalue(evaluator.eval(args[0]))
     return '0b' + bin(x.to_int())[2:]
 
+
 def _op_to_oct(evaluator, args):
     """八进制(x): 格式化为 0o... 字符串"""
     if len(args) != 1:
         raise SanyanSyntaxError('八进制 需要一个值')
     x = _to_tritvalue(evaluator.eval(args[0]))
     return '0o' + oct(x.to_int())[2:]
+
 
 register('to_hex', _op_to_hex)
 register('to_bin', _op_to_bin)

@@ -3,9 +3,7 @@
 import sys
 import os
 import subprocess
-from repl import demo, repl
 
-from sanyan import __version__ as VERSION
 from evaluator import SanyanEvaluator
 from sugar import SugarConverter
 from ternary_core import TritValue
@@ -94,8 +92,6 @@ def _compile_ir_to_exe(ir_text: str, suffix: str, gcc_env: dict | None = None) -
 
 def _parse_file(code_str):
     """解析源码为 AST：先 Sugar 后 S-表达式。返回 (ast, None) 或 (None, error_msg)。"""
-    from sugar import SugarConverter
-    from skin import SkinManager
 
     skin_mgr = SkinManager('chinese')
     try:
@@ -113,8 +109,6 @@ def _parse_file(code_str):
 
 def _run_evaluator(code, profiling):
     """Python 求值器模式：解析 → 求值 → 返回 (env, result, ast)。"""
-    from evaluator import SanyanEvaluator
-    from skin import SkinManager
 
     skin_mgr = SkinManager('chinese')
     env = SanyanEvaluator(skin_manager=skin_mgr)
@@ -130,6 +124,7 @@ def _run_evaluator(code, profiling):
         result = env.eval(ast)
     except (SanyanError, SyntaxError, RecursionError) as e:
         import traceback
+
         traceback.print_exc()
         print(f'执行错误: {e}')
         sys.exit(1)
@@ -184,6 +179,7 @@ def _run_native(code, mode, filepath):
         out_exe = _compile_ir_to_exe(str(cg.module), 'pycc')
     else:
         from llvmgen.compiler import self_hosted_compile
+
         ir_text = self_hosted_compile(code)
         out_exe = _compile_ir_to_exe(ir_text, 'san')
 
@@ -248,6 +244,7 @@ def main():
         sys.exit(0)
 
     from preprocess import preprocess_includes
+
     code = preprocess_includes(code)
 
     # 字节码缓存 + VM 执行（默认模式）
@@ -256,8 +253,10 @@ def main():
         if not os.path.exists(bin_path) or os.path.getmtime(bin_path) < os.path.getmtime(filepath):
             os.makedirs('build', exist_ok=True)
             from compile_bytecode import compile_san
+
             compile_san(filepath, bin_path)
         from vm import VM as SanyanVM
+
         SanyanVM.from_bin(bin_path)
         sys.exit(0)
 
@@ -269,6 +268,7 @@ def main():
     os.makedirs('build', exist_ok=True)
     try:
         from compile_bytecode import compile_san
+
         compile_san(filepath, bin_path)
     except (SanyanError, SyntaxError, OSError):
         pass

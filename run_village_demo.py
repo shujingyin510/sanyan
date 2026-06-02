@@ -48,7 +48,7 @@ def _register_aliases():
         ('切片', 'slice'),
         ('置元素', 'set_element'),
     ]
-    from ops.registry import register_alias
+
     for a, t in aliases:
         try:
             register_alias(a, t)
@@ -59,15 +59,32 @@ def _register_aliases():
 def run_auto():
     """自动演示模式"""
     steps = [
-        ('送苹果', '见面礼'), ('送花', '再送花'), ('铁匠', '去铁匠铺'),
-        ('送酒', '送酒'), ('帮忙', '帮忙'), ('村长', '去村长家'),
-        ('你好', '打招呼'), ('刘嫂', '找刘嫂'), ('你好', '打招呼'),
-        ('状态', '查看全村'), ('睡觉', '过夜'),
-        ('猎户', '找猎户'), ('送肉', '送猎物'), ('小贩', '去村口'),
-        ('你好', '打招呼'), ('状态', '查看'), ('睡觉', '过夜'),
-        ('郎中', '找郎中'), ('送苹果', '送礼'), ('睡觉', '过夜'),
-        ('老王', '回老王家'), ('你好', '打招呼'), ('状态', '查看'),
-        ('睡觉', '过夜'), ('睡觉', '又一天'), ('状态', '多天后'),
+        ('送苹果', '见面礼'),
+        ('送花', '再送花'),
+        ('铁匠', '去铁匠铺'),
+        ('送酒', '送酒'),
+        ('帮忙', '帮忙'),
+        ('村长', '去村长家'),
+        ('你好', '打招呼'),
+        ('刘嫂', '找刘嫂'),
+        ('你好', '打招呼'),
+        ('状态', '查看全村'),
+        ('睡觉', '过夜'),
+        ('猎户', '找猎户'),
+        ('送肉', '送猎物'),
+        ('小贩', '去村口'),
+        ('你好', '打招呼'),
+        ('状态', '查看'),
+        ('睡觉', '过夜'),
+        ('郎中', '找郎中'),
+        ('送苹果', '送礼'),
+        ('睡觉', '过夜'),
+        ('老王', '回老王家'),
+        ('你好', '打招呼'),
+        ('状态', '查看'),
+        ('睡觉', '过夜'),
+        ('睡觉', '又一天'),
+        ('状态', '多天后'),
         ('退出', '结束'),
     ]
     test_iter = iter([s[0] for s in steps])
@@ -88,6 +105,7 @@ def run_auto():
     ast, _ = parse_code(src)
     fixed = [s for s in ast[1:] if not (isinstance(s, list) and s[0] == 'export')]
     from values import ReturnException
+
     try:
         e.eval(['do'] + fixed)
     except ReturnException:
@@ -105,11 +123,11 @@ def run_manual():
     src = src.replace('设 LLM启用 = 假', '设 LLM启用 = 真')
     # 检查环境变量覆盖
     if os.environ.get('LLM_URL'):
-        src = src.replace('模型URL = "https://api.xiaomimimo.com/v1/chat/completions"',
-                           f'模型URL = "{os.environ["LLM_URL"]}"')
+        src = src.replace(
+            '模型URL = "https://api.xiaomimimo.com/v1/chat/completions"', f'模型URL = "{os.environ["LLM_URL"]}"'
+        )
     if os.environ.get('LLM_MODEL'):
-        src = src.replace('模型名 = "mimo-v1"',
-                           f'模型名 = "{os.environ["LLM_MODEL"]}"')
+        src = src.replace('模型名 = "mimo-v1"', f'模型名 = "{os.environ["LLM_MODEL"]}"')
     if os.environ.get('LLM_KEY'):
         src = src.replace('tp-你的key', os.environ['LLM_KEY'])
 

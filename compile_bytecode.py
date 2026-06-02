@@ -21,13 +21,20 @@ COMPILER_MAX_LOOP = 100000
 
 # ── 常量折叠优化 ──
 _CONST_OPS = {
-    'add': lambda a, b: a + b, '加': lambda a, b: a + b,
-    'sub': lambda a, b: a - b, '减': lambda a, b: a - b,
-    'mul': lambda a, b: a * b, '乘': lambda a, b: a * b,
-    'div': lambda a, b: a // b if b != 0 else 0, '除': lambda a, b: a // b if b != 0 else 0,
-    'mod': lambda a, b: a % b if b != 0 else 0, '余': lambda a, b: a % b if b != 0 else 0,
-    'eq': lambda a, b: 1 if a == b else -1, '等于': lambda a, b: 1 if a == b else -1,
+    'add': lambda a, b: a + b,
+    '加': lambda a, b: a + b,
+    'sub': lambda a, b: a - b,
+    '减': lambda a, b: a - b,
+    'mul': lambda a, b: a * b,
+    '乘': lambda a, b: a * b,
+    'div': lambda a, b: a // b if b != 0 else 0,
+    '除': lambda a, b: a // b if b != 0 else 0,
+    'mod': lambda a, b: a % b if b != 0 else 0,
+    '余': lambda a, b: a % b if b != 0 else 0,
+    'eq': lambda a, b: 1 if a == b else -1,
+    '等于': lambda a, b: 1 if a == b else -1,
 }
+
 
 def _fold_constants(node):
     """递归常量折叠：将 ['add', 1, 2] 替换为 3。仅处理纯常量子树。"""

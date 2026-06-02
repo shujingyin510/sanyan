@@ -72,9 +72,22 @@ def _find_position(source: str, token_index: int, tokens: list) -> tuple[int, in
         # 普通 token
         token_start = i
         while i < len(source) and source[i] not in (
-            ' ', '\n', '\t', '\r', '\u3000',
-            '(', ')', '（', '）', '；', '，', '：',
-            '"', "'", '\u201c', '\u2018',
+            ' ',
+            '\n',
+            '\t',
+            '\r',
+            '\u3000',
+            '(',
+            ')',
+            '（',
+            '）',
+            '；',
+            '，',
+            '：',
+            '"',
+            "'",
+            '\u201c',
+            '\u2018',
         ):
             if source[i] == '/' and i + 1 < len(source) and source[i + 1] == '/':
                 break

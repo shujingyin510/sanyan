@@ -67,6 +67,7 @@ def _color_value(value) -> str:
 _history_file = os.path.expanduser(os.path.join(os.path.expanduser('~'), '.sanyan_history'))
 _state_file = os.path.expanduser(os.path.join(os.path.expanduser('~'), '.sanyan_state.json'))
 
+
 # 加载 REPL 持久化状态（变量和命令）
 def _load_state(env):
     """从文件恢复 REPL 状态（变量和命令定义）。"""
@@ -74,12 +75,14 @@ def _load_state(env):
         return
     try:
         import json
+
         with open(_state_file, 'r', encoding='utf-8') as f:
             state = json.load(f)
         # 只恢复简单值（int/float/str），跳过函数和对象
         for k, v in state.get('vars', {}).items():
             try:
                 from ternary_core import TritValue
+
                 if isinstance(v, float) or (isinstance(v, int) and not isinstance(v, bool)):
                     env.set_var(k, TritValue(v))
                 elif isinstance(v, str):
@@ -95,11 +98,13 @@ def _save_state(env):
     """保存 REPL 状态到文件（仅保存简单值变量）。"""
     try:
         import json
+
         state = {'vars': {}}
         for k, v in env.all_scoped_vars().items():
             if k.startswith('_'):
                 continue
             from ternary_core import TritValue
+
             if isinstance(v, TritValue):
                 if v.is_float():
                     state['vars'][k] = v.to_float()
@@ -113,6 +118,8 @@ def _save_state(env):
             json.dump(state, f, ensure_ascii=False, indent=2)
     except Exception:
         pass
+
+
 readline: Any = None
 try:
     import readline as _rl

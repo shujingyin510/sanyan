@@ -1,7 +1,7 @@
 """三态时间操作: 置信度衰减、记忆时效、序列化"""
 
 from ternary_core import TritValue
-from values import SanyanSyntaxError, SanyanTypeError
+from values import SanyanSyntaxError
 from ops.registry import register
 import time
 

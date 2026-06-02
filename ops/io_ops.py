@@ -200,9 +200,9 @@ class IOOps:
             val = evaluator.eval(a)
             if isinstance(val, TritValue) and val.confidence < 1.0:
                 src = f' [{val._source}]' if val._source else ''
-                print(f'  步骤{i+1}: {val.to_int()} (信度: {val.confidence:.3f}{src})')
+                print(f'  步骤{i + 1}: {val.to_int()} (信度: {val.confidence:.3f}{src})')
             else:
-                print(f'  步骤{i+1}: {val}')
+                print(f'  步骤{i + 1}: {val}')
         print('═════════════════')
         return TritValue(0)
 
@@ -222,7 +222,7 @@ class IOOps:
                 print(f'  来源: {result._source}')
             print(f'  类型: {"字符串" if result.is_string() else "数值"}')
             if result.confidence < 0.5:
-                print(f'  ⚠ 低信度 — 建议判定()处理')
+                print('  ⚠ 低信度 — 建议判定()处理')
         else:
             print(f'  值: {result}')
         print('──────────────────')

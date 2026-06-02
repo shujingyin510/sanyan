@@ -81,7 +81,7 @@ HALT = 0xFF
 
 # ── 扩展操作码（位运算/字节操作）──
 BIT_AND = 0x3B
-BIT_OR  = 0x3C
+BIT_OR = 0x3C
 BIT_XOR = 0x3D
 BIT_NOT = 0x3E
 SHIFT_L = 0x3F
@@ -301,7 +301,8 @@ class VM:
             self.stack.append(self._read_i32())
         elif op == PUSH_FLOAT:
             import struct
-            raw = bytes(self.code[self.pc:self.pc + 8])
+
+            raw = bytes(self.code[self.pc : self.pc + 8])
             self.pc += 8
             self.stack.append(struct.unpack('<d', raw)[0])
         elif op == PUSH_STR:
@@ -354,20 +355,25 @@ class VM:
         elif op == SUB:
             if isinstance(a, (int, float)) and isinstance(b, (int, float)):
                 self.stack.append(self._ternary_result(a - b, a, b))
-            else: self.stack.append(0)
+            else:
+                self.stack.append(0)
         elif op == MUL:
             if isinstance(a, (int, float)) and isinstance(b, (int, float)):
                 self.stack.append(self._ternary_result(a * b, a, b))
-            else: self.stack.append(0)
+            else:
+                self.stack.append(0)
         elif op == DIV:
             if isinstance(a, (int, float)) and isinstance(b, (int, float)) and b:
                 self.stack.append(self._ternary_result(a // b, a, b))
-            else: self.stack.append(0)
+            else:
+                self.stack.append(0)
         elif op == MOD:
             if isinstance(a, int) and isinstance(b, int) and b:
                 self.stack.append(self._ternary_result(a % b, a, b))
-            else: self.stack.append(0)
-        else: return False
+            else:
+                self.stack.append(0)
+        else:
+            return False
         return True
 
     def _exec_bitwise(self, op: int) -> bool:
@@ -377,53 +383,66 @@ class VM:
         if op == BIT_AND:
             if isinstance(a, int) and isinstance(b, int):
                 self.stack.append(self._ternary_result(a & b, a, b))
-            else: self.stack.append(0)
+            else:
+                self.stack.append(0)
         elif op == BIT_OR:
             if isinstance(a, int) and isinstance(b, int):
                 self.stack.append(self._ternary_result(a | b, a, b))
-            else: self.stack.append(0)
+            else:
+                self.stack.append(0)
         elif op == BIT_XOR:
             if isinstance(a, int) and isinstance(b, int):
                 self.stack.append(self._ternary_result(a ^ b, a, b))
-            else: self.stack.append(0)
+            else:
+                self.stack.append(0)
         elif op == BIT_NOT:
             if isinstance(a, int):
                 self.stack.append(self._ternary_result(~a, a) if isinstance(a, TritValue) else ~a)
         elif op == SHIFT_L:
             if isinstance(a, int) and isinstance(b, int):
                 self.stack.append(self._ternary_result(a << b, a, b))
-            else: self.stack.append(0)
+            else:
+                self.stack.append(0)
         elif op == SHIFT_R:
             if isinstance(a, int) and isinstance(b, int):
                 self.stack.append(self._ternary_result(a >> b, a, b))
-            else: self.stack.append(0)
+            else:
+                self.stack.append(0)
         elif op == BIT_SET:
             if isinstance(a, int) and isinstance(b, int):
                 self.stack.append(self._ternary_result(a | (1 << b), a, b))
-            else: self.stack.append(0)
+            else:
+                self.stack.append(0)
         elif op == BIT_CLR:
             if isinstance(a, int) and isinstance(b, int):
                 self.stack.append(self._ternary_result(a & ~(1 << b), a, b))
-            else: self.stack.append(0)
+            else:
+                self.stack.append(0)
         elif op == BIT_TGL:
             if isinstance(a, int) and isinstance(b, int):
                 self.stack.append(self._ternary_result(a ^ (1 << b), a, b))
-            else: self.stack.append(0)
+            else:
+                self.stack.append(0)
         elif op == BIT_TST:
             if isinstance(a, int) and isinstance(b, int):
                 self.stack.append(self._ternary_result(1 if (a >> b) & 1 else 0, a, b))
-            else: self.stack.append(0)
+            else:
+                self.stack.append(0)
         elif op == LO_BYTE:
             if isinstance(a, int):
                 self.stack.append(self._ternary_result(a & 0xFF, a) if isinstance(a, TritValue) else a & 0xFF)
         elif op == HI_BYTE:
             if isinstance(a, int):
-                self.stack.append(self._ternary_result((a >> 8) & 0xFF, a) if isinstance(a, TritValue) else (a >> 8) & 0xFF)
+                self.stack.append(
+                    self._ternary_result((a >> 8) & 0xFF, a) if isinstance(a, TritValue) else (a >> 8) & 0xFF
+                )
         elif op == MRG_BYT:
             if isinstance(a, int) and isinstance(b, int):
                 self.stack.append(self._ternary_result(((a & 0xFF) << 8) | (b & 0xFF), a, b))
-            else: self.stack.append(0)
-        else: return False
+            else:
+                self.stack.append(0)
+        else:
+            return False
         return True
 
     def _exec_comparison(self, op: int) -> bool:
@@ -440,7 +459,7 @@ class VM:
             if isinstance(a, TritValue) and isinstance(b, TritValue):
                 self.stack.append(TritValue(r, confidence=max(a.confidence, b.confidence)))
             elif isinstance(a, TritValue) or isinstance(b, TritValue):
-                c = (a.confidence if isinstance(a, TritValue) else 1.0)
+                c = a.confidence if isinstance(a, TritValue) else 1.0
                 c = max(c, b.confidence if isinstance(b, TritValue) else 1.0)
                 self.stack.append(TritValue(r, confidence=c))
             else:
@@ -453,7 +472,7 @@ class VM:
             if isinstance(a, TritValue) and isinstance(b, TritValue):
                 self.stack.append(TritValue(r, confidence=min(a.confidence, b.confidence)))
             elif isinstance(a, TritValue) or isinstance(b, TritValue):
-                c = (a.confidence if isinstance(a, TritValue) else 1.0)
+                c = a.confidence if isinstance(a, TritValue) else 1.0
                 c = min(c, b.confidence if isinstance(b, TritValue) else 1.0)
                 self.stack.append(TritValue(r, confidence=c))
             else:

@@ -25,10 +25,10 @@ def match_params(params: list, op: str, args: list, defaults: dict | None = None
             return sole.split('：', 1)
     # 可变参数: 多余参数打包到 rest_param（追加到 args 末尾）
     if rest_param and len(args) > len(params):
-        return list(args[:len(params)]) + [args[len(params):]]
+        return list(args[: len(params)]) + [args[len(params) :]]
     # 默认参数填充
     if len(args) < len(params):
-        missing_params = params[len(args):]
+        missing_params = params[len(args) :]
         can_fill = all(p in defaults for p in missing_params)
         if can_fill:
             return list(args) + [defaults[p] for p in missing_params]
@@ -70,6 +70,7 @@ def resolve_command(evaluator, op: str):
         available = list(evaluator.commands.keys())[:10]
         hint = f'，可用命令: {available}' if available else ''
         from values import SanyanNameError
+
         raise SanyanNameError(f"未定义的操作: '{op}'{hint}")
     cmd_def = evaluator.commands[op]
     if len(cmd_def) >= 6:
