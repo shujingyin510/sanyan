@@ -245,3 +245,4 @@ tests/*.bin
 docs/api/
 sanyan-vscode/node_modules/
 sanyan-vscode/package-lock.json
+ternary_agent/runtime_v2/village_config.san

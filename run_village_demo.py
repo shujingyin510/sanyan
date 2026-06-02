@@ -85,10 +85,6 @@ def run_auto():
     e = SanyanEvaluator(max_loop_steps=999999)
     _register_aliases()
     src = open('ternary_agent/runtime_v2/village_game.san', encoding='utf-8').read()
-    # 注入 API 密钥
-    key = os.environ.get('LLM_KEY', '')
-    if key:
-        src = src.replace('sk-你的key', key)
     ast, _ = parse_code(src)
     fixed = [s for s in ast[1:] if not (isinstance(s, list) and s[0] == 'export')]
     from values import ReturnException
@@ -103,23 +99,19 @@ def run_manual():
     e = SanyanEvaluator(max_loop_steps=999999)
     _register_aliases()
 
-    # 注册环境变量读取函数
-    def _get_env(ev, args):
-        val = ev.eval(args[0])
-        name = val.to_payload() if (hasattr(val, 'is_string') and val.is_string()) else str(val)
-        return os.environ.get(name, '')
-    from ops.registry import register
-    register('env_var', _get_env)
-
-    # 注入 API 密钥
-    key = os.environ.get('LLM_KEY', os.environ.get('SANYAN_API_KEY', 'sk-你的key'))
+    # 直接读取配置（village_config.san 已包含 key）
     src = open('ternary_agent/runtime_v2/village_game.san', encoding='utf-8').read()
-    src = src.replace('sk-你的key', key)
+    # 手动模式自动启用 LLM
     src = src.replace('设 LLM启用 = 假', '设 LLM启用 = 真')
-    src = src.replace('模型URL = "https://api.deepseek.com/v1/chat/completions"',
-                       f'模型URL = "{os.environ.get("LLM_URL", "https://api.deepseek.com/v1/chat/completions")}"')
-    src = src.replace('模型名 = "deepseek-chat"',
-                       f'模型名 = "{os.environ.get("LLM_MODEL", "deepseek-chat")}"')
+    # 检查环境变量覆盖
+    if os.environ.get('LLM_URL'):
+        src = src.replace('模型URL = "https://api.xiaomimimo.com/v1/chat/completions"',
+                           f'模型URL = "{os.environ["LLM_URL"]}"')
+    if os.environ.get('LLM_MODEL'):
+        src = src.replace('模型名 = "mimo-v1"',
+                           f'模型名 = "{os.environ["LLM_MODEL"]}"')
+    if os.environ.get('LLM_KEY'):
+        src = src.replace('tp-你的key', os.environ['LLM_KEY'])
 
     ast, _ = parse_code(src)
     fixed = [s for s in ast[1:] if not (isinstance(s, list) and s[0] == 'export')]

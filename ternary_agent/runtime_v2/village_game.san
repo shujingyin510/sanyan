@@ -1,5 +1,8 @@
 // 三言 Agent Runtime v3 — 村庄模拟
 // 8个NPC + 传闻传播网 + 声望系统
+// LLM 配置 → 编辑 village_config.san
+
+#include "ternary_agent/runtime_v2/village_config.san"
 
 // ============================================================
 // 全局状态
@@ -524,9 +527,6 @@
 // ============================================================
 设 对话历史 = 字典()
 设 LLM启用 = 假
-设 模型URL = "https://api.deepseek.com/v1/chat/completions"
-设 模型名 = "deepseek-chat"
-设 API密钥 = "sk-你的key"  // run_village_demo.py 启动时替换为环境变量 LLM_KEY
 
 // 构建 NPC 系统提示词（角色+性格+关系+记忆+当前状态）
 定义 构建NPC提示 (npc) {
