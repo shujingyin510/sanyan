@@ -41,10 +41,16 @@ cfg['key'] = cfg['key'] or os.environ.get('LLM_KEY','')
 has_llm = cfg['key'] and len(cfg['key']) > 10 and '你的' not in cfg['key'] and cfg['key'] != 'sk-你的key'
 
 
+def llm_narrate(period, weather, n1, n2, d1, d2, rel):
+    """裁判 LLM：生成场景描述"""
+    prompt = f'{period}，{weather}。桃花村。{n1}({d1.get("角色","")})和{n2}({d2.get("角色","")})。请用一句话描述此刻场景，不超过30字，不要对话。'
+    return llm_call(prompt)
+
+
 def llm_call(prompt):
     if not has_llm: return None
     body = json.dumps({'model':cfg['model'],'messages':[{'role':'user','content':prompt}],
-                       'temperature':0.9,'max_tokens':80}).encode('utf-8')
+                       'temperature':0.8,'max_tokens':40}).encode('utf-8')
     req = urllib.request.Request(cfg['url'], body,
         {'Content-Type':'application/json','Authorization':f'Bearer {cfg["key"]}'})
     try:
@@ -83,23 +89,22 @@ def _gen_dialogue(ev, args):
         d1 = npc_data.get(n1,{}); d2 = npc_data.get(n2,{})
         rel = ev.eval(['取关系',n1,n2])
         cache = ev.scope_vars.get('对话缓存',{}) or {}
-        # 天气相关的行为提示
-        weather_hint = ''
-        if weather == '下雨': weather_hint = '外面下着雨'
-        elif weather == '阴天': weather_hint = '天阴着'
-        else: weather_hint = '阳光很好'
-        # 时段相关的行为提示
-        period_hint = ''
-        if period == '早晨': period_hint = '刚起床'
-        elif period == '中午': period_hint = '该吃午饭了'
-        elif period == '晚上': period_hint = '天黑了'
-        elif period == '深夜': period_hint = '很晚了'
+        # 天气/时段强约束
+        scene = f'{period}，{weather}'
+        if weather == '下雨': scene += '，正在下雨，地都是湿的'
+        elif weather == '阴天': scene += '，没有太阳'
+        if period == '深夜' or period == '晚上': scene += '，天已经黑了'
 
-        p1 = f'{period}，{weather_hint}，{period_hint}。{n1}是{d1.get("角色","村民")}，性格{d1.get("性格","")}。和{n2}是{rel}关系。{n1}遇到{n2}，说一句自然的话（15字内）。'
+        # 裁判 LLM：描述场景
+        scene_desc = llm_narrate(period, weather, n1, n2, d1, d2, rel)
+        if scene_desc and scene_desc.strip():
+            cache['_scene'] = scene_desc.strip()
+
+        p1 = f'{scene}。{n1}是{d1.get("角色","")}，{n2}是{d2.get("角色","")}，他们{rel}。{n1}用大白话对{n2}说一句日常话，20字以内。'
         line1 = llm_call(p1)
         if line1:
             cache[n1] = line1
-            p2 = f'{period}，{weather_hint}。{n2}是{d2.get("角色","村民")}。{n1}刚说：{line1}。请{n2}自然回应（15字内）。'
+            p2 = f'{scene}。{n2}是{d2.get("角色","")}。{n1}说：{line1}。{n2}用大白话回一句，不超过20字。'
             line2 = llm_call(p2)
             if line2: cache[n2] = line2
         ev.scope_vars['对话缓存'] = cache
