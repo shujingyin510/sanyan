@@ -269,6 +269,7 @@ class SanyanEvaluator(SanyanRuntime):
         self._name_cache_max: int = 5000
         self._module_cache: Dict[str, Any] = {}
         self._import_stack: set = set()
+        self._type_warnings: list = []  # 类型检查警告收集
 
     @staticmethod
     def _is_numeric_string(s: str) -> bool:
@@ -377,6 +378,24 @@ class SanyanEvaluator(SanyanRuntime):
     def _apply(self, op: str, args: list) -> Any:
         """执行操作：分派到注册的处理函数。返回类型由具体操作决定（TritValue/FunctionValue/ModuleValue/str/list 等）。"""
         from ops.dispatcher import apply
+
+        # 静态类型检查：对字面量参数做类型断言
+        try:
+            from type_checker import check_types, _type_of
+            simpl = []
+            for a in args:
+                if isinstance(a, (int, float, str, list, dict)) and not isinstance(a, SrcNode):
+                    simpl.append(a)
+                elif isinstance(a, str) and len(a) >= 2 and a[0] in ('"', "'", '\u201c'):
+                    simpl.append(a)  # 字符串字面量
+                else:
+                    simpl.append(None)  # 变量/表达式，跳过检查
+            if any(v is not None for v in simpl) and all(v is not None for v in simpl):
+                err = check_types(op, args, simpl)
+                if err:
+                    self._type_warnings.append(err)
+        except Exception:
+            pass  # 类型检查失败不阻塞执行
 
         self._debug_before(op, op, args)
         if self._profiling:
