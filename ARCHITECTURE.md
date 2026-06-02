@@ -38,8 +38,9 @@
 - `sugar/lexer.py` — 糖语法词法分析器，全角映射、关键字识别
 
 ### 语法解析 (`parser.py` + `sugar/parser.py`)
-- `parser.py` — S 表达式解析器
-- `sugar/parser.py` — 中文糖语法解析器，支持 `设`/`若`/`循环`/`定义` 等
+- `parser.py`（143 行）— S 表达式解析器，供 VM/字节码编译器/LSP/gui/repl 使用
+- `sugar/parser.py`（540 行）— 中文糖语法解析器，支持 `设`/`若`/`循环`/`定义`/`尝试`/`捕获` 等，供 run_*.py 和 Agent 使用
+- 两者互补而非重复：S-expression 是底层格式，sugar 是用户层语法糖
 - **`_parse_try` 修复（2026-06-02）**: 正确处理 `捕获 (e)` 带括号写法——原代码在遇到 `(` 时 `next()` 吃掉括号而非读取变量名，导致嵌套 try/catch/if 产生孤立 AST 节点
 
 ### 字节码编译器 (`compile_bytecode.py` + `stdlib/bytecode_compiler.san`)

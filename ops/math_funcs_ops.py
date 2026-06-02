@@ -15,7 +15,7 @@ from ternary_core import (
 from ternary_core import _int_at_precision
 from values import SanyanSyntaxError, SanyanTypeError, SanyanValueError
 from ops.registry import register
-from eval_helpers import propagated_confidence
+from eval_utils import propagated_confidence
 
 _DEFAULT_PRECISION = 32
 

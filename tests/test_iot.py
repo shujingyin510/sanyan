@@ -1,5 +1,7 @@
 """IoT 模块单元测试：设备注册、传感器、执行器、随机态"""
 
+import os, sys
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import os
 import tempfile
 

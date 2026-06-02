@@ -1,20 +1,30 @@
 # 三言 VS Code Extension
 
-安装方法：
-1. 在 VS Code 中按 `Ctrl+Shift+P` (或 `Cmd+Shift+P`)
-2. 输入并选择 **Extensions: Install from VSIX...**
-3. 或选择 **File → Open Folder...** 打开 `sanyan-vscode/` 文件夹
-4. 按 `F5` 启动 Extension Development Host
+> **注意**：因 VS Code Marketplace 上架需银行卡验证，当前仅支持本地安装。
 
-或者用命令行打包：
+## 安装方法
+
+### 方法一：命令行安装（推荐）
+
 ```bash
 cd sanyan-vscode
-npm install -g vsce
+npm install -g @vscode/vsce
 vsce package
-code --install-extension sanyan-language-0.1.0.vsix
+code --install-extension sanyan-0.2.0.vsix
 ```
 
-功能：
+### 方法二：图形界面安装
+
+1. 在 VS Code 中按 `Ctrl+Shift+P` (或 `Cmd+Shift+P`)
+2. 输入并选择 **Extensions: Install from VSIX...**
+3. 选择 `sanyan-0.2.0.vsix` 文件
+
+### 方法三：开发调试
+
+1. 用 VS Code 打开 `sanyan-vscode/` 文件夹
+2. 按 `F5` 启动 Extension Development Host
+
+## 功能
 - 语法高亮（关键字、字符串、数字、注释）
 - 关键字补全（含用户定义的变量和函数）
 - 悬停提示（内置函数文档 + 用户自定义文档注释）

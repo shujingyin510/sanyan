@@ -1,5 +1,7 @@
 """ops 模块单元测试：覆盖所有内置操作"""
 
+import os, sys
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import os
 import contextlib
 

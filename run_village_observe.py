@@ -31,7 +31,7 @@ def _register_aliases():
         ('列表合','list_concat'),('取','get'),('不','not'),('读文件','read_file'),
         ('写文件','write_file'),('切片','slice'),('置元素','set_element')]:
         try: register_alias(a,t)
-        except: pass
+        except Exception: pass  # 目标操作尚未注册时静默跳过（延迟加载机制）
 
 e = SanyanEvaluator(max_loop_steps=9999999)
 _register_aliases()

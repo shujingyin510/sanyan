@@ -1,6 +1,6 @@
 # Sanyan v3.25.0
 
-[![VS Code Marketplace](https://img.shields.io/badge/VS%20Code-Marketplace-%23007ACC?logo=visualstudiocode)](https://marketplace.visualstudio.com/items?itemName=sanyan-lang.sanyan-language)
+[![VS Code Extension](https://img.shields.io/badge/VS%20Code-Syntax%20Highlight-%23007ACC?logo=visualstudiocode)](sanyan-vscode/README.md)
 [![CI](https://github.com/shujingyin510/sanyan/actions/workflows/test.yml/badge.svg)](https://github.com/shujingyin510/sanyan/actions)
 
 > **A programming language built for the real world.** Sensors glitch. Users hesitate. Networks fluctuate. The real world was never binary to begin with.

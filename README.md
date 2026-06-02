@@ -1,6 +1,6 @@
 # 三言 Sanyan v3.25.0
 
-[![VS Code Marketplace](https://img.shields.io/badge/VS%20Code-Marketplace-%23007ACC?logo=visualstudiocode)](https://marketplace.visualstudio.com/items?itemName=sanyan-lang.sanyan-language)
+[![VS Code Extension](https://img.shields.io/badge/VS%20Code-%E8%AF%AD%E6%B3%95%E9%AB%98%E4%BA%AE-%23007ACC?logo=visualstudiocode)](sanyan-vscode/README.md)
 [![CI](https://github.com/shujingyin510/sanyan/actions/workflows/test.yml/badge.svg)](https://github.com/shujingyin510/sanyan/actions)
 
 > **处理真实世界的三值编程语言。** 传感器会失灵，用户会犹豫，网络会波动——真实世界从来不是非黑即白的。

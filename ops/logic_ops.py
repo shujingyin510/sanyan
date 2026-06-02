@@ -7,7 +7,7 @@
 from ternary_core import BT, TernaryALU, TritValue
 from values import SanyanValueError
 from ops.registry import register
-from eval_helpers import propagated_confidence
+from eval_utils import propagated_confidence
 
 
 class LogicOps:

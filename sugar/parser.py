@@ -521,6 +521,10 @@ def parse_tokens(tokens: list[Token], reporter: SugarErrorReporter, source: str 
 
 
 def parse_code(code: str, skin_mgr=None) -> tuple[Any, list[str]]:
+    # 自动展开 #include 指令（预处理层，所有 sugar 解析入口统一处理）
+    from preprocess import preprocess_includes
+    code = preprocess_includes(code)
+
     reporter = SugarErrorReporter(code)
     tokens = tokenize(code)
 

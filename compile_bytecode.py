@@ -19,6 +19,33 @@ from values import SanyanSyntaxError, SanyanRuntimeError
 
 COMPILER_MAX_LOOP = 100000
 
+# ── 常量折叠优化 ──
+_CONST_OPS = {
+    'add': lambda a, b: a + b, '加': lambda a, b: a + b,
+    'sub': lambda a, b: a - b, '减': lambda a, b: a - b,
+    'mul': lambda a, b: a * b, '乘': lambda a, b: a * b,
+    'div': lambda a, b: a // b if b != 0 else 0, '除': lambda a, b: a // b if b != 0 else 0,
+    'mod': lambda a, b: a % b if b != 0 else 0, '余': lambda a, b: a % b if b != 0 else 0,
+    'eq': lambda a, b: 1 if a == b else -1, '等于': lambda a, b: 1 if a == b else -1,
+}
+
+def _fold_constants(node):
+    """递归常量折叠：将 ['add', 1, 2] 替换为 3。仅处理纯常量子树。"""
+    if not isinstance(node, list) or len(node) == 0:
+        return node
+    op = node[0]
+    # 先递归折叠子节点
+    folded = [op] + [_fold_constants(a) for a in node[1:]]
+    # 检查是否所有参数都是常量
+    if op in _CONST_OPS:
+        args = folded[1:]
+        if all(isinstance(a, (int, float)) for a in args) and len(args) == 2:
+            try:
+                return _CONST_OPS[op](args[0], args[1])
+            except (ZeroDivisionError, TypeError):
+                pass
+    return folded
+
 
 def compile_source(source: str, output_path: str, vars_table: dict | None = None) -> list:
     """编译源码字符串为 .bin 文件。返回 [成功, 代码大小, 变量数]。"""
@@ -88,6 +115,9 @@ def compile_source(source: str, output_path: str, vars_table: dict | None = None
     if export_names and isinstance(ast, list) and len(ast) > 0 and isinstance(ast[0], str):
         for name in export_names:
             ast.append(['export', name])
+
+    # 常量折叠优化：递归合并常量子树
+    ast = _fold_constants(ast)
 
     # 加载编译器
     e = SanyanEvaluator(max_loop_steps=COMPILER_MAX_LOOP)

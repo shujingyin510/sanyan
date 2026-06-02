@@ -3,7 +3,7 @@
 from ternary_core import TritValue, ArrayValue
 from values import SanyanSyntaxError, SanyanTypeError
 from ops.registry import register, register_alias
-from eval_helpers import unwrap_trit
+from eval_utils import unwrap_trit
 
 
 def _unwrap_str(val):

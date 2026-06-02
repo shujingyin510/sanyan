@@ -1,5 +1,7 @@
 """命令分发器测试 — 覆盖 resolve_op_name、dispatch_op、handle_dot_access、handle_variable_call 等"""
 
+import os, sys
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import unittest
 from evaluator import SanyanEvaluator
 from ternary_core import TritValue, ArrayValue

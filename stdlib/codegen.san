@@ -1,0 +1,2026 @@
+// stdlib/codegen.san — LLVM 代码生成器
+// 从 stdlib/combined.san 拆分
+#include "stdlib/parser.san"
+
+
+// llvmgen.san V4 — 寄存器线程化
+
+定义 新寄存器 (reg) {
+    设 id = 新寄存器ID()
+    返回(列表(连接("%", id), id))
+}
+
+定义 header () {
+    设 s = "; ModuleID = 'sanyan'"; s = 连接(s, 换行)
+    s = 连接(s, "target triple = \"x86_64-pc-linux-gnu\""); s = 连接(s, 换行)
+    s = 连接(s, 换行)
+    s = 连接(s, "declare void @san_sys_write(i32, i8*, i32)"); s = 连接(s, 换行)
+    s = 连接(s, "declare i8* @_rt_malloc(i32)"); s = 连接(s, 换行)
+    s = 连接(s, "declare void @_rt_free(i8*)"); s = 连接(s, 换行)
+    s = 连接(s, "declare i8* @san_read_file(i8*, i32*)"); s = 连接(s, 换行)
+    s = 连接(s, "declare void @san_write_file(i8*, i8*, i32)"); s = 连接(s, 换行)
+    s = 连接(s, "declare i8* @_next_reg_str()"); s = 连接(s, 换行)
+    s = 连接(s, "@_rt_buf = global [22 x i8] zeroinitializer"); s = 连接(s, 换行)
+    s = 连接(s, 声明运行时())
+    s = 连接(s, "@g_error = external global i8*"); s = 连接(s, 换行)
+    s = 连接(s, 换行)
+    返回(s)
+}
+
+定义 footer () {
+    返回(连接("  ret i8* null", 换行, "}", 换行))
+}
+
+设 换行 = "\n"
+
+设 comp_env = 新字典()          // name → alloca register
+设 函数库列表 = 新列表()         // list of function IR strings
+设 函数参数表 = 新字典()         // name → param_count (e.g., "%5")
+
+定义 声明运行时 () {
+    设 s = "declare i8* @rt_awake(i8* noalias, i8* noalias, i8* noalias, i8* nocapture readonly)" ; s = 连接(s, 换行)
+    // rt_list_*, rt_dict_*, rt_print_* 由 生成运行时IR() 提供定义，不需declare
+    返回(s)
+}
+
+设 字符串常量表 = 新字典()     // string_content → global_name
+设 字符串常量列表 = 新列表()   // list of global constant IR strings
+设 字符串计数器 = 0
+
+定义 新标签 (prefix) {
+    设 id = 新标签ID()
+    返回(连接(prefix, id))
+}
+
+定义 取字符串常量 (content) {
+    设 existing = 查键(字符串常量表, content)
+    若 (大于(取长(existing), 0)) {
+        返回(existing)
+    }
+    设 idx = 字典取长(字符串常量表)
+    设 name = 连接("@.str.", idx)
+    存变量(字符串常量表, content, name)
+    返回(name)
+}
+
+定义 生成字符串常量定义 () {
+    设 result = ""
+    设 全部键列表 = 字典键列表(字符串常量表)
+    设 k列表长度 = 列表取长(全部键列表)
+    设 ki = 0
+    设 kc = 加(k列表长度, 1)
+    循环 (小于(ki, kc)) {
+        若 (小于(ki, k列表长度)) {
+            设 content = 取(全部键列表, ki)
+            设 name = 查键(字符串常量表, content)
+            设 len = 加(取字长(content), 1)
+            设 escaped = 转义LLVM字符串(content)
+            result = 连接(result, name, " = private constant [", len, " x i8] c\"", escaped, "\\00\"", 换行)
+        }
+        ki = 加(ki, 1)
+    }
+    返回(result)
+}
+
+定义 parse_int (s) {
+    若 (是数字(s)) { 返回(s) }
+    设 result = 0
+    设 i = 0
+    设 len = 取长(s)
+    设 neg = 假
+    若 (前缀(s, "-")) {
+        neg = 真
+        i = 1
+    }
+    设 digs = "0123456789"
+    循环 (小于(i, len)) {
+        设 ch = 子串(s, i, 1)
+        设 idx = 查找(digs, ch)
+        若 (小于(idx, 0)) { 返回(0) }
+        设 tmp = 乘(result, 10)
+        result = 加(tmp, idx)
+        i = 加(i, 1)
+    }
+    若 (neg) { result = 减(0, result) }
+    返回(result)
+}
+
+定义 是否为数字字符串 (s) {
+    若 (非(是字符串(s))) { 返回(假) }
+    若 (等于(取长(s), 0)) { 返回(假) }
+    设 i = 0; 设 len = 取长(s)
+    若 (前缀(s, "-")) { i = 1 }
+    若 (等于(i, len)) { 返回(假) }
+    设 digs = "0123456789"
+    循环 (小于(i, len)) {
+        设 ch = 子串(s, i, 1)
+        设 idx = 查找(digs, ch)
+        若 (小于(idx, 0)) { 返回(假) }
+        i = 加(i, 1)
+    }
+    返回(真)
+}
+
+定义 最后一行 (text) {
+    设 len = 取长(text)
+    若 (等于(len, 0)) { 返回("") }
+    设 end = 减(len, 1)
+    循环 (end >= 0) {
+        设 ch = 子串(text, end, 1)
+        若 (非(字符串包含(换行, ch))) { 跳出 }
+        end = 减(end, 1)
+    }
+    若 (end < 0) { 返回("") }
+    设 i = end
+    循环 (i >= 0) {
+        设 ch = 子串(text, i, 1)
+        若 (字符串包含(换行, ch)) {
+            返回(子串(text, 加(i, 1), 减(end, i)))
+        }
+        i = 减(i, 1)
+    }
+    返回(子串(text, 0, 加(end, 1)))
+}
+
+定义 不以终止指令结尾 (text) {
+    设 last = 最后一行(text)
+    若 (等于(取长(last), 0)) { 返回(真) }
+    若 (字符串包含(last, "ret")) { 返回(假) }
+    若 (字符串包含(last, "br label")) { 返回(假) }
+    若 (字符串包含(last, "br i1")) { 返回(假) }
+    返回(真)
+}
+
+定义 确保终止 (s, merge_label) {
+    若 (不以终止指令结尾(s)) {
+        s = 连接(s, "  br label %", merge_label, 换行)
+    }
+    返回(s)
+}
+
+定义 编译 (_c_ce, ast, reg) {
+    若 (是列表(ast)) {
+        设 _c_op = 取(ast, 0)
+        设 _c_args = 切片(ast, 1)
+
+    若 (字符串相等(_c_op, "设") 或 字符串相等(_c_op, "set")) {
+        设 _c_name = 列表取(_c_args, 0)
+        设 _c_arg_val = 列表取(_c_args, 1)
+        设 _c_val_r = 编译(_c_ce, _c_arg_val, reg)
+        设 _c_s = 列表取(_c_val_r, 0)
+        设 _c_val_reg = 列表取(_c_val_r, 1)
+        reg = 列表取(_c_val_r, 2)
+        // 检查是否为模块级全局变量
+        设 _c_gv = 查键(全局变量表, _c_name)
+        若 (大于(取长(_c_gv), 0)) {
+            _c_s = 连接(_c_s, "  store i8* ", _c_val_reg, ", i8** @", _c_gv, 换行)
+            返回(列表(_c_s, _c_val_reg, reg))
+        }
+        设 _c_existing = 查键(_c_ce, _c_name)
+        若 (等于(取长(_c_existing), 0)) {
+            设 _c_r = 新寄存器(reg); 设 _c_a = 列表取(_c_r, 0); reg = 列表取(_c_r, 1)
+            _c_s = 连接(_c_s, "  ", _c_a, " = alloca i8*", 换行)
+            _c_s = 连接(_c_s, "  store i8* ", _c_val_reg, ", i8** ", _c_a, 换行)
+            存变量(_c_ce, _c_name, _c_a)
+        } 否则 {
+            设 _c_a = _c_existing
+            _c_s = 连接(_c_s, "  store i8* ", _c_val_reg, ", i8** ", _c_a, 换行)
+        }
+        返回(列表(_c_s, _c_val_reg, reg))
+    }
+
+    若 (字符串相等(_c_op, "新寄存器ID")) {
+        设 _c_r = 新寄存器(reg); 设 rx = 列表取(_c_r, 0); reg = 列表取(_c_r, 1)
+        设 _c_s = 连接("  ", rx, " = call i8* @_next_reg_str()", 换行)
+        返回(列表(_c_s, rx, reg))
+    }
+
+    若 (字符串相等(_c_op, "新标签ID")) {
+        设 _c_r = 新寄存器(reg); 设 rx = 列表取(_c_r, 0); reg = 列表取(_c_r, 1)
+        设 _c_s = 连接("  ", rx, " = call i8* @_next_reg_str()", 换行)
+        返回(列表(_c_s, rx, reg))
+    }
+
+    若 (字符串相等(_c_op, "加") 或 字符串相等(_c_op, "add")) {
+        设 _c_l_val = 列表取(_c_args, 0)
+        设 _c_r_val = 列表取(_c_args, 1)
+        设 _c_l_r = 编译(_c_ce, _c_l_val, reg)
+        设 _c_s = 列表取(_c_l_r, 0); 设 lv = 列表取(_c_l_r, 1); reg = 列表取(_c_l_r, 2)
+        设 _c_r_r = 编译(_c_ce, _c_r_val, reg)
+        _c_s = 连接(_c_s, 列表取(_c_r_r, 0)); 设 rv = 列表取(_c_r_r, 1); reg = 列表取(_c_r_r, 2)
+        设 _c_ub_raw = 新寄存器ID(); 设 ub_val = 新寄存器ID()
+        _c_s = 连接(_c_s, "  %", _c_ub_raw, " = ptrtoint i8* ", lv, " to i64", 换行)
+        _c_s = 连接(_c_s, "  %", ub_val, " = ashr i64 %", _c_ub_raw, ", 1", 换行)
+        设 _c_l_raw = 连接("%", ub_val)
+        设 _c_ub_raw = 新寄存器ID(); 设 ub_val = 新寄存器ID()
+        _c_s = 连接(_c_s, "  %", _c_ub_raw, " = ptrtoint i8* ", rv, " to i64", 换行)
+        _c_s = 连接(_c_s, "  %", ub_val, " = ashr i64 %", _c_ub_raw, ", 1", 换行)
+        设 _c_r_raw = 连接("%", ub_val)
+        设 _c_r = 新寄存器(reg); 设 res = 列表取(_c_r, 0); reg = 列表取(_c_r, 1)
+        _c_s = 连接(_c_s, "  ", res, " = add i64 ", _c_l_raw, ", ", _c_r_raw, 换行)
+        设 _c_bb_shl = 新寄存器ID(); 设 bb_or = 新寄存器ID(); 设 bb_ptr = 新寄存器ID()
+        _c_s = 连接(_c_s, "  %", _c_bb_shl, " = shl i64 ", res, ", 1", 换行)
+        _c_s = 连接(_c_s, "  %", bb_or, " = or i64 %", _c_bb_shl, ", 1", 换行)
+        _c_s = 连接(_c_s, "  %", bb_ptr, " = inttoptr i64 %", bb_or, " to i8*", 换行)
+        设 _c_bv = 连接("%", bb_ptr)
+         返回(列表(_c_s, _c_bv, reg))
+    }
+
+    若 (字符串相等(_c_op, "减") 或 字符串相等(_c_op, "sub")) {
+        设 _c_arg_count = 列表取长(_c_args)
+        若 (等于(_c_arg_count, 1)) {
+            设 _c_v_val = 列表取(_c_args, 0)
+            设 _c_v_r = 编译(_c_ce, _c_v_val, reg)
+            设 _c_s = 列表取(_c_v_r, 0); 设 vv = 列表取(_c_v_r, 1); reg = 列表取(_c_v_r, 2)
+            设 _c_ub_raw = 新寄存器ID(); 设 ub_val = 新寄存器ID()
+        _c_s = 连接(_c_s, "  %", _c_ub_raw, " = ptrtoint i8* ", vv, " to i64", 换行)
+        _c_s = 连接(_c_s, "  %", ub_val, " = ashr i64 %", _c_ub_raw, ", 1", 换行)
+        设 _c_raw = 连接("%", ub_val)
+            设 _c_r = 新寄存器(reg); 设 res = 列表取(_c_r, 0); reg = 列表取(_c_r, 1)
+            _c_s = 连接(_c_s, "  ", res, " = sub i64 0, ", _c_raw, 换行)
+            设 _c_bb_shl = 新寄存器ID(); 设 bb_or = 新寄存器ID(); 设 bb_ptr = 新寄存器ID()
+        _c_s = 连接(_c_s, "  %", _c_bb_shl, " = shl i64 ", res, ", 1", 换行)
+        _c_s = 连接(_c_s, "  %", bb_or, " = or i64 %", _c_bb_shl, ", 1", 换行)
+        _c_s = 连接(_c_s, "  %", bb_ptr, " = inttoptr i64 %", bb_or, " to i8*", 换行)
+        设 _c_bv = 连接("%", bb_ptr)
+            返回(列表(_c_s, _c_bv, reg))
+        }
+        设 _c_l_val = 列表取(_c_args, 0); 设 _c_r_val = 列表取(_c_args, 1)
+        设 _c_arg_count = 列表取长(_c_args)
+        若 (等于(_c_arg_count, 1)) {
+            // Unary negation: -x → sub 0, x
+            设 _c_v_val = 列表取(_c_args, 0)
+            设 _c_v_r = 编译(_c_ce, _c_v_val, reg)
+            设 _c_s = 列表取(_c_v_r, 0); 设 vv = 列表取(_c_v_r, 1); reg = 列表取(_c_v_r, 2)
+            设 _c_ub_raw = 新寄存器ID(); 设 ub_val = 新寄存器ID()
+        _c_s = 连接(_c_s, "  %", _c_ub_raw, " = ptrtoint i8* ", vv, " to i64", 换行)
+        _c_s = 连接(_c_s, "  %", ub_val, " = ashr i64 %", _c_ub_raw, ", 1", 换行)
+        设 _c_raw = 连接("%", ub_val)
+            设 _c_r = 新寄存器(reg); 设 res = 列表取(_c_r, 0); reg = 列表取(_c_r, 1)
+            _c_s = 连接(_c_s, "  ", res, " = sub i64 0, ", _c_raw, 换行)
+            设 _c_bb_shl = 新寄存器ID(); 设 bb_or = 新寄存器ID(); 设 bb_ptr = 新寄存器ID()
+        _c_s = 连接(_c_s, "  %", _c_bb_shl, " = shl i64 ", res, ", 1", 换行)
+        _c_s = 连接(_c_s, "  %", bb_or, " = or i64 %", _c_bb_shl, ", 1", 换行)
+        _c_s = 连接(_c_s, "  %", bb_ptr, " = inttoptr i64 %", bb_or, " to i8*", 换行)
+        设 _c_bv = 连接("%", bb_ptr)
+            返回(列表(_c_s, _c_bv, reg))
+        }
+        设 _c_l_val = 列表取(_c_args, 0); 设 _c_r_val = 列表取(_c_args, 1)
+        设 _c_l_r = 编译(_c_ce, _c_l_val, reg)
+        设 _c_s = 列表取(_c_l_r, 0); 设 lv = 列表取(_c_l_r, 1); reg = 列表取(_c_l_r, 2)
+        设 _c_r_r = 编译(_c_ce, _c_r_val, reg)
+        _c_s = 连接(_c_s, 列表取(_c_r_r, 0)); 设 rv = 列表取(_c_r_r, 1); reg = 列表取(_c_r_r, 2)
+        设 _c_ub_raw = 新寄存器ID(); 设 ub_val = 新寄存器ID()
+        _c_s = 连接(_c_s, "  %", _c_ub_raw, " = ptrtoint i8* ", lv, " to i64", 换行)
+        _c_s = 连接(_c_s, "  %", ub_val, " = ashr i64 %", _c_ub_raw, ", 1", 换行)
+        设 _c_l_raw = 连接("%", ub_val)
+        设 _c_ub_raw = 新寄存器ID(); 设 ub_val = 新寄存器ID()
+        _c_s = 连接(_c_s, "  %", _c_ub_raw, " = ptrtoint i8* ", rv, " to i64", 换行)
+        _c_s = 连接(_c_s, "  %", ub_val, " = ashr i64 %", _c_ub_raw, ", 1", 换行)
+        设 _c_r_raw = 连接("%", ub_val)
+        设 _c_r = 新寄存器(reg); 设 res = 列表取(_c_r, 0); reg = 列表取(_c_r, 1)
+        _c_s = 连接(_c_s, "  ", res, " = sub i64 ", _c_l_raw, ", ", _c_r_raw, 换行)
+        设 _c_bb_shl = 新寄存器ID(); 设 bb_or = 新寄存器ID(); 设 bb_ptr = 新寄存器ID()
+        _c_s = 连接(_c_s, "  %", _c_bb_shl, " = shl i64 ", res, ", 1", 换行)
+        _c_s = 连接(_c_s, "  %", bb_or, " = or i64 %", _c_bb_shl, ", 1", 换行)
+        _c_s = 连接(_c_s, "  %", bb_ptr, " = inttoptr i64 %", bb_or, " to i8*", 换行)
+        设 _c_bv = 连接("%", bb_ptr)
+        返回(列表(_c_s, _c_bv, reg))
+    }
+
+    若 (字符串相等(_c_op, "乘") 或 字符串相等(_c_op, "mul")) {
+        设 _c_l_val = 列表取(_c_args, 0); 设 _c_r_val = 列表取(_c_args, 1)
+        设 _c_l_r = 编译(_c_ce, _c_l_val, reg)
+        设 _c_s = 列表取(_c_l_r, 0); 设 lv = 列表取(_c_l_r, 1); reg = 列表取(_c_l_r, 2)
+        设 _c_r_r = 编译(_c_ce, _c_r_val, reg)
+        _c_s = 连接(_c_s, 列表取(_c_r_r, 0)); 设 rv = 列表取(_c_r_r, 1); reg = 列表取(_c_r_r, 2)
+        设 _c_ub_raw = 新寄存器ID(); 设 ub_val = 新寄存器ID()
+        _c_s = 连接(_c_s, "  %", _c_ub_raw, " = ptrtoint i8* ", lv, " to i64", 换行)
+        _c_s = 连接(_c_s, "  %", ub_val, " = ashr i64 %", _c_ub_raw, ", 1", 换行)
+        设 _c_l_raw = 连接("%", ub_val)
+        设 _c_ub_raw = 新寄存器ID(); 设 ub_val = 新寄存器ID()
+        _c_s = 连接(_c_s, "  %", _c_ub_raw, " = ptrtoint i8* ", rv, " to i64", 换行)
+        _c_s = 连接(_c_s, "  %", ub_val, " = ashr i64 %", _c_ub_raw, ", 1", 换行)
+        设 _c_r_raw = 连接("%", ub_val)
+        设 _c_r = 新寄存器(reg); 设 res = 列表取(_c_r, 0); reg = 列表取(_c_r, 1)
+        _c_s = 连接(_c_s, "  ", res, " = mul i64 ", _c_l_raw, ", ", _c_r_raw, 换行)
+        设 _c_bb_shl = 新寄存器ID(); 设 bb_or = 新寄存器ID(); 设 bb_ptr = 新寄存器ID()
+        _c_s = 连接(_c_s, "  %", _c_bb_shl, " = shl i64 ", res, ", 1", 换行)
+        _c_s = 连接(_c_s, "  %", bb_or, " = or i64 %", _c_bb_shl, ", 1", 换行)
+        _c_s = 连接(_c_s, "  %", bb_ptr, " = inttoptr i64 %", bb_or, " to i8*", 换行)
+        设 _c_bv = 连接("%", bb_ptr)
+        返回(列表(_c_s, _c_bv, reg))
+    }
+
+    若 (字符串相等(_c_op, "除") 或 字符串相等(_c_op, "div")) {
+        设 _c_l_val = 列表取(_c_args, 0); 设 _c_r_val = 列表取(_c_args, 1)
+        设 _c_l_r = 编译(_c_ce, _c_l_val, reg)
+        设 _c_s = 列表取(_c_l_r, 0); 设 lv = 列表取(_c_l_r, 1); reg = 列表取(_c_l_r, 2)
+        设 _c_r_r = 编译(_c_ce, _c_r_val, reg)
+        _c_s = 连接(_c_s, 列表取(_c_r_r, 0)); 设 rv = 列表取(_c_r_r, 1); reg = 列表取(_c_r_r, 2)
+        设 _c_ub_raw = 新寄存器ID(); 设 ub_val = 新寄存器ID()
+        _c_s = 连接(_c_s, "  %", _c_ub_raw, " = ptrtoint i8* ", lv, " to i64", 换行)
+        _c_s = 连接(_c_s, "  %", ub_val, " = ashr i64 %", _c_ub_raw, ", 1", 换行)
+        设 _c_l_raw = 连接("%", ub_val)
+        设 _c_ub_raw = 新寄存器ID(); 设 ub_val = 新寄存器ID()
+        _c_s = 连接(_c_s, "  %", _c_ub_raw, " = ptrtoint i8* ", rv, " to i64", 换行)
+        _c_s = 连接(_c_s, "  %", ub_val, " = ashr i64 %", _c_ub_raw, ", 1", 换行)
+        设 _c_r_raw = 连接("%", ub_val)
+        设 _c_r = 新寄存器(reg); 设 res = 列表取(_c_r, 0); reg = 列表取(_c_r, 1)
+        _c_s = 连接(_c_s, "  ", res, " = sdiv i64 ", _c_l_raw, ", ", _c_r_raw, 换行)
+        设 _c_bb_shl = 新寄存器ID(); 设 bb_or = 新寄存器ID(); 设 bb_ptr = 新寄存器ID()
+        _c_s = 连接(_c_s, "  %", _c_bb_shl, " = shl i64 ", res, ", 1", 换行)
+        _c_s = 连接(_c_s, "  %", bb_or, " = or i64 %", _c_bb_shl, ", 1", 换行)
+        _c_s = 连接(_c_s, "  %", bb_ptr, " = inttoptr i64 %", bb_or, " to i8*", 换行)
+        设 _c_bv = 连接("%", bb_ptr)
+        返回(列表(_c_s, _c_bv, reg))
+    }
+
+    若 (字符串相等(_c_op, "小于") 或 字符串相等(_c_op, "lt")) {
+        设 _c_l_val = 列表取(_c_args, 0); 设 _c_r_val = 列表取(_c_args, 1)
+        设 _c_l_r = 编译(_c_ce, _c_l_val, reg)
+        设 _c_s = 列表取(_c_l_r, 0); 设 lv = 列表取(_c_l_r, 1); reg = 列表取(_c_l_r, 2)
+        设 _c_r_r = 编译(_c_ce, _c_r_val, reg)
+        _c_s = 连接(_c_s, 列表取(_c_r_r, 0)); 设 rv = 列表取(_c_r_r, 1); reg = 列表取(_c_r_r, 2)
+        设 _c_ub_raw = 新寄存器ID(); 设 ub_val = 新寄存器ID()
+        _c_s = 连接(_c_s, "  %", _c_ub_raw, " = ptrtoint i8* ", lv, " to i64", 换行)
+        _c_s = 连接(_c_s, "  %", ub_val, " = ashr i64 %", _c_ub_raw, ", 1", 换行)
+        设 _c_l_raw = 连接("%", ub_val)
+        设 _c_ub_raw = 新寄存器ID(); 设 ub_val = 新寄存器ID()
+        _c_s = 连接(_c_s, "  %", _c_ub_raw, " = ptrtoint i8* ", rv, " to i64", 换行)
+        _c_s = 连接(_c_s, "  %", ub_val, " = ashr i64 %", _c_ub_raw, ", 1", 换行)
+        设 _c_r_raw = 连接("%", ub_val)
+        设 _c_r = 新寄存器(reg); 设 cmp = 列表取(_c_r, 0); reg = 列表取(_c_r, 1)
+        设 _c_r = 新寄存器(reg); 设 result = 列表取(_c_r, 0); reg = 列表取(_c_r, 1)
+        _c_s = 连接(_c_s, "  ", cmp, " = icmp slt i64 ", _c_l_raw, ", ", _c_r_raw, 换行)
+        _c_s = 连接(_c_s, "  ", result, " = zext i1 ", cmp, " to i64", 换行)
+        设 _c_bb_shl = 新寄存器ID(); 设 bb_or = 新寄存器ID(); 设 bb_ptr = 新寄存器ID()
+        _c_s = 连接(_c_s, "  %", _c_bb_shl, " = shl i64 ", result, ", 1", 换行)
+        _c_s = 连接(_c_s, "  %", bb_or, " = or i64 %", _c_bb_shl, ", 1", 换行)
+        _c_s = 连接(_c_s, "  %", bb_ptr, " = inttoptr i64 %", bb_or, " to i8*", 换行)
+        设 _c_bv = 连接("%", bb_ptr)
+        返回(列表(_c_s, _c_bv, reg))
+    }
+
+    若 (字符串相等(_c_op, "大于") 或 字符串相等(_c_op, "gt")) {
+        设 _c_l_val = 列表取(_c_args, 0); 设 _c_r_val = 列表取(_c_args, 1)
+        设 _c_l_r = 编译(_c_ce, _c_l_val, reg)
+        设 _c_s = 列表取(_c_l_r, 0); 设 lv = 列表取(_c_l_r, 1); reg = 列表取(_c_l_r, 2)
+        设 _c_r_r = 编译(_c_ce, _c_r_val, reg)
+        _c_s = 连接(_c_s, 列表取(_c_r_r, 0)); 设 rv = 列表取(_c_r_r, 1); reg = 列表取(_c_r_r, 2)
+        设 _c_ub_raw = 新寄存器ID(); 设 ub_val = 新寄存器ID()
+        _c_s = 连接(_c_s, "  %", _c_ub_raw, " = ptrtoint i8* ", lv, " to i64", 换行)
+        _c_s = 连接(_c_s, "  %", ub_val, " = ashr i64 %", _c_ub_raw, ", 1", 换行)
+        设 _c_l_raw = 连接("%", ub_val)
+        设 _c_ub_raw = 新寄存器ID(); 设 ub_val = 新寄存器ID()
+        _c_s = 连接(_c_s, "  %", _c_ub_raw, " = ptrtoint i8* ", rv, " to i64", 换行)
+        _c_s = 连接(_c_s, "  %", ub_val, " = ashr i64 %", _c_ub_raw, ", 1", 换行)
+        设 _c_r_raw = 连接("%", ub_val)
+        设 _c_r = 新寄存器(reg); 设 cmp = 列表取(_c_r, 0); reg = 列表取(_c_r, 1)
+        设 _c_r = 新寄存器(reg); 设 result = 列表取(_c_r, 0); reg = 列表取(_c_r, 1)
+        _c_s = 连接(_c_s, "  ", cmp, " = icmp sgt i64 ", _c_l_raw, ", ", _c_r_raw, 换行)
+        _c_s = 连接(_c_s, "  ", result, " = zext i1 ", cmp, " to i64", 换行)
+        设 _c_bb_shl = 新寄存器ID(); 设 bb_or = 新寄存器ID(); 设 bb_ptr = 新寄存器ID()
+        _c_s = 连接(_c_s, "  %", _c_bb_shl, " = shl i64 ", result, ", 1", 换行)
+        _c_s = 连接(_c_s, "  %", bb_or, " = or i64 %", _c_bb_shl, ", 1", 换行)
+        _c_s = 连接(_c_s, "  %", bb_ptr, " = inttoptr i64 %", bb_or, " to i8*", 换行)
+        设 _c_bv = 连接("%", bb_ptr)
+        返回(列表(_c_s, _c_bv, reg))
+    }
+
+    若 (字符串相等(_c_op, "等于") 或 字符串相等(_c_op, "eq")) {
+        设 _c_l_val = 列表取(_c_args, 0); 设 _c_r_val = 列表取(_c_args, 1)
+        设 _c_l_r = 编译(_c_ce, _c_l_val, reg)
+        设 _c_s = 列表取(_c_l_r, 0); 设 lv = 列表取(_c_l_r, 1); reg = 列表取(_c_l_r, 2)
+        设 _c_r_r = 编译(_c_ce, _c_r_val, reg)
+        _c_s = 连接(_c_s, 列表取(_c_r_r, 0)); 设 rv = 列表取(_c_r_r, 1); reg = 列表取(_c_r_r, 2)
+        设 _c_ub_raw = 新寄存器ID(); 设 ub_val = 新寄存器ID()
+        _c_s = 连接(_c_s, "  %", _c_ub_raw, " = ptrtoint i8* ", lv, " to i64", 换行)
+        _c_s = 连接(_c_s, "  %", ub_val, " = ashr i64 %", _c_ub_raw, ", 1", 换行)
+        设 _c_l_raw = 连接("%", ub_val)
+        设 _c_ub_raw = 新寄存器ID(); 设 ub_val = 新寄存器ID()
+        _c_s = 连接(_c_s, "  %", _c_ub_raw, " = ptrtoint i8* ", rv, " to i64", 换行)
+        _c_s = 连接(_c_s, "  %", ub_val, " = ashr i64 %", _c_ub_raw, ", 1", 换行)
+        设 _c_r_raw = 连接("%", ub_val)
+        设 _c_r = 新寄存器(reg); 设 cmp = 列表取(_c_r, 0); reg = 列表取(_c_r, 1)
+        设 _c_r = 新寄存器(reg); 设 result = 列表取(_c_r, 0); reg = 列表取(_c_r, 1)
+        _c_s = 连接(_c_s, "  ", cmp, " = icmp eq i64 ", _c_l_raw, ", ", _c_r_raw, 换行)
+        _c_s = 连接(_c_s, "  ", result, " = zext i1 ", cmp, " to i64", 换行)
+        设 _c_bb_shl = 新寄存器ID(); 设 bb_or = 新寄存器ID(); 设 bb_ptr = 新寄存器ID()
+        _c_s = 连接(_c_s, "  %", _c_bb_shl, " = shl i64 ", result, ", 1", 换行)
+        _c_s = 连接(_c_s, "  %", bb_or, " = or i64 %", _c_bb_shl, ", 1", 换行)
+        _c_s = 连接(_c_s, "  %", bb_ptr, " = inttoptr i64 %", bb_or, " to i8*", 换行)
+        设 _c_bv = 连接("%", bb_ptr)
+        返回(列表(_c_s, _c_bv, reg))
+    }
+
+    若 (字符串相等(_c_op, "且") 或 字符串相等(_c_op, "and")) {
+        设 _c_l_r = 编译(_c_ce, 列表取(_c_args, 0), reg)
+        设 _c_s = 列表取(_c_l_r, 0); 设 lv = 列表取(_c_l_r, 1); reg = 列表取(_c_l_r, 2)
+        设 _c_r_r = 编译(_c_ce, 列表取(_c_args, 1), reg)
+        _c_s = 连接(_c_s, 列表取(_c_r_r, 0)); 设 rv = 列表取(_c_r_r, 1); reg = 列表取(_c_r_r, 2)
+        设 _c_ub_raw = 新寄存器ID(); 设 ub_val = 新寄存器ID()
+        _c_s = 连接(_c_s, "  %", _c_ub_raw, " = ptrtoint i8* ", lv, " to i64", 换行)
+        _c_s = 连接(_c_s, "  %", ub_val, " = ashr i64 %", _c_ub_raw, ", 1", 换行)
+        设 _c_la = 连接("%", ub_val)
+        设 _c_ub_raw = 新寄存器ID(); 设 ub_val = 新寄存器ID()
+        _c_s = 连接(_c_s, "  %", _c_ub_raw, " = ptrtoint i8* ", rv, " to i64", 换行)
+        _c_s = 连接(_c_s, "  %", ub_val, " = ashr i64 %", _c_ub_raw, ", 1", 换行)
+        设 _c_ra = 连接("%", ub_val)
+        设 _c_r = 新寄存器(reg); 设 b1 = 列表取(_c_r, 0); reg = 列表取(_c_r, 1)
+        设 _c_r = 新寄存器(reg); 设 b2 = 列表取(_c_r, 0); reg = 列表取(_c_r, 1)
+        设 _c_r = 新寄存器(reg); 设 ab = 列表取(_c_r, 0); reg = 列表取(_c_r, 1)
+        _c_s = 连接(_c_s, "  ", b1, " = icmp ne i64 ", _c_la, ", 0", 换行)
+        _c_s = 连接(_c_s, "  ", b2, " = icmp ne i64 ", _c_ra, ", 0", 换行)
+        _c_s = 连接(_c_s, "  ", ab, " = and i1 ", b1, ", ", b2, 换行)
+        设 _c_r = 新寄存器(reg); 设 _c_zx = 列表取(_c_r, 0); reg = 列表取(_c_r, 1)
+        _c_s = 连接(_c_s, "  ", _c_zx, " = zext i1 ", ab, " to i64", 换行)
+        设 _c_bb_shl = 新寄存器ID(); 设 bb_or = 新寄存器ID(); 设 bb_ptr = 新寄存器ID()
+        _c_s = 连接(_c_s, "  %", _c_bb_shl, " = shl i64 ", _c_zx, ", 1", 换行)
+        _c_s = 连接(_c_s, "  %", bb_or, " = or i64 %", _c_bb_shl, ", 1", 换行)
+        _c_s = 连接(_c_s, "  %", bb_ptr, " = inttoptr i64 %", bb_or, " to i8*", 换行)
+        设 _c_bv = 连接("%", bb_ptr)
+        返回(列表(_c_s, _c_bv, reg))
+    }
+
+    若 (字符串相等(_c_op, "或") 或 字符串相等(_c_op, "or")) {
+        设 _c_l_r = 编译(_c_ce, 列表取(_c_args, 0), reg); 设 _c_s = 列表取(_c_l_r, 0); 设 lv = 列表取(_c_l_r, 1); reg = 列表取(_c_l_r, 2)
+        设 _c_r_r = 编译(_c_ce, 列表取(_c_args, 1), reg); _c_s = 连接(_c_s, 列表取(_c_r_r, 0)); 设 rv = 列表取(_c_r_r, 1); reg = 列表取(_c_r_r, 2)
+        设 _c_ub_raw = 新寄存器ID(); 设 ub_val = 新寄存器ID()
+        _c_s = 连接(_c_s, "  %", _c_ub_raw, " = ptrtoint i8* ", lv, " to i64", 换行)
+        _c_s = 连接(_c_s, "  %", ub_val, " = ashr i64 %", _c_ub_raw, ", 1", 换行)
+        设 _c_la = 连接("%", ub_val)
+        设 _c_ub_raw = 新寄存器ID(); 设 ub_val = 新寄存器ID()
+        _c_s = 连接(_c_s, "  %", _c_ub_raw, " = ptrtoint i8* ", rv, " to i64", 换行)
+        _c_s = 连接(_c_s, "  %", ub_val, " = ashr i64 %", _c_ub_raw, ", 1", 换行)
+        设 _c_ra = 连接("%", ub_val)
+        设 _c_r = 新寄存器(reg); 设 b1 = 列表取(_c_r, 0); reg = 列表取(_c_r, 1)
+        设 _c_r = 新寄存器(reg); 设 b2 = 列表取(_c_r, 0); reg = 列表取(_c_r, 1)
+        设 _c_r = 新寄存器(reg); 设 ob = 列表取(_c_r, 0); reg = 列表取(_c_r, 1)
+        _c_s = 连接(_c_s, "  ", b1, " = icmp ne i64 ", _c_la, ", 0", 换行)
+        _c_s = 连接(_c_s, "  ", b2, " = icmp ne i64 ", _c_ra, ", 0", 换行)
+        _c_s = 连接(_c_s, "  ", ob, " = or i1 ", b1, ", ", b2, 换行)
+        设 _c_r = 新寄存器(reg); 设 _c_zx = 列表取(_c_r, 0); reg = 列表取(_c_r, 1)
+        _c_s = 连接(_c_s, "  ", _c_zx, " = zext i1 ", ob, " to i64", 换行)
+        设 _c_bb_shl = 新寄存器ID(); 设 bb_or = 新寄存器ID(); 设 bb_ptr = 新寄存器ID()
+        _c_s = 连接(_c_s, "  %", _c_bb_shl, " = shl i64 ", _c_zx, ", 1", 换行)
+        _c_s = 连接(_c_s, "  %", bb_or, " = or i64 %", _c_bb_shl, ", 1", 换行)
+        _c_s = 连接(_c_s, "  %", bb_ptr, " = inttoptr i64 %", bb_or, " to i8*", 换行)
+        设 _c_bv = 连接("%", bb_ptr)
+        返回(列表(_c_s, _c_bv, reg))
+    }
+
+    若 (字符串相等(_c_op, "非") 或 字符串相等(_c_op, "not")) {
+        设 _c_v_r = 编译(_c_ce, 列表取(_c_args, 0), reg); 设 _c_s = 列表取(_c_v_r, 0); 设 vv = 列表取(_c_v_r, 1); reg = 列表取(_c_v_r, 2)
+        设 _c_ub_raw = 新寄存器ID(); 设 ub_val = 新寄存器ID()
+        _c_s = 连接(_c_s, "  %", _c_ub_raw, " = ptrtoint i8* ", vv, " to i64", 换行)
+        _c_s = 连接(_c_s, "  %", ub_val, " = ashr i64 %", _c_ub_raw, ", 1", 换行)
+        设 _c_raw = 连接("%", ub_val)
+        设 _c_r = 新寄存器(reg); 设 c = 列表取(_c_r, 0); reg = 列表取(_c_r, 1)
+        设 _c_r = 新寄存器(reg); 设 _c_zx = 列表取(_c_r, 0); reg = 列表取(_c_r, 1)
+        _c_s = 连接(_c_s, "  ", c, " = icmp eq i64 ", _c_raw, ", 0", 换行)
+        _c_s = 连接(_c_s, "  ", _c_zx, " = zext i1 ", c, " to i64", 换行)
+        设 _c_bb_shl = 新寄存器ID(); 设 bb_or = 新寄存器ID(); 设 bb_ptr = 新寄存器ID()
+        _c_s = 连接(_c_s, "  %", _c_bb_shl, " = shl i64 ", _c_zx, ", 1", 换行)
+        _c_s = 连接(_c_s, "  %", bb_or, " = or i64 %", _c_bb_shl, ", 1", 换行)
+        _c_s = 连接(_c_s, "  %", bb_ptr, " = inttoptr i64 %", bb_or, " to i8*", 换行)
+        设 _c_bv = 连接("%", bb_ptr)
+        返回(列表(_c_s, _c_bv, reg))
+    }
+
+    若 (字符串相等(_c_op, "大于等于") 或 字符串相等(_c_op, "gte")) {
+        设 _c_l_r = 编译(_c_ce, 列表取(_c_args, 0), reg); 设 _c_s = 列表取(_c_l_r, 0); 设 lv = 列表取(_c_l_r, 1); reg = 列表取(_c_l_r, 2)
+        设 _c_r_r = 编译(_c_ce, 列表取(_c_args, 1), reg); _c_s = 连接(_c_s, 列表取(_c_r_r, 0)); 设 rv = 列表取(_c_r_r, 1); reg = 列表取(_c_r_r, 2)
+        设 _c_ub_raw = 新寄存器ID(); 设 ub_val = 新寄存器ID()
+        _c_s = 连接(_c_s, "  %", _c_ub_raw, " = ptrtoint i8* ", lv, " to i64", 换行)
+        _c_s = 连接(_c_s, "  %", ub_val, " = ashr i64 %", _c_ub_raw, ", 1", 换行)
+        设 _c_la = 连接("%", ub_val)
+        设 _c_ub_raw = 新寄存器ID(); 设 ub_val = 新寄存器ID()
+        _c_s = 连接(_c_s, "  %", _c_ub_raw, " = ptrtoint i8* ", rv, " to i64", 换行)
+        _c_s = 连接(_c_s, "  %", ub_val, " = ashr i64 %", _c_ub_raw, ", 1", 换行)
+        设 _c_ra = 连接("%", ub_val)
+        设 _c_r = 新寄存器(reg); 设 c = 列表取(_c_r, 0); reg = 列表取(_c_r, 1)
+        设 _c_r = 新寄存器(reg); 设 _c_zx = 列表取(_c_r, 0); reg = 列表取(_c_r, 1)
+        _c_s = 连接(_c_s, "  ", c, " = icmp sge i64 ", _c_la, ", ", _c_ra, 换行)
+        _c_s = 连接(_c_s, "  ", _c_zx, " = zext i1 ", c, " to i64", 换行)
+        设 _c_bb_shl = 新寄存器ID(); 设 bb_or = 新寄存器ID(); 设 bb_ptr = 新寄存器ID()
+        _c_s = 连接(_c_s, "  %", _c_bb_shl, " = shl i64 ", _c_zx, ", 1", 换行)
+        _c_s = 连接(_c_s, "  %", bb_or, " = or i64 %", _c_bb_shl, ", 1", 换行)
+        _c_s = 连接(_c_s, "  %", bb_ptr, " = inttoptr i64 %", bb_or, " to i8*", 换行)
+        设 _c_bv = 连接("%", bb_ptr)
+        返回(列表(_c_s, _c_bv, reg))
+    }
+
+    若 (字符串相等(_c_op, "字符串相等") 或 字符串相等(_c_op, "str_equals")) {
+        设 _c_l_r = 编译(_c_ce, 列表取(_c_args, 0), reg); 设 _c_s = 列表取(_c_l_r, 0); 设 lv = 列表取(_c_l_r, 1); reg = 列表取(_c_l_r, 2)
+        设 _c_r_r = 编译(_c_ce, 列表取(_c_args, 1), reg); _c_s = 连接(_c_s, 列表取(_c_r_r, 0)); 设 rv = 列表取(_c_r_r, 1); reg = 列表取(_c_r_r, 2)
+        设 _c_r = 新寄存器(reg); 设 eqv = 列表取(_c_r, 0); reg = 列表取(_c_r, 1)
+        _c_s = 连接(_c_s, "  ", eqv, " = call i32 @_rt_str_eq(i8* ")
+        _c_s = 连接(_c_s, lv, ", i8* ", rv, ")", 换行)
+        设 _c_r = 新寄存器(reg); 设 _c_zx = 列表取(_c_r, 0); reg = 列表取(_c_r, 1)
+        _c_s = 连接(_c_s, "  ", _c_zx, " = zext i32 ", eqv, " to i64", 换行)
+        设 _c_bb_shl = 新寄存器ID(); 设 bb_or = 新寄存器ID(); 设 bb_ptr = 新寄存器ID()
+        _c_s = 连接(_c_s, "  %", _c_bb_shl, " = shl i64 ", _c_zx, ", 1", 换行)
+        _c_s = 连接(_c_s, "  %", bb_or, " = or i64 %", _c_bb_shl, ", 1", 换行)
+        _c_s = 连接(_c_s, "  %", bb_ptr, " = inttoptr i64 %", bb_or, " to i8*", 换行)
+        设 _c_bv = 连接("%", bb_ptr)
+        返回(列表(_c_s, _c_bv, reg))
+    }
+
+    若 (字符串相等(_c_op, "是列表") 或 字符串相等(_c_op, "is_list")) {
+        设 _c_v_r = 编译(_c_ce, 列表取(_c_args, 0), reg); 设 _c_s = 列表取(_c_v_r, 0); 设 vv = 列表取(_c_v_r, 1); reg = 列表取(_c_v_r, 2)
+        设 _c_r = 新寄存器(reg); 设 tag = 列表取(_c_r, 0); reg = 列表取(_c_r, 1)
+        设 _c_r = 新寄存器(reg); 设 t = 列表取(_c_r, 0); reg = 列表取(_c_r, 1)
+        设 _c_r = 新寄存器(reg); 设 obj = 列表取(_c_r, 0); reg = 列表取(_c_r, 1)
+        设 _c_r = 新寄存器(reg); 设 tp = 列表取(_c_r, 0); reg = 列表取(_c_r, 1)
+        设 _c_r = 新寄存器(reg); 设 ty = 列表取(_c_r, 0); reg = 列表取(_c_r, 1)
+        设 _c_r = 新寄存器(reg); 设 k = 列表取(_c_r, 0); reg = 列表取(_c_r, 1)
+        设 _c_r = 新寄存器(reg); 设 _c_r1 = 列表取(_c_r, 0); reg = 列表取(_c_r, 1)
+        设 _c_r = 新寄存器(reg); 设 _c_zx = 列表取(_c_r, 0); reg = 列表取(_c_r, 1)
+        _c_s = 连接(_c_s, "  ", tag, " = ptrtoint i8* ", vv, " to i64", 换行)
+        _c_s = 连接(_c_s, "  ", t, " = and i64 ", tag, ", 1", 换行)
+        _c_s = 连接(_c_s, "  ", obj, " = icmp eq i64 ", t, ", 0", 换行)
+        _c_s = 连接(_c_s, "  ", tp, " = bitcast i8* ", vv, " to i32*", 换行)
+        _c_s = 连接(_c_s, "  ", ty, " = load i32, i32* ", tp, 换行)
+        _c_s = 连接(_c_s, "  ", k, " = icmp eq i32 ", ty, ", 2", 换行)
+        _c_s = 连接(_c_s, "  ", _c_r1, " = select i1 ", obj, ", i1 ", k, ", i1 0", 换行)
+        _c_s = 连接(_c_s, "  ", _c_zx, " = zext i1 ", _c_r1, " to i64", 换行)
+        设 _c_bb_shl = 新寄存器ID(); 设 bb_or = 新寄存器ID(); 设 bb_ptr = 新寄存器ID()
+        _c_s = 连接(_c_s, "  %", _c_bb_shl, " = shl i64 ", _c_zx, ", 1", 换行)
+        _c_s = 连接(_c_s, "  %", bb_or, " = or i64 %", _c_bb_shl, ", 1", 换行)
+        _c_s = 连接(_c_s, "  %", bb_ptr, " = inttoptr i64 %", bb_or, " to i8*", 换行)
+        设 _c_bv = 连接("%", bb_ptr)
+        返回(列表(_c_s, _c_bv, reg))
+    }
+
+    若 (字符串相等(_c_op, "是字符串") 或 字符串相等(_c_op, "is_string")) {
+        设 _c_v_r = 编译(_c_ce, 列表取(_c_args, 0), reg); 设 _c_s = 列表取(_c_v_r, 0); 设 vv = 列表取(_c_v_r, 1); reg = 列表取(_c_v_r, 2)
+        设 _c_r = 新寄存器(reg); 设 tag = 列表取(_c_r, 0); reg = 列表取(_c_r, 1)
+        设 _c_r = 新寄存器(reg); 设 t = 列表取(_c_r, 0); reg = 列表取(_c_r, 1)
+        设 _c_r = 新寄存器(reg); 设 obj = 列表取(_c_r, 0); reg = 列表取(_c_r, 1)
+        设 _c_r = 新寄存器(reg); 设 tp = 列表取(_c_r, 0); reg = 列表取(_c_r, 1)
+        设 _c_r = 新寄存器(reg); 设 ty = 列表取(_c_r, 0); reg = 列表取(_c_r, 1)
+        设 _c_r = 新寄存器(reg); 设 k = 列表取(_c_r, 0); reg = 列表取(_c_r, 1)
+        设 _c_r = 新寄存器(reg); 设 _c_r1 = 列表取(_c_r, 0); reg = 列表取(_c_r, 1)
+        设 _c_r = 新寄存器(reg); 设 _c_zx = 列表取(_c_r, 0); reg = 列表取(_c_r, 1)
+        _c_s = 连接(_c_s, "  ", tag, " = ptrtoint i8* ", vv, " to i64", 换行)
+        _c_s = 连接(_c_s, "  ", t, " = and i64 ", tag, ", 1", 换行)
+        _c_s = 连接(_c_s, "  ", obj, " = icmp eq i64 ", t, ", 0", 换行)
+        _c_s = 连接(_c_s, "  ", tp, " = bitcast i8* ", vv, " to i32*", 换行)
+        _c_s = 连接(_c_s, "  ", ty, " = load i32, i32* ", tp, 换行)
+        _c_s = 连接(_c_s, "  ", k, " = icmp eq i32 ", ty, ", 1", 换行)
+        _c_s = 连接(_c_s, "  ", _c_r1, " = select i1 ", obj, ", i1 ", k, ", i1 0", 换行)
+        _c_s = 连接(_c_s, "  ", _c_zx, " = zext i1 ", _c_r1, " to i64", 换行)
+        设 _c_bb_shl = 新寄存器ID(); 设 bb_or = 新寄存器ID(); 设 bb_ptr = 新寄存器ID()
+        _c_s = 连接(_c_s, "  %", _c_bb_shl, " = shl i64 ", _c_zx, ", 1", 换行)
+        _c_s = 连接(_c_s, "  %", bb_or, " = or i64 %", _c_bb_shl, ", 1", 换行)
+        _c_s = 连接(_c_s, "  %", bb_ptr, " = inttoptr i64 %", bb_or, " to i8*", 换行)
+        设 _c_bv = 连接("%", bb_ptr)
+        返回(列表(_c_s, _c_bv, reg))
+    }
+
+    若 (字符串相等(_c_op, "跳出") 或 字符串相等(_c_op, "break")) {
+        返回(列表("", "null", reg))
+    }
+
+    若 (字符串相等(_c_op, "输出") 或 字符串相等(_c_op, "print")) {
+        设 _c_p_val = 列表取(_c_args, 0)
+        设 _c_v_r = 编译(_c_ce, _c_p_val, reg)
+        设 _c_s = 列表取(_c_v_r, 0); 设 _c_vr = 列表取(_c_v_r, 1); reg = 列表取(_c_v_r, 2)
+        设 _c_ml = 取合并标签()
+        设 _c_has_ml = 大于(取长(_c_ml), 0)
+        设 _c_lb_reg = 新寄存器(reg)
+        设 _c_r1 = 列表取(_c_lb_reg, 0); 设 lbn = 列表取(_c_lb_reg, 1); reg = lbn
+        设 _c_lb_reg = 新寄存器(reg)
+        设 _c_r2 = 列表取(_c_lb_reg, 0); 设 lbn = 列表取(_c_lb_reg, 1); reg = lbn
+        设 _c_lb_reg = 新寄存器(reg)
+        设 _c_r3 = 列表取(_c_lb_reg, 0); 设 lbn = 列表取(_c_lb_reg, 1); reg = lbn
+        设 _c_lb_reg = 新寄存器(reg)
+        设 _c_r4 = 列表取(_c_lb_reg, 0); 设 lbn = 列表取(_c_lb_reg, 1); reg = lbn
+        设 _c_label_num = lbn
+        若 (_c_has_ml) { 设 done_l = _c_ml } 否则 { 设 done_l = 连接("done_", _c_label_num) }
+        _c_s = 连接(_c_s, "  ", _c_r1, " = ptrtoint i8* ", _c_vr, " to i64", 换行)
+        _c_s = 连接(_c_s, "  ", _c_r2, " = and i64 ", _c_r1, ", 1", 换行)
+        _c_s = 连接(_c_s, "  ", _c_r3, " = icmp ne i64 ", _c_r2, ", 0", 换行)
+        _c_s = 连接(_c_s, "  br i1 ", _c_r3, ", label %int_", _c_label_num, ", label %str_", _c_label_num, 换行)
+        _c_s = 连接(_c_s, "int_", _c_label_num, ":", 换行)
+        _c_s = 连接(_c_s, "  call void @rt_print_int(i64 ", _c_r1, ")", 换行)
+        _c_s = 连接(_c_s, "  br label %", done_l, 换行)
+        _c_s = 连接(_c_s, "str_", _c_label_num, ":", 换行)
+        _c_s = 连接(_c_s, "  call void @rt_print_str(i8* ", _c_vr, ")", 换行)
+        _c_s = 连接(_c_s, "  br label %", done_l, 换行)
+        若 (非(_c_has_ml)) {
+            _c_s = 连接(_c_s, done_l, ":", 换行)
+        }
+        返回(列表(_c_s, _c_vr, reg))
+    }
+
+    若 (字符串相等(_c_op, "若") 或 字符串相等(_c_op, "if")) {
+        设 _c_cond_ast = 列表取(_c_args, 0); 设 then_ast = 列表取(_c_args, 1)
+        设 _c_has_else = 大于(表长(_c_args), 2)
+        设 _c_cond_r = 编译(_c_ce, _c_cond_ast, reg)
+        设 _c_s = 列表取(_c_cond_r, 0); 设 cv = 列表取(_c_cond_r, 1); reg = 列表取(_c_cond_r, 2)
+       设 _c_ub_raw = 新寄存器ID(); 设 ub_val = 新寄存器ID()
+        _c_s = 连接(_c_s, "  %", _c_ub_raw, " = ptrtoint i8* ", cv, " to i64", 换行)
+        _c_s = 连接(_c_s, "  %", ub_val, " = ashr i64 %", _c_ub_raw, ", 1", 换行)
+       设 _c_i1v = 连接("%", 新寄存器ID())
+        _c_s = 连接(_c_s, "  ", _c_i1v, " = trunc i64 %", ub_val, " to i1", 换行)
+        // _c_alloca 存结果
+        设 _c_result_a = 连接("%", 新寄存器ID())
+        _c_s = 连接(_c_s, "  ", _c_result_a, " = alloca i8*", 换行)
+        设 _c_then_l = 新标签("then"); 设 else_l = 新标签("else"); 设 merge_l = 新标签("merge")
+        _c_s = 连接(_c_s, "  br i1 ", _c_i1v, ", label %", _c_then_l, ", label %", else_l, 换行)
+        _c_s = 连接(_c_s, _c_then_l, ":", 换行)
+    设 _c_t_r = 编译(_c_ce, then_ast, reg); 设 then_ir = 列表取(_c_t_r, 0); _c_s = 连接(_c_s, then_ir)
+    设 _c_tv = 列表取(_c_t_r, 1); 设 reg_then = 列表取(_c_t_r, 2)
+    若 (非(是终止指令(then_ir))) {
+        _c_s = 连接(_c_s, "  store i8* ", _c_tv, ", i8** ", _c_result_a, 换行)
+        _c_s = 连接(_c_s, "  br label %", merge_l, 换行)
+    }
+        _c_s = 连接(_c_s, else_l, ":", 换行)
+        设 _c_reg_else = reg_then
+        若 (_c_has_else) {
+            设 _c_else_ast = 列表取(_c_args, 2)
+            设 _c_e_r = 编译(_c_ce, _c_else_ast, reg_then); 设 else_ir = 列表取(_c_e_r, 0); _c_s = 连接(_c_s, else_ir)
+            设 _c_ev = 列表取(_c_e_r, 1); _c_reg_else = 列表取(_c_e_r, 2)
+            _c_s = 连接(_c_s, "  store i8* ", _c_ev, ", i8** ", _c_result_a, 换行)
+            _c_s = 连接(_c_s, "  br label %", merge_l, 换行)
+        } 否则 {
+            _c_s = 连接(_c_s, "  br label %", merge_l, 换行)
+        }
+        _c_s = 连接(_c_s, merge_l, ":", 换行)
+        若 (大于(reg_then, _c_reg_else)) { reg = reg_then } 否则 { reg = _c_reg_else }
+        设 _c_r = 新寄存器(reg); 设 result_val = 列表取(_c_r, 0); reg = 列表取(_c_r, 1)
+        _c_s = 连接(_c_s, "  ", result_val, " = load i8*, i8** ", _c_result_a, 换行)
+        返回(列表(_c_s, result_val, reg))
+    }
+
+    若 (字符串相等(_c_op, "循环")) {
+        设 _c_cond_ast = 列表取(_c_args, 0); 设 _c_body_ast = 列表取(_c_args, 1)
+        设 _c_hdr_l = 新标签("loop_hdr"); 设 body_l = 新标签("loop_body"); 设 end_l = 新标签("loop_end")
+        设 _c_s = 连接("  br label %", _c_hdr_l, 换行)
+        _c_s = 连接(_c_s, _c_hdr_l, ":", 换行)
+        设 _c_cond_r = 编译(_c_ce, _c_cond_ast, reg); _c_s = 连接(_c_s, 列表取(_c_cond_r, 0)); 设 cv = 列表取(_c_cond_r, 1); reg = 列表取(_c_cond_r, 2)
+        设 _c_ub_raw = 新寄存器ID(); 设 ub_val = 新寄存器ID()
+        _c_s = 连接(_c_s, "  %", _c_ub_raw, " = ptrtoint i8* ", cv, " to i64", 换行)
+        _c_s = 连接(_c_s, "  %", ub_val, " = ashr i64 %", _c_ub_raw, ", 1", 换行)
+        设 _c_i1v = 连接("%", 新寄存器ID())
+        _c_s = 连接(_c_s, "  ", _c_i1v, " = trunc i64 %", ub_val, " to i1", 换行)
+        _c_s = 连接(_c_s, "  br i1 ", _c_i1v, ", label %", body_l, ", label %", end_l, 换行)
+        _c_s = 连接(_c_s, body_l, ":", 换行)
+        循环进栈(_c_hdr_l)
+        设 _c_b_r = 编译(_c_ce, _c_body_ast, reg); _c_s = 连接(_c_s, 列表取(_c_b_r, 0)); reg = 列表取(_c_b_r, 2)
+        循环出栈()
+        _c_s = 连接(_c_s, "  br label %", _c_hdr_l, 换行)
+        _c_s = 连接(_c_s, end_l, ":", 换行)
+        返回(列表(_c_s, "null", reg))
+    }
+
+    若 (字符串相等(_c_op, "loop")) {
+        设 _c_cond_ast = 列表取(_c_args, 0); 设 _c_body_ast = 列表取(_c_args, 1)
+        设 _c_hdr_l = 新标签("loop_hdr"); 设 body_l = 新标签("loop_body"); 设 end_l = 新标签("loop_end")
+        设 _c_s = 连接("  br label %", _c_hdr_l, 换行)
+        _c_s = 连接(_c_s, _c_hdr_l, ":", 换行)
+        设 _c_cond_r = 编译(_c_ce, _c_cond_ast, reg); _c_s = 连接(_c_s, 列表取(_c_cond_r, 0)); 设 cv = 列表取(_c_cond_r, 1); reg = 列表取(_c_cond_r, 2)
+        设 _c_ub_raw = 新寄存器ID(); 设 ub_val = 新寄存器ID()
+        _c_s = 连接(_c_s, "  %", _c_ub_raw, " = ptrtoint i8* ", cv, " to i64", 换行)
+        _c_s = 连接(_c_s, "  %", ub_val, " = ashr i64 %", _c_ub_raw, ", 1", 换行)
+        设 _c_i1v = 连接("%", 新寄存器ID())
+        _c_s = 连接(_c_s, "  ", _c_i1v, " = trunc i64 %", ub_val, " to i1", 换行)
+        _c_s = 连接(_c_s, "  br i1 ", _c_i1v, ", label %", body_l, ", label %", end_l, 换行)
+        _c_s = 连接(_c_s, body_l, ":", 换行)
+        循环进栈(_c_hdr_l)
+        设 _c_b_r = 编译(_c_ce, _c_body_ast, reg); _c_s = 连接(_c_s, 列表取(_c_b_r, 0)); reg = 列表取(_c_b_r, 2)
+        循环出栈()
+        _c_s = 连接(_c_s, "  br label %", _c_hdr_l, 换行)
+        _c_s = 连接(_c_s, end_l, ":", 换行)
+        返回(列表(_c_s, "null", reg))
+    }
+
+    若 (字符串相等(_c_op, "继续") 或 字符串相等(_c_op, "continue")) {
+        返回(列表("", "null", reg))
+    }
+
+    若 (字符串相等(_c_op, "做") 或 字符串相等(_c_op, "do")) {
+        设 _c_s = ""; 设 last = "null"
+        遍历 stmt 在 _c_args {
+            设 _c_r = 编译(_c_ce, stmt, reg)
+            _c_s = 连接(_c_s, 列表取(_c_r, 0)); last = 列表取(_c_r, 1); reg = 列表取(_c_r, 2)
+        }
+         返回(列表(_c_s, last, reg))
+    }
+
+若 (字符串相等(_c_op, "定义") 或 字符串相等(_c_op, "fn") 或 字符串相等(_c_op, "define")) {
+        设 _c_fn_name = 列表取(_c_args, 0)
+        // ASCII函数名映射（LLVM不支持中文函数名）
+       设 _c_ascii_name = 注册函数名(_c_fn_name)
+        设 _c_fn_params = 列表取(_c_args, 1)
+        设 _c_fn_body = 列表取(_c_args, 2)
+        // 保存上下文 + 创建函数局部 _c_ce
+        设 _c_saved_alloca = comp_env
+        设 _c_saved_reg = reg
+        comp_env = 新字典()
+        _c_ce = comp_env
+        reg = 0
+        // 函数头: define i8* @_c_name(...)
+        设 _c_fn_ir = 连接(换行, "define i8* @", _c_ascii_name, "(")
+        设 _c_param_count = 列表取长(_c_fn_params)
+        设 _c_pi = 0
+        循环 (小于(_c_pi, _c_param_count)) {
+            设 _c_pn = 列表取(_c_fn_params, _c_pi)
+            设 _c_ascii_pn = 注册函数名(_c_pn)
+            若 (大于(_c_pi, 0)) { _c_fn_ir = 连接(_c_fn_ir, ", ") }
+            _c_fn_ir = 连接(_c_fn_ir, "i8* %", _c_ascii_pn, "_arg")
+            _c_pi = 加(_c_pi, 1)
+        }
+        _c_fn_ir = 连接(_c_fn_ir, ") {", 换行, "entry:", 换行)
+        // 保存外层参数值 → 注入新参数
+        设 _c_pi = 0
+        循环 (小于(_c_pi, _c_param_count)) {
+            设 _c_pn = 列表取(_c_fn_params, _c_pi)
+            设 _c_ascii_pn = 注册函数名(_c_pn)
+            // 注入参数到当前层
+            设 _c_r = 新寄存器(reg); 设 _c_a = 列表取(_c_r, 0); reg = 列表取(_c_r, 1)
+            _c_fn_ir = 连接(_c_fn_ir, "  ", _c_a, " = alloca i8*", 换行)
+            _c_fn_ir = 连接(_c_fn_ir, "  store i8* %", _c_ascii_pn, "_arg, i8** ", _c_a, 换行)
+            存变量(_c_ce, _c_pn, _c_a)
+            _c_pi = 加(_c_pi, 1)
+        }
+        // 先注册函数名
+        存变量(函数参数表, _c_ascii_name, _c_param_count)
+        // 编译函数体
+        设 _c_body_r = 编译(comp_env, _c_fn_body, reg)
+        _c_fn_ir = 连接(_c_fn_ir, 列表取(_c_body_r, 0))
+        reg = 列表取(_c_body_r, 2)
+        _c_fn_ir = 连接(_c_fn_ir, "}", 换行)
+        // 存入函数库
+        设 函数库列表 = 列表追加(函数库列表, _c_fn_ir)
+        // 恢复外层 comp_env 和参数 _c_ce
+        comp_env = _c_saved_alloca
+        _c_ce = comp_env
+        reg = _c_saved_reg
+        返回(列表("", "null", reg))
+    }
+
+    若 (字符串相等(_c_op, "返回") 或 字符串相等(_c_op, "return")) {
+        设 _c_ret_val = 列表取(_c_args, 0)
+        设 _c_v_r = 编译(_c_ce, _c_ret_val, reg)
+        设 _c_s = 列表取(_c_v_r, 0); 设 _c_vr = 列表取(_c_v_r, 1); reg = 列表取(_c_v_r, 2)
+        // 返回值已经boxed，直接ret
+        _c_s = 连接(_c_s, "  ret i8* ", _c_vr, 换行)
+        返回(列表(_c_s, _c_vr, reg))
+    }
+
+    若 (字符串相等(_c_op, "尝试") 或 字符串相等(_c_op, "try")) {
+        设 _c_body_ast = 列表取(_c_args, 0)
+        设 _c_catch_info = 列表取(_c_args, 1)
+        设 _c_catch_body = 列表取(_c_catch_info, 2)
+        设 _c_s = "  store i8* null, i8** @g_error"; _c_s = 连接(_c_s, 换行)
+        设 _c_r = 新寄存器(reg); reg = 列表取(_c_r, 1)
+        设 _c_check_num = 加(reg, 10)
+        设 _c_check_l = 连接("try_check_", _c_check_num)
+        进入合并上下文(_c_check_l)
+        设 _c_b_r = 编译(_c_ce, _c_body_ast, reg); 设 body_ir = 列表取(_c_b_r, 0); _c_s = 连接(_c_s, body_ir); reg = 列表取(_c_b_r, 2)
+        退出合并上下文()
+        _c_s = 连接(_c_s, _c_check_l, ":", 换行)
+        设 _c_r = 新寄存器(reg); 设 err_ptr = 列表取(_c_r, 0); reg = 列表取(_c_r, 1)
+        _c_s = 连接(_c_s, "  ", err_ptr, " = load i8*, i8** @g_error", 换行)
+        设 _c_r = 新寄存器(reg); 设 has_err = 列表取(_c_r, 0); reg = 列表取(_c_r, 1)
+        _c_s = 连接(_c_s, "  ", has_err, " = icmp ne i8* ", err_ptr, ", null", 换行)
+        设 _c_catch_num = 加(reg, 1); 设 cont_num = 加(reg, 2)
+        设 _c_catch_l = 连接("catch_", _c_catch_num)
+        设 _c_cont_l = 连接("try_cont_", cont_num)
+        _c_s = 连接(_c_s, "  br i1 ", has_err, ", label %", _c_catch_l, ", label %", _c_cont_l, 换行)
+        _c_s = 连接(_c_s, _c_catch_l, ":", 换行)
+        进入合并上下文(_c_cont_l)
+        设 _c_c_r = 编译(_c_ce, _c_catch_body, reg); 设 catch_ir = 列表取(_c_c_r, 0); _c_s = 连接(_c_s, catch_ir); reg = 列表取(_c_c_r, 2)
+        退出合并上下文()
+        _c_s = 连接(_c_s, _c_cont_l, ":", 换行)
+        _c_s = 连接(_c_s, "  ret i8* null", 换行)
+        返回(列表(_c_s, "null", reg))
+    }
+
+    若 (字符串相等(_c_op, "列表") 或 字符串相等(_c_op, "list")) {
+        设 _c_s = ""
+        设 _c_r = 新寄存器(reg); 设 lst_reg = 列表取(_c_r, 0); reg = 列表取(_c_r, 1)
+        _c_s = 连接(_c_s, "  ", lst_reg, " = call i8* @rt_list_new()", 换行)
+        设 _c_count = 列表取长(_c_args)
+        设 _c_i = 0
+        循环 (小于(_c_i, _c_count)) {
+            设 _c_elem = 列表取(_c_args, _c_i)
+            设 _c_e_r = 编译(_c_ce, _c_elem, reg)
+            _c_s = 连接(_c_s, 列表取(_c_e_r, 0)); 设 _c_ev = 列表取(_c_e_r, 1); reg = 列表取(_c_e_r, 2)
+            设 _c_tmp_r = 新寄存器(reg); 设 tmp_lst = 列表取(_c_tmp_r, 0); reg = 列表取(_c_tmp_r, 1)
+            _c_s = 连接(_c_s, "  ", tmp_lst, " = call i8* @rt_list_push_item(i8* ", lst_reg, ", i8* ", _c_ev, ")", 换行)
+            lst_reg = tmp_lst
+            _c_i = 加(_c_i, 1)
+        }
+        返回(列表(_c_s, lst_reg, reg))
+    }
+
+    若 (字符串相等(_c_op, "取") 或 字符串相等(_c_op, "get")) {
+        设 _c_container_ast = 列表取(_c_args, 0)
+        设 _c_index_ast = 列表取(_c_args, 1)
+        设 _c_c_r = 编译(_c_ce, _c_container_ast, reg)
+        设 _c_s = 列表取(_c_c_r, 0); 设 cv = 列表取(_c_c_r, 1); reg = 列表取(_c_c_r, 2)
+        设 _c_i_r = 编译(_c_ce, _c_index_ast, reg)
+        _c_s = 连接(_c_s, 列表取(_c_i_r, 0)); 设 iv = 列表取(_c_i_r, 1); reg = 列表取(_c_i_r, 2)
+        设 _c_ub_raw = 新寄存器ID(); 设 ub_val = 新寄存器ID()
+        _c_s = 连接(_c_s, "  %", _c_ub_raw, " = ptrtoint i8* ", iv, " to i64", 换行)
+        _c_s = 连接(_c_s, "  %", ub_val, " = ashr i64 %", _c_ub_raw, ", 1", 换行)
+        设 _c_idx_raw = 连接("%", ub_val)
+        设 _c_r = 新寄存器(reg); 设 idx32 = 列表取(_c_r, 0); reg = 列表取(_c_r, 1)
+        _c_s = 连接(_c_s, "  ", idx32, " = trunc i64 ", _c_idx_raw, " to i32", 换行)
+        设 _c_r = 新寄存器(reg); 设 result = 列表取(_c_r, 0); reg = 列表取(_c_r, 1)
+        _c_s = 连接(_c_s, "  ", result, " = call i8* @rt_list_get(i8* ", cv, ", i32 ", idx32, ")", 换行)
+        返回(列表(_c_s, result, reg))
+    }
+
+    若 (字符串相等(_c_op, "取长") 或 字符串相等(_c_op, "len") 或 字符串相等(_c_op, "length")) {
+        设 _c_c_ast = 列表取(_c_args, 0)
+        设 _c_c_r = 编译(_c_ce, _c_c_ast, reg)
+        设 _c_s = 列表取(_c_c_r, 0); 设 cv = 列表取(_c_c_r, 1); reg = 列表取(_c_c_r, 2)
+        设 _c_r = 新寄存器(reg); 设 raw_len = 列表取(_c_r, 0); reg = 列表取(_c_r, 1)
+        _c_s = 连接(_c_s, "  ", raw_len, " = call i32 @rt_list_len(i8* ", cv, ")", 换行)
+        设 _c_r = 新寄存器(reg); 设 b1 = 列表取(_c_r, 0); reg = 列表取(_c_r, 1)
+        设 _c_r = 新寄存器(reg); 设 b2 = 列表取(_c_r, 0); reg = 列表取(_c_r, 1)
+        设 _c_r = 新寄存器(reg); 设 b3 = 列表取(_c_r, 0); reg = 列表取(_c_r, 1)
+        设 _c_r = 新寄存器(reg); 设 bp = 列表取(_c_r, 0); reg = 列表取(_c_r, 1)
+        _c_s = 连接(_c_s, "  ", b1, " = zext i32 ", raw_len, " to i64", 换行)
+        _c_s = 连接(_c_s, "  ", b2, " = shl i64 ", b1, ", 1", 换行)
+        _c_s = 连接(_c_s, "  ", b3, " = or i64 ", b2, ", 1", 换行)
+        _c_s = 连接(_c_s, "  ", bp, " = inttoptr i64 ", b3, " to i8*", 换行)
+        返回(列表(_c_s, bp, reg))
+    }
+
+    若 (字符串相等(_c_op, "取键") 或 字符串相等(_c_op, "get_key")) {
+        设 _c_dict_ast = 列表取(_c_args, 0)
+        设 _c_key_ast = 列表取(_c_args, 1)
+        设 _c_d_r = 编译(_c_ce, _c_dict_ast, reg)
+        设 _c_s = 列表取(_c_d_r, 0); 设 dv = 列表取(_c_d_r, 1); reg = 列表取(_c_d_r, 2)
+        设 _c_k_r = 编译(_c_ce, _c_key_ast, reg)
+        _c_s = 连接(_c_s, 列表取(_c_k_r, 0)); 设 kv = 列表取(_c_k_r, 1); reg = 列表取(_c_k_r, 2)
+        设 _c_r = 新寄存器(reg); 设 result = 列表取(_c_r, 0); reg = 列表取(_c_r, 1)
+        _c_s = 连接(_c_s, "  ", result, " = call i8* @rt_dict_get(i8* ", dv, ", i8* ", kv, ")", 换行)
+        返回(列表(_c_s, result, reg))
+    }
+
+    若 (字符串相等(_c_op, "置键")) {
+        设 _c_dict_ast = 列表取(_c_args, 0)
+        设 _c_key_ast = 列表取(_c_args, 1)
+        设 _c_val_ast = 列表取(_c_args, 2)
+        设 _c_d_r = 编译(_c_ce, _c_dict_ast, reg)
+        设 _c_s = 列表取(_c_d_r, 0); 设 dv = 列表取(_c_d_r, 1); reg = 列表取(_c_d_r, 2)
+        设 _c_k_r = 编译(_c_ce, _c_key_ast, reg)
+        _c_s = 连接(_c_s, 列表取(_c_k_r, 0)); 设 kv = 列表取(_c_k_r, 1); reg = 列表取(_c_k_r, 2)
+        设 _c_v_r = 编译(_c_ce, _c_val_ast, reg)
+        _c_s = 连接(_c_s, 列表取(_c_v_r, 0)); 设 vv = 列表取(_c_v_r, 1); reg = 列表取(_c_v_r, 2)
+        _c_s = 连接(_c_s, "  call void @rt_dict_set(i8* ", dv, ", i8* ", kv, ", i8* ", vv, ")", 换行)
+        返回(列表(_c_s, dv, reg))
+    }
+
+    若 (字符串相等(_c_op, "字典") 或 字符串相等(_c_op, "dict")) {
+        设 _c_s = ""
+        设 _c_r = 新寄存器(reg); 设 d_reg = 列表取(_c_r, 0); reg = 列表取(_c_r, 1)
+        _c_s = 连接(_c_s, "  ", d_reg, " = call i8* @rt_dict_new()", 换行)
+        设 _c_count = 列表取长(_c_args)
+        设 _c_i = 0
+        循环 (小于(_c_i, _c_count)) {
+            设 _c_k_ast = 列表取(_c_args, _c_i)
+            设 _c_v_ast = 列表取(_c_args, 加(_c_i, 1))
+            设 _c_k_r = 编译(_c_ce, _c_k_ast, reg)
+            _c_s = 连接(_c_s, 列表取(_c_k_r, 0)); 设 kv = 列表取(_c_k_r, 1); reg = 列表取(_c_k_r, 2)
+            设 _c_v_r = 编译(_c_ce, _c_v_ast, reg)
+            _c_s = 连接(_c_s, 列表取(_c_v_r, 0)); 设 vv = 列表取(_c_v_r, 1); reg = 列表取(_c_v_r, 2)
+            _c_s = 连接(_c_s, "  call void @rt_dict_set(i8* ", d_reg, ", i8* ", kv, ", i8* ", vv, ")", 换行)
+            _c_i = 加(_c_i, 2)
+        }
+        返回(列表(_c_s, d_reg, reg))
+    }
+
+    若 (字符串相等(_c_op, "切片") 或 字符串相等(_c_op, "slice")) {
+        设 _c_cr = 编译(_c_ce, 列表取(_c_args, 0), reg); 设 _c_s = 列表取(_c_cr, 0); 设 cv = 列表取(_c_cr, 1); reg = 列表取(_c_cr, 2)
+        设 _c_ir = 编译(_c_ce, 列表取(_c_args, 1), reg); _c_s = 连接(_c_s, 列表取(_c_ir, 0)); 设 iv = 列表取(_c_ir, 1); reg = 列表取(_c_ir, 2)
+        设 _c_jr = 编译(_c_ce, 列表取(_c_args, 2), reg); _c_s = 连接(_c_s, 列表取(_c_jr, 0)); 设 jv = 列表取(_c_jr, 1); reg = 列表取(_c_jr, 2)
+        设 _c_r = 新寄存器(reg); 设 rx = 列表取(_c_r, 0); reg = 列表取(_c_r, 1)
+        _c_s = 连接(_c_s, "  ", rx, " = call i8* @rt_list_slice(i8* ", cv, ", i8* ", iv, ", i8* ", jv, ")", 换行)
+        返回(列表(_c_s, rx, reg))
+    }
+
+    若 (字符串相等(_c_op, "列表取长") 或 字符串相等(_c_op, "list_len")) {
+        设 _c_cr = 编译(_c_ce, 列表取(_c_args, 0), reg); 设 _c_s = 列表取(_c_cr, 0); 设 cv = 列表取(_c_cr, 1); reg = 列表取(_c_cr, 2)
+        设 _c_r = 新寄存器(reg); 设 rx = 列表取(_c_r, 0); reg = 列表取(_c_r, 1)
+        _c_s = 连接(_c_s, "  ", rx, " = call i32 @rt_list_len(i8* ", cv, ")", 换行)
+        设 _c_r = 新寄存器(reg); 设 b1 = 列表取(_c_r, 0); reg = 列表取(_c_r, 1)
+        _c_s = 连接(_c_s, "  ", b1, " = zext i32 ", rx, " to i64", 换行)
+        设 _c_bb_shl = 新寄存器ID(); 设 bb_or = 新寄存器ID(); 设 bb_ptr = 新寄存器ID()
+        _c_s = 连接(_c_s, "  %", _c_bb_shl, " = shl i64 ", b1, ", 1", 换行)
+        _c_s = 连接(_c_s, "  %", bb_or, " = or i64 %", _c_bb_shl, ", 1", 换行)
+        _c_s = 连接(_c_s, "  %", bb_ptr, " = inttoptr i64 %", bb_or, " to i8*", 换行)
+        设 _c_bv = 连接("%", bb_ptr)
+        返回(列表(_c_s, _c_bv, reg))
+    }
+
+    若 (字符串相等(_c_op, "列表合") 或 字符串相等(_c_op, "list_concat")) {
+        设 _c_lr = 编译(_c_ce, 列表取(_c_args, 0), reg); 设 _c_s = 列表取(_c_lr, 0); 设 lv = 列表取(_c_lr, 1); reg = 列表取(_c_lr, 2)
+        设 _c_rr = 编译(_c_ce, 列表取(_c_args, 1), reg); _c_s = 连接(_c_s, 列表取(_c_rr, 0)); 设 rv = 列表取(_c_rr, 1); reg = 列表取(_c_rr, 2)
+        设 _c_r = 新寄存器(reg); 设 rx = 列表取(_c_r, 0); reg = 列表取(_c_r, 1)
+        _c_s = 连接(_c_s, "  ", rx, " = call i8* @rt_list_concat(i8* ", lv, ", i8* ", rv, ")", 换行)
+        返回(列表(_c_s, rx, reg))
+    }
+
+    若 (字符串相等(_c_op, "子串") 或 字符串相等(_c_op, "substring")) {
+        设 _c_sr = 编译(_c_ce, 列表取(_c_args, 0), reg); 设 _c_s = 列表取(_c_sr, 0); 设 sv = 列表取(_c_sr, 1); reg = 列表取(_c_sr, 2)
+        设 _c_ir = 编译(_c_ce, 列表取(_c_args, 1), reg); _c_s = 连接(_c_s, 列表取(_c_ir, 0)); 设 iv = 列表取(_c_ir, 1); reg = 列表取(_c_ir, 2)
+        设 _c_jr = 编译(_c_ce, 列表取(_c_args, 2), reg); _c_s = 连接(_c_s, 列表取(_c_jr, 0)); 设 jv = 列表取(_c_jr, 1); reg = 列表取(_c_jr, 2)
+        设 _c_r = 新寄存器(reg); 设 rx = 列表取(_c_r, 0); reg = 列表取(_c_r, 1)
+        _c_s = 连接(_c_s, "  ", rx, " = call i8* @rt_str_substr(i8* ", sv, ", i8* ", iv, ", i8* ", jv, ")", 换行)
+        返回(列表(_c_s, rx, reg))
+    }
+
+    若 (字符串相等(_c_op, "字列") 或 字符串相等(_c_op, "str_to_list")) {
+        设 _c_vr = 编译(_c_ce, 列表取(_c_args, 0), reg); 设 _c_s = 列表取(_c_vr, 0); 设 vv = 列表取(_c_vr, 1); reg = 列表取(_c_vr, 2)
+        设 _c_r = 新寄存器(reg); 设 rx = 列表取(_c_r, 0); reg = 列表取(_c_r, 1)
+        _c_s = 连接(_c_s, "  ", rx, " = call i8* @rt_str_to_list(i8* ", vv, ")", 换行)
+        返回(列表(_c_s, rx, reg))
+    }
+
+    若 (字符串相等(_c_op, "连接") 或 字符串相等(_c_op, "concat")) {
+        设 _c_s = ""
+        设 _c_count = 列表取长(_c_args)
+        若 (等于(_c_count, 0)) {
+            返回(列表(_c_s, "null", reg))
+        }
+        // 编译第一个参数
+        设 _c_a1 = 列表取(_c_args, 0)
+        设 _c_r1 = 编译(_c_ce, _c_a1, reg)
+        _c_s = 连接(_c_s, 列表取(_c_r1, 0)); 设 cur = 列表取(_c_r1, 1); reg = 列表取(_c_r1, 2)
+        // 依次拼接后续参数
+        设 _c_i = 1
+        循环 (小于(_c_i, _c_count)) {
+            设 _c_ai = 列表取(_c_args, _c_i)
+            设 _c_ri = 编译(_c_ce, _c_ai, reg)
+            _c_s = 连接(_c_s, 列表取(_c_ri, 0)); 设 _c_av = 列表取(_c_ri, 1); reg = 列表取(_c_ri, 2)
+            设 _c_r = 新寄存器(reg); 设 new_str = 列表取(_c_r, 0); reg = 列表取(_c_r, 1)
+            _c_s = 连接(_c_s, "  ", new_str, " = call i8* @rt_str_concat(i8* ", cur, ", i8* ", _c_av, ")", 换行)
+            cur = new_str
+            _c_i = 加(_c_i, 1)
+        }
+        返回(列表(_c_s, cur, reg))
+    }
+
+    若 (字符串相等(_c_op, "forin")) {
+        设 _c_var_name = 列表取(_c_args, 0)
+        设 _c_lst_ast = 列表取(_c_args, 1)
+        设 _c_body_ast = 列表取(_c_args, 2)
+        设 _c_c_r = 编译(_c_ce, _c_lst_ast, reg)
+        设 _c_s = 列表取(_c_c_r, 0); 设 lst_ptr = 列表取(_c_c_r, 1); reg = 列表取(_c_c_r, 2)
+        设 _c_r = 新寄存器(reg); 设 len_reg = 列表取(_c_r, 0); reg = 列表取(_c_r, 1)
+        _c_s = 连接(_c_s, "  ", len_reg, " = call i32 @rt_list_len(i8* ", lst_ptr, ")", 换行)
+        设 _c_r = 新寄存器(reg); 设 idx_a = 列表取(_c_r, 0); reg = 列表取(_c_r, 1)
+        _c_s = 连接(_c_s, "  ", idx_a, " = alloca i32", 换行)
+        _c_s = 连接(_c_s, "  store i32 0, i32* ", idx_a, 换行)
+        设 _c_hdr_l = 新标签("forin_hdr"); 设 body_l = 新标签("forin_body"); 设 end_l = 新标签("forin_end")
+        _c_s = 连接(_c_s, "  br label %", _c_hdr_l, 换行)
+        _c_s = 连接(_c_s, _c_hdr_l, ":", 换行)
+        设 _c_r = 新寄存器(reg); 设 i_val = 列表取(_c_r, 0); reg = 列表取(_c_r, 1)
+        _c_s = 连接(_c_s, "  ", i_val, " = load i32, i32* ", idx_a, 换行)
+        设 _c_r = 新寄存器(reg); 设 cmp = 列表取(_c_r, 0); reg = 列表取(_c_r, 1)
+        _c_s = 连接(_c_s, "  ", cmp, " = icmp slt i32 ", i_val, ", ", len_reg, 换行)
+        _c_s = 连接(_c_s, "  br i1 ", cmp, ", label %", body_l, ", label %", end_l, 换行)
+        _c_s = 连接(_c_s, body_l, ":", 换行)
+        设 _c_r = 新寄存器(reg); 设 _c_elem = 列表取(_c_r, 0); reg = 列表取(_c_r, 1)
+        _c_s = 连接(_c_s, "  ", _c_elem, " = call i8* @rt_list_get(i8* ", lst_ptr, ", i32 ", i_val, ")", 换行)
+        设 _c_r = 新寄存器(reg);         设 var_a = 列表取(_c_r, 0); reg = 列表取(_c_r, 1)
+        _c_s = 连接(_c_s, "  ", var_a, " = alloca i8*", 换行)
+        _c_s = 连接(_c_s, "  store i8* ", _c_elem, ", i8** ", var_a, 换行)
+        存变量(_c_ce, _c_var_name, var_a)
+        循环进栈(_c_hdr_l)
+        设 _c_b_r = 编译(_c_ce, _c_body_ast, reg); _c_s = 连接(_c_s, 列表取(_c_b_r, 0)); reg = 列表取(_c_b_r, 2)
+        循环出栈()
+        // 递增索引并跳回 header
+        设 _c_r = 新寄存器(reg); 设 i_cur = 列表取(_c_r, 0); reg = 列表取(_c_r, 1)
+        _c_s = 连接(_c_s, "  ", i_cur, " = load i32, i32* ", idx_a, 换行)
+        设 _c_r = 新寄存器(reg); 设 i_next = 列表取(_c_r, 0); reg = 列表取(_c_r, 1)
+        _c_s = 连接(_c_s, "  ", i_next, " = add i32 ", i_cur, ", 1", 换行)
+        _c_s = 连接(_c_s, "  store i32 ", i_next, ", i32* ", idx_a, 换行)
+        _c_s = 连接(_c_s, "  br label %", _c_hdr_l, 换行)
+        _c_s = 连接(_c_s, end_l, ":", 换行)
+        返回(列表(_c_s, "null", reg))
+    }
+
+    // ── 第一批: no-_c_op 评估器命令 ──
+    若 (字符串相等(_c_op, "循环进栈") 或 字符串相等(_c_op, "循环出栈")) {
+        返回(列表("", "null", reg))
+    }
+    若 (字符串相等(_c_op, "进入合并上下文") 或 字符串相等(_c_op, "退出合并上下文")) {
+        返回(列表("", "null", reg))
+    }
+    若 (字符串相等(_c_op, "取合并标签")) {
+        设 _c_r = 新寄存器(reg); 设 rx = 列表取(_c_r, 0); reg = 列表取(_c_r, 1)
+        设 _c_s = 连接("  ", rx, " = call i8* @_next_reg_str()", 换行)
+        返回(列表(_c_s, rx, reg))
+    }
+
+    // ── 第二批: 已有 runtime 复用 ──
+    若 (字符串相等(_c_op, "查键")) {
+        设 _c_dr = 编译(_c_ce, 列表取(_c_args, 0), reg); 设 _c_s = 列表取(_c_dr, 0); 设 dv = 列表取(_c_dr, 1); reg = 列表取(_c_dr, 2)
+        设 _c_kr = 编译(_c_ce, 列表取(_c_args, 1), reg); _c_s = 连接(_c_s, 列表取(_c_kr, 0)); 设 kv = 列表取(_c_kr, 1); reg = 列表取(_c_kr, 2)
+        设 _c_r = 新寄存器(reg); 设 rx = 列表取(_c_r, 0); reg = 列表取(_c_r, 1)
+        _c_s = 连接(_c_s, "  ", rx, " = call i8* @rt_dict_get(i8* ", dv, ", i8* ", kv, ")", 换行)
+        返回(列表(_c_s, rx, reg))
+    }
+    若 (字符串相等(_c_op, "存变量")) {
+        设 _c_dr = 编译(_c_ce, 列表取(_c_args, 0), reg); 设 _c_s = 列表取(_c_dr, 0); 设 dv = 列表取(_c_dr, 1); reg = 列表取(_c_dr, 2)
+        设 _c_kr = 编译(_c_ce, 列表取(_c_args, 1), reg); _c_s = 连接(_c_s, 列表取(_c_kr, 0)); 设 kv = 列表取(_c_kr, 1); reg = 列表取(_c_kr, 2)
+        设 _c_vr = 编译(_c_ce, 列表取(_c_args, 2), reg); _c_s = 连接(_c_s, 列表取(_c_vr, 0)); reg = 列表取(_c_vr, 2)
+        _c_s = 连接(_c_s, "  call void @rt_dict_set(i8* ", dv, ", i8* ", kv, ", i8* ", 列表取(_c_vr, 1), ")", 换行)
+        返回(列表(_c_s, dv, reg))
+    }
+    若 (字符串相等(_c_op, "取") 或 字符串相等(_c_op, "list_get")) {
+        设 _c_container_ast = 列表取(_c_args, 0)
+        设 _c_index_ast = 列表取(_c_args, 1)
+        设 _c_c_r = 编译(_c_ce, _c_container_ast, reg)
+        设 _c_s = 列表取(_c_c_r, 0); 设 _c_cv = 列表取(_c_c_r, 1); reg = 列表取(_c_c_r, 2)
+        设 _c_i_r = 编译(_c_ce, _c_index_ast, reg)
+        _c_s = 连接(_c_s, 列表取(_c_i_r, 0)); 设 _c_iv = 列表取(_c_i_r, 1); reg = 列表取(_c_i_r, 2)
+        设 _c_ub_raw = 新寄存器ID(); 设 _c_ub_val = 新寄存器ID()
+        _c_s = 连接(_c_s, "  %", _c_ub_raw, " = ptrtoint i8* ", _c_iv, " to i64", 换行)
+        _c_s = 连接(_c_s, "  %", _c_ub_val, " = ashr i64 %", _c_ub_raw, ", 1", 换行)
+        设 _c_idx32 = 连接("%", _c_ub_val)
+        设 _c_r = 新寄存器(reg); 设 _c_result = 列表取(_c_r, 0); reg = 列表取(_c_r, 1)
+        _c_s = 连接(_c_s, "  ", _c_result, " = call i8* @rt_list_get(i8* ", _c_cv, ", i64 ", _c_idx32, ")", 换行)
+        返回(列表(_c_s, _c_result, reg))
+    }
+    若 (字符串相等(_c_op, "列表追加")) {
+        返回(列表("", "null", reg))
+    }
+    若 (字符串相等(_c_op, "新列表")) {
+        设 _c_r = 新寄存器(reg); 设 rx = 列表取(_c_r, 0); reg = 列表取(_c_r, 1)
+        设 _c_s = 连接("  ", rx, " = call i8* @rt_list_new()", 换行)
+        返回(列表(_c_s, rx, reg))
+    }
+    若 (字符串相等(_c_op, "新字典")) {
+        设 _c_r = 新寄存器(reg); 设 rx = 列表取(_c_r, 0); reg = 列表取(_c_r, 1)
+        设 _c_s = 连接("  ", rx, " = call i8* @rt_dict_new()", 换行)
+        返回(列表(_c_s, rx, reg))
+    }
+    若 (字符串相等(_c_op, "取字长")) {
+        设 _c_cr = 编译(_c_ce, 列表取(_c_args, 0), reg); 设 _c_s = 列表取(_c_cr, 0); 设 cv = 列表取(_c_cr, 1); reg = 列表取(_c_cr, 2)
+        设 _c_r = 新寄存器(reg); 设 r32 = 列表取(_c_r, 0); reg = 列表取(_c_r, 1)
+        _c_s = 连接(_c_s, "  ", r32, " = call i32 @rt_str_len(i8* ", cv, ")", 换行)
+        设 _c_r = 新寄存器(reg); 设 b1 = 列表取(_c_r, 0); reg = 列表取(_c_r, 1)
+        _c_s = 连接(_c_s, "  ", b1, " = zext i32 ", r32, " to i64", 换行)
+        设 _c_bb_shl = 新寄存器ID(); 设 bb_or = 新寄存器ID(); 设 bb_ptr = 新寄存器ID()
+        _c_s = 连接(_c_s, "  %", _c_bb_shl, " = shl i64 ", b1, ", 1", 换行)
+        _c_s = 连接(_c_s, "  %", bb_or, " = or i64 %", _c_bb_shl, ", 1", 换行)
+        _c_s = 连接(_c_s, "  %", bb_ptr, " = inttoptr i64 %", bb_or, " to i8*", 换行)
+        设 _c_bv = 连接("%", bb_ptr)
+        返回(列表(_c_s, _c_bv, reg))
+    }
+    若 (字符串相等(_c_op, "字典取长")) {
+        设 _c_cr = 编译(_c_ce, 列表取(_c_args, 0), reg); 设 _c_s = 列表取(_c_cr, 0); 设 cv = 列表取(_c_cr, 1); reg = 列表取(_c_cr, 2)
+        设 _c_r = 新寄存器(reg); 设 r32 = 列表取(_c_r, 0); reg = 列表取(_c_r, 1)
+        _c_s = 连接(_c_s, "  ", r32, " = call i32 @rt_dict_len(i8* ", cv, ")", 换行)
+        设 _c_r = 新寄存器(reg); 设 b1 = 列表取(_c_r, 0); reg = 列表取(_c_r, 1)
+        _c_s = 连接(_c_s, "  ", b1, " = zext i32 ", r32, " to i64", 换行)
+        设 _c_bb_shl = 新寄存器ID(); 设 bb_or = 新寄存器ID(); 设 bb_ptr = 新寄存器ID()
+        _c_s = 连接(_c_s, "  %", _c_bb_shl, " = shl i64 ", b1, ", 1", 换行)
+        _c_s = 连接(_c_s, "  %", bb_or, " = or i64 %", _c_bb_shl, ", 1", 换行)
+        _c_s = 连接(_c_s, "  %", bb_ptr, " = inttoptr i64 %", bb_or, " to i8*", 换行)
+        设 _c_bv = 连接("%", bb_ptr)
+        返回(列表(_c_s, _c_bv, reg))
+    }
+    若 (字符串相等(_c_op, "字典键列表")) {
+        设 _c_cr = 编译(_c_ce, 列表取(_c_args, 0), reg); 设 _c_s = 列表取(_c_cr, 0); 设 cv = 列表取(_c_cr, 1); reg = 列表取(_c_cr, 2)
+        设 _c_r = 新寄存器(reg); 设 rx = 列表取(_c_r, 0); reg = 列表取(_c_r, 1)
+        _c_s = 连接(_c_s, "  ", rx, " = call i8* @rt_dict_keys(i8* ", cv, ")", 换行)
+        返回(列表(_c_s, rx, reg))
+    }
+
+    // ── 第三批: 新逻辑 ──
+    若 (字符串相等(_c_op, "字符串包含")) {
+        设 _c_sr = 编译(_c_ce, 列表取(_c_args, 0), reg); 设 _c_s = 列表取(_c_sr, 0); 设 sv = 列表取(_c_sr, 1); reg = 列表取(_c_sr, 2)
+        设 _c_cr = 编译(_c_ce, 列表取(_c_args, 1), reg); _c_s = 连接(_c_s, 列表取(_c_cr, 0)); 设 cv = 列表取(_c_cr, 1); reg = 列表取(_c_cr, 2)
+        设 _c_r = 新寄存器(reg); 设 r32 = 列表取(_c_r, 0); reg = 列表取(_c_r, 1)
+        _c_s = 连接(_c_s, "  ", r32, " = call i32 @rt_str_contains(i8* ", sv, ", i8* ", cv, ")", 换行)
+        设 _c_r = 新寄存器(reg); 设 b1 = 列表取(_c_r, 0); reg = 列表取(_c_r, 1)
+        _c_s = 连接(_c_s, "  ", b1, " = zext i32 ", r32, " to i64", 换行)
+        设 _c_bb_shl = 新寄存器ID(); 设 bb_or = 新寄存器ID(); 设 bb_ptr = 新寄存器ID()
+        _c_s = 连接(_c_s, "  %", _c_bb_shl, " = shl i64 ", b1, ", 1", 换行)
+        _c_s = 连接(_c_s, "  %", bb_or, " = or i64 %", _c_bb_shl, ", 1", 换行)
+        _c_s = 连接(_c_s, "  %", bb_ptr, " = inttoptr i64 %", bb_or, " to i8*", 换行)
+        设 _c_bv = 连接("%", bb_ptr)
+        返回(列表(_c_s, _c_bv, reg))
+    }
+    若 (字符串相等(_c_op, "查找") 或 字符串相等(_c_op, "find")) {
+        设 _c_sr = 编译(_c_ce, 列表取(_c_args, 0), reg); 设 _c_s = 列表取(_c_sr, 0); 设 sv = 列表取(_c_sr, 1); reg = 列表取(_c_sr, 2)
+        设 _c_cr = 编译(_c_ce, 列表取(_c_args, 1), reg); _c_s = 连接(_c_s, 列表取(_c_cr, 0)); 设 cv = 列表取(_c_cr, 1); reg = 列表取(_c_cr, 2)
+        设 _c_r = 新寄存器(reg); 设 r32 = 列表取(_c_r, 0); reg = 列表取(_c_r, 1)
+        _c_s = 连接(_c_s, "  ", r32, " = call i32 @rt_str_find(i8* ", sv, ", i8* ", cv, ")", 换行)
+        设 _c_r = 新寄存器(reg); 设 b1 = 列表取(_c_r, 0); reg = 列表取(_c_r, 1)
+        _c_s = 连接(_c_s, "  ", b1, " = zext i32 ", r32, " to i64", 换行)
+        设 _c_bb_shl = 新寄存器ID(); 设 bb_or = 新寄存器ID(); 设 bb_ptr = 新寄存器ID()
+        _c_s = 连接(_c_s, "  %", _c_bb_shl, " = shl i64 ", b1, ", 1", 换行)
+        _c_s = 连接(_c_s, "  %", bb_or, " = or i64 %", _c_bb_shl, ", 1", 换行)
+        _c_s = 连接(_c_s, "  %", bb_ptr, " = inttoptr i64 %", bb_or, " to i8*", 换行)
+        设 _c_bv = 连接("%", bb_ptr)
+        返回(列表(_c_s, _c_bv, reg))
+    }
+
+    若 (字符串相等(_c_op, "是数字") 或 字符串相等(_c_op, "is_number")) {
+        设 _c_vr = 编译(_c_ce, 列表取(_c_args, 0), reg); 设 _c_s = 列表取(_c_vr, 0); 设 vv = 列表取(_c_vr, 1); reg = 列表取(_c_vr, 2)
+        设 _c_raw = 新寄存器ID(); 设 tag = 新寄存器ID(); 设 cmp = 新寄存器ID()
+        _c_s = 连接(_c_s, "  %", _c_raw, " = ptrtoint i8* ", vv, " to i64", 换行)
+        _c_s = 连接(_c_s, "  %", tag, " = and i64 %", _c_raw, ", 1", 换行)
+        _c_s = 连接(_c_s, "  %", cmp, " = icmp eq i64 %", tag, ", 1", 换行)
+        设 _c_zx = 新寄存器ID(); 设 shl1 = 新寄存器ID(); 设 or1 = 新寄存器ID(); 设 ptr1 = 新寄存器ID()
+        _c_s = 连接(_c_s, "  %", _c_zx, " = zext i1 %", cmp, " to i64", 换行)
+        _c_s = 连接(_c_s, "  %", shl1, " = shl i64 %", _c_zx, ", 1", 换行)
+        _c_s = 连接(_c_s, "  %", or1, " = or i64 %", shl1, ", 1", 换行)
+        _c_s = 连接(_c_s, "  %", ptr1, " = inttoptr i64 %", or1, " to i8*", 换行)
+        设 _c_bv = 连接("%", ptr1)
+        返回(列表(_c_s, _c_bv, reg))
+    }
+
+若 (字符串相等(_c_op, "是字典")) {
+        返回(列表("", "null", reg))
+    }
+    若 (字符串相等(_c_op, "前缀") 或 字符串相等(_c_op, "startswith")) {
+        设 _c_sr = 编译(_c_ce, 列表取(_c_args, 0), reg); 设 _c_s = 列表取(_c_sr, 0); 设 sv = 列表取(_c_sr, 1); reg = 列表取(_c_sr, 2)
+        设 _c_pr = 编译(_c_ce, 列表取(_c_args, 1), reg); _c_s = 连接(_c_s, 列表取(_c_pr, 0)); 设 pv = 列表取(_c_pr, 1); reg = 列表取(_c_pr, 2)
+        设 _c_r = 新寄存器(reg); 设 r32 = 列表取(_c_r, 0); reg = 列表取(_c_r, 1)
+        _c_s = 连接(_c_s, "  ", r32, " = call i32 @rt_str_startswith(i8* ", sv, ", i8* ", pv, ")", 换行)
+        设 _c_r = 新寄存器(reg); 设 b1 = 列表取(_c_r, 0); reg = 列表取(_c_r, 1)
+        _c_s = 连接(_c_s, "  ", b1, " = zext i32 ", r32, " to i64", 换行)
+        设 _c_bb_shl = 新寄存器ID(); 设 bb_or = 新寄存器ID(); 设 bb_ptr = 新寄存器ID()
+        _c_s = 连接(_c_s, "  %", _c_bb_shl, " = shl i64 ", b1, ", 1", 换行)
+        _c_s = 连接(_c_s, "  %", bb_or, " = or i64 %", _c_bb_shl, ", 1", 换行)
+        _c_s = 连接(_c_s, "  %", bb_ptr, " = inttoptr i64 %", bb_or, " to i8*", 换行)
+        设 _c_bv = 连接("%", bb_ptr)
+        返回(列表(_c_s, _c_bv, reg))
+    }
+
+    若 (字符串相等(_c_op, "判断") 或 字符串相等(_c_op, "judge")) {
+        返回(列表("", "null", reg))
+    }
+    若 (字符串相等(_c_op, "注册函数名")) {
+        返回(列表("", "null", reg))
+    }
+    若 (字符串相等(_c_op, "取函数名")) {
+        设 _c_nr = 编译(_c_ce, 列表取(_c_args, 0), reg); 设 _c_s = 列表取(_c_nr, 0); 设 nv = 列表取(_c_nr, 1); reg = 列表取(_c_nr, 2)
+        返回(列表(_c_s, nv, reg))
+    }
+    若 (字符串相等(_c_op, "转义LLVM字符串")) {
+        设 _c_nr = 编译(_c_ce, 列表取(_c_args, 0), reg); 设 _c_s = 列表取(_c_nr, 0); 设 nv = 列表取(_c_nr, 1); reg = 列表取(_c_nr, 2)
+        返回(列表(_c_s, nv, reg))
+    }
+    若 (字符串相等(_c_op, "是终止指令")) {
+        返回(列表("", "null", reg))
+    }
+
+    // 函数调用: op是函数名且在函数参数表中
+    设 _c_ascii_op = 取函数名(_c_op)
+    设 _c_fn_arity = 查键(函数参数表, _c_ascii_op)
+    若 (大于(取长(_c_fn_arity), 0)) {
+        设 _c_call_ir = ""
+        设 _c_arg_regs = ""
+        设 _c_arg_count = 列表取长(_c_args)
+        设 _c_ai = 0
+        循环 (小于(_c_ai, _c_arg_count)) {
+            设 _c_a_val = 列表取(_c_args, _c_ai)
+            设 _c_a_r = 编译(_c_ce, _c_a_val, reg)
+            _c_call_ir = 连接(_c_call_ir, 列表取(_c_a_r, 0))
+            设 _c_av = 列表取(_c_a_r, 1); reg = 列表取(_c_a_r, 2)
+            若 (大于(_c_ai, 0)) { _c_arg_regs = 连接(_c_arg_regs, ", ") }
+            _c_arg_regs = 连接(_c_arg_regs, "i8* ", _c_av)
+            _c_ai = 加(_c_ai, 1)
+        }
+        设 _c_r = 新寄存器(reg); 设 result_reg = 列表取(_c_r, 0); reg = 列表取(_c_r, 1)
+        _c_call_ir = 连接(_c_call_ir, "  ", result_reg, " = call i8* @", _c_ascii_op, "(", _c_arg_regs, ")", 换行)
+        返回(列表(_c_call_ir, result_reg, reg))
+    }
+
+    // 外部C函数调用
+    设 _c_is_extern = 假
+    若 (字符串相等(_c_op, "san_read_file")) {
+        设 _c_call_ir = ""
+        设 _c_a1 = 列表取(_c_args, 0)
+        设 _c_r1 = 编译(_c_ce, _c_a1, reg)
+        _c_call_ir = 连接(_c_call_ir, 列表取(_c_r1, 0)); 设 av1 = 列表取(_c_r1, 1); reg = 列表取(_c_r1, 2)
+        设 _c_r = 新寄存器(reg); 设 result_reg = 列表取(_c_r, 0); reg = 列表取(_c_r, 1)
+        _c_call_ir = 连接(_c_call_ir, "  ", result_reg, " = call i8* @san_read_file(i8* ", av1, ", i32* null)", 换行)
+        返回(列表(_c_call_ir, result_reg, reg))
+    }
+    若 (字符串相等(_c_op, "san_write_file")) {
+        设 _c_call_ir = ""
+        设 _c_a1 = 列表取(_c_args, 0); 设 _c_r1 = 编译(_c_ce, _c_a1, reg)
+        _c_call_ir = 连接(_c_call_ir, 列表取(_c_r1, 0)); 设 av1 = 列表取(_c_r1, 1); reg = 列表取(_c_r1, 2)
+        设 _c_a2 = 列表取(_c_args, 1); 设 _c_r2 = 编译(_c_ce, _c_a2, reg)
+        _c_call_ir = 连接(_c_call_ir, 列表取(_c_r2, 0)); 设 av2 = 列表取(_c_r2, 1); reg = 列表取(_c_r2, 2)
+        设 _c_a3 = 列表取(_c_args, 2); 设 _c_r3 = 编译(_c_ce, _c_a3, reg)
+        _c_call_ir = 连接(_c_call_ir, 列表取(_c_r3, 0)); 设 av3 = 列表取(_c_r3, 1); reg = 列表取(_c_r3, 2)
+        _c_call_ir = 连接(_c_call_ir, "  call void @san_write_file(i8* ", av1, ", i8* ", av2, ", i32 0)", 换行)
+        返回(列表(_c_call_ir, "null", reg))
+    }
+    若 (字符串相等(_c_op, "san_argv")) { _c_is_extern = 真 }
+    若 (字符串相等(_c_op, "san_argc")) { _c_is_extern = 真 }
+    若 (字符串相等(_c_op, "_rt_malloc")) { _c_is_extern = 真 }
+    若 (字符串相等(_c_op, "_rt_free")) { _c_is_extern = 真 }
+    若 (_c_is_extern) {
+        设 _c_call_ir = ""
+        设 _c_arg_regs = ""
+        设 _c_arg_count = 列表取长(_c_args)
+        设 _c_ai = 0
+        循环 (小于(_c_ai, _c_arg_count)) {
+            设 _c_a_val = 列表取(_c_args, _c_ai)
+            设 _c_a_r = 编译(_c_ce, _c_a_val, reg)
+            _c_call_ir = 连接(_c_call_ir, 列表取(_c_a_r, 0))
+            设 _c_av = 列表取(_c_a_r, 1); reg = 列表取(_c_a_r, 2)
+            若 (大于(_c_ai, 0)) { _c_arg_regs = 连接(_c_arg_regs, ", ") }
+            _c_arg_regs = 连接(_c_arg_regs, "i8* ", _c_av)
+            _c_ai = 加(_c_ai, 1)
+        }
+        设 _c_r = 新寄存器(reg); 设 result_reg = 列表取(_c_r, 0); reg = 列表取(_c_r, 1)
+        _c_call_ir = 连接(_c_call_ir, "  ", result_reg, " = call i8* @", _c_ascii_op, "(", _c_arg_regs, ")", 换行)
+        返回(列表(_c_call_ir, result_reg, reg))
+    }
+
+    // 通用函数调用 fallback
+    设 _c_call_ir = ""
+    设 _c_arg_regs = ""
+    设 _c_arg_count = 列表取长(_c_args)
+    设 _c_ai = 0
+    循环 (小于(_c_ai, _c_arg_count)) {
+        设 _c_a_val = 列表取(_c_args, _c_ai)
+        设 _c_a_r = 编译(_c_ce, _c_a_val, reg)
+        _c_call_ir = 连接(_c_call_ir, 列表取(_c_a_r, 0))
+        设 _c_av = 列表取(_c_a_r, 1); reg = 列表取(_c_a_r, 2)
+        若 (大于(_c_ai, 0)) { _c_arg_regs = 连接(_c_arg_regs, ", ") }
+        _c_arg_regs = 连接(_c_arg_regs, "i8* ", _c_av)
+        _c_ai = 加(_c_ai, 1)
+    }
+    设 _c_r = 新寄存器(reg); 设 result_reg = 列表取(_c_r, 0); reg = 列表取(_c_r, 1)
+    _c_call_ir = 连接(_c_call_ir, "  ", result_reg, " = call i8* @", _c_ascii_op, "(", _c_arg_regs, ")", 换行)
+    返回(列表(_c_call_ir, result_reg, reg))
+
+    }
+
+    若 (是字符串(ast)) {
+        若 (是否为数字字符串(ast)) {
+            设 ast = parse_int(ast)
+         }
+    }
+
+    若 (是数字(ast)) {
+        设 _c_n = ast
+        设 _c_r = 新寄存器(reg); 设 rn = 列表取(_c_r, 0); reg = 列表取(_c_r, 1)
+        设 _c_s = 连接("  ", rn, " = add i64 0, ", _c_n, 换行)
+        设 _c_bb_shl = 新寄存器ID(); 设 bb_or = 新寄存器ID(); 设 bb_ptr = 新寄存器ID()
+        _c_s = 连接(_c_s, "  %", _c_bb_shl, " = shl i64 ", rn, ", 1", 换行)
+        _c_s = 连接(_c_s, "  %", bb_or, " = or i64 %", _c_bb_shl, ", 1", 换行)
+        _c_s = 连接(_c_s, "  %", bb_ptr, " = inttoptr i64 %", bb_or, " to i8*", 换行)
+        设 _c_bv = 连接("%", bb_ptr)
+        返回(列表(_c_s, _c_bv, reg))
+    }
+
+    若 (是字符串(ast)) {
+        设 _c_first_char = 子串(ast, 0, 1)
+        若 (前缀(ast, "\"")) {
+            // 字符串字面量: "content" → 全局常量gep → rt_str_new创建堆对象
+            设 _c_content = 子串(ast, 1, 减(取长(ast), 2))
+            设 _c_gname = 取字符串常量(_c_content)
+            设 _c_s = ""
+            设 _c_r = 新寄存器(reg); 设 gep = 列表取(_c_r, 0); reg = 列表取(_c_r, 1)
+            设 _c_len = 加(取字长(_c_content), 1)
+            _c_s = 连接("  ", gep, " = getelementptr inbounds [", _c_len, " x i8], [", _c_len, " x i8]* ", _c_gname, ", i32 0, i32 0", 换行)
+            设 _c_slen = 取字长(_c_content)
+            设 _c_r = 新寄存器(reg); 设 str_obj = 列表取(_c_r, 0); reg = 列表取(_c_r, 1)
+            _c_s = 连接(_c_s, "  ", str_obj, " = call i8* @rt_str_new(i8* ", gep, ", i32 ", _c_slen, ")", 换行)
+            返回(列表(_c_s, str_obj, reg))
+         }
+        // 全局变量引用: load from @global
+        设 _c_gv_ref = 查键(全局变量表, ast)
+        若 (大于(取长(_c_gv_ref), 0)) {
+            设 _c_r = 新寄存器(reg); 设 _c_r1 = 列表取(_c_r, 0); reg = 列表取(_c_r, 1)
+            设 _c_s = 连接("  ", _c_r1, " = load i8*, i8** @", _c_gv_ref, 换行)
+            返回(列表(_c_s, _c_r1, reg))
+        }
+        设 _c_alloca = 查键(_c_ce, ast)
+        若 (大于(取长(_c_alloca), 0)) {
+            设 _c_r = 新寄存器(reg); 设 _c_r1 = 列表取(_c_r, 0); reg = 列表取(_c_r, 1)
+            设 _c_s = 连接("  ", _c_r1, " = load i8*, i8** ", _c_alloca, 换行)
+            返回(列表(_c_s, _c_r1, reg))
+        }
+    }
+
+    返回(列表("", "null", reg))
+}
+
+定义 生成运行时IR () {
+    // 返回所有运行时函数的 LLVM IR 定义
+    设 ir = ""
+
+    // ── rt_print_str ──
+    ir = 连接(ir, "define void @rt_print_str(i8* %str) {", 换行)
+    ir = 连接(ir, "entry:", 换行)
+    ir = 连接(ir, "  %_pi = ptrtoint i8* %str to i64", 换行)
+    ir = 连接(ir, "  %_is_tagged = and i64 %_pi, 1", 换行)
+    ir = 连接(ir, "  %_check = icmp eq i64 %_is_tagged, 0", 换行)
+    ir = 连接(ir, "  br i1 %_check, label %obj, label %scan", 换行)
+    ir = 连接(ir, "obj:", 换行)
+    ir = 连接(ir, "  %_tp = bitcast i8* %str to i32*", 换行)
+    ir = 连接(ir, "  %_type = load i32, i32* %_tp", 换行)
+    ir = 连接(ir, "  %_is_str = icmp eq i32 %_type, 1", 换行)
+    ir = 连接(ir, "  br i1 %_is_str, label %str_obj, label %scan", 换行)
+    ir = 连接(ir, "str_obj:", 换行)
+    ir = 连接(ir, "  %_lp = getelementptr i8, i8* %str, i32 4", 换行)
+    ir = 连接(ir, "  %_li = bitcast i8* %_lp to i32*", 换行)
+    ir = 连接(ir, "  %_len = load i32, i32* %_li", 换行)
+    ir = 连接(ir, "  %_dp = getelementptr i8, i8* %str, i32 8", 换行)
+    ir = 连接(ir, "  call void @san_sys_write(i32 1, i8* %_dp, i32 %_len)", 换行)
+    ir = 连接(ir, "  ret void", 换行)
+    ir = 连接(ir, "scan:", 换行)
+    ir = 连接(ir, "  %_si = phi i32 [ 0, %entry ], [ 0, %obj ], [ %_ni, %scan ]", 换行)
+    ir = 连接(ir, "  %_sp = getelementptr inbounds i8, i8* %str, i32 %_si", 换行)
+    ir = 连接(ir, "  %_sc = load i8, i8* %_sp", 换行)
+    ir = 连接(ir, "  %_sd = icmp eq i8 %_sc, 0", 换行)
+    ir = 连接(ir, "  %_ni = add i32 %_si, 1", 换行)
+    ir = 连接(ir, "  br i1 %_sd, label %write, label %scan", 换行)
+    ir = 连接(ir, "write:", 换行)
+    ir = 连接(ir, "  call void @san_sys_write(i32 1, i8* %str, i32 %_si)", 换行)
+    ir = 连接(ir, "  ret void", 换行)
+    ir = 连接(ir, "}", 换行)
+    ir = 连接(ir, 换行)
+
+    // ── rt_print_int ──
+    ir = 连接(ir, "define void @rt_print_int(i64 %tagged) {", 换行)
+    ir = 连接(ir, "entry:", 换行)
+    ir = 连接(ir, "  %raw = ashr i64 %tagged, 1", 换行)
+    ir = 连接(ir, "  %is_neg = icmp slt i64 %raw, 0", 换行)
+    ir = 连接(ir, "  %abs = sub i64 0, %raw", 换行)
+    ir = 连接(ir, "  %val = select i1 %is_neg, i64 %abs, i64 %raw", 换行)
+    ir = 连接(ir, "  br i1 %is_neg, label %put_sign, label %build", 换行)
+    ir = 连接(ir, "put_sign:", 换行)
+    ir = 连接(ir, "  %sp = getelementptr inbounds [22 x i8], [22 x i8]* @_rt_buf, i64 0, i32 0", 换行)
+    ir = 连接(ir, "  store i8 45, i8* %sp", 换行)
+    ir = 连接(ir, "  br label %build", 换行)
+    ir = 连接(ir, "build:", 换行)
+    ir = 连接(ir, "  %off = phi i32 [ 1, %put_sign ], [ 0, %entry ]", 换行)
+    ir = 连接(ir, "  br label %loop", 换行)
+    ir = 连接(ir, "loop:", 换行)
+    ir = 连接(ir, "  %i = phi i32 [ %off, %build ], [ %ni, %loop ]", 换行)
+    ir = 连接(ir, "  %v = phi i64 [ %val, %build ], [ %nv, %loop ]", 换行)
+    ir = 连接(ir, "  %p = getelementptr inbounds [22 x i8], [22 x i8]* @_rt_buf, i64 0, i32 %i", 换行)
+    ir = 连接(ir, "  %d = urem i64 %v, 10", 换行)
+    ir = 连接(ir, "  %ch64 = add i64 %d, 48", 换行)
+    ir = 连接(ir, "  %ch = trunc i64 %ch64 to i8", 换行)
+    ir = 连接(ir, "  store i8 %ch, i8* %p", 换行)
+    ir = 连接(ir, "  %nv = udiv i64 %v, 10", 换行)
+    ir = 连接(ir, "  %ni = add i32 %i, 1", 换行)
+    ir = 连接(ir, "  %ld = icmp eq i64 %nv, 0", 换行)
+    ir = 连接(ir, "  br i1 %ld, label %exit, label %loop", 换行)
+    ir = 连接(ir, "exit:", 换行)
+    ir = 连接(ir, "  %ei = phi i32 [ %ni, %loop ]", 换行)
+    ir = 连接(ir, "  %nl = getelementptr inbounds [22 x i8], [22 x i8]* @_rt_buf, i64 0, i32 %ei", 换行)
+    ir = 连接(ir, "  store i8 10, i8* %nl", 换行)
+    ir = 连接(ir, "  %re = sub i32 %ei, 1", 换行)
+    ir = 连接(ir, "  br label %rev_loop", 换行)
+    ir = 连接(ir, "rev_loop:", 换行)
+    ir = 连接(ir, "  %l = phi i32 [ %off, %exit ], [ %nl2, %rev_swap ]", 换行)
+    ir = 连接(ir, "  %r = phi i32 [ %re, %exit ], [ %nr2, %rev_swap ]", 换行)
+    ir = 连接(ir, "  %rd = icmp sge i32 %l, %r", 换行)
+    ir = 连接(ir, "  br i1 %rd, label %done, label %rev_swap", 换行)
+    ir = 连接(ir, "rev_swap:", 换行)
+    ir = 连接(ir, "  %lp = getelementptr inbounds [22 x i8], [22 x i8]* @_rt_buf, i64 0, i32 %l", 换行)
+    ir = 连接(ir, "  %rp = getelementptr inbounds [22 x i8], [22 x i8]* @_rt_buf, i64 0, i32 %r", 换行)
+    ir = 连接(ir, "  %lc = load i8, i8* %lp", 换行)
+    ir = 连接(ir, "  %rc = load i8, i8* %rp", 换行)
+    ir = 连接(ir, "  store i8 %rc, i8* %lp", 换行)
+    ir = 连接(ir, "  store i8 %lc, i8* %rp", 换行)
+    ir = 连接(ir, "  %nl2 = add i32 %l, 1", 换行)
+    ir = 连接(ir, "  %nr2 = sub i32 %r, 1", 换行)
+    ir = 连接(ir, "  br label %rev_loop", 换行)
+    ir = 连接(ir, "done:", 换行)
+    ir = 连接(ir, "  %tl = add i32 %ei, 1", 换行)
+    ir = 连接(ir, "  %startp = getelementptr inbounds [22 x i8], [22 x i8]* @_rt_buf, i64 0, i32 %off", 换行)
+    ir = 连接(ir, "  call void @san_sys_write(i32 1, i8* %startp, i32 %tl)", 换行)
+    ir = 连接(ir, "  ret void", 换行)
+    ir = 连接(ir, "}", 换行)
+    ir = 连接(ir, 换行)
+
+    ir = 连接(ir, 生成_字符串操作())
+    ir = 连接(ir, 生成_列表操作())
+    ir = 连接(ir, 生成_字典操作())
+
+    返回(ir)
+}
+
+定义 生成_字符串操作 () {
+    设 ir = ""
+
+    // rt_str_new: 创建字符串对象 (data: i8*, len: i32) → i8* (堆对象)
+    // 布局: [type:i32=1][len:i32][data:i8[len+1]]
+    ir = 连接(ir, "define i8* @rt_str_new(i8* %data, i32 %len) {", 换行)
+    ir = 连接(ir, "entry:", 换行)
+    ir = 连接(ir, "  %_sz = add i32 %len, 9", 换行)
+    ir = 连接(ir, "  %_m = call i8* @_rt_malloc(i32 %_sz)", 换行)
+    ir = 连接(ir, "  %_tp = bitcast i8* %_m to i32*", 换行)
+    ir = 连接(ir, "  store i32 1, i32* %_tp", 换行)
+    ir = 连接(ir, "  %_lp = getelementptr i8, i8* %_m, i32 4", 换行)
+    ir = 连接(ir, "  %_li = bitcast i8* %_lp to i32*", 换行)
+    ir = 连接(ir, "  store i32 %len, i32* %_li", 换行)
+    ir = 连接(ir, "  %_dp = getelementptr i8, i8* %_m, i32 8", 换行)
+    // memcpy
+    ir = 连接(ir, "  %_cp = icmp sgt i32 %len, 0", 换行)
+    ir = 连接(ir, "  br i1 %_cp, label %copy, label %done", 换行)
+    ir = 连接(ir, "copy:", 换行)
+    ir = 连接(ir, "  %_i = phi i32 [ 0, %entry ], [ %_ni, %copy ]", 换行)
+    ir = 连接(ir, "  %_sp = getelementptr inbounds i8, i8* %data, i32 %_i", 换行)
+    ir = 连接(ir, "  %_sc = load i8, i8* %_sp", 换行)
+    ir = 连接(ir, "  %_dp2 = getelementptr inbounds i8, i8* %_dp, i32 %_i", 换行)
+    ir = 连接(ir, "  store i8 %_sc, i8* %_dp2", 换行)
+    ir = 连接(ir, "  %_ni = add i32 %_i, 1", 换行)
+    ir = 连接(ir, "  %_cd = icmp slt i32 %_ni, %len", 换行)
+    ir = 连接(ir, "  br i1 %_cd, label %copy, label %done", 换行)
+    ir = 连接(ir, "done:", 换行)
+    ir = 连接(ir, "  %_np = getelementptr inbounds i8, i8* %_dp, i32 %len", 换行)
+    ir = 连接(ir, "  store i8 0, i8* %_np", 换行)
+    ir = 连接(ir, "  ret i8* %_m", 换行)
+    ir = 连接(ir, "}", 换行)
+    ir = 连接(ir, 换行)
+
+    // rt_str_concat: 拼接两个字符串对象 → 新字符串
+    ir = 连接(ir, "define i8* @rt_str_concat(i8* %a, i8* %b) {", 换行)
+    ir = 连接(ir, "entry:", 换行)
+    ir = 连接(ir, "  %_lap = getelementptr i8, i8* %a, i32 4", 换行)
+    ir = 连接(ir, "  %_lai = bitcast i8* %_lap to i32*", 换行)
+    ir = 连接(ir, "  %_la = load i32, i32* %_lai", 换行)
+    ir = 连接(ir, "  %_lbp = getelementptr i8, i8* %b, i32 4", 换行)
+    ir = 连接(ir, "  %_lbi = bitcast i8* %_lbp to i32*", 换行)
+    ir = 连接(ir, "  %_lb = load i32, i32* %_lbi", 换行)
+    ir = 连接(ir, "  %_tl = add i32 %_la, %_lb", 换行)
+    ir = 连接(ir, "  %_sz = add i32 %_tl, 9", 换行)
+    ir = 连接(ir, "  %_m = call i8* @_rt_malloc(i32 %_sz)", 换行)
+    ir = 连接(ir, "  %_tp = bitcast i8* %_m to i32*", 换行)
+    ir = 连接(ir, "  store i32 1, i32* %_tp", 换行)
+    ir = 连接(ir, "  %_lp = getelementptr i8, i8* %_m, i32 4", 换行)
+    ir = 连接(ir, "  %_li = bitcast i8* %_lp to i32*", 换行)
+    ir = 连接(ir, "  store i32 %_tl, i32* %_li", 换行)
+    ir = 连接(ir, "  %_dp = getelementptr i8, i8* %_m, i32 8", 换行)
+    ir = 连接(ir, "  %_ad = getelementptr i8, i8* %a, i32 8", 换行)
+    ir = 连接(ir, "  %_bd = getelementptr i8, i8* %b, i32 8", 换行)
+    // copy a
+    ir = 连接(ir, "  %_ca = icmp sgt i32 %_la, 0", 换行)
+    ir = 连接(ir, "  br i1 %_ca, label %copy_a, label %copy_b_start", 换行)
+    ir = 连接(ir, "copy_a:", 换行)
+    ir = 连接(ir, "  %_ai = phi i32 [ 0, %entry ], [ %_ani, %copy_a ]", 换行)
+    ir = 连接(ir, "  %_asp = getelementptr i8, i8* %_ad, i32 %_ai", 换行)
+    ir = 连接(ir, "  %_asc = load i8, i8* %_asp", 换行)
+    ir = 连接(ir, "  %_adp = getelementptr i8, i8* %_dp, i32 %_ai", 换行)
+    ir = 连接(ir, "  store i8 %_asc, i8* %_adp", 换行)
+    ir = 连接(ir, "  %_ani = add i32 %_ai, 1", 换行)
+    ir = 连接(ir, "  %_acd = icmp slt i32 %_ani, %_la", 换行)
+    ir = 连接(ir, "  br i1 %_acd, label %copy_a, label %copy_b_start", 换行)
+    ir = 连接(ir, "copy_b_start:", 换行)
+    ir = 连接(ir, "  %_cbc = icmp sgt i32 %_lb, 0", 换行)
+    ir = 连接(ir, "  br i1 %_cbc, label %copy_b, label %done", 换行)
+    ir = 连接(ir, "copy_b:", 换行)
+    ir = 连接(ir, "  %_bi = phi i32 [ 0, %copy_b_start ], [ %_bni, %copy_b ]", 换行)
+    ir = 连接(ir, "  %_bsp = getelementptr i8, i8* %_bd, i32 %_bi", 换行)
+    ir = 连接(ir, "  %_bsc = load i8, i8* %_bsp", 换行)
+    ir = 连接(ir, "  %_boff = add i32 %_bi, %_la", 换行)
+    ir = 连接(ir, "  %_bdp = getelementptr i8, i8* %_dp, i32 %_boff", 换行)
+    ir = 连接(ir, "  store i8 %_bsc, i8* %_bdp", 换行)
+    ir = 连接(ir, "  %_bni = add i32 %_bi, 1", 换行)
+    ir = 连接(ir, "  %_bcd = icmp slt i32 %_bni, %_lb", 换行)
+    ir = 连接(ir, "  br i1 %_bcd, label %copy_b, label %done", 换行)
+    ir = 连接(ir, "done:", 换行)
+    ir = 连接(ir, "  %_np = getelementptr inbounds i8, i8* %_dp, i32 %_tl", 换行)
+    ir = 连接(ir, "  store i8 0, i8* %_np", 换行)
+    ir = 连接(ir, "  ret i8* %_m", 换行)
+    ir = 连接(ir, "}", 换行)
+    ir = 连接(ir, 换行)
+
+    // rt_str_len: 返回字符串长度
+    ir = 连接(ir, "define i32 @rt_str_len(i8* %s) {", 换行)
+    ir = 连接(ir, "  %_lp = getelementptr i8, i8* %s, i32 4", 换行)
+    ir = 连接(ir, "  %_li = bitcast i8* %_lp to i32*", 换行)
+    ir = 连接(ir, "  %_l = load i32, i32* %_li", 换行)
+    ir = 连接(ir, "  ret i32 %_l", 换行)
+    ir = 连接(ir, "}", 换行)
+    ir = 连接(ir, 换行)
+
+    // rt_str_as_cstr: 提取字符串原始数据指针(用于C函数)
+    ir = 连接(ir, "define i8* @rt_str_as_cstr(i8* %s) {", 换行)
+    ir = 连接(ir, "  %_dp = getelementptr i8, i8* %s, i32 8", 换行)
+    ir = 连接(ir, "  ret i8* %_dp", 换行)
+    ir = 连接(ir, "}", 换行)
+    ir = 连接(ir, 换行)
+
+    返回(ir)
+}
+
+定义 生成_列表操作 () {
+    设 ir = ""
+
+    // rt_list_new: alloc header(16 bytes) + 4 initial item slots(32 bytes) = 48 bytes
+    ir = 连接(ir, "define i8* @rt_list_new() {", 换行)
+    ir = 连接(ir, "entry:", 换行)
+    ir = 连接(ir, "  %_m = call i8* @_rt_malloc(i32 48)", 换行)
+    ir = 连接(ir, "  %_tp = bitcast i8* %_m to i32*", 换行)
+    ir = 连接(ir, "  store i32 2, i32* %_tp", 换行)
+    ir = 连接(ir, "  %_lp = getelementptr i8, i8* %_m, i32 4", 换行)
+    ir = 连接(ir, "  %_li = bitcast i8* %_lp to i32*", 换行)
+    ir = 连接(ir, "  store i32 0, i32* %_li", 换行)
+    ir = 连接(ir, "  %_cp = getelementptr i8, i8* %_m, i32 8", 换行)
+    ir = 连接(ir, "  %_ci = bitcast i8* %_cp to i32*", 换行)
+    ir = 连接(ir, "  store i32 4, i32* %_ci", 换行)
+    ir = 连接(ir, "  ret i8* %_m", 换行)
+    ir = 连接(ir, "}", 换行)
+    ir = 连接(ir, 换行)
+
+    // rt_list_push_item → 返回可能更新的列表指针
+    ir = 连接(ir, "define i8* @rt_list_push_item(i8* %lst, i8* %item) {", 换行)
+    ir = 连接(ir, "entry:", 换行)
+    ir = 连接(ir, "  %_lp = getelementptr i8, i8* %lst, i32 4", 换行)
+    ir = 连接(ir, "  %_li = bitcast i8* %_lp to i32*", 换行)
+    ir = 连接(ir, "  %_len = load i32, i32* %_li", 换行)
+    ir = 连接(ir, "  %_cp = getelementptr i8, i8* %lst, i32 8", 换行)
+    ir = 连接(ir, "  %_ci = bitcast i8* %_cp to i32*", 换行)
+    ir = 连接(ir, "  %_cap = load i32, i32* %_ci", 换行)
+    ir = 连接(ir, "  %_full = icmp sge i32 %_len, %_cap", 换行)
+    ir = 连接(ir, "  br i1 %_full, label %grow, label %append", 换行)
+    ir = 连接(ir, "grow:", 换行)
+    ir = 连接(ir, "  %_ncap = mul i32 %_cap, 2", 换行)
+    ir = 连接(ir, "  %_nbytes = mul i32 %_ncap, 8", 换行)
+    ir = 连接(ir, "  %_ntotal = add i32 %_nbytes, 16", 换行)
+    ir = 连接(ir, "  %_new = call i8* @_rt_malloc(i32 %_ntotal)", 换行)
+    ir = 连接(ir, "  %_ntp = bitcast i8* %_new to i32*", 换行)
+    ir = 连接(ir, "  store i32 2, i32* %_ntp", 换行)
+    ir = 连接(ir, "  %_nlp = getelementptr i8, i8* %_new, i32 4", 换行)
+    ir = 连接(ir, "  %_nli = bitcast i8* %_nlp to i32*", 换行)
+    ir = 连接(ir, "  store i32 %_len, i32* %_nli", 换行)
+    ir = 连接(ir, "  %_ncp = getelementptr i8, i8* %_new, i32 8", 换行)
+    ir = 连接(ir, "  %_nci = bitcast i8* %_ncp to i32*", 换行)
+    ir = 连接(ir, "  store i32 %_ncap, i32* %_nci", 换行)
+    ir = 连接(ir, "  %_od = icmp sgt i32 %_len, 0", 换行)
+    ir = 连接(ir, "  br i1 %_od, label %copy, label %set_ret", 换行)
+    ir = 连接(ir, "copy:", 换行)
+    ir = 连接(ir, "  %_ci2 = phi i32 [ 0, %grow ], [ %_cni, %copy ]", 换行)
+    ir = 连接(ir, "  %_osp = getelementptr i8, i8* %lst, i32 16", 换行)
+    ir = 连接(ir, "  %_ospp = bitcast i8* %_osp to i8**", 换行)
+    ir = 连接(ir, "  %_ospi = getelementptr i8*, i8** %_ospp, i32 %_ci2", 换行)
+    ir = 连接(ir, "  %_ov = load i8*, i8** %_ospi", 换行)
+    ir = 连接(ir, "  %_ndp = getelementptr i8, i8* %_new, i32 16", 换行)
+    ir = 连接(ir, "  %_ndpp = bitcast i8* %_ndp to i8**", 换行)
+    ir = 连接(ir, "  %_ndpi = getelementptr i8*, i8** %_ndpp, i32 %_ci2", 换行)
+    ir = 连接(ir, "  store i8* %_ov, i8** %_ndpi", 换行)
+    ir = 连接(ir, "  %_cni = add i32 %_ci2, 1", 换行)
+    ir = 连接(ir, "  %_cd = icmp slt i32 %_cni, %_len", 换行)
+    ir = 连接(ir, "  br i1 %_cd, label %copy, label %free_old", 换行)
+    ir = 连接(ir, "free_old:", 换行)
+    ir = 连接(ir, "  call void @_rt_free(i8* %lst)", 换行)
+    ir = 连接(ir, "  br label %append_new", 换行)
+    ir = 连接(ir, "set_ret:", 换行)
+    ir = 连接(ir, "  br label %append_new", 换行)
+    ir = 连接(ir, "append_new:", 换行)
+    ir = 连接(ir, "  %_al = phi i8* [ %_new, %free_old ], [ %_new, %set_ret ]", 换行)
+    ir = 连接(ir, "  %_alp = getelementptr i8, i8* %_al, i32 16", 换行)
+    ir = 连接(ir, "  %_alpp = bitcast i8* %_alp to i8**", 换行)
+    ir = 连接(ir, "  %_alpi = getelementptr i8*, i8** %_alpp, i32 %_len", 换行)
+    ir = 连接(ir, "  store i8* %item, i8** %_alpi", 换行)
+    ir = 连接(ir, "  %_nlen2 = add i32 %_len, 1", 换行)
+    ir = 连接(ir, "  %_alpp2 = getelementptr i8, i8* %_al, i32 4", 换行)
+    ir = 连接(ir, "  %_alpi2 = bitcast i8* %_alpp2 to i32*", 换行)
+    ir = 连接(ir, "  store i32 %_nlen2, i32* %_alpi2", 换行)
+    ir = 连接(ir, "  ret i8* %_al", 换行)
+    ir = 连接(ir, "append:", 换行)
+    ir = 连接(ir, "  %_ip = getelementptr i8, i8* %lst, i32 16", 换行)
+    ir = 连接(ir, "  %_ipp = bitcast i8* %_ip to i8**", 换行)
+    ir = 连接(ir, "  %_ipi = getelementptr i8*, i8** %_ipp, i32 %_len", 换行)
+    ir = 连接(ir, "  store i8* %item, i8** %_ipi", 换行)
+    ir = 连接(ir, "  %_nlen = add i32 %_len, 1", 换行)
+    ir = 连接(ir, "  store i32 %_nlen, i32* %_li", 换行)
+    ir = 连接(ir, "  ret i8* %lst", 换行)
+    ir = 连接(ir, "}", 换行)
+    ir = 连接(ir, 换行)
+
+    // rt_list_get(list, index)
+    ir = 连接(ir, "define i8* @rt_list_get(i8* %lst, i32 %idx) {", 换行)
+    ir = 连接(ir, "  %_ip = getelementptr i8, i8* %lst, i32 16", 换行)
+    ir = 连接(ir, "  %_ipp = bitcast i8* %_ip to i8**", 换行)
+    ir = 连接(ir, "  %_ipi = getelementptr i8*, i8** %_ipp, i32 %idx", 换行)
+    ir = 连接(ir, "  %_v = load i8*, i8** %_ipi", 换行)
+    ir = 连接(ir, "  ret i8* %_v", 换行)
+    ir = 连接(ir, "}", 换行)
+    ir = 连接(ir, 换行)
+
+    // rt_list_len(list)
+    ir = 连接(ir, "define i32 @rt_list_len(i8* %lst) {", 换行)
+    ir = 连接(ir, "  %_lp = getelementptr i8, i8* %lst, i32 4", 换行)
+    ir = 连接(ir, "  %_li = bitcast i8* %_lp to i32*", 换行)
+    ir = 连接(ir, "  %_v = load i32, i32* %_li", 换行)
+    ir = 连接(ir, "  ret i32 %_v", 换行)
+    ir = 连接(ir, "}", 换行)
+    ir = 连接(ir, 换行)
+
+    返回(ir)
+}
+
+定义 生成_字典操作 () {
+    设 ir = ""
+
+    // _rt_str_eq: null-safe, 长度感知, 比较data字段(offset 8)
+    ir = 连接(ir, "define i32 @_rt_str_eq(i8* %a, i8* %b) {", 换行)
+    ir = 连接(ir, "  %_ns_a = icmp eq i8* %a, null", 换行)
+    ir = 连接(ir, "  %_ns_b = icmp eq i8* %b, null", 换行)
+    ir = 连接(ir, "  %_ns_or = or i1 %_ns_a, %_ns_b", 换行)
+    ir = 连接(ir, "  br i1 %_ns_or, label %_ns_null, label %_ns_ok", 换行)
+    ir = 连接(ir, "_ns_null:", 换行)
+    ir = 连接(ir, "  %_ns_and = and i1 %_ns_a, %_ns_b", 换行)
+    ir = 连接(ir, "  br i1 %_ns_and, label %_ns_ret1, label %_ns_ret0", 换行)
+    ir = 连接(ir, "_ns_ret1:", 换行)
+    ir = 连接(ir, "  ret i32 1", 换行)
+    ir = 连接(ir, "_ns_ret0:", 换行)
+    ir = 连接(ir, "  ret i32 0", 换行)
+    ir = 连接(ir, "_ns_ok:", 换行)
+    ir = 连接(ir, "  %_ns_la = getelementptr i8, i8* %a, i32 4", 换行)
+    ir = 连接(ir, "  %_ns_lai = bitcast i8* %_ns_la to i32*", 换行)
+    ir = 连接(ir, "  %_ns_lav = load i32, i32* %_ns_lai", 换行)
+    ir = 连接(ir, "  %_ns_lb = getelementptr i8, i8* %b, i32 4", 换行)
+    ir = 连接(ir, "  %_ns_lbi = bitcast i8* %_ns_lb to i32*", 换行)
+    ir = 连接(ir, "  %_ns_lbv = load i32, i32* %_ns_lbi", 换行)
+    ir = 连接(ir, "  %_ns_leq = icmp eq i32 %_ns_lav, %_ns_lbv", 换行)
+    ir = 连接(ir, "  br i1 %_ns_leq, label %_ns_cmp, label %_ns_ret0b", 换行)
+    ir = 连接(ir, "_ns_ret0b:", 换行)
+    ir = 连接(ir, "  ret i32 0", 换行)
+    ir = 连接(ir, "_ns_cmp:", 换行)
+    ir = 连接(ir, "  %_ns_da = getelementptr i8, i8* %a, i32 8", 换行)
+    ir = 连接(ir, "  %_ns_db = getelementptr i8, i8* %b, i32 8", 换行)
+    ir = 连接(ir, "  br label %_ns_loop", 换行)
+    ir = 连接(ir, "_ns_loop:", 换行)
+    ir = 连接(ir, "  %_ns_i = phi i32 [ 0, %_ns_cmp ], [ %_ns_in, %_ns_next ]", 换行)
+    ir = 连接(ir, "  %_ns_pa = getelementptr i8, i8* %_ns_da, i32 %_ns_i", 换行)
+    ir = 连接(ir, "  %_ns_pb = getelementptr i8, i8* %_ns_db, i32 %_ns_i", 换行)
+    ir = 连接(ir, "  %_ns_ca = load i8, i8* %_ns_pa", 换行)
+    ir = 连接(ir, "  %_ns_cb = load i8, i8* %_ns_pb", 换行)
+    ir = 连接(ir, "  %_ns_ne = icmp ne i8 %_ns_ca, %_ns_cb", 换行)
+    ir = 连接(ir, "  br i1 %_ns_ne, label %_ns_neq, label %_ns_chk", 换行)
+    ir = 连接(ir, "_ns_chk:", 换行)
+    ir = 连接(ir, "  %_ns_z = icmp eq i8 %_ns_ca, 0", 换行)
+    ir = 连接(ir, "  br i1 %_ns_z, label %_ns_eq, label %_ns_next", 换行)
+    ir = 连接(ir, "_ns_next:", 换行)
+    ir = 连接(ir, "  %_ns_in = add i32 %_ns_i, 1", 换行)
+    ir = 连接(ir, "  %_ns_lt = icmp slt i32 %_ns_in, %_ns_lav", 换行)
+    ir = 连接(ir, "  br i1 %_ns_lt, label %_ns_loop, label %_ns_eq", 换行)
+    ir = 连接(ir, "_ns_eq:", 换行)
+    ir = 连接(ir, "  ret i32 1", 换行)
+    ir = 连接(ir, "_ns_neq:", 换行)
+    ir = 连接(ir, "  ret i32 0", 换行)
+    ir = 连接(ir, "}", 换行)
+    ir = 连接(ir, 换行)
+
+    // rt_str_find: 查找字符/子串位置，未找到返回-1
+    ir = 连接(ir, "define i32 @rt_str_find(i8* %s, i8* %sub) {", 换行)
+    ir = 连接(ir, "  %_sp = ptrtoint i8* %s to i64", 换行)
+    ir = 连接(ir, "  %_st = and i64 %_sp, 1", 换行)
+    ir = 连接(ir, "  %_sc = icmp eq i64 %_st, 0", 换行)
+    ir = 连接(ir, "  br i1 %_sc, label %srch, label %fail", 换行)
+    ir = 连接(ir, "srch:", 换行)
+    ir = 连接(ir, "  %_sp2 = ptrtoint i8* %sub to i64", 换行)
+    ir = 连接(ir, "  %_st2 = and i64 %_sp2, 1", 换行)
+    ir = 连接(ir, "  %_sc2 = icmp eq i64 %_st2, 0", 换行)
+    ir = 连接(ir, "  br i1 %_sc2, label %scan, label %fail", 换行)
+    ir = 连接(ir, "scan:", 换行)
+    ir = 连接(ir, "  %_sdp = getelementptr i8, i8* %s, i32 8", 换行)
+    ir = 连接(ir, "  %_subdp = getelementptr i8, i8* %sub, i32 8", 换行)
+    ir = 连接(ir, "  %_slp = getelementptr i8, i8* %s, i32 4", 换行)
+    ir = 连接(ir, "  %_sli = bitcast i8* %_slp to i32*", 换行)
+    ir = 连接(ir, "  %_slen = load i32, i32* %_sli", 换行)
+    ir = 连接(ir, "  %_sublp = getelementptr i8, i8* %sub, i32 4", 换行)
+    ir = 连接(ir, "  %_subli = bitcast i8* %_sublp to i32*", 换行)
+    ir = 连接(ir, "  %_sublen = load i32, i32* %_subli", 换行)
+    ir = 连接(ir, "  %_subc = load i8, i8* %_subdp", 换行)
+    ir = 连接(ir, "  br label %scan_loop", 换行)
+    ir = 连接(ir, "scan_loop:", 换行)
+    ir = 连接(ir, "  %_i = phi i32 [ 0, %scan ], [ %_ni, %scan_cont ]", 换行)
+    ir = 连接(ir, "  %_ec = icmp eq i32 %_i, %_slen", 换行)
+    ir = 连接(ir, "  br i1 %_ec, label %fail, label %scan_ch", 换行)
+    ir = 连接(ir, "scan_ch:", 换行)
+    ir = 连接(ir, "  %_spos = getelementptr i8, i8* %_sdp, i32 %_i", 换行)
+    ir = 连接(ir, "  %_c = load i8, i8* %_spos", 换行)
+    ir = 连接(ir, "  %_match = icmp eq i8 %_c, %_subc", 换行)
+    ir = 连接(ir, "  br i1 %_match, label %found, label %scan_cont", 换行)
+    ir = 连接(ir, "scan_cont:", 换行)
+    ir = 连接(ir, "  %_ni = add i32 %_i, 1", 换行)
+    ir = 连接(ir, "  br label %scan_loop", 换行)
+    ir = 连接(ir, "found:", 换行)
+    ir = 连接(ir, "  ret i32 %_i", 换行)
+    ir = 连接(ir, "fail:", 换行)
+    ir = 连接(ir, "  ret i32 -1", 换行)
+    ir = 连接(ir, "}", 换行)
+    ir = 连接(ir, 换行)
+
+    // rt_dict_new: header 16 bytes + 4 entries * 16 bytes = 80
+    ir = 连接(ir, "define i8* @rt_dict_new() {", 换行)
+    ir = 连接(ir, "entry:", 换行)
+    ir = 连接(ir, "  %_m = call i8* @_rt_malloc(i32 80)", 换行)
+    ir = 连接(ir, "  %_tp = bitcast i8* %_m to i32*", 换行)
+    ir = 连接(ir, "  store i32 3, i32* %_tp", 换行)
+    ir = 连接(ir, "  %_cp = getelementptr i8, i8* %_m, i32 4", 换行)
+    ir = 连接(ir, "  %_ci = bitcast i8* %_cp to i32*", 换行)
+    ir = 连接(ir, "  store i32 0, i32* %_ci", 换行)
+    ir = 连接(ir, "  %_ap = getelementptr i8, i8* %_m, i32 8", 换行)
+    ir = 连接(ir, "  %_ai = bitcast i8* %_ap to i32*", 换行)
+    ir = 连接(ir, "  store i32 4, i32* %_ai", 换行)
+    ir = 连接(ir, "  ret i8* %_m", 换行)
+    ir = 连接(ir, "}", 换行)
+    ir = 连接(ir, 换行)
+
+    // rt_dict_set(dict, key, val)
+    ir = 连接(ir, "define void @rt_dict_set(i8* %d, i8* %key, i8* %val) {", 换行)
+    ir = 连接(ir, "entry:", 换行)
+    ir = 连接(ir, "  %_cp = getelementptr i8, i8* %d, i32 4", 换行)
+    ir = 连接(ir, "  %_ci = bitcast i8* %_cp to i32*", 换行)
+    ir = 连接(ir, "  %_cnt = load i32, i32* %_ci", 换行)
+    ir = 连接(ir, "  %_app = getelementptr i8, i8* %d, i32 8", 换行)
+    ir = 连接(ir, "  %_api = bitcast i8* %_app to i32*", 换行)
+    ir = 连接(ir, "  %_cap = load i32, i32* %_api", 换行)
+    ir = 连接(ir, "  %_ep = getelementptr i8, i8* %d, i32 16", 换行)
+    ir = 连接(ir, "  br label %find", 换行)
+    ir = 连接(ir, "find:", 换行)
+    ir = 连接(ir, "  %_fi = phi i32 [ 0, %entry ], [ %_fni, %fnext ]", 换行)
+    ir = 连接(ir, "  %_fd = icmp slt i32 %_fi, %_cnt", 换行)
+    ir = 连接(ir, "  br i1 %_fd, label %cmp, label %not_found", 换行)
+    ir = 连接(ir, "cmp:", 换行)
+    ir = 连接(ir, "  %_off = mul i32 %_fi, 16", 换行)
+    ir = 连接(ir, "  %_kp = getelementptr i8, i8* %_ep, i32 %_off", 换行)
+    ir = 连接(ir, "  %_kpp = bitcast i8* %_kp to i8**", 换行)
+    ir = 连接(ir, "  %_ek = load i8*, i8** %_kpp", 换行)
+    ir = 连接(ir, "  %_eq = call i32 @_rt_str_eq(i8* %_ek, i8* %key)", 换行)
+    ir = 连接(ir, "  %_ft = icmp ne i32 %_eq, 0", 换行)
+    ir = 连接(ir, "  br i1 %_ft, label %update, label %fnext", 换行)
+    ir = 连接(ir, "fnext:", 换行)
+    ir = 连接(ir, "  %_fni = add i32 %_fi, 1", 换行)
+    ir = 连接(ir, "  br label %find", 换行)
+    ir = 连接(ir, "update:", 换行)
+    ir = 连接(ir, "  %_uc = add i32 %_off, 8", 换行)
+    ir = 连接(ir, "  %_up = getelementptr i8, i8* %_ep, i32 %_uc", 换行)
+    ir = 连接(ir, "  %_upp = bitcast i8* %_up to i8**", 换行)
+    ir = 连接(ir, "  store i8* %val, i8** %_upp", 换行)
+    ir = 连接(ir, "  ret void", 换行)
+    ir = 连接(ir, "not_found:", 换行)
+    ir = 连接(ir, "  %_full = icmp sge i32 %_cnt, %_cap", 换行)
+    ir = 连接(ir, "  br i1 %_full, label %grow, label %append", 换行)
+    ir = 连接(ir, "grow:", 换行)
+    ir = 连接(ir, "  %_ncap = mul i32 %_cap, 2", 换行)
+    ir = 连接(ir, "  %_nbytes = mul i32 %_ncap, 16", 换行)
+    ir = 连接(ir, "  %_ntotal = add i32 %_nbytes, 16", 换行)
+    ir = 连接(ir, "  %_new = call i8* @_rt_malloc(i32 %_ntotal)", 换行)
+    ir = 连接(ir, "  %_ntp = bitcast i8* %_new to i32*", 换行)
+    ir = 连接(ir, "  store i32 3, i32* %_ntp", 换行)
+    ir = 连接(ir, "  %_nlp = getelementptr i8, i8* %_new, i32 4", 换行)
+    ir = 连接(ir, "  %_nli = bitcast i8* %_nlp to i32*", 换行)
+    ir = 连接(ir, "  store i32 %_cnt, i32* %_nli", 换行)
+    ir = 连接(ir, "  %_ncp = getelementptr i8, i8* %_new, i32 8", 换行)
+    ir = 连接(ir, "  %_nci = bitcast i8* %_ncp to i32*", 换行)
+    ir = 连接(ir, "  store i32 %_ncap, i32* %_nci", 换行)
+    ir = 连接(ir, "  %_od = icmp sgt i32 %_cnt, 0", 换行)
+    ir = 连接(ir, "  br i1 %_od, label %copy, label %set_ret", 换行)
+    ir = 连接(ir, "copy:", 换行)
+    ir = 连接(ir, "  %_ci2 = phi i32 [ 0, %grow ], [ %_cni, %copy ]", 换行)
+    ir = 连接(ir, "  %_coff = mul i32 %_ci2, 16", 换行)
+    ir = 连接(ir, "  %_csp = getelementptr i8, i8* %_ep, i32 %_coff", 换行)
+    ir = 连接(ir, "  %_cspp = bitcast i8* %_csp to i8**", 换行)
+    ir = 连接(ir, "  %_ck = load i8*, i8** %_cspp", 换行)
+    ir = 连接(ir, "  %_cvo = add i32 %_coff, 8", 换行)
+    ir = 连接(ir, "  %_cvp = getelementptr i8, i8* %_ep, i32 %_cvo", 换行)
+    ir = 连接(ir, "  %_cvpp = bitcast i8* %_cvp to i8**", 换行)
+    ir = 连接(ir, "  %_cv = load i8*, i8** %_cvpp", 换行)
+    ir = 连接(ir, "  %_ndp = getelementptr i8, i8* %_new, i32 16", 换行)
+    ir = 连接(ir, "  %_ndpo = getelementptr i8, i8* %_ndp, i32 %_coff", 换行)
+    ir = 连接(ir, "  %_ndpp = bitcast i8* %_ndpo to i8**", 换行)
+    ir = 连接(ir, "  store i8* %_ck, i8** %_ndpp", 换行)
+    ir = 连接(ir, "  %_ndvo = add i32 %_coff, 8", 换行)
+    ir = 连接(ir, "  %_ndvp = getelementptr i8, i8* %_ndp, i32 %_ndvo", 换行)
+    ir = 连接(ir, "  %_ndvpp = bitcast i8* %_ndvp to i8**", 换行)
+    ir = 连接(ir, "  store i8* %_cv, i8** %_ndvpp", 换行)
+    ir = 连接(ir, "  %_cni = add i32 %_ci2, 1", 换行)
+    ir = 连接(ir, "  %_cd = icmp slt i32 %_cni, %_cnt", 换行)
+    ir = 连接(ir, "  br i1 %_cd, label %copy, label %free_old", 换行)
+    ir = 连接(ir, "free_old:", 换行)
+    ir = 连接(ir, "  call void @_rt_free(i8* %d)", 换行)
+    ir = 连接(ir, "  br label %append", 换行)
+    ir = 连接(ir, "set_ret:", 换行)
+    ir = 连接(ir, "  br label %append", 换行)
+    ir = 连接(ir, "append:", 换行)
+    ir = 连接(ir, "  %_ae = phi i8* [ %_new, %free_old ], [ %_new, %set_ret ], [ %d, %not_found ]", 换行)
+    ir = 连接(ir, "  %_acp = getelementptr i8, i8* %_ae, i32 4", 换行)
+    ir = 连接(ir, "  %_aci = bitcast i8* %_acp to i32*", 换行)
+    ir = 连接(ir, "  %_ac = load i32, i32* %_aci", 换行)
+    ir = 连接(ir, "  %_aoff = mul i32 %_ac, 16", 换行)
+    ir = 连接(ir, "  %_aep = getelementptr i8, i8* %_ae, i32 16", 换行)
+    ir = 连接(ir, "  %_akp = getelementptr i8, i8* %_aep, i32 %_aoff", 换行)
+    ir = 连接(ir, "  %_akpp = bitcast i8* %_akp to i8**", 换行)
+    ir = 连接(ir, "  store i8* %key, i8** %_akpp", 换行)
+    ir = 连接(ir, "  %_avo = add i32 %_aoff, 8", 换行)
+    ir = 连接(ir, "  %_avp = getelementptr i8, i8* %_aep, i32 %_avo", 换行)
+    ir = 连接(ir, "  %_avpp = bitcast i8* %_avp to i8**", 换行)
+    ir = 连接(ir, "  store i8* %val, i8** %_avpp", 换行)
+    ir = 连接(ir, "  %_nc = add i32 %_ac, 1", 换行)
+    ir = 连接(ir, "  store i32 %_nc, i32* %_aci", 换行)
+    ir = 连接(ir, "  ret void", 换行)
+    ir = 连接(ir, "}", 换行)
+    ir = 连接(ir, 换行)
+
+    // rt_dict_get(dict, key)
+    ir = 连接(ir, "define i8* @rt_dict_get(i8* %d, i8* %key) {", 换行)
+    ir = 连接(ir, "entry:", 换行)
+    ir = 连接(ir, "  %_cp = getelementptr i8, i8* %d, i32 4", 换行)
+    ir = 连接(ir, "  %_ci = bitcast i8* %_cp to i32*", 换行)
+    ir = 连接(ir, "  %_cnt = load i32, i32* %_ci", 换行)
+    ir = 连接(ir, "  %_ep = getelementptr i8, i8* %d, i32 16", 换行)
+    ir = 连接(ir, "  br label %find", 换行)
+    ir = 连接(ir, "find:", 换行)
+    ir = 连接(ir, "  %_fi = phi i32 [ 0, %entry ], [ %_fni, %fnext ]", 换行)
+    ir = 连接(ir, "  %_fd = icmp slt i32 %_fi, %_cnt", 换行)
+    ir = 连接(ir, "  br i1 %_fd, label %cmp, label %nf", 换行)
+    ir = 连接(ir, "cmp:", 换行)
+    ir = 连接(ir, "  %_off = mul i32 %_fi, 16", 换行)
+    ir = 连接(ir, "  %_kp = getelementptr i8, i8* %_ep, i32 %_off", 换行)
+    ir = 连接(ir, "  %_kpp = bitcast i8* %_kp to i8**", 换行)
+    ir = 连接(ir, "  %_ek = load i8*, i8** %_kpp", 换行)
+    ir = 连接(ir, "  %_eq = call i32 @_rt_str_eq(i8* %_ek, i8* %key)", 换行)
+    ir = 连接(ir, "  %_ft = icmp ne i32 %_eq, 0", 换行)
+    ir = 连接(ir, "  br i1 %_ft, label %found, label %fnext", 换行)
+    ir = 连接(ir, "fnext:", 换行)
+    ir = 连接(ir, "  %_fni = add i32 %_fi, 1", 换行)
+    ir = 连接(ir, "  br label %find", 换行)
+    ir = 连接(ir, "found:", 换行)
+    ir = 连接(ir, "  %_vo = add i32 %_off, 8", 换行)
+    ir = 连接(ir, "  %_vp = getelementptr i8, i8* %_ep, i32 %_vo", 换行)
+    ir = 连接(ir, "  %_vpp = bitcast i8* %_vp to i8**", 换行)
+    ir = 连接(ir, "  %_v = load i8*, i8** %_vpp", 换行)
+    ir = 连接(ir, "  ret i8* %_v", 换行)
+    ir = 连接(ir, "nf:", 换行)
+    ir = 连接(ir, "  ret i8* null", 换行)
+    ir = 连接(ir, "}", 换行)
+    ir = 连接(ir, 换行)
+
+    返回(ir)
+}
+
+定义 生成_桩函数 () {
+    设 ir = ""
+    // rt_list_concat
+    ir = 连接(ir, "define i8* @rt_list_concat(i8* %a, i8* %b) {", 换行)
+    ir = 连接(ir, "  ret i8* %a", 换行)
+    ir = 连接(ir, "}", 换行)
+    ir = 连接(ir, 换行)
+    // rt_list_slice
+    ir = 连接(ir, "define i8* @rt_list_slice(i8* %a, i8* %b, i8* %c) {", 换行)
+    ir = 连接(ir, "  ret i8* %a", 换行)
+    ir = 连接(ir, "}", 换行)
+    ir = 连接(ir, 换行)
+    // rt_str_substr
+    ir = 连接(ir, "define i8* @rt_str_substr(i8* %a, i8* %b, i8* %c) {", 换行)
+    ir = 连接(ir, "  ret i8* %a", 换行)
+    ir = 连接(ir, "}", 换行)
+    ir = 连接(ir, 换行)
+    // rt_str_to_list: 字符串→字符列表
+    ir = 连接(ir, "define i8* @rt_str_to_list(i8* %a) {", 换行)
+    ir = 连接(ir, "  %_s2l_n = icmp eq i8* %a, null", 换行)
+    ir = 连接(ir, "  br i1 %_s2l_n, label %_s2l_null, label %_s2l_ok", 换行)
+    ir = 连接(ir, "_s2l_null:", 换行)
+    ir = 连接(ir, "  %_s2l_e = call i8* @rt_list_new()", 换行)
+    ir = 连接(ir, "  ret i8* %_s2l_e", 换行)
+    ir = 连接(ir, "_s2l_ok:", 换行)
+    ir = 连接(ir, "  %_s2l_lp = getelementptr i8, i8* %a, i32 4", 换行)
+    ir = 连接(ir, "  %_s2l_li = bitcast i8* %_s2l_lp to i32*", 换行)
+    ir = 连接(ir, "  %_s2l_len = load i32, i32* %_s2l_li", 换行)
+    ir = 连接(ir, "  %_s2l_dp = getelementptr i8, i8* %a, i32 8", 换行)
+    ir = 连接(ir, "  %_s2l_lst = call i8* @rt_list_new()", 换行)
+    ir = 连接(ir, "  br label %_s2l_loop", 换行)
+    ir = 连接(ir, "_s2l_loop:", 换行)
+    ir = 连接(ir, "  %_s2l_i = phi i32 [ 0, %_s2l_ok ], [ %_s2l_ni, %_s2l_next ]", 换行)
+    ir = 连接(ir, "  %_s2l_cur = phi i8* [ %_s2l_lst, %_s2l_ok ], [ %_s2l_nl, %_s2l_next ]", 换行)
+    ir = 连接(ir, "  %_s2l_cmp = icmp slt i32 %_s2l_i, %_s2l_len", 换行)
+    ir = 连接(ir, "  br i1 %_s2l_cmp, label %_s2l_body, label %_s2l_done", 换行)
+    ir = 连接(ir, "_s2l_body:", 换行)
+    ir = 连接(ir, "  %_s2l_chp = getelementptr i8, i8* %_s2l_dp, i32 %_s2l_i", 换行)
+    ir = 连接(ir, "  %_s2l_ch = load i8, i8* %_s2l_chp", 换行)
+    ir = 连接(ir, "  %_s2l_cs = call i8* @rt_str_new(i8* %_s2l_chp, i32 1)", 换行)
+    ir = 连接(ir, "  %_s2l_nl = call i8* @rt_list_push_item(i8* %_s2l_cur, i8* %_s2l_cs)", 换行)
+    ir = 连接(ir, "  br label %_s2l_next", 换行)
+    ir = 连接(ir, "_s2l_next:", 换行)
+    ir = 连接(ir, "  %_s2l_ni = add i32 %_s2l_i, 1", 换行)
+    ir = 连接(ir, "  br label %_s2l_loop", 换行)
+    ir = 连接(ir, "_s2l_done:", 换行)
+    ir = 连接(ir, "  ret i8* %_s2l_cur", 换行)
+    ir = 连接(ir, "}", 换行)
+    ir = 连接(ir, 换行)
+    // rt_int_to_str: 整数→字符串(返回常量桩)
+    ir = 连接(ir, "define i8* @rt_int_to_str(i8* %v) {", 换行)
+    ir = 连接(ir, "  ret i8* null", 换行)
+    ir = 连接(ir, "}", 换行)
+    ir = 连接(ir, 换行)
+    // rt_dict_len: 字典条目数
+    ir = 连接(ir, "define i32 @rt_dict_len(i8* %d) {", 换行)
+    ir = 连接(ir, "  ret i32 0", 换行)
+    ir = 连接(ir, "}", 换行)
+    ir = 连接(ir, 换行)
+    // rt_dict_keys: 字典键列表
+    ir = 连接(ir, "define i8* @rt_dict_keys(i8* %d) {", 换行)
+    ir = 连接(ir, "  ret i8* null", 换行)
+    ir = 连接(ir, "}", 换行)
+    ir = 连接(ir, 换行)
+    // rt_str_contains: 字符串包含
+    ir = 连接(ir, "define i32 @rt_str_contains(i8* %s, i8* %sub) {", 换行)
+    ir = 连接(ir, "  ret i32 0", 换行)
+    ir = 连接(ir, "}", 换行)
+    ir = 连接(ir, 换行)
+    // rt_str_startswith: 前缀判断
+    ir = 连接(ir, "define i32 @rt_str_startswith(i8* %s, i8* %p) {", 换行)
+    ir = 连接(ir, "  ret i32 0", 换行)
+    ir = 连接(ir, "}", 换行)
+    ir = 连接(ir, 换行)
+    返回(ir)
+}
+
+定义 编译顶层 (ast) {
+    设 reg = 0
+    设 comp_env = 新字典()
+    设 函数库列表 = 新列表()
+    设 函数参数表 = 新字典()
+    设 全局变量表 = 新字典()
+    设 全局变量计数 = 0
+    // 预扫描: 注册所有函数名 + 提取模块级设变量
+    若 (是列表(ast)) {
+        设 alen = 列表取长(ast)
+        设 ai = 0
+        循环 (小于(ai, alen)) {
+            设 stmt = 取(ast, ai)
+            若 (是列表(stmt)) {
+                设 op = 取(stmt, 0)
+                若 (字符串相等(op, "fn") 或 字符串相等(op, "定义") 或 字符串相等(op, "define")) {
+                    设 fn_name = 取(stmt, 1)
+                    设 plist = 取(stmt, 2)
+                    // 排除 llvmgen 内部函数：不注册到函数参数表
+                    若 (等于(取长(查键(排除字典, fn_name)), 0)) {
+                        设 ascii = 注册函数名(fn_name)
+                        存变量(函数参数表, ascii, 列表取长(plist))
+                    }
+                }
+                若 (字符串相等(op, "设") 或 字符串相等(op, "設") 或 字符串相等(op, "set")) {
+                    设 var_name = 取(stmt, 1)
+                    设 gv_ascii = 连接("_gv", 全局变量计数)
+                    存变量(全局变量表, var_name, gv_ascii)
+                    全局变量计数 = 加(全局变量计数, 1)
+                }
+            }
+            ai = 加(ai, 1)
+        }
+    }
+    设 s = header()
+    // 生成模块级 @global 变量声明
+    设 全局键列表 = 字典键列表(全局变量表)
+    设 gki = 0; 设 gkc = 列表取长(全局键列表)
+    循环 (小于(gki, gkc)) {
+        设 gv_name = 取(全局键列表, gki)
+        设 gv_ascii = 查键(全局变量表, gv_name)
+        s = 连接(s, "@", gv_ascii, " = global i8* null", 换行)
+        gki = 加(gki, 1)
+    }
+    s = 连接(s, 换行)
+    设 r = 编译(comp_env, ast, reg)
+    // 生成字符串常量定义
+    s = 连接(s, 生成字符串常量定义())
+    s = 连接(s, 换行)
+    // 生成运行时函数定义（rt_print_int, rt_print_str 等）
+    s = 连接(s, 生成运行时IR())
+    s = 连接(s, 生成_桩函数())
+    // 拼接用户函数定义
+    设 fn_count = 列表取长(函数库列表)
+    设 fi = 0
+    循环 (小于(fi, fn_count)) {
+        设 fn_ir = 取(函数库列表, fi)
+        s = 连接(s, fn_ir)
+        fi = 加(fi, 1)
+    }
+    s = 连接(s, 换行)
+    // 把所有顶层代码包装为 __init 函数（解决顶层设语句的全局变量问题）
+    s = 连接(s, "define void @__init() {"); s = 连接(s, 换行)
+    s = 连接(s, "entry:"); s = 连接(s, 换行)
+    s = 连接(s, 取(r, 0))
+    s = 连接(s, "  ret void"); s = 连接(s, 换行)
+    s = 连接(s, "}"); s = 连接(s, 换行)
+    s = 连接(s, 换行)
+    s = 连接(s, "define i8* @main() {"); s = 连接(s, 换行)
+    s = 连接(s, "entry:"); s = 连接(s, 换行)
+    s = 连接(s, "  call void @__init()"); s = 连接(s, 换行)
+    s = 连接(s, footer())
+    返回(s)
+}
+
+导出 编译顶层

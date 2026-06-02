@@ -72,8 +72,16 @@ def _push_i(val):
     return list(struct.pack('<B', PUSH_I)) + list(struct.pack('<i', val))
 
 
+
 def _halt():
     return [HALT]
+
+def _push_str(s):
+    """构造 PUSH_STR 字节码：PUSH_STR + 长度 + UTF-16LE 字符"""
+    code = [PUSH_STR, len(s)]
+    for ch in s:
+        code.extend([ord(ch) & 0xFF, (ord(ch) >> 8) & 0xFF])
+    return code
 
 
 class TestStackOps(unittest.TestCase):
@@ -705,6 +713,113 @@ class TestVMUncoveredOps(unittest.TestCase):
         vm = _make_vm(_push_i(0) + [DICT] + [DICT_LEN] + _halt())
         vm.run()
         self.assertEqual(vm.stack[0], 0)
+
+
+class TestBitwiseOps(unittest.TestCase):
+    """位运算操作码测试"""
+
+    def test_bit_and(self):
+        """BIT_AND: 按位与"""
+        from vm import BIT_AND
+        # 0b1100 & 0b1010 = 0b1000 = 8
+        vm = _make_vm(_push_i(12) + _push_i(10) + [BIT_AND] + _halt())
+        vm.run()
+        self.assertEqual(vm.stack[0], 8)
+
+    def test_bit_or(self):
+        """BIT_OR: 按位或"""
+        from vm import BIT_OR
+        # 0b1100 | 0b1010 = 0b1110 = 14
+        vm = _make_vm(_push_i(12) + _push_i(10) + [BIT_OR] + _halt())
+        vm.run()
+        self.assertEqual(vm.stack[0], 14)
+
+    def test_bit_xor(self):
+        """BIT_XOR: 按位异或"""
+        from vm import BIT_XOR
+        # 0b1100 ^ 0b1010 = 0b0110 = 6
+        vm = _make_vm(_push_i(12) + _push_i(10) + [BIT_XOR] + _halt())
+        vm.run()
+        self.assertEqual(vm.stack[0], 6)
+
+    def test_bit_not(self):
+        """BIT_NOT: 按位取反"""
+        from vm import BIT_NOT
+        # ~0 = -1
+        vm = _make_vm(_push_i(0) + [BIT_NOT] + _halt())
+        vm.run()
+        self.assertEqual(vm.stack[0], -1)
+
+    def test_shift_left(self):
+        """SHIFT_L: 左移"""
+        from vm import SHIFT_L
+        # 1 << 3 = 8
+        vm = _make_vm(_push_i(1) + _push_i(3) + [SHIFT_L] + _halt())
+        vm.run()
+        self.assertEqual(vm.stack[0], 8)
+
+    def test_shift_right(self):
+        """SHIFT_R: 右移"""
+        from vm import SHIFT_R
+        # 8 >> 2 = 2
+        vm = _make_vm(_push_i(8) + _push_i(2) + [SHIFT_R] + _halt())
+        vm.run()
+        self.assertEqual(vm.stack[0], 2)
+
+
+class TestStringExtOps(unittest.TestCase):
+    """扩展字符串操作码测试"""
+
+    def test_str_contains(self):
+        """STR_CONTAINS: 字符串包含"""
+        from vm import STR_CONTAINS
+        vm = _make_vm(_push_str('hello world') + _push_str('world') + [STR_CONTAINS] + _halt())
+        vm.run()
+        self.assertEqual(vm.stack[0], 1)
+
+    def test_str_contains_false(self):
+        """STR_CONTAINS: 不包含"""
+        from vm import STR_CONTAINS
+        vm = _make_vm(_push_str('hello') + _push_str('xyz') + [STR_CONTAINS] + _halt())
+        vm.run()
+        self.assertEqual(vm.stack[0], -1)
+
+    def test_str_startswith(self):
+        """STR_STARTSWITH: 字符串前缀"""
+        from vm import STR_STARTSWITH
+        vm = _make_vm(_push_str('hello world') + _push_str('hello') + [STR_STARTSWITH] + _halt())
+        vm.run()
+        self.assertEqual(vm.stack[0], 1)
+
+
+class TestByteOps(unittest.TestCase):
+    """字节操作码测试"""
+
+    def test_hi_byte(self):
+        """HI_BYTE: 高字节"""
+        from vm import HI_BYTE
+        # HI_BYTE is binary op: (value, _) → high byte
+        # 0x1234 → 0x12
+        vm = _make_vm(_push_i(0x1234) + _push_i(0) + [HI_BYTE] + _halt())
+        vm.run()
+        self.assertEqual(vm.stack[0], 0x12)
+
+    def test_lo_byte(self):
+        """LO_BYTE: 低字节"""
+        from vm import LO_BYTE
+        # LO_BYTE is binary op: (value, _) → low byte
+        # 0x1234 → 0x34 = 52
+        vm = _make_vm(_push_i(0x1234) + _push_i(0) + [LO_BYTE] + _halt())
+        vm.run()
+        self.assertEqual(vm.stack[0], 0x34)
+
+    def test_merge_bytes(self):
+        """MRG_BYT: 合并字节"""
+        from vm import MRG_BYT
+        # (0x12, 0x34) → 0x1234
+        vm = _make_vm(_push_i(0x12) + _push_i(0x34) + [MRG_BYT] + _halt())
+        vm.run()
+        self.assertEqual(vm.stack[0], 0x1234)
 
 
 if __name__ == '__main__':

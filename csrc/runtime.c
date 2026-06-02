@@ -123,6 +123,40 @@ typedef enum {
 } Opcode;
 
 
+/* ── UTF-8 字符操作 ──────────────────────────── */
+/* UTF-8 编码：1 字节(0xxxxxxx), 2 字节(110xxxxx 10xxxxxx),
+   3 字节(1110xxxx 10xxxxxx 10xxxxxx), 4 字节(11110xxx ...)
+   后续字节以 10 开头（0xC0 掩码 = 0x80）。 */
+static size_t utf8_char_len(const char *s) {
+    size_t count = 0;
+    while (*s) {
+        if ((*s & 0xC0) != 0x80) count++;  /* 跳过后续字节 */
+        s++;
+    }
+    return count;
+}
+
+/* 找到 UTF-8 字符串中第 idx 个字符的字节偏移量 */
+static int32_t utf8_byte_offset(const char *s, int32_t idx) {
+    int32_t count = 0;
+    const char *p = s;
+    while (*p && count < idx) {
+        if ((*p & 0xC0) != 0x80) count++;
+        p++;
+    }
+    return (int32_t)(p - s);
+}
+
+/* 从字节偏移量开始复制 n 个 UTF-8 字符 */
+static char *utf8_substr(const char *s, int32_t start_char, int32_t n_char) {
+    int32_t byte_st = utf8_byte_offset(s, start_char);
+    int32_t byte_end = utf8_byte_offset(s + byte_st, n_char) + byte_st;
+    size_t len = (size_t)(byte_end - byte_st);
+    char *buf = (char*)malloc(len + 1);
+    if (buf) { memcpy(buf, s + byte_st, len); buf[len] = '\0'; }
+    return buf;
+}
+
 /* ── 字符串操作 ───────────────────────────────── */
 static rt_str_t *rt_str_new(const char *s) {
     if (!s) return NULL;
@@ -171,16 +205,28 @@ static uint32_t hash_key(void *k) {
         h = ((h >> 16) ^ h) * 0x45d9f3b;
         return (h >> 16) ^ h;
     }
+    /* float: 按双精度位模式哈希 */
+    if (obj_type(k) == OBJ_FLOAT) {
+        union { double d; uint64_t u; } fu;
+        fu.d = ((rt_float_t*)k)->value;
+        uint32_t lo = (uint32_t)(fu.u & 0xFFFFFFFF);
+        uint32_t hi = (uint32_t)(fu.u >> 32);
+        return lo ^ hi;
+    }
     const char *s = rt_str_c(k);
     uint32_t h = 5381;
     while (*s) h = ((h << 5) + h) + (unsigned char)*s++;
     return h;
 }
 
-/* 比较两个键是否相等（处理 int 和 string）*/
+/* 比较两个键是否相等（支持 int/float/string）*/
 static int key_eq(void *a, void *b) {
     if (is_int_val(a) && is_int_val(b)) return untag_i(a) == untag_i(b);
-    if (!is_int_val(a) && !is_int_val(b) && a && b)
+    /* float: 按位比较（含 NaN ≠ NaN，符合 IEEE 语义）*/
+    if (obj_type(a) == OBJ_FLOAT && obj_type(b) == OBJ_FLOAT)
+        return ((rt_float_t*)a)->value == ((rt_float_t*)b)->value;
+    if (!is_int_val(a) && !is_int_val(b) && a && b
+        && obj_type(a) != OBJ_FLOAT && obj_type(b) != OBJ_FLOAT)
         return strcmp(((rt_str_t*)a)->data, ((rt_str_t*)b)->data) == 0;
     return a == b;
 }
@@ -731,21 +777,20 @@ static int trit_is_trit(void *v) { return !is_int_val(v) && ((rt_str_t*)v)->h_ty
             if (is_int_val(a)) {
                 char buf[24];
                 snprintf(buf, sizeof(buf), "%lld", (long long)untag_i(a));
-                push(vm, tag_i((intptr_t)strlen(buf)));
-            } else push(vm, tag_i((intptr_t)strlen(rt_str_c(a))));
+                push(vm, tag_i((intptr_t)strlen(buf)));  /* 数字转字符串按字节计数 */
+            } else push(vm, tag_i((intptr_t)utf8_char_len(rt_str_c(a))));  /* UTF-8 按字符计数 */
             break;
         }
         case STRSUB: {
             int32_t n = to_int(pop(vm));
             int32_t st = to_int(pop(vm));
             const char *s = rt_str_c(pop(vm));
-            int32_t sl = (int32_t)strlen(s);
+            int32_t sl = (int32_t)utf8_char_len(s);               /* ⚡ 改为字符计数 */
             if (st < 0) st = 0;
             if (st > sl) st = sl;
             if (n < 0) n = 0;
             if (st + n > sl) n = sl - st;
-            char *buf = (char*)malloc((size_t)n + 1);
-            if (buf) { memcpy(buf, s + st, (size_t)n); buf[n] = '\0'; }
+            char *buf = utf8_substr(s, st, n);                    /* ⚡ 按字符切片 */
             push(vm, rt_str_new(buf ? buf : ""));
             free(buf);
             break;

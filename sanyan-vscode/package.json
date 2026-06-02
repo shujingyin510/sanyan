@@ -1,9 +1,9 @@
 {
-  "name": "sanyan-language",
+  "name": "sanyan",
   "displayName": "三言 Sanyan Language",
   "description": "三言编程语言支持 — LSP 语法高亮/补全/诊断/跳转定义",
   "version": "0.2.0",
-  "publisher": "sanyan-lang",
+  "publisher": "sanyan",
   "license": "MIT",
   "icon": "icon.png",
   "repository": {

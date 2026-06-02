@@ -1,0 +1,202 @@
+// stdlib/lexer.san — 词法分析器
+// 从 stdlib/combined.san 拆分
+
+// stdlib/sugar.san — 糖语法解析器（Sanyan 版）
+// 将糖语法源代码解析为 AST，输出格式与 Python sugar/parser.py 兼容
+// 注意：字符串比较必须用 str_equals，不能用 ==
+
+// ==================== 词法分析 ====================
+
+设 空白 = " \n\t\r\u3000"
+设 换行符 = "\n"
+
+设 全角映射 = 字典(
+    "（", "(", "）", ")", "｛", "{", "｝", "}", "［", "[", "］", "]",
+    "＝", "=", "＞", ">", "＜", "<", "＋", "+", "－", "-", "＊", "*", "／", "/",
+    "％", "%", "＾", "^", "，", ",", "；", ";", "：", ":", "！", "!",
+    "　", " ",
+    "０", "0", "１", "1", "２", "2", "３", "3", "４", "4",
+    "５", "5", "６", "6", "７", "7", "８", "8", "９", "9",
+)
+
+设 字符串开始 = "\"'\u201c\u2018\u300c\u300e"
+设 字符串结束 = 字典(
+    "\"", "\"", "'", "'",
+    "\u201c", "\u201d", "\u2018", "\u2019",
+    "\u300c", "\u300d", "\u300e", "\u300f",
+)
+
+定义 键取值 (d, key, fallback) {
+    尝试 {
+        返回(取键(d, key))
+    } 捕获 (e) {
+        返回(fallback)
+    }
+}
+
+定义 映射全角 (ch) {
+    返回(键取值(全角映射, ch, ch))
+}
+
+定义 生成token (类型, 值) {
+    返回(列表(类型, 值))
+}
+
+定义 词法分析 (source) {
+    设 len = 取长(source)
+    设 chars = 字列(source)
+    设 tokens = 列表()
+    设 i = 0
+
+    循环 (i < len) {
+        设 c = 取(chars, i)
+
+        // 换行
+        若 (str_equals(c, 换行符)) { i = i + 1; 继续 }
+
+        // 空白
+        若 (查找(空白, c) >= 0) { i = i + 1; 继续 }
+
+        // 行注释 //, ／／ 或 #
+        若 (str_equals(c, "/") 或 str_equals(c, "／") 或 str_equals(c, "#")) {
+            设 is_comment = 假
+            若 (str_equals(c, "#")) { is_comment = 真 }
+            若 (非(is_comment) 且 i + 1 < len) {
+                设 nxt = 取(chars, i + 1)
+                若 (str_equals(nxt, "/") 或 str_equals(nxt, "／")) { is_comment = 真 }
+            }
+            若 (is_comment) {
+                循环 (i < len 且 非(str_equals(取(chars, i), 换行符))) { i = i + 1 }
+                继续
+            }
+        }
+
+        // 字符串
+        若 (查找(字符串开始, c) >= 0) {
+            设 quote = c
+            设 end_quote = 键取值(字符串结束, c, c)
+            设 start = i
+            i = i + 1
+            循环 (i < len 且 非(str_equals(取(chars, i), end_quote))) {
+                若 (str_equals(取(chars, i), "\\")) { i = i + 1 }
+                i = i + 1
+            }
+            若 (i < len) { i = i + 1 }
+            设 val = 子串(source, start, i - start)
+            tokens = 列表合(tokens, 列表(生成token("字符串", val)))
+            继续
+        }
+
+        // 全角映射
+        设 mapped = 映射全角(c)
+
+        // 符号
+        若 (str_equals(mapped, "(") 或 str_equals(mapped, ")") 或
+            str_equals(mapped, "{") 或 str_equals(mapped, "}") 或
+            str_equals(mapped, "[") 或 str_equals(mapped, "]") 或
+            str_equals(mapped, ",") 或 str_equals(mapped, ";") 或
+            str_equals(mapped, ":") 或 str_equals(mapped, ".")) {
+            tokens = 列表合(tokens, 列表(生成token("符号", mapped)))
+            i = i + 1
+            继续
+        }
+
+        // 运算符
+        若 (str_equals(mapped, "=") 或 str_equals(mapped, ">") 或
+            str_equals(mapped, "<") 或 str_equals(mapped, "+") 或
+            str_equals(mapped, "-") 或 str_equals(mapped, "*") 或
+            str_equals(mapped, "/") 或 str_equals(mapped, "%") 或
+            str_equals(mapped, "^") 或 str_equals(mapped, "!")) {
+            // 合并多字符运算符: >=, <=, !=
+            若 (i + 1 < len) {
+                设 next_c = 取(chars, i + 1)
+                设 next_mapped = 映射全角(next_c)
+                若 (str_equals(mapped, ">") 且 str_equals(next_mapped, "=")) {
+                    tokens = 列表合(tokens, 列表(生成token("运算符", ">=")))
+                    i = i + 2; 继续
+                }
+                若 (str_equals(mapped, "<") 且 str_equals(next_mapped, "=")) {
+                    tokens = 列表合(tokens, 列表(生成token("运算符", "<=")))
+                    i = i + 2; 继续
+                }
+                若 (str_equals(mapped, "!") 且 str_equals(next_mapped, "=")) {
+                    tokens = 列表合(tokens, 列表(生成token("运算符", "!=")))
+                    i = i + 2; 继续
+                }
+                若 (str_equals(mapped, "=") 且 str_equals(next_mapped, "=")) {
+                    tokens = 列表合(tokens, 列表(生成token("运算符", "==")))
+                    i = i + 2; 继续
+                }
+            }
+            tokens = 列表合(tokens, 列表(生成token("运算符", mapped)))
+            i = i + 1
+            继续
+        }
+
+        // 数字（含全角数字）
+        设 is_digit = 假
+        若 (查找("0123456789", mapped) >= 0) { is_digit = 真 }
+        // 处理全角数字
+        若 (str_equals(c, "０")) { mapped = "0"; is_digit = 真 }
+        若 (str_equals(c, "１")) { mapped = "1"; is_digit = 真 }
+        若 (str_equals(c, "２")) { mapped = "2"; is_digit = 真 }
+        若 (str_equals(c, "３")) { mapped = "3"; is_digit = 真 }
+        若 (str_equals(c, "４")) { mapped = "4"; is_digit = 真 }
+        若 (str_equals(c, "５")) { mapped = "5"; is_digit = 真 }
+        若 (str_equals(c, "６")) { mapped = "6"; is_digit = 真 }
+        若 (str_equals(c, "７")) { mapped = "7"; is_digit = 真 }
+        若 (str_equals(c, "８")) { mapped = "8"; is_digit = 真 }
+        若 (str_equals(c, "９")) { mapped = "9"; is_digit = 真 }
+
+        若 (is_digit) {
+            设 start = i
+            i = i + 1
+            设 is_float = 假
+            循环 (i < len) {
+                设 ch = 取(chars, i)
+                设 ch_mapped = 映射全角(ch)
+                若 (查找("0123456789", ch_mapped) >= 0) { i = i + 1; 继续 }
+                若 (str_equals(ch_mapped, ".") 且 非(is_float)) {
+                    is_float = 真; i = i + 1; 继续
+                }
+                跳出
+            }
+            设 val = 子串(source, start, i - start)
+            // 全角数字转为半角
+            设 converted = ""
+            设 j = 0
+            循环 (j < 取长(val)) {
+                设 ch = 子串(val, j, 1)
+                设 m = 映射全角(ch)
+                converted = 连接(converted, m)
+                j = j + 1
+            }
+            设 new_token = 生成token("数字", converted)
+            设 token_list = 列表(new_token)
+            tokens = 列表合(tokens, token_list)
+            继续
+        }
+
+        // 标识符 / 单词
+        设 start = i
+        循环 (i < len) {
+            设 ch = 取(chars, i)
+            设 is_break = 假
+            若 (查找(空白, ch) >= 0) { is_break = 真 }
+            若 (查找("(){)}[],;:.", ch) >= 0) { is_break = 真 }
+            // 全角符号也作为边界
+            若 (查找("（）｛｝［］，；：", ch) >= 0) { is_break = 真 }
+            若 (查找("＝＞＜＋－＊／％＾！", ch) >= 0) { is_break = 真 }
+            若 (查找(" \n\t\r\u3000", ch) >= 0) { is_break = 真 }
+            若 (is_break) { 跳出 }
+            i = i + 1
+        }
+        若 (i > start) {
+            设 val = 子串(source, start, i - start)
+            tokens = 列表合(tokens, 列表(生成token("标识符", val)))
+        }
+    }
+
+    返回(tokens)
+}
+

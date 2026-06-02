@@ -11,7 +11,8 @@
 import sys
 import os
 
-os.chdir(os.path.dirname(os.path.abspath(__file__)) or '.')
+PROJECT_ROOT = os.path.dirname(os.path.abspath(__file__)) or '.'
+os.chdir(PROJECT_ROOT)
 
 from sugar.parser import parse_code
 from evaluator import SanyanEvaluator
@@ -56,7 +57,8 @@ def _register_aliases():
         try:
             register_alias(alias, target)
         except Exception:
-            pass  # 目标尚未注册时静默跳过
+            import sys
+            print(f'  ⚠ 别名注册失败: {alias} → {target}', file=sys.stderr)
 
 
 def load_api_key():
@@ -79,15 +81,19 @@ def load_api_key():
 
 def init_evaluator(api_key):
     clear_cache()
+    # 注入环境变量，供 .san 文件通过 getenv 读取
+    if api_key:
+        os.environ['SANYAN_API_KEY'] = api_key
     evaluator = SanyanEvaluator(max_loop_steps=500000)
-    _register_aliases()  # 注册中文别名（必须在 evaluator 实例化之后）
+    _register_aliases()
 
     agent_path = os.path.join('ternary_agent', 'agent.san')
     src = open(agent_path, encoding='utf-8').read()
-    # 预处理 #include 展开 + API key 注入
-    # 注入是必要的：agent_policy.san 中的 API密钥 默认值为 "sk-你的key"
+    # 预处理 #include 展开
     src = preprocess_includes(src)
-    src = src.replace('sk-你的key', api_key)
+    # API key 注入：替换 agent_policy.san 中的占位符
+    if api_key:
+        src = src.replace('sk-你的key', api_key)
     ast, _ = parse_code(src)
     fixed = [s for s in ast[1:] if not (isinstance(s, list) and s[0] == 'export')]
     evaluator.eval(['do'] + fixed)

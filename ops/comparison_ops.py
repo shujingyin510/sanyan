@@ -6,7 +6,7 @@
 from ternary_core import TritValue
 from values import SanyanSyntaxError, SanyanTypeError
 from ops.registry import register
-from eval_helpers import propagated_confidence
+from eval_utils import propagated_confidence
 
 
 def _to_num(v, skin_manager=None):

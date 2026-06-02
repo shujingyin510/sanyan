@@ -1,5 +1,8 @@
 """sugar.san 专项测试：AST 兼容性 + 解析正确性"""
 
+import os, sys
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
 import unittest
 from ops.file_ops import _parse_with_sugar_san, _load_sugar_parser, clear_cache
 from sugar import SugarConverter

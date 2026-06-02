@@ -7,7 +7,7 @@ from ternary_core import BT, TernaryALU, TritValue
 from ternary_core import _int_at_precision, ternary_log, ternary_exp
 from values import SanyanSyntaxError, SanyanValueError, SanyanTypeError
 from ops.registry import register
-from eval_helpers import propagated_confidence
+from eval_utils import propagated_confidence
 
 _DEFAULT_PRECISION = 16
 

@@ -1,5 +1,7 @@
 """Commands 模块单元测试：定义、调用、类型检查、尾递归"""
 
+import os, sys
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import contextlib
 
 
