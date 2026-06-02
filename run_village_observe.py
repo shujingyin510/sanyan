@@ -101,9 +101,12 @@ def _gen_dialogue(ev, args):
         line2 = llm_call(p2)
         if line2: cache[n2] = line2
 
-    # ── 行为标签分析（从算子配置读取）──
-    trust_map = ev.scope_vars.get('关系互信', {'陌生人':0.10})
-    behave_delta = ev.scope_vars.get('互信算子', {'问候':0.001})
+    # ── 行为标签分析 ──
+    trust_map = {'夫妻':0.95, '朋友':0.75, '邻居':0.55, '熟人':0.35, '陌生人':0.10}
+    behave_delta = {
+        '帮助':0.020, '赞扬':0.010, '交易':0.005, '问候':0.003,
+        '争吵':-0.030, '欺骗':-0.080, '赠礼':0.050, '闲聊':0.001
+    }
     label = '问候'
     full_text = (line1 or '') + (line2 or '')
     if full_text:
@@ -122,11 +125,15 @@ def _gen_dialogue(ev, args):
     ev.scope_vars['_last_label'] = label
     ev.scope_vars['_last_delta'] = delta
 
-    # 传闻生成（概率从算子配置读取）
-    rumor_prob = ev.scope_vars.get('传闻概率', 0.3)
-    if random.random() < rumor_prob and n1 and n2:
-        rumor_pool = ev.scope_vars.get('传闻池', ['庄稼今年特别好。'])
-        rumor = f'{n1}说{n2}家的{random.choice(rumor_pool)}'
+    # 传闻生成：随机事件触发传闻
+    if random.random() < 0.3 and n1 and n2:
+        topics = [
+            f'{n1}说{n2}家的庄稼今年特别好。',
+            f'听说{n1}和{n2}在商量合伙做生意。',
+            f'{n2}告诉{n1}山里最近有野猪出没。',
+            f'{n1}听说{n2}最近身体不太好。',
+        ]
+        rumor = random.choice(topics)
         cache['_rumor'] = rumor
 
     # 更新 NPC 间关系值（存在NPC信任字典）
@@ -177,15 +184,4 @@ e.scope_vars['最大天数'] = max_days
 try: e.eval(['开始观察'])
 except (KeyboardInterrupt,ReturnException): print('结束')
 except SystemExit: pass
-finally:
-    # 宏观趋势统计
-    trust_dict = e.scope_vars.get('NPC信任', {})
-    if trust_dict:
-        total = sum(trust_dict.values())
-        avg = total / max(1, len(trust_dict))
-        print(f'\n═══ 宏观趋势 ═══')
-        print(f'互信对数: {len(trust_dict)}')
-        print(f'平均互信: {avg:.3f}')
-        print(f'最高互信: {max(trust_dict.values()):.3f}')
-        print(f'最低互信: {min(trust_dict.values()):.3f}')
-    log.close()
+finally: log.close()

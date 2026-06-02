@@ -433,5 +433,77 @@ class TestNPCGame(unittest.TestCase):
             pass
 
 
+class TestVillageE2E(unittest.TestCase):
+    """桃花村观察模式 E2E：加载+运行1天不崩溃"""
+
+    def test_load_observer(self):
+        """加载 village_game + village_observe 不崩溃"""
+        from evaluator import SanyanEvaluator
+        from sugar.parser import parse_code
+        from values import ReturnException
+        import ops.file_ops
+        ops.file_ops.clear_cache()
+
+        e = SanyanEvaluator(max_loop_steps=100000)
+        # Phase 1: 村庄世界
+        src = open('ternary_agent/runtime_v2/village_game.san', encoding='utf-8').read()
+        ast, _ = parse_code(src)
+        fixed = [s for s in ast[1:]
+                 if not (isinstance(s, list) and s[0] == 'export')
+                 and not (isinstance(s, list) and len(s) == 1 and s[0] == '游戏开始')]
+        try:
+            e.eval(['do'] + fixed)
+        except ReturnException:
+            pass
+        self.assertIn('NPC数据', e.scope_vars)
+
+        # Phase 2: 观察模式
+        src2 = open('ternary_agent/runtime_v2/village_observe.san', encoding='utf-8').read()
+        ast2, _ = parse_code(src2)
+        fixed2 = [s for s in ast2[1:] if not (isinstance(s, list) and s[0] == 'export')]
+        try:
+            e.eval(['do'] + fixed2)
+        except ReturnException:
+            pass
+        self.assertIn('开始观察', e.commands)
+
+    def test_run_one_day(self):
+        """运行 1 天不崩溃（无 LLM，只用模板对话）"""
+        from evaluator import SanyanEvaluator
+        from sugar.parser import parse_code
+        from values import ReturnException, TritValue
+        import io, sys
+        import ops.file_ops, ops.registry
+        ops.file_ops.clear_cache()
+
+        e = SanyanEvaluator(max_loop_steps=200000)
+        # 注册 mock 生成对话（无 LLM）
+        ops.registry.register('生成对话', lambda ev, args: TritValue(0))
+
+        for fname in ['ternary_agent/runtime_v2/village_game.san',
+                       'ternary_agent/runtime_v2/village_observe.san']:
+            src = open(fname, encoding='utf-8').read()
+            ast, _ = parse_code(src)
+            fixed = [s for s in ast[1:]
+                     if not (isinstance(s, list) and s[0] == 'export')
+                     and not (isinstance(s, list) and len(s) == 1 and s[0] == '游戏开始')]
+            try:
+                e.eval(['do'] + fixed)
+            except ReturnException:
+                pass
+
+        e.scope_vars['最大天数'] = 1
+        old = sys.stdout
+        sys.stdout = io.StringIO()
+        try:
+            e.eval(['开始观察'])
+        except ReturnException:
+            pass
+        finally:
+            output = sys.stdout.getvalue()
+            sys.stdout = old
+        self.assertIn('第 1 天', output)
+
+
 if __name__ == '__main__':
     unittest.main()
