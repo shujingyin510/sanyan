@@ -101,16 +101,52 @@ def _gen_dialogue(ev, args):
         line2 = llm_call(p2)
         if line2: cache[n2] = line2
 
-    # 三态置信度注解（verbose模式）
+    # ── 行为标签分析 ──
+    trust_map = {'夫妻':0.95, '朋友':0.75, '邻居':0.55, '熟人':0.35, '陌生人':0.10}
+    behave_delta = {
+        '帮助':0.020, '赞扬':0.010, '交易':0.005, '问候':0.003,
+        '争吵':-0.030, '欺骗':-0.080, '赠礼':0.050, '闲聊':0.001
+    }
+    label = '问候'
+    full_text = (line1 or '') + (line2 or '')
+    if full_text:
+        for kw in ['帮你', '帮忙', '我来', '给你送', '分你']: 
+            if kw in full_text: label = '帮助'; break
+        for kw in ['真好', '厉害', '不错', '佩服', '多谢', '谢谢']: 
+            if kw in full_text and label == '问候': label = '赞扬'; break
+        for kw in ['多少钱', '卖', '买', '便宜', '换', '给你']: 
+            if kw in full_text and label == '问候': label = '交易'; break
+        for kw in ['骗', '撒谎', '胡说', '胡扯', '瞎说']: 
+            if kw in full_text: label = '争吵'; break
+        for kw in ['送你', '拿着', '收下', '给你带']: 
+            if kw in full_text: label = '赠礼'; break
+
+    delta = behave_delta.get(label, 0.001)
+    ev.scope_vars['_last_label'] = label
+    ev.scope_vars['_last_delta'] = delta
+
+    # 传闻生成：随机事件触发传闻
+    if random.random() < 0.3 and n1 and n2:
+        topics = [
+            f'{n1}说{n2}家的庄稼今年特别好。',
+            f'听说{n1}和{n2}在商量合伙做生意。',
+            f'{n2}告诉{n1}山里最近有野猪出没。',
+            f'{n1}听说{n2}最近身体不太好。',
+        ]
+        rumor = random.choice(topics)
+        cache['_rumor'] = rumor
+
+    # 更新 NPC 间关系值（存在NPC信任字典）
+    trust_key = f'{min(n1,n2)}_{max(n1,n2)}'
+    trust_dict = ev.scope_vars.get('NPC信任', {}) or {}
+    old_trust = trust_dict.get(trust_key, trust_map.get(rel, 0.10))
+    new_trust = max(0.01, min(1.0, old_trust + delta))
+    trust_dict[trust_key] = new_trust
+    ev.scope_vars['NPC信任'] = trust_dict
+
+    # verbose 输出
     if _verbose and line1 and line2:
-        fav1 = npc_data.get(n1,{}).get('好感',50)
-        fav2 = npc_data.get(n2,{}).get('好感',50)
-        # NPC间信度：基于关系类型 + 随机波动模拟互动影响
-        trust_map = {'夫妻':0.95, '朋友':0.75, '邻居':0.55, '熟人':0.35, '陌生人':0.10}
-        base_trust = trust_map.get(rel, 0.10)
-        delta = (random.random() - 0.5) * 0.04  # -0.02 ~ +0.02 波动
-        trust = max(0, min(1, base_trust + delta))
-        cache['_trit'] = f'  ◈ {n1}↔{n2} 互信={trust:.3f}({rel}) δ={delta:+.3f}'
+        cache['_trit'] = f'  ◈ {n1}↔{n2} 互信={new_trust:.3f}({rel}) δ={delta:+.3f}[{label}]'
     if _verbose and not line1:
         cache['_trit'] = f'  ◈ {n1}↔{n2} LLM调用失败，降级为默认对话 [信度=0]'
 
