@@ -1,4 +1,4 @@
-# 三言 Sanyan v3.24.0
+# 三言 Sanyan v3.25.0
 
 [![VS Code Marketplace](https://img.shields.io/badge/VS%20Code-Marketplace-%23007ACC?logo=visualstudiocode)](https://marketplace.visualstudio.com/items?itemName=sanyan-lang.sanyan-language)
 [![CI](https://github.com/shujingyin510/sanyan/actions/workflows/test.yml/badge.svg)](https://github.com/shujingyin510/sanyan/actions)
@@ -381,6 +381,7 @@ tests/
 | **规则引擎** | `匹配规则()` 关键词匹配 + `策略概览()` 中文展示 + `验证策略()` 检查 |
 | **热重载** | 修改策略文件后自动重载，无需重启 |
 | **记忆系统** | TTL 过期 + 上下文压缩 + 冲突检测 |
+| **村庄观察器** | NPC 自主生活模拟 → 三态信任演变 → SVG 图表 + JSON 日志 |
 
 ## 三进制算术（模拟实现）
 
@@ -439,6 +440,7 @@ sanyan/
 ├── run_v2.py                  # v2 演示启动器
 ├── run_v2_demo.py             # v2 演示脚本
 ├── run_village_demo.py        # 村庄演示脚本
+├── run_village_observe.py     # 村庄观察器（NPC 自主生活模拟）
 ├── runtime.py                 # 运行环境
 ├── runtime_components.py      # 运行组件（作用域/IoT/调试/性能）
 ├── sandbox.py                 # 沙箱安全机制

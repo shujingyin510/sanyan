@@ -157,22 +157,23 @@ class TestAgentDecision(unittest.TestCase):
     def test_protect_high_risk(self):
         """保护：高风险 → 拒绝"""
         r = _agent_call(self.e, '保护', 0, 1.0, '高', [])
-        self.assertEqual(r[0], -1)
+        self.assertEqual(_tv(r['投票结果']), -1)
+        self.assertEqual(r['action'], 'block')
 
     def test_protect_exceed_limit(self):
         """保护：犹豫次数超限 → 多数投票"""
         r = _agent_call(self.e, '保护', 4, 1.0, '低', [1, 1, 1, -1])
-        self.assertEqual(r[0], 1)
+        self.assertEqual(_tv(r['投票结果']), 1)
 
     def test_protect_insufficient_gain(self):
         """保护：增益不足 → 多数投票"""
         r = _agent_call(self.e, '保护', 1, 0.05, '低', [1, 1, -1])
-        self.assertEqual(r[0], 1)
+        self.assertEqual(_tv(r['投票结果']), 1)
 
     def test_protect_continue(self):
         """保护：正常情况 → continue"""
         r = _agent_call(self.e, '保护', 1, 0.5, '低', [])
-        self.assertEqual(r[0], 0)
+        self.assertEqual(r['action'], 'continue')
 
     def test_match_rule_weather(self):
         """匹配规则：天气关键词→天气查询"""
@@ -479,6 +480,35 @@ class TestVillageE2E(unittest.TestCase):
         e = SanyanEvaluator(max_loop_steps=200000)
         # 注册 mock 生成对话（无 LLM）
         ops.registry.register('生成对话', lambda ev, args: TritValue(0))
+        # 注册夜间冲突事件（无 LLM 模式下退化为基础氛围）
+        def _mock_night(ev, args):
+            import random
+            r = random.randint(0, 100)
+            if r < 25: print('  远处传来几声狗叫。')
+            elif r < 4: print('  一只猫头鹰咕咕叫了几声。')
+            elif r < 2: print('  有人家的门吱呀响了一声。')
+            return TritValue(0)
+        ops.registry.register('夜间冲突事件', _mock_night)
+        ops.registry.register('夜间事件', _mock_night)
+        # 清除求值器 op 缓存（确保注册被感知）
+        e._op_cache.pop('夜间冲突事件', None)
+        e._op_cache.pop('夜间事件', None)
+        # 注册 .san 文件所需的别名
+        for a, t in [('转字符串', 'to_string'), ('转JSON', 'to_json'),
+                     ('字符串相等', 'str_equals'), ('表长', 'list_len'),
+                     ('连接', 'concat'), ('取长', 'length'),
+                     ('取键', 'get_key'), ('置键', 'set_key'),
+                     ('含键', 'dict_contains'), ('字典键列表', 'dict_keys'),
+                     ('不', 'not'), ('字符串包含', 'str_contains'),
+                     ('取', 'get'), ('列表合', 'list_concat'),
+                     ('是字典', 'is_dict'), ('切片', 'slice'),
+                     ('子串', 'substring'), ('删除键', 'delete_key'),
+                     ('列表', '列表'), ('随机数', 'random'),
+                     ('余', 'mod'), ('加', 'add'), ('减', 'sub'),
+                     ('字典', '新字典'), ('等于', 'equals'),
+                     ('继续', 'continue')]:
+            try: ops.registry.register_alias(a, t)
+            except: pass
 
         for fname in ['ternary_agent/runtime_v2/village_game.san',
                        'ternary_agent/runtime_v2/village_observe.san']:

@@ -31,6 +31,7 @@
 - `apply(evaluator, op, args)` — 统一入口
 - 分派链：`dispatch_op` → `handle_dot_access` → `handle_variable_call` → `Commands.call`
 - 每个 `ops/*.py` 模块通过 `register()` 注册操作到 `_OP_DISPATCH` 表
+- **`_DISPATCH_NOT_FOUND` 哨兵**: 区分"操作未找到"和"操作返回None"（2026-06-02 修复）
 
 ### 词法分析 (`lexer.py` + `sugar/lexer.py`)
 - `lexer.py` — S 表达式词法分析器，识别 token 类型
@@ -39,6 +40,7 @@
 ### 语法解析 (`parser.py` + `sugar/parser.py`)
 - `parser.py` — S 表达式解析器
 - `sugar/parser.py` — 中文糖语法解析器，支持 `设`/`若`/`循环`/`定义` 等
+- **`_parse_try` 修复（2026-06-02）**: 正确处理 `捕获 (e)` 带括号写法——原代码在遇到 `(` 时 `next()` 吃掉括号而非读取变量名，导致嵌套 try/catch/if 产生孤立 AST 节点
 
 ### 字节码编译器 (`compile_bytecode.py` + `stdlib/bytecode_compiler.san`)
 - Python 端：`compile_source()` 生成 `.bin` 文件

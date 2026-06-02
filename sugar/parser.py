@@ -286,10 +286,16 @@ class _Parser:
         try_body = self.parse_block()
         if self.peek() and self._kw(self.peek()) == 'catch':
             self.advance()
-            err_var = self.advance()
+            # 捕获 支持 捕获 e 和 捕获 (e) 两种写法
+            if self.peek() and self.peek().value == '(':
+                self.advance()
+                err_var = self.advance()
+                self._expect(')')
+            else:
+                err_var = self.advance()
             catch_body = self.parse_block()
             if isinstance(catch_body, list) and len(catch_body) > 0 and catch_body[0] == 'do':
-                catch_body_list = catch_body[1:] if len(catch_body) > 1 else [TritValue(0)]
+                catch_body_list = catch_body[1:] if len(catch_body) > 1 else [0]
             else:
                 catch_body_list = (
                     [catch_body]

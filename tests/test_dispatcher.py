@@ -70,8 +70,9 @@ class TestDispatchOp(unittest.TestCase):
         self.assertEqual(result.to_int(), 7)
 
     def test_dispatch_unknown(self):
+        from ops.dispatcher import _DISPATCH_NOT_FOUND
         result = dispatch_op(self.env, '非存在', [1])
-        self.assertIsNone(result)
+        self.assertIs(result, _DISPATCH_NOT_FOUND)
 
     def test_dispatch_with_extra(self):
         from ops.registry import register

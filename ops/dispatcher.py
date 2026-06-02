@@ -18,6 +18,9 @@ from values import (
 from ternary_core import TritValue, ArrayValue
 from sandbox import check_op as _check_op, check_func as _check_func
 
+# 哨兵：dispatch_op 用此值区分"未找到 op"和"op 返回了 None"
+_DISPATCH_NOT_FOUND = object()
+
 
 def resolve_op_name(evaluator: Any, op: str) -> str:
     """解析操作名为内部标识符（皮肤映射 + 缓存）。"""
@@ -52,6 +55,8 @@ def dispatch_op(evaluator: Any, internal: str, args: list) -> Any:
     """从注册表查询并执行内置操作。
 
     支持缓存加速，对有副作用的操作每次重新查找。
+    未找到操作时返回 _DISPATCH_NOT_FOUND 哨兵（而非 None），
+    避免与操作体合法返回 None 产生歧义。
     """
     _check_op(internal)
     if internal in _NO_CACHE_OPS:
@@ -61,7 +66,7 @@ def dispatch_op(evaluator: Any, internal: str, args: list) -> Any:
             if extra:
                 return method(evaluator, extra, args)
             return method(evaluator, args)
-        return None
+        return _DISPATCH_NOT_FOUND
     if internal in evaluator._op_cache:
         method, extra = evaluator._op_cache[internal]
     else:
@@ -70,7 +75,7 @@ def dispatch_op(evaluator: Any, internal: str, args: list) -> Any:
             method, extra = entry
             evaluator._op_cache[internal] = entry
         else:
-            return None
+            return _DISPATCH_NOT_FOUND
     if extra:
         return method(evaluator, extra, args)
     return method(evaluator, args)
@@ -138,13 +143,15 @@ def apply(evaluator: Any, op: str, args: list) -> Any:
     """主分派入口：依次尝试注册表 → 点号访问 → 变量调用 → 自定义命令。
 
     按优先级查找并执行操作，返回执行结果。
+    dispatch_op 返回 _DISPATCH_NOT_FOUND 时才回退后续路径，
+    避免操作体返回 None 时误判为分派失败。
     """
     from commands import Commands
 
     internal = resolve_op_name(evaluator, op)
 
     result = dispatch_op(evaluator, internal, args)
-    if result is not None:
+    if result is not _DISPATCH_NOT_FOUND:
         return result
 
     result = handle_dot_access(evaluator, op, args)
