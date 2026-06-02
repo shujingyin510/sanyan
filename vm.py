@@ -341,7 +341,7 @@ class VM:
         return True
 
     def _exec_arithmetic(self, op: int) -> bool:
-        """算术运算指令：ADD, SUB, MUL, DIV, MOD"""
+        """算术运算：ADD, SUB, MUL, DIV, MOD"""
         b = self.stack.pop() if self.stack else 0
         a = self.stack.pop() if self.stack else 0
         if op == ADD:
@@ -354,71 +354,65 @@ class VM:
         elif op == SUB:
             if isinstance(a, (int, float)) and isinstance(b, (int, float)):
                 self.stack.append(self._ternary_result(a - b, a, b))
-            else:
-                self.stack.append(0)
+            else: self.stack.append(0)
         elif op == MUL:
             if isinstance(a, (int, float)) and isinstance(b, (int, float)):
                 self.stack.append(self._ternary_result(a * b, a, b))
-            else:
-                self.stack.append(0)
+            else: self.stack.append(0)
         elif op == DIV:
             if isinstance(a, (int, float)) and isinstance(b, (int, float)) and b:
                 self.stack.append(self._ternary_result(a // b, a, b))
-            else:
-                self.stack.append(0)
+            else: self.stack.append(0)
         elif op == MOD:
             if isinstance(a, int) and isinstance(b, int) and b:
                 self.stack.append(self._ternary_result(a % b, a, b))
-            else:
-                self.stack.append(0)
-        elif op == BIT_AND:
+            else: self.stack.append(0)
+        else: return False
+        return True
+
+    def _exec_bitwise(self, op: int) -> bool:
+        """位运算和字节操作：BIT_AND~BIT_TST, SHIFT_L/R, LO_BYTE~MRG_BYT"""
+        b = self.stack.pop() if self.stack else 0
+        a = self.stack.pop() if self.stack else 0
+        if op == BIT_AND:
             if isinstance(a, int) and isinstance(b, int):
                 self.stack.append(self._ternary_result(a & b, a, b))
-            else:
-                self.stack.append(0)
+            else: self.stack.append(0)
         elif op == BIT_OR:
             if isinstance(a, int) and isinstance(b, int):
                 self.stack.append(self._ternary_result(a | b, a, b))
-            else:
-                self.stack.append(0)
+            else: self.stack.append(0)
         elif op == BIT_XOR:
             if isinstance(a, int) and isinstance(b, int):
                 self.stack.append(self._ternary_result(a ^ b, a, b))
-            else:
-                self.stack.append(0)
+            else: self.stack.append(0)
         elif op == BIT_NOT:
             if isinstance(a, int):
                 self.stack.append(self._ternary_result(~a, a) if isinstance(a, TritValue) else ~a)
         elif op == SHIFT_L:
             if isinstance(a, int) and isinstance(b, int):
                 self.stack.append(self._ternary_result(a << b, a, b))
-            else:
-                self.stack.append(0)
+            else: self.stack.append(0)
         elif op == SHIFT_R:
             if isinstance(a, int) and isinstance(b, int):
                 self.stack.append(self._ternary_result(a >> b, a, b))
-            else:
-                self.stack.append(0)
+            else: self.stack.append(0)
         elif op == BIT_SET:
             if isinstance(a, int) and isinstance(b, int):
                 self.stack.append(self._ternary_result(a | (1 << b), a, b))
-            else:
-                self.stack.append(0)
+            else: self.stack.append(0)
         elif op == BIT_CLR:
             if isinstance(a, int) and isinstance(b, int):
                 self.stack.append(self._ternary_result(a & ~(1 << b), a, b))
-            else:
-                self.stack.append(0)
+            else: self.stack.append(0)
         elif op == BIT_TGL:
             if isinstance(a, int) and isinstance(b, int):
                 self.stack.append(self._ternary_result(a ^ (1 << b), a, b))
-            else:
-                self.stack.append(0)
+            else: self.stack.append(0)
         elif op == BIT_TST:
             if isinstance(a, int) and isinstance(b, int):
                 self.stack.append(self._ternary_result(1 if (a >> b) & 1 else 0, a, b))
-            else:
-                self.stack.append(0)
+            else: self.stack.append(0)
         elif op == LO_BYTE:
             if isinstance(a, int):
                 self.stack.append(self._ternary_result(a & 0xFF, a) if isinstance(a, TritValue) else a & 0xFF)
@@ -428,8 +422,8 @@ class VM:
         elif op == MRG_BYT:
             if isinstance(a, int) and isinstance(b, int):
                 self.stack.append(self._ternary_result(((a & 0xFF) << 8) | (b & 0xFF), a, b))
-            else:
-                self.stack.append(0)
+            else: self.stack.append(0)
+        else: return False
         return True
 
     def _exec_comparison(self, op: int) -> bool:
@@ -830,19 +824,19 @@ _DISPATCH: dict[int, 'Callable'] = {
     DIV: VM._exec_arithmetic,
     MOD: VM._exec_arithmetic,
     # 位运算与字节操作
-    BIT_AND: VM._exec_arithmetic,
-    BIT_OR: VM._exec_arithmetic,
-    BIT_XOR: VM._exec_arithmetic,
-    BIT_NOT: VM._exec_arithmetic,
-    SHIFT_L: VM._exec_arithmetic,
-    SHIFT_R: VM._exec_arithmetic,
-    BIT_SET: VM._exec_arithmetic,
-    BIT_CLR: VM._exec_arithmetic,
-    BIT_TGL: VM._exec_arithmetic,
-    BIT_TST: VM._exec_arithmetic,
-    LO_BYTE: VM._exec_arithmetic,
-    HI_BYTE: VM._exec_arithmetic,
-    MRG_BYT: VM._exec_arithmetic,
+    BIT_AND: VM._exec_bitwise,
+    BIT_OR: VM._exec_bitwise,
+    BIT_XOR: VM._exec_bitwise,
+    BIT_NOT: VM._exec_bitwise,
+    SHIFT_L: VM._exec_bitwise,
+    SHIFT_R: VM._exec_bitwise,
+    BIT_SET: VM._exec_bitwise,
+    BIT_CLR: VM._exec_bitwise,
+    BIT_TGL: VM._exec_bitwise,
+    BIT_TST: VM._exec_bitwise,
+    LO_BYTE: VM._exec_bitwise,
+    HI_BYTE: VM._exec_bitwise,
+    MRG_BYT: VM._exec_bitwise,
     # 比较与逻辑
     GT: VM._exec_comparison,
     LT: VM._exec_comparison,
