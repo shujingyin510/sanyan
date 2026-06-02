@@ -137,7 +137,7 @@ def run_manual():
     else:
         print('  桃花村 手动规则模式')
         print('  设置 LLM_KEY 环境变量启用大模型')
-    print('  命令: 老王/送苹果/你好/状态/睡觉/退出/启用LLM/禁用LLM')
+        print('  命令: 老王/送苹果/你好/状态/睡觉/退出/启用LLM/开始观察')
     print('  ══════════════════════════════════════')
     print()
 
@@ -164,6 +164,16 @@ def run_manual():
             continue
         if cmd == '禁用LLM':
             e.eval(['禁用LLM'])
+            continue
+        if cmd == '开始观察':
+            e.eval(['开始观察'])
+            continue
+        # 村庄命令：直接调用
+        if cmd in ('状态', '睡觉'):
+            try:
+                e.eval([cmd])
+            except Exception as ex:
+                print(f'  错误: {ex}')
             continue
         try:
             e.eval(['NPC对话', cmd])
