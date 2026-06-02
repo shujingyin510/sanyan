@@ -547,3 +547,32 @@ ${MSYS2_PATH:-D:/msys64}/usr/bin/bash.exe -lc "gcc /d/path/to/obj1.o /d/path/to/
 - ~~`rt_str_join` 返回类型错误~~ → 返回值类型已修正
 
 `gcc -c runtime.c -std=c99 -Wall` 编译通过，无警告。
+
+## 架构治理记录（2026-06-02）
+
+### 运行时合并
+
+`runtime_components.py` → `runtime.py`，`debug_eval.py` → `evaluator.py`，`eval_helpers.py` 拆为 `eval_utils.py`（纯工具）+ 合回 `evaluator.py`（求值逻辑）。净删 2 文件。
+
+### 标准库拆分
+
+`stdlib/combined.san`(2960 行) → `lexer.san`(199 行) + `parser.san`(739 行) + `codegen.san`(2022 行)，原文件变薄包装器。
+
+### VM 扩展
+
+- PUSH_FLOAT(0x48) opcode：IEEE 754 double 浮点常量
+- VM 测试 79→91（位运算/字符串扩展/字节操作）
+
+### C VM 修复
+
+- UTF-8 字符计数：`utf8_char_len`/`utf8_byte_offset`/`utf8_substr`
+- float 字典键：`hash_key`/`key_eq` 支持 `OBJ_FLOAT`
+
+### 工程改进
+
+- `#include` 预处理移到 `sugar/parser.py:parse_code()` 入口
+- 常量折叠：`compile_bytecode.py:_fold_constants()`
+- LLVM 工具路径环境变量化：`MSYS2_PATH`/`CC`/`LLC_PATH`/`BASH_PATH`
+- 启动器 `os.chdir()` → `PROJECT_ROOT` 常量
+- `ensure_trit()` 边界转换包装
+- `_DEFAULT_RECURSION_LIMIT` 常量化

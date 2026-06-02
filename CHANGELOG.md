@@ -2,6 +2,29 @@
 
 ---
 
+## [v3.26.0] — 2026-06-02
+
+### 新增
+- **VM 浮点支持**: `PUSH_FLOAT`(0x48) 操作码，IEEE 754 double 8 字节编码
+- **C VM UTF-8 字符计数**: `utf8_char_len`/`utf8_byte_offset`/`utf8_substr`，修复 `STRLEN`/`STRSUB` 对中文字符串的字节级错误
+- **C VM float 字典键**: `hash_key`/`key_eq` 支持 `OBJ_FLOAT`，`rt_float_t` + `rt_float_new()` 结构体
+- **常量折叠优化**: `compile_bytecode.py:_fold_constants()` 递归折叠 `(加 1 2)` → `3`
+- **LLVM 工具路径环境变量化**: `MSYS2_PATH`/`CC`/`LLC_PATH`/`BASH_PATH`/`GCC_PATH`/`SANYAN_CC`/`SANYAN_LLC`/`SANYAN_BASH`
+
+### 变更
+- **ev
+
+_val() 边界统一**: `eval_utils.py:ensure_trit()` 统一转换 raw↔TritValue
+- **#include 预处理**: 移到 `sugar/parser.py:parse_code()` 入口自动展开
+- **ops 文档化**: `_init_ops` 注释写明 import 即注册机制
+- **递归上限常量化**: `_DEFAULT_RECURSION_LIMIT = 2000`
+
+### 修复
+- **C VM UTF-8**: `STRLEN` 改用字符计数（非字节），`STRSUB` 按字符边界切片
+- **C VM 字典**: `key_eq` 区分 float/string 类型比较
+
+---
+
 ## [v3.25.0] — 2026-06-02
 
 ### 新增
