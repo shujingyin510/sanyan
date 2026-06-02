@@ -95,8 +95,8 @@ class SrcNode(list):
 
     def __repr__(self) -> str:
         items = super().__repr__()
-        if self.line or self.col:
-            return f'<SrcNode L{self.line}:C{self.col} {items}>'
+        if self.line or self.col:  # type: ignore[attr-defined]
+            return f'<SrcNode L{self.line}:C{self.col} {items}>'  # type: ignore[attr-defined]
         return f'<SrcNode {items}>'
 
 

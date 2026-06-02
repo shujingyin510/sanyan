@@ -104,7 +104,7 @@ def propagated_confidence(*values: Any) -> float:
     return max(0.0, min(1.0, c))
 
 
-def ensure_trit(v):
+def ensure_trit(v: Any) -> Any:
     """将 raw Python 值包装为 TritValue，若已是 TritValue 则原样返回。
 
     用于 ops 边界统一化——eval() 可能返回 TritValue 或 raw int/str/float。

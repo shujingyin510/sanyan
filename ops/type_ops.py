@@ -254,7 +254,7 @@ def _conflict_merge(evaluator, args):
             else TritValue(v if isinstance(v, int) else 0, confidence=0.5, source='冲突合并(优先级)')
         )
     elif strategy == '投票' or strategy == 'vote':
-        best, best_c = TritValue(0), 0
+        best, best_c = TritValue(0), 0.0
         for v in vals:
             c = v.confidence if isinstance(v, TritValue) else 1.0
             if c > best_c:

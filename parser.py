@@ -114,12 +114,12 @@ def parse(tokens: list, source: str = '') -> Optional[Union[list, str]]:
             return None
         tok = tokens[pos]
         pos += 1
-        return tok
+        return tok  # type: ignore[no-any-return]
 
     def _peek() -> Optional[str]:
         if pos >= len(tokens):
             return None
-        return tokens[pos]
+        return tokens[pos]  # type: ignore[no-any-return]
 
     def _error(msg: str) -> str:
         """生成带位置的错误信息。"""

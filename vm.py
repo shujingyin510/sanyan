@@ -283,7 +283,7 @@ class VM:
                 self.pc = addr
         return True
 
-    def _ternary_result(self, result: int, *inputs: Any) -> Any:
+    def _ternary_result(self, result: int | float, *inputs: Any) -> Any:
         """如果任意输入是 TritValue，用传播信度包装结果。否则返回纯 int。"""
         conf = 1.0
         has_trit = False

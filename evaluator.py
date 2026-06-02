@@ -20,7 +20,7 @@ _ops_initialized = False
 _DEFAULT_RECURSION_LIMIT = 2000
 
 
-def _debug_before(evaluator, internal: str, op: str, args: list) -> None:
+def _debug_before(evaluator: Any, internal: str, op: str, args: list) -> None:
     """操作执行前的调试检查（从 debug_eval.py 合并）"""
     if not evaluator.debug_mode:
         return
@@ -29,7 +29,7 @@ def _debug_before(evaluator, internal: str, op: str, args: list) -> None:
     _debug_prompt(evaluator, internal or op, args)
 
 
-def _debug_after(evaluator, internal: str, op: str, args: list) -> None:
+def _debug_after(evaluator: Any, internal: str, op: str, args: list) -> None:
     """操作执行后的监视变量检查（从 debug_eval.py 合并）"""
     if not evaluator._watched_vars:
         return
@@ -41,7 +41,7 @@ def _debug_after(evaluator, internal: str, op: str, args: list) -> None:
             print(f'  [监视] {v} = {evaluator.get_var(v)}')
 
 
-def _debug_prompt(evaluator, cur_op: str, args: list) -> None:
+def _debug_prompt(evaluator: Any, cur_op: str, args: list) -> None:
     """调试断点交互提示（从 debug_eval.py 合并）"""
     from ops.io_ops import IOOps
 
@@ -83,7 +83,7 @@ def _debug_prompt(evaluator, cur_op: str, args: list) -> None:
 # ── 求值辅助函数（从 eval_helpers.py 合并）──
 
 
-def _resolve_identifier(evaluator, node: str) -> Any:
+def _resolve_identifier(evaluator: Any, node: str) -> Any:
     """解析标识符：字典点号访问 → 符号求值 → 中文字符串降级"""
     if '.' in node:
         parts = node.split('.', 1)
@@ -100,7 +100,7 @@ def _resolve_identifier(evaluator, node: str) -> Any:
         raise
 
 
-def _eval_str(evaluator, node: str) -> Any:
+def _eval_str(evaluator: Any, node: str) -> Any:
     """求值字符串节点。
 
     解析顺序：引号字符串 → 数值字面量 → 皮肤关键字 → 变量/命令 → 字面量。
@@ -132,7 +132,7 @@ def _eval_str(evaluator, node: str) -> Any:
     return node
 
 
-def _make_closure_value(evaluator, cmd_name: str) -> Any:
+def _make_closure_value(evaluator: Any, cmd_name: str) -> Any:
     """将已注册的命令包装为 FunctionValue，捕获当前作用域作为闭包环境。"""
     from values import FunctionValue
 
@@ -147,7 +147,7 @@ def _make_closure_value(evaluator, cmd_name: str) -> Any:
     return FunctionValue(params, body, evaluator, closure_vars, param_types)
 
 
-def _eval_symbol(evaluator, symbol: str) -> Any:
+def _eval_symbol(evaluator: Any, symbol: str) -> Any:
     """求值符号：变量 → 字面量 → 三态词 → IoT 设备 → 上下文对象"""
     if evaluator.has_var(symbol):
         return evaluator.get_var(symbol)
@@ -169,7 +169,7 @@ def _eval_symbol(evaluator, symbol: str) -> Any:
     raise SanyanNameError(f'未定义的符号: {symbol}')
 
 
-def _eval_dot_symbol(evaluator, symbol: str) -> Any:
+def _eval_dot_symbol(evaluator: Any, symbol: str) -> Any:
     """解析 对象.属性 形式的 IoT 设备访问"""
     obj, attr = symbol.split('.')
     if obj in evaluator.actuators:
@@ -183,7 +183,7 @@ def _eval_dot_symbol(evaluator, symbol: str) -> Any:
     raise SanyanNameError(f'未定义的设备: {obj}')
 
 
-def _eval_context_symbol(evaluator, symbol: str) -> Any:
+def _eval_context_symbol(evaluator: Any, symbol: str) -> Any:
     """在 对 作用域内解析符号为 IoT 设备操作"""
     obj = evaluator.context_object
     if obj in evaluator.actuators:
@@ -381,7 +381,7 @@ class SanyanEvaluator(SanyanRuntime):
         try:
             from type_checker import check_types
 
-            simpl = []
+            simpl: list = []
             for a in args:
                 if isinstance(a, (int, float, str, list, dict)) and not isinstance(a, SrcNode):
                     simpl.append(a)
