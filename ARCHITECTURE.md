@@ -52,6 +52,14 @@
 - 1461 行 C 语言字节码解释器
 - 标记指针值系统（LSB=1 整数，LSB=0 堆对象）
 - 支持全部 52 个操作码
+- **UTF-8 字符计数**: `utf8_char_len`/`utf8_byte_offset`/`utf8_substr`（2026-06-02 修复）
+- **float 字典键**: `hash_key`/`key_eq` 支持 `OBJ_FLOAT`（2026-06-02 新增）
+
+### 类型系统 (`type_checker.py` + `eval_utils.py` + `values.py`)
+- `type_checker.py` — 50+ 内置操作的类型签名表，求值前做字面量参数断言
+- `eval_utils.py` — `ensure_trit()` 边界转换、`unwrap_trit()` 三态解包、`propagated_confidence()` 置信度传播
+- `values.py:check_type()` — 支持英文类型名（int/float/str/list/dict/num/any）
+- 函数参数类型标注：`定义 f (x: int) { ... }` 在调用时校验（2026-06-02 新增）
 
 ### LLVM 后端 (`llvmgen/`)
 - `codegen.py` — AST → LLVM IR 代码生成（419 行）

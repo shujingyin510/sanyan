@@ -1,4 +1,4 @@
-# 三言 Sanyan v3.25.0
+# 三言 Sanyan v3.26.0
 
 [![VS Code Extension](https://img.shields.io/badge/VS%20Code-%E8%AF%AD%E6%B3%95%E9%AB%98%E4%BA%AE-%23007ACC?logo=visualstudiocode)](sanyan-vscode/README.md)
 [![CI](https://github.com/shujingyin510/sanyan/actions/workflows/test.yml/badge.svg)](https://github.com/shujingyin510/sanyan/actions)
@@ -585,16 +585,16 @@ sanyan/
 │       ├── runtime_stm32.c    # STM32 VM + 外设驱动
 │       ├── Makefile           # 构建系统
 │       └── stm32_flash.ld     # 链接脚本
-├── tests/                     # 自动测试（351 项）
-│   ├── test_core.py           # 核心单测（52 项）
-│   ├── test_ops.py            # ops 模块单测（78 项）
-│   ├── test_ops_ext.py        # 扩展 ops 单测
-│   ├── test_parser.py         # 解析器 AST 校验
+├── tests/                     # 自动测试（617+ 项）
+│   ├── test_core.py           # 核心单测（137 项）
+│   ├── test_ops.py            # ops 模块单测（92 项）
+│   ├── test_ops_ext.py        # 扩展 ops 单测（64 项）
+│   ├── test_parser.py         # 解析器 AST 校验（28 项）
 │   ├── test_sugar_san.py      # sugar.san 测试（45 项）
 │   ├── test_llvmgen.py        # LLVM 代码生成测试（53 项）
 │   ├── test_self_host.py      # 字节码编译器自举验证（SHA256）
-│   ├── test_sugar_self_host.py # sugar.bin 自举验证
-│   ├── test_vm.py             # VM 字节码测试（73 项）
+│   ├── test_sugar_self_host.py # sugar.bin 自举验证（3 项）
+│   ├── test_vm.py             # VM 字节码测试（91 项）
 │   ├── test_llvm_native.py    # LLVM 原生编译测试
 │   └── run_all.py             # 集成测试（46 项）
 ├── docs/                      # 文档

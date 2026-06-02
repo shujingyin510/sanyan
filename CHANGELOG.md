@@ -10,18 +10,31 @@
 - **C VM float 字典键**: `hash_key`/`key_eq` 支持 `OBJ_FLOAT`，`rt_float_t` + `rt_float_new()` 结构体
 - **常量折叠优化**: `compile_bytecode.py:_fold_constants()` 递归折叠 `(加 1 2)` → `3`
 - **LLVM 工具路径环境变量化**: `MSYS2_PATH`/`CC`/`LLC_PATH`/`BASH_PATH`/`GCC_PATH`/`SANYAN_CC`/`SANYAN_LLC`/`SANYAN_BASH`
+- **静态类型检查**: `type_checker.py` — 50+ 内置操作的类型签名表，在求值前做字面量参数断言
+- **LLVM 三态运行时**: `rt_trit_add`/`sub`/`mul`/`div`/`mod` 运行时函数，支持三态置信度传播
+- **类型标注支持**: `check_type` 支持英文类型名（int/float/str/list/dict/num/any），`定义 f (x: int) { ... }` 参数类型在调用时校验
 
 ### 变更
-- **ev
-
-_val() 边界统一**: `eval_utils.py:ensure_trit()` 统一转换 raw↔TritValue
+- **运行时合并**: `runtime_components.py` → `runtime.py`，`debug_eval.py` → `evaluator.py`，`eval_helpers.py` 拆为 `eval_utils.py` + 合回 `evaluator.py`。净删 3 文件
+- **标准库拆分**: `stdlib/combined.san`(2960 行) → `lexer.san`(199 行) + `parser.san`(739 行) + `codegen.san`(2022 行)
+- **VM 重构**: `_exec_arithmetic`(92 行) 拆为 `_exec_arithmetic`(算术) + `_exec_bitwise`(位运算/字节)
+- **eval() 边界统一**: `eval_utils.py:ensure_trit()` 统一转换 raw↔TritValue
 - **#include 预处理**: 移到 `sugar/parser.py:parse_code()` 入口自动展开
 - **ops 文档化**: `_init_ops` 注释写明 import 即注册机制
 - **递归上限常量化**: `_DEFAULT_RECURSION_LIMIT = 2000`
+- **启动器改进**: `os.chdir()` → `PROJECT_ROOT` 常量
 
 ### 修复
 - **C VM UTF-8**: `STRLEN` 改用字符计数（非字节），`STRSUB` 按字符边界切片
 - **C VM 字典**: `key_eq` 区分 float/string 类型比较
+- **糖解析器**: `_parse_try` 正确处理 `捕获 (e)` 带括号写法
+- **分派器**: `_DISPATCH_NOT_FOUND` 哨兵区分"未找到 op"和"op 返回 None"
+
+### 测试
+- 覆盖率从 69.2% → 75.09%
+- `test_core.py`: 100 → 137 项
+- `test_vm.py`: 79 → 91 项
+- 新增 type_checker/eval_utils/常量折叠专项测试
 
 ---
 
