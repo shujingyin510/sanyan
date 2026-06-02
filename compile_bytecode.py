@@ -43,8 +43,8 @@ def _fold_constants(node):
     op = node[0]
     # 先递归折叠子节点
     folded = [op] + [_fold_constants(a) for a in node[1:]]
-    # 检查是否所有参数都是常量
-    if op in _CONST_OPS:
+    # 检查是否所有参数都是常量（op 必须是字符串，跳过嵌套列表如参数定义）
+    if isinstance(op, str) and op in _CONST_OPS:
         args = folded[1:]
         if all(isinstance(a, (int, float)) for a in args) and len(args) == 2:
             try:
