@@ -41,6 +41,8 @@ e = SanyanEvaluator(max_loop_steps=999999)
 _register_aliases()
 
 src = open('ternary_agent/runtime_v2/village_game.san', encoding='utf-8').read()
+# 跳过游戏开始（含 input 循环），直接进观察模式
+src = src.replace('游戏开始()', '开始观察()')
 # 自动启用 LLM
 src = src.replace('设 LLM启用 = 假', '设 LLM启用 = 真')
 # 环境变量覆盖
@@ -63,12 +65,6 @@ except ReturnException:
 print()
 print('  ══════════════════════════════════════')
 print('  桃花村 观察模式 — NPC 自主生活')
-print('  全部 NPC 入睡后自动进入下一天')
+print('  Ctrl+C 退出')
 print('  ══════════════════════════════════════')
 print()
-
-try:
-    e.eval(['开始观察'])
-except KeyboardInterrupt:
-    print()
-    print('  观察结束')
