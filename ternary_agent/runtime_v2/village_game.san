@@ -518,3 +518,166 @@
 }
 
 游戏开始()
+
+// ============================================================
+// LLM 对话管道 — NPC 回复由大模型生成
+// ============================================================
+设 对话历史 = 字典()  // NPC名 → [{"role":"user","content":...}, ...]
+设 LLM启用 = 假  // 设为真时启用 LLM，假时用规则回复
+设 模型URL = "https://api.deepseek.com/v1/chat/completions"
+设 模型名 = "deepseek-chat"
+设 API密钥 = 环境变量("LLM_KEY")
+若 (等于(API密钥, 假)) { 设 API密钥 = "sk-你的key" }
+
+// 构建 NPC 系统提示词（角色+性格+关系+记忆+当前状态）
+定义 构建NPC提示 (npc) {
+    设 data = 取键(NPC数据, npc)
+    设 角色 = 取键(data, "角色")
+    设 性格 = 取键(data, "性格")
+    设 fav = 取键(data, "好感")
+    设 关系 = ""
+    设 m = 心情(fav)
+
+    // 构建该 NPC 与玩家的关系描述
+    设 npcKeys = 字典键列表(NPC数据)
+    设 关系列表 = 列表()
+    设 i = 0; 设 len = 表长(npcKeys)
+    循环 (i < len) {
+        设 other = 取(npcKeys, i)
+        若 (非(字符串相等(other, npc))) {
+            设 rel = 取关系(npc, other)
+             若 (非(字符串相等(rel, "陌生人"))) {
+                设 关系列表 = 列表合(关系列表, 列表(连接(other, "是", rel)))
+            }
+        }
+        设 i = i + 1
+    }
+
+    // 搜索 NPC 的相关记忆
+   设 相关记忆 = 列表()
+   设 memKeys = 字典键列表(记忆表)
+   设 i = 0; 设 mlen = 表长(memKeys)
+   循环 (i < mlen) {
+       设 k = 取(memKeys, i)
+       若 (字符串包含(k, npc) 且 不(字符串包含(k, "传闻"))) {
+           设 node = 取键(记忆表, k)
+           若 (是字典(node) 且 含键(node, "内容")) {
+               设 相关记忆 = 列表合(相关记忆, 列表(取键(node, "内容")))
+           }
+       }
+       设 i = i + 1
+   }
+
+    // 搜索传闻
+   设 传闻列表 = 列表()
+   设 i = 0; 设 mlen = 表长(memKeys)
+   循环 (i < mlen) {
+       设 k = 取(memKeys, i)
+       若 (字符串包含(k, 连接(npc, "_传闻"))) {
+           设 node = 取键(记忆表, k)
+           若 (是字典(node) 且 含键(node, "内容")) {
+               设 传闻列表 = 列表合(传闻列表, 列表(取键(node, "内容")))
+           }
+       }
+       设 i = i + 1
+   }
+
+    // 拼接系统提示词
+   设 prompt = 连接(连接("你是桃花村的", 角色), 连接("，名叫", npc))
+   设 prompt = 连接(prompt, 连接("。", 性格))
+   设 prompt = 连接(prompt, 连接("。现在心情:", m))
+   若 (表长(关系列表) > 0) {
+       设 prompt = 连接(prompt, "。与你有关的人：")
+       设 j = 0; 设 rlen = 表长(关系列表)
+       循环 (j < rlen) {
+           设 prompt = 连接(prompt, 取(关系列表, j))
+           若 (j < rlen - 1) { 设 prompt = 连接(prompt, "，") }
+           设 j = j + 1
+       }
+   }
+   若 (表长(相关记忆) > 0) {
+       设 prompt = 连接(prompt, "。你知道的事：")
+       设 j = 0; 设 rlen = 表长(相关记忆)
+       循环 (j < rlen) {
+           设 prompt = 连接(prompt, 取(相关记忆, j))
+           若 (j < rlen - 1) { 设 prompt = 连接(prompt, "；") }
+           设 j = j + 1
+       }
+   }
+   若 (表长(传闻列表) > 0) {
+       设 prompt = 连接(prompt, "。你听到的传闻：")
+       设 j = 0; 设 rlen = 表长(传闻列表)
+       循环 (j < rlen) {
+           设 prompt = 连接(prompt, 取(传闻列表, j))
+           若 (j < rlen - 1) { 设 prompt = 连接(prompt, "；") }
+           设 j = j + 1
+       }
+   }
+   设 prompt = 连接(prompt, "。今天是第")
+   设 prompt = 连接(prompt, 连接(转字符串(取键(_V, "天数")), "天"))
+   设 prompt = 连接(prompt, 连接("，", 连接(取时段名(), 连接("，天气", 取键(_V, "天气")))))
+   设 prompt = 连接(prompt, "。有人来找你说话。请用中文简短回复（1-3句话），保持角色性格。")
+   返回(prompt)
+}
+
+// LLM 调用 NPC 对话
+定义 NPC对话 (玩家输入) {
+    若 (非(LLM启用)) { 返回(NPC回复(玩家输入)) }
+
+    设 npc = 取键(_V, "当前NPC")
+    设 data = 取键(NPC数据, npc)
+    设 fav = 取键(data, "好感")
+
+    // 构建消息
+    设 系统提示 = 构建NPC提示(npc)
+    设 消息 = 列表(字典("role", "system", "content", 系统提示))
+
+    // 加载对话历史（最近 5 轮）
+    设 历史 = 列表()
+    若 (含键(对话历史, npc)) {
+        设 历史 = 取键(对话历史, npc)
+        设 hlen = 表长(历史)
+        若 (hlen > 10) { 设 历史 = 切片(历史, hlen - 10, hlen) }
+    }
+    设 消息 = 列表合(消息, 历史)
+    设 消息 = 列表合(消息, 列表(字典("role", "user", "content", 连接("(好感:", 转字符串(fav), 连接(")", 玩家输入)))))
+
+    // 调用 LLM
+    若 (字符串相等(API密钥, "sk-你的key")) {
+        返回(连接(npc, "（LLM未配置，使用规则模式）"))
+    }
+    设 body = 转JSON(字典("model", 模型名, "messages", 消息, "temperature", 0.8))
+    设 headers = 字典("Content-Type", "application/json", "Authorization", 连接("Bearer ", API密钥))
+
+    尝试 {
+        设 raw = http写(模型URL, body, headers)
+        若 (取长(raw) == 0) { 返回(连接(npc, " 看了看你，没说话。")) }
+        设 outer = 解析JSON(raw)
+        设 choices = 取键(outer, "choices")
+        若 (表长(choices) > 0) {
+            设 msg = 取键(取(choices, 0), "message")
+            设 回答 = 取键(msg, "content")
+            // 保存对话历史
+            设 历史 = 列表合(历史, 列表(
+                字典("role", "user", "content", 玩家输入),
+                字典("role", "assistant", "content", 回答)
+            ))
+            置键(对话历史, npc, 历史)
+            // 根据回答内容调整好感
+            若 (字符串包含(回答, "谢谢") 或 字符串包含(回答, "高兴") 或 字符串包含(回答, "开心")) {
+                改NPC好感(npc, 2)
+            }
+            若 (字符串包含(回答, "讨厌") 或 字符串包含(回答, "滚") 或 字符串包含(回答, "走开")) {
+                改NPC好感(npc, -3)
+            }
+            返回(连接(npc, "：", 回答))
+        }
+    } 捕获 (e) {
+        输出(连接("[LLM] 调用失败，使用规则回复: ", 转字符串(e)))
+    }
+    返回(NPC回复(玩家输入))  // 降级到规则回复
+}
+
+// 开关 LLM 模式
+定义 启用LLM () { 设 LLM启用 = 真; 输出("LLM 对话模式已启用") }
+定义 禁用LLM () { 设 LLM启用 = 假; 输出("LLM 已禁用，使用规则回复") }
