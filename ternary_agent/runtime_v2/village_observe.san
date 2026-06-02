@@ -3,7 +3,7 @@
 
 #include "ternary_agent/runtime_v2/village_config.san"
 
-设 观察速度 = 800
+设 观察速度 = 0  // 0=无延迟快速跑，改大的值恢复延迟
 设 最大天数 = 30
 设 对话缓存 = 字典()
 设 NPC活跃 = 字典()
