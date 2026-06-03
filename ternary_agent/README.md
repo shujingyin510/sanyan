@@ -12,10 +12,11 @@ set SANYAN_API_KEY=sk-你的密钥    # Windows
 export SANYAN_API_KEY=sk-你的密钥  # Linux/Mac
 
 # 方式二：直接写到策略文件
-# 编辑 ternary_agent/agent_policy.san，修改第 14 行：
+# 编辑 ternary_agent/agent_policy.san，修改第 15 行的占位符：
 #   设 API密钥 = "sk-你的密钥"
 
-# 方式三：游戏配置文件
+# 方式三：游戏配置文件（复制模板后修改）
+# cp ternary_agent/runtime_v2/village_config.template.san ternary_agent/runtime_v2/village_config.san
 # 编辑 ternary_agent/runtime_v2/village_config.san
 ```
 
