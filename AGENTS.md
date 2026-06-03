@@ -55,10 +55,23 @@ Agent 功能通过端到端 mock 测试验证（mock `http写` 返回模拟 LLM 
 
 ### Agent 已知修复（2026-06-02）
 
-- **`保护()` 返回字典**: `ternary_agent/decision.san` 中 `保护()` 原返回列表，消费者用 `取键()` 期望字典，改为返回 `{action, reason, 拒绝原因, 犹豫次数, 增益}` 字典
-- **`规则降级()` 调用方式**: `query_weather()` 未定义 → 改为 `调度工具("query_weather", 城市)`
+- **`保护()` 返回字典**: `ternary_agent/decision.san` 中 `保护()` 原返回列表，消费者用 `取键()` 期望字典，改为返回 `{action, reason, 投票结果}` 字典
+- **`规则降级()` 调用方式**: `query_weather()` 未定义 → 改为 `调度工具(\"query_weather\", 城市)`
 - **死代码移除**: 两个连续的 `传播后 == -1` 分支合并为一个
 - **`好感要求` 安全读取**: `_V` 未定义时 try/catch 保护，默认好感=50
+
+---
+
+## 村庄观察器（`run_village_observe.py`，详情见 `docs/village_observer.md`）
+
+桃花村 NPC 自主生活模拟 → LLM 驱动对话 → 三态信任演变 → SVG 图表 + JSON 日志。
+
+```bash
+python -X utf8 run_village_observe.py          # 默认 10 天
+python -X utf8 run_village_observe.py --verbose # 详细三态推理链
+```
+
+核心特性：Python 主循环逐日调用 LLM、夜间 8 项负面事件池、事件记忆跨日追踪、LLM 五类语气检测、动态 δ 加权（性格×天气×长度×位置）、宏观趋势分析、SVG 交互图表。
 
 ---
 
@@ -325,19 +338,7 @@ CI 使用 `pytest --cov=. --cov-report=xml` 测量覆盖率，阈值 75%。
 - `vm.py` (63%) — 字节码 VM，需补充更多 opcode 测试
 - `compile_bytecode.py` (58%) — 字节码编译器，需补充编译路径测试
 - `llvmgen/codegen.py` (58%) — LLVM 代码生成，需补充更多 IR 生成测试
-
-2026-05-30 修复记录：
-- llvmgen/runtime.c：struct rt_list_s 移到使用函数之前，rt_list_push → rt_list_push_item，新增公共接口 `rt_make()` 用于 C 字符串→三言字符串转换
-- LLVM compiler bootstrap 路径：S-expression set 字面量字符串创建全局变量；_make_bootstrap_harness 用 rt_make 包装 C 字符串参数（修复 parse_sanyan 入口函数不返回问题）
-- VM import：.san → .bin 自动转换 + 自动编译 .bin 不存在时
-- VM from_bin：导出表边界检查（不完整文件不崩溃）
-- VM 所有操作码处理：栈下溢保护 + 类型安全比较/算术
-- Python 求值器 dict ops 中 list→tuple 键转换
-- Python 求值器 list_ops.generic_get 越界返回 0 替代抛异常
-- test_http_get：改用 unittest.mock.patch 替代外网请求（去掉 skip）
-- test_import_resolves / test_text_analysis：取消 skip，import 系统实际已可用（去掉 2 个 skip）
-- LLVM codegen `_normalize_fn_format`：多语句函数体被截断为仅第一条语句，修复为将 `node[3:]` 包装为 `do` 块
-- LLVM codegen `(div 1 0)`：`_check_div_zero` 生成 `icmp eq 0, 0`（常量 true）→ `rt_throw` 污染 `g_error`，修复为 AST 级别检测常量除零并跳过检查
+- **2026-05-30 修复记录已合并到下方「架构治理记录」**
 
 Python 文档同步：首次或每次代码修改后建议运行：
 ```bash
@@ -540,11 +541,6 @@ ${MSYS2_PATH:-D:/msys64}/usr/bin/bash.exe -lc "gcc /d/path/to/obj1.o /d/path/to/
 ```
 
 ### llvmgen/runtime.c 已知问题
-
-**2026-05-30 已修复。** 以下问题已不存在：
-- ~~`rt_list_t` incomplete typedef~~ → `#include "../csrc/runtime_common.h"` 提供完整类型定义
-- ~~`rt_list_push` 未声明~~ → 已统一为 `rt_list_push_item`
-- ~~`rt_str_join` 返回类型错误~~ → 返回值类型已修正
 
 `gcc -c runtime.c -std=c99 -Wall` 编译通过，无警告。
 
