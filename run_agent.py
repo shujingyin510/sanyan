@@ -284,9 +284,9 @@ def init_evaluator(api_key):
                     return str(result.to_int() if hasattr(result, 'to_int') else result)
             if code.strip().startswith('('):
                 tokens = tokenize(code)
-                sexpr = parse(tokens)
-                if sexpr is not None:
-                    result = sandbox.eval(sexpr)
+                single = parse(tokens)
+                if single is not None:
+                    result = sandbox.eval(single)
                     return str(result.to_int() if hasattr(result, 'to_int') else result)
             from sugar.parser import parse_code as pc
 
