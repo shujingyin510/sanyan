@@ -88,13 +88,28 @@ class _Parser:
             return None
         if tok.value != kind:
             msg = f"期望 '{kind}'，但得到 '{tok.value}'"
-            # 常见笔误提示
+            # 括号不匹配提示
             if kind == ')' and tok.value in ('(', '（'):
-                msg += '（可能未闭合左括号）'
-            elif kind == '}' and tok.value == '{':
-                msg += '（可能未闭合左大括号）'
+                hint = '（可能未闭合左括号）'
+            elif kind == ')' and tok.value == ']':
+                hint = '（期望圆括号但得到方括号）'
+            elif kind == ')' and tok.value == '}':
+                hint = '（期望圆括号但得到花括号）'
             elif kind == ')' and tok.tok_type in ('WORD',):
-                msg += f'（' + tok.value + ' 是变量名，括号可能漏了）'
+                hint = f'（{tok.value} 是变量名，圆括号可能漏了）'
+            elif kind == '}' and tok.value == '{':
+                hint = '（可能未闭合左大括号）'
+            elif kind == '}' and tok.value == ')':
+                hint = '（期望花括号但得到圆括号）'
+            elif kind == '}' and tok.value == ']':
+                hint = '（期望花括号但得到方括号）'
+            elif kind == ']' and tok.value == ')':
+                hint = '（期望方括号但得到圆括号）'
+            elif kind == ']' and tok.value == '}':
+                hint = '（期望方括号但得到花括号）'
+            else:
+                hint = ''
+            msg += hint
             self.reporter.error(tok.line, tok.col, msg)
             return None
         return self.advance()
