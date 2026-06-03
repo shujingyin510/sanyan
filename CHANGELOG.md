@@ -29,10 +29,17 @@
 - **C VM 字典**: `key_eq` 区分 float/string 类型比较
 - **糖解析器**: `_parse_try` 正确处理 `捕获 (e)` 带括号写法
 - **分派器**: `_DISPATCH_NOT_FOUND` 哨兵区分"未找到 op"和"op 返回 None"
+- **常量折叠**: `isinstance(op, str)` 检查防止嵌套参数列表被误判
+- **死代码**: `ternary_core.py` 删除 10 行不可达的重复分支
+- **API 密钥**: 占位符 `\"sk-你的key\"` 改为显式错误退出（`run_agent.py`）
+- **错误信息**: `_expect` 补全 9 种括号不匹配提示
+- **抽象泄漏**: `_NO_CACHE_OPS` 从分派器移除
+- **mypy/ruff**: 37 个类型错误全修、24 个 lint 全修
+- **测试**: 617 测试全过，45/46 集成测试通过
 
 ### 测试
-- 覆盖率从 69.2% → 75.09%
-- `test_core.py`: 100 → 137 项
+- 覆盖率从 69.2% → 75.32%
+- `test_core.py`: 100 → 137+ 项
 - `test_vm.py`: 79 → 91 项
 - 新增 type_checker/eval_utils/常量折叠专项测试
 

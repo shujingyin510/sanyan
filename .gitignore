@@ -247,3 +247,8 @@ sanyan-vscode/node_modules/
 sanyan-vscode/package-lock.json
 ternary_agent/runtime_v2/village_config.san
 village_log.txt
+village_log.json
+village_trust.html
+build/_test_*.bin
+_test_*.bin
+*.log

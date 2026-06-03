@@ -591,7 +591,19 @@ ${MSYS2_PATH:-D:/msys64}/usr/bin/bash.exe -lc "gcc /d/path/to/obj1.o /d/path/to/
 
 ### 测试
 
-- 覆盖率 69.2% → 75.09%
+- 覆盖率 69.2% → 75.32%
 - `test_core.py`：100 → 137 项
 - `test_vm.py`：79 → 91 项
 - 新增 type_checker/eval_utils/常量折叠专项测试
+- mypy 37→0 错误，ruff 24→0 lint 警告
+
+### P0/P1 修复（2026-06-03）
+
+- **死代码**: `ternary_core.py` 删除 10 行不可达重复分支（`isinstance(value, list)` 二次判断）
+- **抽象泄漏**: `_NO_CACHE_OPS` 从 `ops/dispatcher.py` 移除，缓存不影响 LLVM op 正确性
+- **API 密钥**: `run_agent.py` 占位符 `\"sk-你的key\"` 改为显式 `sys.exit(1)` 报错
+- **错误信息**: `sugar/parser.py:_expect()` 补全 9 种括号不匹配提示
+- **CALL 启发式**: `vm.py` 添加注释说明参数计数扫描 STORE 的限制
+- **类型系统**: `check_type()` 支持中英双名（int/str/list/dict/num/any）
+- **项目清理**: `.gitignore` 加 `village_log.json`/`village_trust.html`/`*.log`
+- **常量折叠**: `isinstance(op, str)` 检查防止参数列表被误判为常量 op
