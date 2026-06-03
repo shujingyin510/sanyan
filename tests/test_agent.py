@@ -100,6 +100,7 @@ def _load_agent():
             if code_stripped.startswith('('):
                 from lexer import tokenize
                 from parser import parse
+
                 tokens = tokenize(code)
                 # 多个顶层表达式（如 (设 x 1)(输出 x)）需要包 (做 ...)
                 sexpr = parse(tokens)
@@ -114,9 +115,10 @@ def _load_agent():
                     result = sandbox.eval(sexpr)
                     return str(result.to_int() if hasattr(result, 'to_int') else result)
             from sugar.parser import parse_code as pc
+
             ast2, _ = pc(code)
             result = None
-            for stmt2 in (ast2[1:] if isinstance(ast2, list) and len(ast2) > 1 else []):
+            for stmt2 in ast2[1:] if isinstance(ast2, list) and len(ast2) > 1 else []:
                 try:
                     result = sandbox.eval(stmt2)
                 except Exception as ex:

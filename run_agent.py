@@ -33,7 +33,7 @@ def _extract_exprs(text):
         elif c == ')':
             depth -= 1
             if depth == 0 and start >= 0:
-                exprs.append(text[start:i+1])
+                exprs.append(text[start : i + 1])
     return exprs
 
 
@@ -82,6 +82,7 @@ def _register_aliases():
             register_alias(alias, target)
         except Exception:
             import sys
+
             print(f'  ⚠ 别名注册失败: {alias} → {target}', file=sys.stderr)
 
 
@@ -139,6 +140,7 @@ def init_evaluator(api_key):
     def _list_files(e, args):
         """列文件(glob_pattern) — 列出项目文件"""
         import glob as _glob
+
         pattern = str(e.eval(args[0])) if args else '*.san'
         try:
             files = _glob.glob(pattern, recursive=True)
@@ -157,6 +159,7 @@ def init_evaluator(api_key):
         try:
             import glob as _glob
             import os as _os
+
             matches = _glob.glob(file_path, recursive=True) if file_path != '*' else []
             if not matches:
                 matches = _glob.glob('*.san', recursive=False) + _glob.glob('*.py', recursive=False)
@@ -183,6 +186,7 @@ def init_evaluator(api_key):
         """直接列出文件（用于 agent 工具调用）"""
         pattern = str(e.eval(args[0])) if args else '*.san'
         import glob as _glob
+
         try:
             # 简单模式不含路径分隔符时，自动改为递归搜索
             if '/' not in pattern and '\\' not in pattern:
@@ -265,6 +269,7 @@ def init_evaluator(api_key):
         try:
             from lexer import tokenize
             from parser import parse
+
             exprs = _extract_exprs(code)
             if len(exprs) > 1:
                 stmts = []
@@ -284,9 +289,10 @@ def init_evaluator(api_key):
                     result = sandbox.eval(sexpr)
                     return str(result.to_int() if hasattr(result, 'to_int') else result)
             from sugar.parser import parse_code as pc
+
             ast2, _ = pc(code)
             result = None
-            for stmt2 in (ast2[1:] if isinstance(ast2, list) and len(ast2) > 1 else []):
+            for stmt2 in ast2[1:] if isinstance(ast2, list) and len(ast2) > 1 else []:
                 try:
                     result = sandbox.eval(stmt2)
                 except Exception as ex:
@@ -336,6 +342,7 @@ def run_once(evaluator, question):
         try:
             from lexer import tokenize
             from parser import parse
+
             exprs = _extract_exprs(q)
             if not exprs:
                 exprs = [q]
@@ -362,6 +369,7 @@ def run_once(evaluator, question):
                 records = records.to_payload()
             if isinstance(records, dict):
                 import json as _json
+
                 _rec = {str(k): (v.to_payload() if hasattr(v, 'to_payload') else str(v)) for k, v in records.items()}
                 with open('agent_decision.json', 'w', encoding='utf-8') as jf:
                     _json.dump(_rec, jf, ensure_ascii=False, indent=2)
@@ -461,6 +469,7 @@ def main():
             from lexer import tokenize
             from parser import parse
             from evaluator import SanyanEvaluator
+
             e = SanyanEvaluator(max_loop_steps=50000)
             try:
                 # 括号匹配提取所有顶层表达式
@@ -469,6 +478,7 @@ def main():
                     exprs = [q]
                 from lexer import tokenize
                 from parser import parse
+
                 parsed = []
                 for ex in exprs:
                     tokens = tokenize(ex)

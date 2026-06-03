@@ -95,7 +95,7 @@ class _Parser:
                 hint = '（期望圆括号但得到方括号）'
             elif kind == ')' and tok.value == '}':
                 hint = '（期望圆括号但得到花括号）'
-            elif kind == ')' and tok.tok_type in ('WORD',):
+            elif kind == ')' and tok.kind in ('WORD',):
                 hint = f'（{tok.value} 是变量名，圆括号可能漏了）'
             elif kind == '}' and tok.value == '{':
                 hint = '（可能未闭合左大括号）'
@@ -225,7 +225,21 @@ class _Parser:
         self.advance()
         names = []
         while self.peek() and self.peek().value not in (';', '{', '}'):
-            if self.peek().kind in ('WORD',) and self._kw(self.peek()) in ('fn', 'if', 'loop', 'for', 'return', 'break', 'continue', 'set', 'try', 'judge', 'export', 'import', 'context'):
+            if self.peek().kind in ('WORD',) and self._kw(self.peek()) in (
+                'fn',
+                'if',
+                'loop',
+                'for',
+                'return',
+                'break',
+                'continue',
+                'set',
+                'try',
+                'judge',
+                'export',
+                'import',
+                'context',
+            ):
                 break  # 遇到新语句关键字，停止
             name_tok = self.advance()
             names.append(name_tok.value)
