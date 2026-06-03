@@ -374,6 +374,8 @@ tests/
 
 ### Agent 可读决策 DSL
 
+> 详见 [ternary_agent/README.md](ternary_agent/README.md) — 完整架构、数据流图、v0.1→v0.3 演进路线。
+
 | 特性 | 说明 |
 |---|---|
 | **三态推理** | LLM 5 种认知态 → 三态映射 → 置信度传播 → 保护门控 → 动作分发 |
@@ -467,8 +469,7 @@ sanyan/
 ├── run_v2_demo.py             # v2 演示脚本
 ├── run_village_demo.py        # 村庄演示脚本
 ├── run_village_observe.py     # 村庄观察器（NPC 自主生活模拟）
-├── runtime.py                 # 运行环境
-├── runtime.py                 # 运行支持（作用域/IoT/调试/性能）
+├── runtime.py                 # 运行环境（作用域/IoT/调试/性能）
 ├── sandbox.py                 # 沙箱安全机制
 ├── sanfmt.py                  # 源码格式化器
 ├── sanyancc.py                # STM32 交叉编译器
@@ -611,7 +612,7 @@ sanyan/
 │       ├── runtime_stm32.c    # STM32 VM + 外设驱动
 │       ├── Makefile           # 构建系统
 │       └── stm32_flash.ld     # 链接脚本
-├── tests/                     # 自动测试（615+ 项）
+├── tests/                     # 自动测试（629+ 项）
 │   ├── test_core.py           # 核心单测（138 项）
 │   ├── test_ops.py            # ops 模块单测（92 项）
 │   ├── test_ops_ext.py        # 扩展 ops 单测（64 项）

@@ -140,13 +140,6 @@ Agent 将 LLM 返回的 5 种认知态映射为三进制决策：
 | `runtime_v2/npc_demo.san` | v2 | NPC 30 天行为演示 |
 | `runtime_v2/tests_v2.san` | v2 | v2 测试集 |
 | `runtime_v2/village_game.san` | v3 | 桃花村 8 人村庄模拟 |
-| `run_v2.py` | v2 | v2 NPC 游戏启动器 |
-| `run_v2_demo.py` | v2 | v2 NPC 30 天演示启动器 |
-| `run_village_demo.py` | v3 | v3 桃花村 10 天演示启动器 |
-| `CHANGELOG.md` | — | 开发日志 |
-| `ARCHITECTURE.md` | — | 系统架构文档 |
-| `PLAN_v2.md` | — | v2 实现计划 |
-| `future.md` | — | 未来扩展路线图 |
 | `protocol_versions.md` | — | 协议版本记录 |
 
 ## 运行测试

@@ -30,11 +30,18 @@ LLVM 代码生成器将三言 AST 编译为平台原生机器码。编译流程�
 
 ```text
 llvmgen/
-├── __init__.py          # 模块入口
-├── build.py             # 完整编译管线（.san → 可执行文件）
-├── codegen.py           # AST → LLVM IR 代码生成器（~1393 行）
-├── compiler.py          # 编译入口（解析 + 代码生成）
-└── runtime.c            # C 语言运行时库（~383 行）
+├── __init__.py                 # 模块入口
+├── build.py                    # 完整编译管线（.san → 可执行文件）
+├── codegen.py                  # AST → LLVM IR 代码生成器（~420 行）
+├── compiler.py                 # 编译入口（解析 + 代码生成，~280 行）
+├── ops_gen.py                  # 算术/比较/三态操作（~410 行）
+├── ops_gen_control.py          # 控制流（~360 行）
+├── ops_gen_helpers.py          # 辅助函数（~240 行）
+├── ir_builder.py               # IR 构建器抽象（~280 行）
+├── ir_fixes.py                 # IR 后处理（~220 行）
+├── helpers.py                  # 反射/类型工具（~450 行）
+├── type_mapping.py             # 类型映射表（~90 行）
+└── runtime.c                   # C 运行时库（~1790 行）
 ```
 
 ### 关键设计

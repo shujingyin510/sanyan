@@ -38,7 +38,7 @@
 - `sugar/lexer.py` — 糖语法词法分析器，全角映射、关键字识别
 
 ### 语法解析 (`parser.py` + `sugar/parser.py`)
-- `parser.py`（143 行）— S 表达式解析器，供 VM/字节码编译器/LSP/gui/repl 使用
+- `parser.py`（156 行）— S 表达式解析器，供 VM/字节码编译器/LSP/gui/repl 使用
 - `sugar/parser.py`（540 行）— 中文糖语法解析器，支持 `设`/`若`/`循环`/`定义`/`尝试`/`捕获` 等，供 run_*.py 和 Agent 使用
 - 两者互补而非重复：S-expression 是底层格式，sugar 是用户层语法糖
 - **`_parse_try` 修复（2026-06-02）**: 正确处理 `捕获 (e)` 带括号写法——原代码在遇到 `(` 时 `next()` 吃掉括号而非读取变量名，导致嵌套 try/catch/if 产生孤立 AST 节点
@@ -62,14 +62,13 @@
 - 函数参数类型标注：`定义 f (x: int) { ... }` 在调用时校验（2026-06-02 新增）
 
 ### LLVM 后端 (`llvmgen/`)
-- `codegen.py` — AST → LLVM IR 代码生成（419 行）
-- `compiler.py` — 编译入口 + 源码解析（424 行）
-- `ops_gen.py` — 主编译入口 + `_compile_node_inner`（410 行）
-- `ops_gen_control.py` — 控制流编译：若/判/遍历/循环/尝试（341 行）
-- `ops_gen_helpers.py` — 算术辅助/浮点/容器编译（240 行）
-- `ir_builder.py` — `CodegenContext` 构建器
+- `codegen.py` — AST → LLVM IR 代码生成（420 行）
+- `compiler.py` — 编译入口 + 源码解析（279 行）
+- `ops_gen.py` — 主编译入口 + `_compile_node_inner`（412 行）
+- `ops_gen_control.py` — 控制流编译：若/判/遍历/循环/尝试（359 行）
+- `ops_gen_helpers.py` — 算术辅助/浮点/容器编译（243 行）
 - `ir_fixes.py` — IR 后处理工具（220 行）
-- `helpers.py` — Python 辅助函数（377 行）
+- `helpers.py` — Python 辅助函数（446 行）
 - `runtime.c` — C 运行时库（arena 分配器 + 52 操作码）
 - `type_mapping.py` — 类型映射与运行时函数规范
 

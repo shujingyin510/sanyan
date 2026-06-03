@@ -303,7 +303,7 @@ sanyan/
 │   ├── iot_state_machine.san  # IoT device state machine
 │   ├── greenhouse.san         # Smart greenhouse
 │   └── stm32-blinky/          # STM32 embedded example
-├── tests/                     # Automated tests (615+ tests)
+├── tests/                     # Automated tests (629+ tests)
 ├── docs/                      # Documentation
 │   ├── manual.md              # User manual
 │   ├── llvm.md                # LLVM documentation
