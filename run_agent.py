@@ -168,6 +168,35 @@ def init_evaluator(api_key):
 
 
 def run_once(evaluator, question):
+    # 检测三言代码：直接执行，不走 LLM
+    q = question.strip()
+    is_code = (
+        q.startswith('(')
+        or any(kw in q for kw in ['(设 ', '(循环 ', '(输出 ', '(加 ', '(减 ', '(乘 ', '(除 '])
+        or '输出(' in q
+        or '设 ' == q[:2]
+    )
+    if is_code:
+        try:
+            from lexer import tokenize
+            from parser import parse
+            tokens = tokenize(q)
+            sexpr = parse(tokens)
+            if sexpr is not None:
+                remaining = parse(tokens)
+                if remaining is not None:
+                    sexpr = ['做', sexpr] + [remaining]
+                    more = parse(tokens)
+                    while more is not None:
+                        sexpr.append(more)
+                        more = parse(tokens)
+                result = evaluator.eval(sexpr)
+                print(f'= {result}')
+                return
+        except Exception as ex:
+            print(f'执行错误: {ex}')
+            return
+
     evaluator.eval(['Agent运行', question])
     # 导出决策数据 JSON（置信度、传播链等）
     try:
