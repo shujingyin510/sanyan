@@ -407,7 +407,12 @@ python -X utf8 run_agent.py "把AGENTS.md里的v0.3改成v0.4"
 
 ## 三进制算术（模拟实现）
 
-三言的三进制不是"用二进制模拟三进制"。`ternary_core.py` 从位运算层开始就是三值的：
+当前版本的三进制基于 Python 整数模拟。`ternary_core.py` 使用 `TritValue` 类包装整数值（+1 / 0 / -1）：
+
+- **BT 类**: `from_int(n)` → 三进制 trits 列表，`to_int(trits)` → Python 整数
+- **算术运算**: 三态值 → `BT.to_int()` → Python 整数计算 → `BT.from_int()` → 三态值
+- **逻辑运算**: 真值表匹配（Kleene 强三值逻辑），不依赖整数转换
+- **展示层**: `symbol` 属性输出 `+` / `0` / `-` 表示法
 
 ```text
 平衡三进制加法：
