@@ -63,10 +63,12 @@ def _register_aliases():
 
 
 def load_api_key():
-    """从环境变量或 agent_policy.san 读取 API 密钥。"""
-    env_key = os.environ.get('SANYAN_API_KEY', '')
-    if env_key:
-        return env_key
+    """从环境变量或配置文件读取 API 密钥。"""
+    # 优先级: SANYAN_API_KEY > LLM_KEY > agent_policy.san > village_config.san
+    for var in ['SANYAN_API_KEY', 'LLM_KEY']:
+        key = os.environ.get(var, '')
+        if key and '你的' not in key:
+            return key
     # 在 agent.san（含 #include 展开）中查找 API密钥
     agent_path = os.path.join('ternary_agent', 'agent.san')
     with open(agent_path, encoding='utf-8') as f:
@@ -77,6 +79,15 @@ def load_api_key():
             key = line.split('"')[1] if '"' in line else ''
             if key and '你的' not in key:
                 return key
+    # 尝试从 village_config.san 读取（游戏用的密钥文件）
+    village_cfg = os.path.join('ternary_agent', 'runtime_v2', 'village_config.san')
+    if os.path.exists(village_cfg):
+        with open(village_cfg, encoding='utf-8') as f:
+            for line in f:
+                if 'API密钥' in line or '密钥' in line:
+                    key = line.split('"')[1] if '"' in line else ''
+                    if key and '你的' not in key and key.startswith('sk-'):
+                        return key
     return ''
 
 
@@ -96,7 +107,7 @@ def init_evaluator(api_key):
     from ops.registry import register as reg_op
     def _new_evaluator(e, args):
         """创建新的沙箱求值器实例"""
-        e2 = SanyanEvaluator(max_loop_steps=1000)
+        e2 = SanyanEvaluator(max_loop_steps=100000)
         # 返回一个可以被 san 代码引用的对象
         tag = f'_sandbox_{id(e2)}'
         e.set_var(tag, e2)
@@ -116,6 +127,13 @@ def init_evaluator(api_key):
                 tokens = tokenize(code)
                 sexpr = parse(tokens)
                 if sexpr is not None:
+                    remaining = parse(tokens)
+                    if remaining is not None:
+                        sexpr = ['做', sexpr] + [remaining]
+                        more = parse(tokens)
+                        while more is not None:
+                            sexpr.append(more)
+                            more = parse(tokens)
                     result = sandbox.eval(sexpr)
                     return str(result.to_int() if hasattr(result, 'to_int') else result)
             from sugar.parser import parse_code as pc

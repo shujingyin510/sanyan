@@ -84,7 +84,7 @@ def _load_agent():
 
     # 注册 write_code 工具所需的 Python 函数
     def _test_new_eval(e, args):
-        e2 = SanyanEvaluator(max_loop_steps=1000)
+        e2 = SanyanEvaluator(max_loop_steps=100000)
         tag = f'_sandbox_{id(e2)}'
         e.set_var(tag, e2)
         return tag
@@ -101,8 +101,16 @@ def _load_agent():
                 from lexer import tokenize
                 from parser import parse
                 tokens = tokenize(code)
+                # 多个顶层表达式（如 (设 x 1)(输出 x)）需要包 (做 ...)
                 sexpr = parse(tokens)
                 if sexpr is not None:
+                    remaining = parse(tokens)  # 尝试继续解析
+                    if remaining is not None:
+                        sexpr = ['做', sexpr] + [remaining]
+                        more = parse(tokens)
+                        while more is not None:
+                            sexpr.append(more)
+                            more = parse(tokens)
                     result = sandbox.eval(sexpr)
                     return str(result.to_int() if hasattr(result, 'to_int') else result)
             from sugar.parser import parse_code as pc
@@ -277,7 +285,7 @@ class TestAgentDecision(unittest.TestCase):
         except Exception as e:
             # 如果是因为 API 密钥问题或运行时计算问题导致的失败，不算测试失败
             err_str = str(e)
-            if any(k in err_str for k in ['API密钥', 'api', '除数', '除零', 'division', 'JSON 解析', '传播']):
+            if any(k in err_str for k in ['API密钥', 'api', '除数', '除零', 'division', 'JSON 解析']):
                 pass
             else:
                 self.fail(f'Agent运行 抛出意外异常: {e}')

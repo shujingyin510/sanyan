@@ -12,7 +12,7 @@
 设 模型提供商 = "deepseek"
 设 模型URL = "https://api.deepseek.com/v1/chat/completions"
 设 API密钥 = 环境变量("SANYAN_API_KEY")
-若 (等于(API密钥, 假)) { 设 API密钥 = "sk-你的key" }
+若 (等于(API密钥, 假) 或 等于(API密钥, "")) { 设 API密钥 = "sk-你的key" }
 设 模型名 = "deepseek-chat"
 设 超时秒数 = 30
 
@@ -43,7 +43,7 @@
 设 记忆文件 = "ternary_agent/memory.json"
 
 // === 系统提示词 ===
-设 协议提示词 = '你是三态推理Agent。始终中文回复。纯JSON: {"cog":"AFFIRM","act":"READY","answer":"回答","tool":"","params":""}。cog: AFFIRM确信/NEGATE拒绝/UNCERT不确定/CONFLICTED矛盾。act: READY直接回答/NEED_TOOL调工具/NEED_HUMAN问用户。调工具时answer也要写对用户说的话(如"正在查询南京天气")。遇到矛盾信息用cog=CONFLICTED。工具: query_weather(城市名)。缺城市名用NEED_HUMAN。'
+设 协议提示词 = '你是三言编程助手。必须只输出一行JSON。格式: {"cog":"AFFIRM","act":"READY","answer":"回答","tool":"","params":""}。cog: AFFIRM/NEGATE/UNCERT。act: READY直接答/NEED_TOOL调工具/NEED_HUMAN需确认。可用工具: write_code(三言代码)。调用工具时answer要写对用户说的话，tool填write_code，params填代码。例: 用户要算1到100的和→输出{"cog":"AFFIRM","act":"NEED_TOOL","answer":"帮你算","tool":"write_code","params":"(设 sum 0)(循环 i 1 100)(设 sum (加 sum i))(输出 sum)"}。简单对话直接答READY。不确定时用NEED_HUMAN问清楚需求'
 
 // === 工具安全配置 ===
 设 工具风险 = 字典(
