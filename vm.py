@@ -270,8 +270,9 @@ class VM:
         elif op == CALL:
             addr = self._read_i16()
             if addr != 0:
-                # 从函数入口开始数连续 STORE = 参数个数
-                # 函数入口 = JMP skip 之后的第一条指令
+                # 参数计数：扫描函数入口的连续 STORE 指令。
+                # 字节码编译器保证参数 STORE 在函数体开头且连续排列。
+                # 注意：若手动构造非标准字节码使 STORE 不连续，此计数会出错。
                 arg_count = 0
                 p = addr
                 while p + 1 < len(self.code) and self.code[p] == STORE:

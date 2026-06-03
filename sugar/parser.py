@@ -87,7 +87,15 @@ class _Parser:
             self.reporter.error(self.tokens[-1].line if self.tokens else 1, 1, f"期望 '{kind}'，但已到文件末尾")
             return None
         if tok.value != kind:
-            self.reporter.error(tok.line, tok.col, f"期望 '{kind}'，但得到 '{tok.value}'")
+            msg = f"期望 '{kind}'，但得到 '{tok.value}'"
+            # 常见笔误提示
+            if kind == ')' and tok.value in ('(', '（'):
+                msg += '（可能未闭合左括号）'
+            elif kind == '}' and tok.value == '{':
+                msg += '（可能未闭合左大括号）'
+            elif kind == ')' and tok.tok_type in ('WORD',):
+                msg += f'（' + tok.value + ' 是变量名，括号可能漏了）'
+            self.reporter.error(tok.line, tok.col, msg)
             return None
         return self.advance()
 
