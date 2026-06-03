@@ -169,6 +169,20 @@ def init_evaluator(api_key):
 
 def run_once(evaluator, question):
     evaluator.eval(['Agent运行', question])
+    # 导出决策数据 JSON（置信度、传播链等）
+    try:
+        if evaluator.has_var('_决策记录'):
+            records = evaluator.get_var('_决策记录')
+            if hasattr(records, 'to_payload') and hasattr(records, 'is_dict') and records.is_dict():
+                records = records.to_payload()
+            if isinstance(records, dict):
+                import json as _json
+                _rec = {str(k): (v.to_payload() if hasattr(v, 'to_payload') else str(v)) for k, v in records.items()}
+                with open('agent_decision.json', 'w', encoding='utf-8') as jf:
+                    _json.dump(_rec, jf, ensure_ascii=False, indent=2)
+                print('决策数据已导出到 agent_decision.json')
+    except Exception:
+        pass
     try:
         evaluator.eval(['保存记忆'])
     except Exception:
