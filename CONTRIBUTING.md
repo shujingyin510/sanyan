@@ -6,8 +6,8 @@
 # 安装开发依赖
 pip install -e .[dev]
 
-# 运行全部测试（15 套）
-python tests/test_core.py          # 100 项
+# 运行全部测试（16 套）
+python tests/test_core.py          # 138 项
 python tests/test_commands.py      # 18 项
 python tests/test_parser.py        # 28 项
 python tests/test_ops.py           # 92 项
@@ -18,11 +18,11 @@ python tests/test_iot.py           # 25 项
 python tests/test_sugar_san.py     # 45 项
 python tests/test_llvmgen.py       # 53 项
 python tests/test_dp_python.py     # 10 项
-python tests/test_self_host.py     # 1 项
+python tests/test_self_host.py     # 5 项
 python tests/test_sugar_self_host.py # 3 项
-python tests/test_vm.py            # 73 项
+python tests/test_vm.py            # 91 项
 python tests/test_c_vm.py          # 14 项（需 C 编译器）
-python tests/test_agent.py         # 29 项
+python tests/test_agent.py         # 31 项
 
 # 集成测试
 python tests/run_all.py
@@ -58,13 +58,12 @@ sanyan/
 ├── evaluator.py          # 求值器（核心）
 ├── values.py             # 值系统（TritValue 等）
 ├── runtime.py            # 运行环境 + BUILTIN_OPS
-├── runtime_components.py # 作用域/IoT/调试/性能
 ├── lexer.py              # S 表达式词法分析
 ├── parser.py             # S 表达式语法解析
 ├── commands.py           # 用户定义命令
 ├── param_matcher.py      # 参数匹配
 ├── tail_call.py          # 尾调用优化
-├── eval_helpers.py       # 求值辅助函数
+├── eval_utils.py          # 求值工具函数（类型转换/边界检查）
 ├── ternary_core.py       # 平衡三值逻辑核心
 ├── ops/                  # 操作模块
 │   ├── registry.py       # 操作注册表

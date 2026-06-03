@@ -426,9 +426,8 @@ sanyan/
 ├── compile_bytecode.py        # .san → .bin 编译器（支持 #include）
 ├── compile_llvmgen.py         # llvmgen.san → llvmgen.bin 编译（V5 自举，无注入）
 ├── dap_server.py              # DAP 调试适配器
-├── debug_eval.py              # 调试辅助模块
 ├── doc_sync.py                # 文档同步检查
-├── eval_helpers.py            # 求值辅助模块
+├── eval_utils.py              # 求值工具函数（类型转换/边界检查）
 ├── evaluator.py               # 求值器
 ├── gui.py                     # 可视化编译器 GUI
 ├── lexer.py                   # S 表达式词法
@@ -445,7 +444,7 @@ sanyan/
 ├── run_village_demo.py        # 村庄演示脚本
 ├── run_village_observe.py     # 村庄观察器（NPC 自主生活模拟）
 ├── runtime.py                 # 运行环境
-├── runtime_components.py      # 运行组件（作用域/IoT/调试/性能）
+├── runtime.py                 # 运行支持（作用域/IoT/调试/性能）
 ├── sandbox.py                 # 沙箱安全机制
 ├── sanfmt.py                  # 源码格式化器
 ├── sanyancc.py                # STM32 交叉编译器
@@ -588,16 +587,19 @@ sanyan/
 │       ├── runtime_stm32.c    # STM32 VM + 外设驱动
 │       ├── Makefile           # 构建系统
 │       └── stm32_flash.ld     # 链接脚本
-├── tests/                     # 自动测试（617+ 项）
-│   ├── test_core.py           # 核心单测（137 项）
+├── tests/                     # 自动测试（615+ 项）
+│   ├── test_core.py           # 核心单测（138 项）
 │   ├── test_ops.py            # ops 模块单测（92 项）
 │   ├── test_ops_ext.py        # 扩展 ops 单测（64 项）
 │   ├── test_parser.py         # 解析器 AST 校验（28 项）
+│   ├── test_commands.py       # 命令模块单测（18 项）
 │   ├── test_sugar_san.py      # sugar.san 测试（45 项）
 │   ├── test_llvmgen.py        # LLVM 代码生成测试（53 项）
-│   ├── test_self_host.py      # 字节码编译器自举验证（SHA256）
+│   ├── test_self_host.py      # 字节码编译器自举验证（5 项）
 │   ├── test_sugar_self_host.py # sugar.bin 自举验证（3 项）
 │   ├── test_vm.py             # VM 字节码测试（91 项）
+│   ├── test_c_vm.py           # C VM 测试（14 项，需 gcc）
+│   ├── test_agent.py          # Agent 测试（31 项）
 │   ├── test_llvm_native.py    # LLVM 原生编译测试
 │   └── run_all.py             # 集成测试（46 项）
 ├── docs/                      # 文档

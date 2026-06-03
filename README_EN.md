@@ -271,7 +271,7 @@ sanyan/
 │   ├── iot_state_machine.san  # IoT device state machine
 │   ├── greenhouse.san         # Smart greenhouse
 │   └── stm32-blinky/          # STM32 embedded example
-├── tests/                     # Automated tests (351 tests)
+├── tests/                     # Automated tests (615+ tests)
 ├── docs/                      # Documentation
 │   ├── manual.md              # User manual
 │   ├── llvm.md                # LLVM documentation
@@ -300,8 +300,7 @@ sanyan/
 - [x] Standard library expansion (network/hardware/math matrix)
 - [x] Three-value IoT cases (sensor fusion, fault-tolerant control, state machine)
 - [x] Three-value vs two-value comparison docs
-- [x] Quick start guide docs/GETTING_STARTED.md
-- [x] Agent subsystem tests (17 tests)
+- [x] Agent subsystem with file tools (read/write/list/replace) and programming capability (31 tests)
 - [x] #include preprocessing full pipeline (Python + C VM)
 - [ ] GPIO hardware control
 - [ ] Web IDE

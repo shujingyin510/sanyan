@@ -284,14 +284,14 @@ git status --short | grep "^??"
 
 ## 测试
 
-每次代码修改后必须运行全部测试（14 套）：
+每次代码修改后必须运行全部测试（16 套）：
 
 ```bash
-python -X utf8 tests/test_core.py -v      # 运行时核心单测 52 项
+python -X utf8 tests/test_core.py -v      # 运行时核心单测 138 项
 python -X utf8 tests/test_commands.py -v  # 命令模块单测 18 项
 python -X utf8 tests/test_parser.py       # 解析器 AST 校验 28 项
-python -X utf8 tests/test_ops.py -v       # ops 模块单测 78 项
-python -X utf8 tests/test_ops_ext.py -v   # 扩展 ops 单测 26 项
+python -X utf8 tests/test_ops.py -v       # ops 模块单测 92 项
+python -X utf8 tests/test_ops_ext.py -v   # 扩展 ops 单测 64 项
 python -X utf8 tests/test_lsp.py -v       # LSP 测试 6 项
 python -X utf8 tests/test_package.py -v   # 包管理器测试 6 项
 python -X utf8 tests/test_iot.py -v       # IoT 测试 25 项
@@ -299,15 +299,15 @@ python -X utf8 tests/test_sugar_san.py -v # sugar.san 测试 45 项
 python -X utf8 tests/test_llvmgen.py -v   # LLVM 代码生成测试 53 项
 python -X utf8 tests/test_dp_python.py -v # S 表达式解析测试 10 项
 python -X utf8 tests/test_llvm_native.py -v # LLVM 原生编译测试（需 C 编译器）
-python -X utf8 tests/test_self_host.py -v # 自举验证测试 1 项
+python -X utf8 tests/test_self_host.py -v # 自举验证测试 5 项
 python -X utf8 tests/test_sugar_self_host.py -v # sugar.bin 自举验证 3 项
-python -X utf8 tests/test_vm.py -v        # VM 字节码测试 73 项
-python -X utf8 tests/test_c_vm.py -v      # C VM 测试 1 项（需 gcc）
-python -X utf8 tests/test_agent.py -v     # Agent 测试 29 项
+python -X utf8 tests/test_vm.py -v        # VM 字节码测试 91 项
+python -X utf8 tests/test_c_vm.py -v      # C VM 测试 14 项（需 gcc）
+python -X utf8 tests/test_agent.py -v     # Agent 测试 31 项
 python -X utf8 tests/run_all.py           # 集成测试 46 项
 
 全部通过才算成功：
-- test_core.py 100/100（含闭包+三态测试）
+- test_core.py 138/138（含闭包+三态测试）
 - test_commands.py 18/18
 - test_parser.py 28/28
 - test_ops.py 92/92
@@ -318,11 +318,11 @@ python -X utf8 tests/run_all.py           # 集成测试 46 项
 - test_sugar_san.py 45/45
 - test_llvmgen.py 53/53
 - test_dp_python.py 10/10
-- test_self_host.py 1/1
+- test_self_host.py 5/5
 - test_sugar_self_host.py 3/3
-- test_vm.py 73/73
+- test_vm.py 91/91
 - test_c_vm.py 14/14（含交叉验证，需 gcc）
-- test_agent.py 29/29
+- test_agent.py 31/31
 - run_all.py 46/46
 
 ### 覆盖率配置
@@ -336,7 +336,7 @@ CI 使用 `pytest --cov=. --cov-report=xml` 测量覆盖率，阈值 75%。
 | `build_combined.py`, `build_exe.py`, `compile_llvmgen.py`, `setup.py`, `sanyancc.py` | 构建脚本，非运行时代码 |
 | `run_agent.py`, `run_v2.py`, `run_v2_demo.py`, `run_village_demo.py` | 演示/启动器，需 LLM 网络调用，无法单测 |
 | `gui.py`, `dap_server.py`, `lsp_server.py`, `main.py`, `lsp/*` | GUI/服务器，需图形或网络环境 |
-| `doc_sync.py`, `sanfmt.py`, `debug_eval.py` | 工具脚本，非核心运行时 |
+| `doc_sync.py`, `sanfmt.py` | 工具脚本，非核心运行时 |
 | `ops/package_ops.py`, `ops/net_ops.py` | 需外网访问（GitHub 包下载/HTTP 请求） |
 | `llvmgen/helpers.py`, `llvmgen/build.py`, `llvmgen/ir_fixes.py`, `llvmgen/compiler.py` | 需 llvmlite 依赖，CI 环境版本与本地不同步 |
 | `utils/*`, `benchmark/*`, `scripts/*`, `examples/*`, `csrc/*` | 工具/基准/示例/C 源码 |
