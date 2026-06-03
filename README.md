@@ -48,7 +48,10 @@ cd sanyan
 python main.py
 ```
 
-> **性能提示**：使用 [PyPy](https://pypy.org) 运行可获得 5-10 倍加速：`pypy main.py`
+> **性能提示**：对性能敏感的程序推荐以下方案（由易到难）：
+> - [PyPy](https://pypy.org) 即时可用，5-10 倍加速：`pypy main.py`
+> - **LLVM 原生编译**至机器码，数量级提升：[安装 llvmlite](https://pypi.org/project/llvmlite/) 后运行 `python compile_llvmgen.py`
+> - **C VM** 纯 C 字节码解释器，无 Python 依赖：`gcc csrc/runtime.c -o vm && ./vm program.bin`
 
 进入 REPL 后尝试：
 

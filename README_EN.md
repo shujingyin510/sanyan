@@ -50,7 +50,10 @@ cd sanyan
 python main.py
 ```
 
-> **Performance tip**: Run with [PyPy](https://pypy.org) for 5-10x speedup: `pypy main.py`
+> **Performance tip**: For performance-sensitive programs, choose from easy to advanced:
+> - [PyPy](https://pypy.org) — drop-in, 5-10x faster: `pypy main.py`
+> - **LLVM native compilation** — machine code, orders of magnitude faster: `pip install llvmlite && python compile_llvmgen.py`
+> - **C VM** — pure C bytecode interpreter, zero Python dependency: `gcc csrc/runtime.c -o vm && ./vm program.bin`
 
 Once in the REPL, try:
 
