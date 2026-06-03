@@ -20,6 +20,23 @@ from ops.file_ops import clear_cache
 from preprocess import preprocess_includes
 
 
+def _extract_exprs(text):
+    """括号匹配提取所有顶层 S 表达式，支持嵌套"""
+    exprs = []
+    depth = 0
+    start = -1
+    for i, c in enumerate(text):
+        if c == '(':
+            if depth == 0:
+                start = i
+            depth += 1
+        elif c == ')':
+            depth -= 1
+            if depth == 0 and start >= 0:
+                exprs.append(text[start:i+1])
+    return exprs
+
+
 def _register_aliases():
     """注册中文别名（必须在 SanyanEvaluator 实例化之后调用）"""
     from ops.registry import register_alias
@@ -52,13 +69,19 @@ def _register_aliases():
         '读文件': 'read_file',
         '写文件': 'write_file',
         '转数字': 'to_number',
+        '取余': 'mod',
+        '大于': 'gt',
+        '小于': 'lt',
+        '等于': 'eq',
+        '不等于': 'ne',
+        '大于等于': 'gte',
+        '小于等于': 'lte',
     }
     for alias, target in aliases.items():
         try:
             register_alias(alias, target)
         except Exception:
             import sys
-
             print(f'  ⚠ 别名注册失败: {alias} → {target}', file=sys.stderr)
 
 
@@ -103,15 +126,134 @@ def init_evaluator(api_key):
     evaluator = SanyanEvaluator(max_loop_steps=500000)
     _register_aliases()
 
+    # 预创建沙箱求值器
+    _sandbox = SanyanEvaluator(max_loop_steps=100000)
+    evaluator.set_var('_sandbox', _sandbox)
+
     # 注册 write_code 工具所需的 Python 函数
     from ops.registry import register as reg_op
+
     def _new_evaluator(e, args):
-        """创建新的沙箱求值器实例"""
-        e2 = SanyanEvaluator(max_loop_steps=100000)
-        # 返回一个可以被 san 代码引用的对象
-        tag = f'_sandbox_{id(e2)}'
-        e.set_var(tag, e2)
-        return tag
+        return '_sandbox'
+
+    def _list_files(e, args):
+        """列文件(glob_pattern) — 列出项目文件"""
+        import glob as _glob
+        pattern = str(e.eval(args[0])) if args else '*.san'
+        try:
+            files = _glob.glob(pattern, recursive=True)
+            # 限制结果数量，排除 __pycache__ 等
+            files = [f for f in files[:100] if '__pycache__' not in f and '.pyc' not in f]
+            return '\n'.join(files) if files else '(无匹配文件)'
+        except Exception as ex:
+            return f'列文件错误: {ex}'
+
+    def _search_content(e, args):
+        """搜内容(pattern, [file_path]) — 搜索文件内容"""
+        pattern = str(e.eval(args[0])) if args else ''
+        file_path = str(e.eval(args[1])) if len(args) > 1 else '*'
+        if not pattern:
+            return '搜内容需要至少1个参数: 搜内容 关键词 [文件模式]'
+        try:
+            import glob as _glob
+            import os as _os
+            matches = _glob.glob(file_path, recursive=True) if file_path != '*' else []
+            if not matches:
+                matches = _glob.glob('*.san', recursive=False) + _glob.glob('*.py', recursive=False)
+            results = []
+            for fp in matches[:20]:
+                if _os.path.isdir(fp) or '__pycache__' in fp:
+                    continue
+                try:
+                    with open(fp, encoding='utf-8', errors='ignore') as fh:
+                        for lineno, line in enumerate(fh, 1):
+                            if pattern.lower() in line.lower():
+                                results.append(f'{fp}:{lineno}: {line.strip()[:120]}')
+                                if len(results) >= 30:
+                                    break
+                    if len(results) >= 30:
+                        break
+                except Exception:
+                    pass
+            return '\n'.join(results) if results else '(未找到)'
+        except Exception as ex:
+            return f'搜内容错误: {ex}'
+
+    def _list_files_direct(e, args):
+        """直接列出文件（用于 agent 工具调用）"""
+        pattern = str(e.eval(args[0])) if args else '*.san'
+        import glob as _glob
+        try:
+            # 简单模式不含路径分隔符时，自动改为递归搜索
+            if '/' not in pattern and '\\' not in pattern:
+                pattern = '**/' + pattern
+            files = _glob.glob(pattern, recursive=True)
+            files = [f for f in files[:200] if '__pycache__' not in f and '.pyc' not in f]
+            if not files:
+                return '(无匹配文件)'
+            # 折叠显示：前 15 个 + 总数
+            shown = files[:15]
+            result = '\n'.join(shown)
+            if len(files) > 15:
+                result += f'\n  ... 还有 {len(files) - 15} 个文件，共 {len(files)} 个'
+            return result
+        except Exception as ex:
+            return f'列文件错误: {ex}'
+
+    def _read_file_direct(e, args):
+        """直接读取文件（用于 agent 工具调用）"""
+        path = str(e.eval(args[0])) if args else ''
+        if not path:
+            return '请指定文件路径'
+        try:
+            with open(path, encoding='utf-8', errors='ignore') as fh:
+                content = fh.read()
+            if len(content) > 5000:
+                content = content[:5000] + '\n...(已截断)'
+            return content
+        except FileNotFoundError:
+            return f'文件不存在: {path}'
+        except Exception as ex:
+            return f'读文件错误: {ex}'
+
+    def _write_file_direct(e, args):
+        """直接写文件（用于 agent 工具调用），params 格式: 路径|内容"""
+        raw = str(e.eval(args[0])) if args else ''
+        parts = raw.split('|', 1)
+        path = parts[0].strip() if parts else ''
+        content = parts[1] if len(parts) > 1 else ''
+        if not path:
+            return '请指定文件路径（格式: 路径|内容）'
+        try:
+            with open(path, 'w', encoding='utf-8') as fh:
+                fh.write(content)
+            return f'已写入: {path} ({len(content)} 字符)'
+        except Exception as ex:
+            return f'写文件错误: {ex}'
+
+    def _replace_in_file(e, args):
+        """替换文件内容并写回，params 格式: 路径|旧文字|新文字"""
+        raw = str(e.eval(args[0])) if args else ''
+        parts = raw.split('|', 2)
+        path = parts[0].strip() if parts else ''
+        old = parts[1] if len(parts) > 1 else ''
+        new = parts[2] if len(parts) > 2 else ''
+        if not path or not old:
+            return '格式: 路径|旧文字|新文字'
+        try:
+            with open(path, encoding='utf-8') as fh:
+                content = fh.read()
+            count = content.count(old)
+            if count == 0:
+                return f'未找到 "{old[:50]}" 在 {path}'
+            content = content.replace(old, new)
+            with open(path, 'w', encoding='utf-8') as fh:
+                fh.write(content)
+            return f'已替换 {count} 处 "{old[:40]}" → "{new[:40]}" 在 {path}'
+        except FileNotFoundError:
+            return f'文件不存在: {path}'
+        except Exception as ex:
+            return f'替换错误: {ex}'
 
     def _sandbox_eval(e, args):
         """在沙箱中求值代码，返回结果"""
@@ -121,19 +263,24 @@ def init_evaluator(api_key):
         if sandbox is None:
             return '沙箱未初始化'
         try:
+            from lexer import tokenize
+            from parser import parse
+            exprs = _extract_exprs(code)
+            if len(exprs) > 1:
+                stmts = []
+                for ex in exprs:
+                    tks = tokenize(ex)
+                    s = parse(tks)
+                    if s is not None:
+                        stmts.append(s)
+                if stmts:
+                    sexpr = ['做'] + stmts
+                    result = sandbox.eval(sexpr)
+                    return str(result.to_int() if hasattr(result, 'to_int') else result)
             if code.strip().startswith('('):
-                from lexer import tokenize
-                from parser import parse
                 tokens = tokenize(code)
                 sexpr = parse(tokens)
                 if sexpr is not None:
-                    remaining = parse(tokens)
-                    if remaining is not None:
-                        sexpr = ['做', sexpr] + [remaining]
-                        more = parse(tokens)
-                        while more is not None:
-                            sexpr.append(more)
-                            more = parse(tokens)
                     result = sandbox.eval(sexpr)
                     return str(result.to_int() if hasattr(result, 'to_int') else result)
             from sugar.parser import parse_code as pc
@@ -143,19 +290,28 @@ def init_evaluator(api_key):
                 try:
                     result = sandbox.eval(stmt2)
                 except Exception as ex:
-                    return str(ex)
-            return str(result.to_int() if hasattr(result, 'to_int') else result) if result is not None else 'nil'
+                    return 'eval_error:' + str(ex)
+            if result is not None:
+                return str(result.to_int() if hasattr(result, 'to_int') else result)
+            return 'no_result'
         except Exception as ex:
-            return str(ex)
+            return 'ex:' + str(ex)
 
     reg_op('新求值器', _new_evaluator)
     reg_op('求值', _sandbox_eval)
     reg_op('sandbox_eval', _sandbox_eval)
+    reg_op('列文件', _list_files)
+    reg_op('搜内容', _search_content)
+    reg_op('列文件钩子', _list_files_direct)
+    reg_op('读文件钩子', _read_file_direct)
+    reg_op('写文件钩子', _write_file_direct)
+    reg_op('替换写回', _replace_in_file)
 
     agent_path = os.path.join('ternary_agent', 'agent.san')
     src = open(agent_path, encoding='utf-8').read()
     # 预处理 #include 展开
     src = preprocess_includes(src)
+    # 新提示词已内置完整语法，不再注入 markdown 文档
     if api_key:
         src = src.replace('sk-你的key', api_key)
         print(f'[调试] API密钥已注入 (长度={len(api_key)})')
@@ -180,19 +336,19 @@ def run_once(evaluator, question):
         try:
             from lexer import tokenize
             from parser import parse
-            tokens = tokenize(q)
-            sexpr = parse(tokens)
-            if sexpr is not None:
-                remaining = parse(tokens)
-                if remaining is not None:
-                    sexpr = ['做', sexpr] + [remaining]
-                    more = parse(tokens)
-                    while more is not None:
-                        sexpr.append(more)
-                        more = parse(tokens)
-                result = evaluator.eval(sexpr)
-                print(f'= {result}')
-                return
+            exprs = _extract_exprs(q)
+            if not exprs:
+                exprs = [q]
+            parsed = []
+            for ex in exprs:
+                tokens = tokenize(ex)
+                node = parse(tokens)
+                if node is not None:
+                    parsed.append(node)
+            sexpr = parsed[0] if len(parsed) == 1 else ['做'] + parsed
+            r = evaluator.eval(sexpr)
+            print(r.to_int() if hasattr(r, 'to_int') else r)
+            return
         except Exception as ex:
             print(f'执行错误: {ex}')
             return
@@ -307,9 +463,8 @@ def main():
             from evaluator import SanyanEvaluator
             e = SanyanEvaluator(max_loop_steps=50000)
             try:
-                # 提取所有括号表达式
-                import re as _re
-                exprs = _re.findall(r'\([^)]*\)', q)
+                # 括号匹配提取所有顶层表达式
+                exprs = _extract_exprs(q)
                 if not exprs:
                     exprs = [q]
                 from lexer import tokenize

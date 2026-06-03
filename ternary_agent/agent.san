@@ -21,7 +21,8 @@
             字典("role", "system", "content", 系统提示),
             字典("role", "user", "content", 用户消息)
         ),
-        "temperature", 0.7
+        "temperature", 0.7,
+        "max_tokens", 1024
     ))
     设 headers = 字典(
         "Content-Type", "application/json",
@@ -85,27 +86,163 @@
         设 first = 取(choices, 0)
         设 msg = 取键(first, "message")
         设 content = 取键(msg, "content")
-        设 parsed = 解析JSON(content)
-        若 (非(是字典(parsed))) {
-             // 非 JSON 响应当做直接回答
-            若 (取长(content) > 0) {
-                返回(字典("cogState","AFFIRM","actState","READY","answer",content,"tool","","params",""))
+
+        // 先尝试整体解析为 JSON
+        尝试 {
+            设 parsed = 解析JSON(content)
+            若 (是字典(parsed)) {
+                返回(字典(
+                    "cogState", 取键(parsed, "cog"),
+                    "actState", 取键(parsed, "act"),
+                    "answer", 取键(parsed, "answer"),
+                    "tool", 取键(parsed, "tool"),
+                    "params", 取键(parsed, "params")
+                ))
             }
-            返回(字典("cogState","UNCERT","actState","NEED_HUMAN","answer","JSON异常","tool","","params",""))
+        } 捕获 (_e) { }
+
+        // 整串不是 JSON → 尝试从末尾提取 JSON 块
+        尝试 {
+            设 maybe = 提取尾部JSON(content)
+            若 (是字典(maybe)) {
+                设 answer = 取键(maybe, "answer")
+                设 tool = 取键(maybe, "tool")
+                设 params = 取键(maybe, "params")
+                若 (或(取长(tool) > 0, 取长(params) > 0)) {
+                    // 末尾有 JSON 指令 → 解析使用
+                    若 (取长(answer) == 0) {
+                        // answer 为空则用自然语言部分
+                        设 自然语言 = 提取自然语言(content)
+                        返回(字典("cogState", 取键(maybe, "cog"), "actState", 取键(maybe, "act"), "answer", 自然语言, "tool", tool, "params", params))
+                    }
+                    返回(字典("cogState", 取键(maybe, "cog"), "actState", 取键(maybe, "act"), "answer", answer, "tool", tool, "params", params))
+                }
+            }
+        } 捕获 (_e) { }
+
+        // 末尾无 JSON → 整段作为直接回答
+        若 (取长(content) > 0) {
+            返回(字典("cogState","AFFIRM","actState","READY","answer",content,"tool","","params",""))
         }
-        返回(字典(
-            "cogState", 取键(parsed, "cog"),
-            "actState", 取键(parsed, "act"),
-            "answer", 取键(parsed, "answer"),
-            "tool", 取键(parsed, "tool"),
-            "params", 取键(parsed, "params")
-        ))
+        返回(字典("cogState","UNCERT","actState","NEED_HUMAN","answer","JSON异常","tool","","params",""))
     } 捕获 (e) {
         若 (取长(raw) > 0) {
             返回(字典("cogState","AFFIRM","actState","READY","answer",raw,"tool","","params",""))
         }
         返回(字典("cogState","UNCERT","actState","NEED_HUMAN","answer","解析失败","tool","","params",""))
     }
+}
+
+// 从字符串末尾提取 JSON 对象（处理自然语言+末尾JSON的混合回复）
+// 同时处理 markdown 代码块 `\`\`\`json {...} \`\`\`` 包裹的情况
+定义 提取尾部JSON (content)
+{
+    设 len = 取长(content)
+    若 (小于(len, 3)) { 返回("") }
+    
+    // 策略1：先尝试整个 content 为 JSON（纯 JSON 响应）
+    尝试 {
+        设 whole = 解析JSON(content)
+        若 (是字典(whole)) { 返回(whole) }
+    } 捕获 (_) { }
+    
+    // 策略2：找 {"cog":" 或 {"cog": 标记（JSON 以 cog 字段开头）
+    设 markerA = 查找(content, "{\"cog\":")
+    设 markerB = 查找(content, "{\"cog")
+    设 brace = 减(1, 1)
+    若 (大于等于(markerA, 0)) { 设 brace = markerA }
+    否则 若 (大于等于(markerB, 0)) { 设 brace = markerB }
+    否则 {
+        // 回退：找最后一个 {
+        设 pos = 减(len, 1)
+        循环 (大于等于(pos, 0)) {
+            // 跳过 } 直到找到 {
+            若 (且(字符串相等(子串(content, pos, 1), "{"), 非(是引号内(content, pos)))) { 设 brace = pos; 跳出 }
+            设 pos = 减(pos, 1)
+        }
+    }
+    
+    若 (小于(brace, 0)) { 返回("") }
+    
+    设 tail = 子串(content, brace, 减(len, brace))
+    
+    // 尝试1：直接解析 tail
+    尝试 {
+        设 parsed = 解析JSON(tail)
+        若 (是字典(parsed)) { 返回(parsed) }
+    } 捕获 (_) { }
+    
+    // 尝试2：去除 markdown 代码块标记后解析
+    尝试 {
+        设 cleaned = 清理代码块(tail)
+        设 parsed = 解析JSON(cleaned)
+        若 (是字典(parsed)) { 返回(parsed) }
+    } 捕获 (_) { }
+    
+    返回("")
+}
+
+// 检查位置 pos 的字符是否在引号内
+定义 是引号内 (s, pos)
+{
+    设 i = 0
+    设 在引号内 = 假
+    循环 (i < pos) {
+        设 ch = 子串(s, i, 1)
+        若 (字符串相等(ch, "\"")) {
+            // 检查是否转义引号
+            若 (或(等于(i, 0), 非(字符串相等(子串(s, 减(i, 1), 1), "\\")))) {
+                设 在引号内 = 非(在引号内)
+            }
+        }
+        设 i = 加(i, 1)
+    }
+    返回(在引号内)
+}
+
+// 去除 markdown 代码块包裹（```json...``` 或 ```...```）
+定义 清理代码块 (text)
+{
+    设 tlen = 取长(text)
+    若 (小于(tlen, 6)) { 返回(text) }
+    
+    // 去掉开头 ```json 或 ```
+    设 start = 0
+    若 (字符串相等(子串(text, 0, 3), "```")) {
+        设 start = 3
+        若 (取长(text) > 7 且 字符串相等(子串(text, 3, 4), "json")) {
+            设 start = 7
+        }
+    }
+    
+    // 去掉末尾 ```
+    设 end = tlen
+    设 ep = 减(tlen, 1)
+    循环 (大于等于(ep, start)) {
+        若 (字符串相等(子串(text, ep, 1), "`")) {
+            设 end = ep
+            设 ep = 减(ep, 1)
+        } 否则 { 跳出 }
+    }
+    
+    若 (且(等于(start, 0), 等于(end, tlen))) { 返回(text) }
+    返回(子串(text, start, 减(end, start)))
+}
+
+// 提取自然语言部分（移除末尾 JSON 后的内容）
+定义 提取自然语言 (content)
+{
+    设 len = 取长(content)
+    设 pos = 减(len, 1)
+    设 brace = 减(1, 1)
+    循环 (大于等于(pos, 0)) {
+        设 ch = 子串(content, pos, 1)
+        若 (字符串相等(ch, "{")) { 设 brace = pos; 跳出 }
+        设 pos = 减(pos, 1)
+    }
+    若 (小于(brace, 0)) { 返回(content) }
+    若 (等于(brace, 0)) { 返回("") }
+    返回(子串(content, 0, brace))
 }
 
 // === 记忆 ===
@@ -321,10 +458,34 @@
         尝试 {
             设 evaluator = 新求值器()
             设 结果 = 求值(evaluator, params)
-            返回(列表(转字符串(结果), 0.8))
+            返回(列表(连接("代码: ", params, " → ", 转字符串(结果)), 0.8))
         } 捕获 (e) {
-            返回(列表(连接("执行错误: ", 转字符串(e)), 0.1))
+            返回(列表(连接("代码: ", params, " ✗ ", 转字符串(e)), 0.1))
         }
+    }
+    若 (字符串相等(tool, "read_file")) {
+        设 结果 = 读文件钩子(params)
+        // 长内容折叠
+        若 (取长(结果) > 1500) { 设 结果 = 连接(子串(结果, 0, 1500), "\n  ...(已折叠)") }
+        返回(列表(结果, 0.9))
+    }
+    若 (字符串相等(tool, "list_files")) {
+        返回(列表(列文件钩子(params), 0.9))
+    }
+    若 (字符串相等(tool, "write_file")) {
+        返回(列表(写文件钩子(params), 0.5))
+    }
+    若 (字符串相等(tool, "replace_in_file")) {
+        // params 格式: 文件路径|旧文字|新文字
+        返回(列表(替换写回(params), 0.6))
+    }
+    若 (字符串相等(tool, "write_file")) {
+        // params 格式: 文件路径|文件内容
+        返回(列表(写文件钩子(params), 0.5))
+    }
+    若 (字符串相等(tool, "list_files")) {
+        // 直接用 Python hook，不走沙箱
+        返回(列表(列文件钩子(params), 0.9))
     }
     返回(列表(连接("tool ", tool, " done"), 0.5))
 }
@@ -645,10 +806,26 @@
             输出("→ [冲突] 检测到矛盾信息，已记录")
         }
 
-        // NEED_TOOL 优先级最高
+         // NEED_TOOL 优先级最高
         若 (字符串相等(act, "NEED_TOOL")) {
             输出(连接("→ [执行] 需要工具：", 取键(r, "tool")))
-            设 工具结果对 = 调度工具(取键(r, "tool"), 取键(r, "params"))
+            设 params = 取键(r, "params")
+            设 answer = 取键(r, "answer")
+            设 当前工具 = 取键(r, "tool")
+            // write_code 特殊处理：params 必须有代码格式
+            若 (字符串相等(当前工具, "write_code")) {
+                若 (取长(params) < 3 或 非(字符串包含(params, "("))) {
+                    若 (取长(answer) > 5 且 字符串包含(answer, "(")) {
+                        设 params = answer
+                    } 否则 {
+                        设 params = 用户问题
+                    }
+                }
+            } 否则 {
+                // read_file/list_files 等：直接使用 params（不做格式检查）
+                若 (取长(params) == 0) { 设 params = answer }
+            }
+            设 工具结果对 = 调度工具(取键(r, "tool"), params)
             设 tr = 取(工具结果对, 0)  // 结果文本
             设 工具信度 = 取(工具结果对, 1)  // 执行信度
             记(连接("tool_", 转字符串(轮次)), tr, 取键(r, "tool"))
