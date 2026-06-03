@@ -298,6 +298,35 @@ def run_interactive(evaluator, api_key):
 
 
 def main():
+    # 三言代码：直接执行，跳过 Agent 和 LLM
+    if len(sys.argv) > 1:
+        q = sys.argv[1].strip()
+        if q.startswith('(') or '(设' in q or '(循环' in q or '(输出' in q or '(加' in q:
+            from lexer import tokenize
+            from parser import parse
+            from evaluator import SanyanEvaluator
+            e = SanyanEvaluator(max_loop_steps=50000)
+            try:
+                # 提取所有括号表达式
+                import re as _re
+                exprs = _re.findall(r'\([^)]*\)', q)
+                if not exprs:
+                    exprs = [q]
+                from lexer import tokenize
+                from parser import parse
+                parsed = []
+                for ex in exprs:
+                    tokens = tokenize(ex)
+                    node = parse(tokens)
+                    if node is not None:
+                        parsed.append(node)
+                sexpr = parsed[0] if len(parsed) == 1 else ['做'] + parsed
+                r = e.eval(sexpr)
+                print(r.to_int() if hasattr(r, 'to_int') else r)
+            except Exception as ex:
+                print(f'错误: {ex}')
+            return
+
     api_key = load_api_key()
     if not api_key or '你的' in api_key:
         print('请设置 API 密钥：set SANYAN_API_KEY=sk-xxx')
