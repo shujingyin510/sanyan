@@ -81,6 +81,10 @@ def load_api_key():
 
 
 def init_evaluator(api_key):
+    if not api_key or '你的key' in api_key:
+        print('错误: 请设置环境变量 SANYAN_API_KEY 或在 agent_policy.san 中填入有效 API 密钥', file=sys.stderr)
+        print('      当前值包含占位符 "sk-你的key"，请替换为实际密钥', file=sys.stderr)
+        sys.exit(1)
     clear_cache()
     # 注入环境变量，供 .san 文件通过 getenv 读取
     if api_key:

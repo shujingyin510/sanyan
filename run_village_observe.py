@@ -89,6 +89,8 @@ cfg['url'] = cfg['url'] or os.environ.get('LLM_URL', 'https://api.deepseek.com/v
 cfg['model'] = cfg['model'] or os.environ.get('LLM_MODEL', 'deepseek-chat')
 cfg['key'] = cfg['key'] or os.environ.get('LLM_KEY', '')
 has_llm = cfg['key'] and len(cfg['key']) > 10 and '你的' not in cfg['key'] and cfg['key'] != 'sk-你的key'
+if not has_llm:
+    print('提示: 未配置有效 API 密钥。设置环境变量 LLM_KEY 或在 village_config.san 中填入密钥。')
 
 _llm_calls: int = 0  # LLM 调用计数
 _llm_times: dict = {}  # {类别: [总次数, 总耗时]}

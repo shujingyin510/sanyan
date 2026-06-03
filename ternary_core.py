@@ -341,16 +341,6 @@ class TritValue:
             self._payload = value  # type: ignore[assignment]
             self.value = []
             self.symbol = ''
-        elif isinstance(value, list) and value and isinstance(value[0], int):
-            # trit 列表（已经解析的）
-            self.value = value
-            self.symbol = BT.to_str(value)
-        elif isinstance(value, list):
-            # 数据列表
-            self._val_type = self.TYPE_LIST
-            self._payload = value
-            self.value = []
-            self.symbol = ''
         elif isinstance(value, int):
             self.value = BT.from_int(value)
             self.symbol = BT.to_str(self.value)

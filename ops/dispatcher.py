@@ -39,34 +39,12 @@ def resolve_op_name(evaluator: Any, op: str) -> str:
     return internal
 
 
-# 不可缓存的函数：每次调用必须重新查找。
-# ⚠ 抽象泄漏：'新寄存器'/'新标签'/'新槽' 是 LLVM 代码生成内部操作，
-#   它们不应该出现在通用分派器。应迁移到 llvmgen/ 模块的独立注册表。
-_NO_CACHE_OPS = frozenset(
-    {
-        '新寄存器',
-        '新标签',
-        '新槽',
-    }
-)
-
-
 def dispatch_op(evaluator: Any, internal: str, args: list) -> Any:
     """从注册表查询并执行内置操作。
 
-    支持缓存加速，对有副作用的操作每次重新查找。
-    未找到操作时返回 _DISPATCH_NOT_FOUND 哨兵（而非 None），
-    避免与操作体合法返回 None 产生歧义。
+    支持缓存加速，未找到时返回 _DISPATCH_NOT_FOUND 哨兵。
     """
     _check_op(internal)
-    if internal in _NO_CACHE_OPS:
-        entry = get_op(internal)
-        if entry is not None:
-            method, extra = entry
-            if extra:
-                return method(evaluator, extra, args)
-            return method(evaluator, args)
-        return _DISPATCH_NOT_FOUND
     if internal in evaluator._op_cache:
         method, extra = evaluator._op_cache[internal]
     else:
