@@ -92,13 +92,57 @@ def init_evaluator(api_key):
     evaluator = SanyanEvaluator(max_loop_steps=500000)
     _register_aliases()
 
+    # 注册 write_code 工具所需的 Python 函数
+    from ops.registry import register as reg_op
+    def _new_evaluator(e, args):
+        """创建新的沙箱求值器实例"""
+        e2 = SanyanEvaluator(max_loop_steps=1000)
+        # 返回一个可以被 san 代码引用的对象
+        tag = f'_sandbox_{id(e2)}'
+        e.set_var(tag, e2)
+        return tag
+
+    def _sandbox_eval(e, args):
+        """在沙箱中求值代码，返回结果"""
+        sandbox_tag = str(e.eval(args[0])) if args else ''
+        code = str(e.eval(args[1])) if len(args) > 1 else ''
+        sandbox = e.get_var(sandbox_tag) if e.has_var(sandbox_tag) else None
+        if sandbox is None:
+            return '沙箱未初始化'
+        try:
+            if code.strip().startswith('('):
+                from lexer import tokenize
+                from parser import parse
+                tokens = tokenize(code)
+                sexpr = parse(tokens)
+                if sexpr is not None:
+                    result = sandbox.eval(sexpr)
+                    return str(result.to_int() if hasattr(result, 'to_int') else result)
+            from sugar.parser import parse_code as pc
+            ast2, _ = pc(code)
+            result = None
+            for stmt2 in (ast2[1:] if isinstance(ast2, list) and len(ast2) > 1 else []):
+                try:
+                    result = sandbox.eval(stmt2)
+                except Exception as ex:
+                    return str(ex)
+            return str(result.to_int() if hasattr(result, 'to_int') else result) if result is not None else 'nil'
+        except Exception as ex:
+            return str(ex)
+
+    reg_op('新求值器', _new_evaluator)
+    reg_op('求值', _sandbox_eval)
+    reg_op('sandbox_eval', _sandbox_eval)
+
     agent_path = os.path.join('ternary_agent', 'agent.san')
     src = open(agent_path, encoding='utf-8').read()
     # 预处理 #include 展开
     src = preprocess_includes(src)
-    # API key 注入：替换 agent_policy.san 中的占位符
     if api_key:
         src = src.replace('sk-你的key', api_key)
+        print(f'[调试] API密钥已注入 (长度={len(api_key)})')
+    else:
+        print('[调试] 警告: API密钥为空，LLM调用将失败')
     ast, _ = parse_code(src)
     fixed = [s for s in ast[1:] if not (isinstance(s, list) and s[0] == 'export')]
     evaluator.eval(['do'] + fixed)
