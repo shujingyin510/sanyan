@@ -4,8 +4,37 @@
 
 ## 快速开始
 
+### 1. 配置 API 密钥（三选一）
+
 ```bash
-# v0.2: LLM 三态推理 Agent
+# 方式一：环境变量（推荐）
+set SANYAN_API_KEY=sk-你的密钥    # Windows
+export SANYAN_API_KEY=sk-你的密钥  # Linux/Mac
+
+# 方式二：直接写到策略文件
+# 编辑 ternary_agent/agent_policy.san，修改第 14 行：
+#   设 API密钥 = "sk-你的密钥"
+
+# 方式三：游戏配置文件
+# 编辑 ternary_agent/runtime_v2/village_config.san
+```
+
+### 2. 选择模型提供商（可选）
+
+编辑 `ternary_agent/agent_policy.san`：
+
+```san
+设 模型提供商 = "deepseek"   # deepseek / openai / qwen / gemini / mimo / ollama / custom
+设 模型URL = "https://api.deepseek.com/v1/chat/completions"
+设 模型名 = "deepseek-chat"
+```
+
+支持 6 家：**DeepSeek** | **OpenAI** | **千问** | **Gemini** | **小米MIMO** | **Ollama**
+
+### 3. 启动
+
+```bash
+# Agent — 可读决策 DSL（v0.3）
 python -X utf8 run_agent.py                    # 多轮对话
 python -X utf8 run_agent.py "你的问题"          # 单次提问
 
