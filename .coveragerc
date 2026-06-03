@@ -17,6 +17,7 @@ omit =
     dap_server.py
     lsp_server.py
     main.py
+    repl.py
     lsp/*
     # 工具脚本（非核心运行时）
     doc_sync.py
