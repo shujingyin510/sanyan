@@ -185,6 +185,38 @@ See [CHANGELOG.md](CHANGELOG.md) for the full version history.
 
 ---
 
+### Agent: Readable Decision DSL
+
+| Feature | Description |
+|---|---|
+| **Ternary Reasoning** | LLM 5 cognitive states → ternary mapping → confidence propagation → safety gating → action dispatch |
+| **Code Generation** | `write_code` tool: LLM generates Sanyan code → sandbox evaluator → result returned. Supports fix-error-retry loops |
+| **File Operations** | `read_file` / `list_files` / `write_file` / `replace_in_file` — Agent can read, modify, and write project files |
+| **Multi-Provider** | DeepSeek / OpenAI / Qwen / Gemini / Xiaomi MIMO / Ollama — switch with one config line |
+| **Probabilistic Ternary** | `TritValue.confidence`, Bayesian propagation, e.g. `真(0.9)` |
+| **Protocol Prompt** | 6-part structured prompt (role/syntax/tools/code/examples/constraints) for precise LLM steering |
+| **Chinese Decision Trace** | Human-readable per-step trace (LLM → mapping → propagation → action → answer) |
+| **Declarative Policy** | `agent_policy.san` pure data + 18 scene rules, editable by non-programmers |
+| **Self-Explaining** | `解释决策(N)` 6-step reasoning chain + `解释原因()` 5-layer explanation |
+| **Hot Reload** | Auto-reloads when policy file changes, no restart needed |
+| **Village Observer** | NPC autonomous life simulation → ternary trust evolution → SVG chart + JSON log |
+
+```bash
+# Interactive mode (multi-turn, hot reload)
+python -X utf8 run_agent.py
+
+# Single-shot programming (LLM generates code → executes → returns result)
+python -X utf8 run_agent.py "calculate sum from 1 to 1000"
+
+# Direct code execution (no LLM)
+python -X utf8 run_agent.py "(set x 10)(print (add x 5))"
+
+# File operations
+python -X utf8 run_agent.py "replace v0.3 with v0.4 in AGENTS.md"
+```
+
+---
+
 ## Architecture
 
 ```
