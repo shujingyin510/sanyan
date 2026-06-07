@@ -168,12 +168,14 @@
         }
     }
     
-    // 策略3：找 ["cog":" 标记
+    // 策略3：找 {"cog": 或 {"tool": 或 {"params": 标记
     设 markerA = 查找(content, "{\"cog\":")
     设 markerB = 查找(content, "{\"cog")
+    设 markerC = 查找(content, "{\"tool\":")
     设 brace = 减(1, 1)
     若 (大于等于(markerA, 0)) { 设 brace = markerA }
     否则 若 (大于等于(markerB, 0)) { 设 brace = markerB }
+    否则 若 (大于等于(markerC, 0)) { 设 brace = markerC }
     否则 {
         // 回退：找最后一个 {
         设 pos = 减(len, 1)
