@@ -974,12 +974,18 @@ class AgentRuntime:
     def _build_prompt(self, task, scene):
         mem_hint = ''
         if self.memory['stage'] == '修改':
-            mem_hint = '\n⚠代码已修改，请run_test验证后再判断是否完成。'
+            mem_hint = '\n代码已修改，应run_test验证。'
         if self.memory['history']:
             last = self.memory['history'][-1]
             if last['tool'] == 'run_test' and 'FAIL' in str(last.get('result', '')):
-                mem_hint = '\n测试失败！请分析错误并修复，然后重测。'
-        return f'任务: {task}\n阶段: {self.memory["stage"]}\n{self.context[-3000:]}\n{mem_hint}\n下一步用什么工具？只答: tool_name|params'
+                mem_hint = '\n测试失败！分析错误并修复后重测。'
+        # 根据任务类型推荐工具
+        tool_hint = ''
+        if any(w in task for w in ['函数','结构','多少行','哪些','def','class']):
+            tool_hint = '\n提示: 用analyze工具分析文件结构。'
+        elif any(w in task for w in ['哪里','引用','定义','谁调用']):
+            tool_hint = '\n提示: 用find_symbol查找符号。'
+        return f'任务: {task}\n{tool_hint}\n{self.context[-2000:]}\n{mem_hint}\n下一步用什么工具？'
 
     def _llm_call(self, prompt):
         try:
@@ -991,10 +997,11 @@ class AgentRuntime:
             if hasattr(url, 'to_payload'): url = str(url.to_payload())
             if hasattr(key, 'to_payload'): key = str(key.to_payload())
             import urllib.request as _req, json as _json
+            sys_prompt = '可用工具: analyze(分析代码结构,找函数/导入/行数), find_symbol(查符号定义引用), read_file(读文件,可选|起始行|结束行), search_code(搜索关键词), replace_in_file(单文件替换 路径|旧|新), replace_all(批量替换 模式|旧|新), write_file(写文件 路径|内容), list_files(列文件), run_test(跑测试), git_diff(看修改), git_status(看状态)。\n根据任务选一个工具，只输出: 工具名|参数。如 analyze|run_agent.py 或 read_file|run_agent.py|1|20。'
             body = _json.dumps({
                 'model': str(model).strip(),
                 'messages': [
-                    {'role': 'system', 'content': '你是工具调用系统。只输出: tool_name|params。如: analyze|run_agent.py。如: read_file|run_agent.py|1|10。如: replace_in_file|f.py|old|new。如: done|回答文本。'},
+                    {'role': 'system', 'content': sys_prompt},
                     {'role': 'user', 'content': prompt}
                 ], 'temperature': 0.7, 'max_tokens': 256
             }, ensure_ascii=False).encode('utf-8')
