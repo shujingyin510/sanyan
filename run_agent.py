@@ -777,6 +777,7 @@ def run_interactive(evaluator, api_key):
                 print('[策略文件已更新，正在重新加载...]')
                 evaluator = init_evaluator(api_key)
                 mtimes = new_mtimes
+                mtimes = new_mtimes
         except OSError:
             pass
 
@@ -910,6 +911,318 @@ def _list_tasks():
         print(f'  [{row[0]}] {icon} {row[2]:10s} {ts}  {row[1][:60]}')
     conn.close()
 
+
+# ====== AgentRuntime V2: 系统决策引擎 ======
+# 架构: LLM只输出下一步工具 → 系统执行 → 系统判断 → 喂回LLM
+# 替代 agent.san 的补丁层（惰性检测/空工具纠正/答案提取等10+补丁）
+
+class AgentRuntime:
+    """Agent 运行时：系统决策 + LLM 工具选择"""
+    def __init__(self, evaluator, sandbox):
+        self.ev = evaluator
+        self.sandbox = sandbox
+        self.tools = {}
+        self.memory = {'history': [], 'modified': [], 'stage': 'init'}
+        self.context = ''
+        self.round = 0
+
+    def register(self, name, handler):
+        self.tools[name] = handler
+
+    def run(self, task, max_rounds=10, dry_run=False):
+        self.round = 0
+        self.context = task
+        self.memory = {'history': [], 'modified': [], 'stage': '分析', 'trust': 50}
+        scene = self._match_scene(task)
+
+        while self.round < max_rounds:
+            self.round += 1
+            prompt = self._build_prompt(task, scene)
+            raw = self._llm_call(prompt)
+            tool, params = self._parse_tool(raw)
+
+            if not tool or tool not in self.tools:
+                decision = self._decide('', {}, scene)
+                if decision == 'done': break
+                if decision == 'retry':
+                    self.context += f'\n[系统] 请选择一个可用工具'
+                    continue
+                break
+
+            result = self.tools[tool](params, dry_run)
+            self.memory['history'].append({'tool': tool, 'params': params, 'result': str(result)[:300]})
+            if tool in ('write_file', 'replace_in_file', 'replace_all'):
+                self.memory['modified'].append(params.split('|')[0] if '|' in params else params)
+                self.memory['stage'] = '修改'
+
+            decision = self._decide(tool, result, scene)
+            if decision == 'done':
+                return {'answer': self._extract_answer(tool, result), 'memory': self.memory}
+            elif decision == 'retry':
+                self.context += f'\n[系统] 需要继续。工具结果: {str(result)[:500]}'
+
+            self.context += f'\n[工具: {tool}] {str(result)[:500]}'
+
+        return {'answer': f'已达{max_rounds}轮上限', 'memory': self.memory}
+
+    def _build_prompt(self, task, scene):
+        mem_hint = ''
+        if self.memory['stage'] == '修改':
+            mem_hint = '\n⚠代码已修改，请run_test验证后再判断是否完成。'
+        if self.memory['history']:
+            last = self.memory['history'][-1]
+            if last['tool'] == 'run_test' and 'FAIL' in str(last.get('result', '')):
+                mem_hint = '\n测试失败！请分析错误并修复，然后重测。'
+        return f'任务: {task}\n阶段: {self.memory["stage"]}\n{self.context[-3000:]}\n{mem_hint}\n下一步用什么工具？只答: tool_name|params'
+
+    def _llm_call(self, prompt):
+        try:
+            model = self.ev.get_var('模型名') if self.ev.has_var('模型名') else 'deepseek-chat'
+            url = self.ev.get_var('模型URL') if self.ev.has_var('模型URL') else ''
+            key = self.ev.get_var('API密钥') if self.ev.has_var('API密钥') else ''
+            # 去包装：Sanyan 变量可能是 TritValue
+            if hasattr(model, 'to_payload'): model = str(model.to_payload())
+            if hasattr(url, 'to_payload'): url = str(url.to_payload())
+            if hasattr(key, 'to_payload'): key = str(key.to_payload())
+            import urllib.request as _req, json as _json
+            body = _json.dumps({
+                'model': str(model).strip(),
+                'messages': [
+                    {'role': 'system', 'content': '你是工具调用系统。只输出: tool_name|params。如: analyze|run_agent.py。如: read_file|run_agent.py|1|10。如: replace_in_file|f.py|old|new。如: done|回答文本。'},
+                    {'role': 'user', 'content': prompt}
+                ], 'temperature': 0.7, 'max_tokens': 256
+            }, ensure_ascii=False).encode('utf-8')
+            req = _req.Request(str(url).strip(), data=body, headers={
+                'Content-Type': 'application/json', 'Authorization': f'Bearer {str(key).strip()}'}, method='POST')
+            resp = _req.urlopen(req, timeout=60).read().decode('utf-8')
+            data = _json.loads(resp)
+            return data['choices'][0]['message']['content'].strip()
+        except Exception as e:
+            print(f'[LLM错误] {e}')
+            return f'error|{e}'
+
+    def _parse_tool(self, raw):
+        raw = raw.strip().replace('---END---', '').replace('---JSON---', '').strip('{}"\' ')
+        if '|' in raw:
+            parts = raw.split('|', 1)
+            return parts[0].strip(), parts[1].strip() if len(parts) > 1 else ''
+        if raw.startswith('done'):
+            rest = raw.split('|', 1)[1] if '|' in raw else ''
+            return 'done', rest
+        return raw, ''
+
+    def _decide(self, tool, result, scene):
+        result_str = str(result)
+        # analyze/find_symbol: 结果有⚠行 → 完成
+        if tool in ('analyze', 'find_symbol'):
+            if '⚠' in result_str or '(0处)' in result_str:
+                return 'done'
+        # run_test passed + 之前改过 → 完成
+        if tool == 'run_test' and ('通过' in result_str or 'OK' in result_str):
+            if self.memory['modified']:
+                return 'done'
+        # run_test failed → 重试（最多3次）
+        if tool == 'run_test' and ('FAIL' in result_str or '失败' in result_str):
+            fails = sum(1 for h in self.memory['history'] if h['tool'] == 'run_test')
+            if fails < 3:
+                return 'retry'
+        # done tool
+        if tool == 'done':
+            return 'done'
+        # 修改后没跑测试 → 继续
+        if tool in ('replace_in_file', 'replace_all', 'write_file') and not any(h['tool'] == 'run_test' for h in self.memory['history']):
+            return 'retry'
+        return 'continue'
+
+    def _extract_answer(self, tool, result):
+        result_str = str(result)
+        if '⚠' in result_str:
+            idx = result_str.index('⚠')
+            return result_str[idx:idx+200]
+        if '共替换' in result_str:
+            return result_str[:200]
+        if '已替换' in result_str:
+            return result_str[:200]
+        return result_str[:200] if result_str else '完成'
+
+    def _match_scene(self, task):
+        kw = task.lower()
+        if any(w in kw for w in ['借钱','借款','转账','密码']):
+            return {'scene': '高风险', 'risk': '高'}
+        if any(w in kw for w in ['改','修改','替换','删','更新']):
+            return {'scene': '修改', 'risk': '低'}
+        if any(w in kw for w in ['写代码','程序','函数','计算']):
+            return {'scene': '代码', 'risk': '低'}
+        return {'scene': '通用', 'risk': '低'}
+
+# ====== Tool 包装函数 (AgentRuntime V2) ======
+
+def _resolve_path_simple(path):
+    if not path or os.path.exists(path):
+        return path
+    import glob as _glob
+    matches = _glob.glob('**/' + path, recursive=True)
+    return matches[0] if matches else path
+
+def _analyze_file_direct(path):
+    try:
+        import ast as _ast
+        path = _resolve_path_simple(path)
+        code = open(path, encoding='utf-8', errors='ignore').read()
+        tree = _ast.parse(code) if path.endswith('.py') else None
+        if not tree:
+            return f'{path}: 非Python文件'
+        result = []
+        for node in _ast.walk(tree):
+            if isinstance(node, _ast.FunctionDef):
+                try:
+                    args_str = ', '.join(a.arg for a in node.args.args)
+                    end = node.end_lineno or node.lineno
+                    lines = end - node.lineno + 1
+                    result.append(f'def {node.name}({args_str}) :{node.lineno}-{end}({lines}行)')
+                except Exception:
+                    result.append(f'def {node.name}(...) :{node.lineno}')
+            elif isinstance(node, _ast.Import):
+                for a in node.names:
+                    result.append(f'import {a.name} :{node.lineno}')
+            elif isinstance(node, _ast.ImportFrom):
+                mod = node.module or ''
+                for a in node.names:
+                    result.append(f'from {mod} import {a.name} :{node.lineno}')
+        defs = [r for r in result if r.startswith('def ')]
+        imps = [r for r in result if r.startswith('import ') or r.startswith('from ')]
+        summary = f'{path}: {code.count(chr(10))}行, {len(defs)}函数, {len(imps)}导入'
+        big = [d for d in defs if '行)' in d and int(d.split('(')[-1].replace('行)','').replace('行','')) > 50]
+        if big:
+            summary += f'\n⚠ >50行: {", ".join(d.split(" :")[0].replace("def ","") for d in big)}'
+        return summary + '\n' + '\n'.join(defs[:12] + ['---'] + imps[:6])
+    except Exception as e:
+        return f'analyze错误: {e}'
+
+def _find_symbol_direct(symbol):
+    import glob as _glob
+    results = []
+    for ext in ['*.py', '*.san']:
+        for fp in _glob.glob('**/' + ext, recursive=True):
+            if '__pycache__' in fp: continue
+            try:
+                with open(fp, encoding='utf-8', errors='ignore') as fh:
+                    for lineno, line in enumerate(fh, 1):
+                        if f'def {symbol}(' in line or f'class {symbol}' in line or f'定义 {symbol}' in line:
+                            results.insert(0, f'DEF {fp}:{lineno}')
+                        elif symbol in line and 'import' not in line.lower():
+                            results.append(f'REF {fp}:{lineno}')
+            except Exception: pass
+            if len(results) > 20: break
+    return f'符号 {symbol} ({len(results)}处):\n' + '\n'.join(results[:15]) if results else f'未找到符号: {symbol}'
+
+def _read_file_direct_simple(params):
+    parts = params.split('|')
+    path = _resolve_path_simple(parts[0])
+    start = int(parts[1]) if len(parts) > 1 and parts[1].strip().isdigit() else 0
+    end = int(parts[2]) if len(parts) > 2 and parts[2].strip().isdigit() else 0
+    try:
+        with open(path, encoding='utf-8', errors='ignore') as fh:
+            all_lines = fh.readlines()
+        total = len(all_lines)
+        if start > 0:
+            all_lines = all_lines[max(start-1,0):min(end,total) if end else total]
+        content = ''.join(all_lines)
+        return content[:3000] + (f'\n...(共{total}行)' if len(content) > 3000 else '')
+    except Exception as e:
+        return f'读文件错误: {e}'
+
+def _search_code_direct(pattern):
+    import glob as _glob
+    results = []
+    for ext in ['*.py', '*.san', '*.md']:
+        for fp in _glob.glob('**/' + ext, recursive=True):
+            if '__pycache__' in fp: continue
+            try:
+                with open(fp, encoding='utf-8', errors='ignore') as fh:
+                    for lineno, line in enumerate(fh, 1):
+                        if pattern.lower() in line.lower():
+                            results.append(f'{fp}:{lineno}: {line.strip()[:100]}')
+                            if len(results) >= 20: break
+            except Exception: pass
+            if len(results) >= 20: break
+    return '\n'.join(results) if results else f'未找到: {pattern}'
+
+def _replace_in_file_direct(params, dry_run=False):
+    parts = params.replace('\\n', '\n').split('|', 2)
+    if len(parts) < 3: return '格式: 路径|旧文字|新文字'
+    path, old, new = _resolve_path_simple(parts[0]), parts[1], parts[2]
+    if dry_run: return f'[干跑] {path}: {old[:30]}→{new[:30]}'
+    try:
+        content = open(path, encoding='utf-8').read()
+        count = content.count(old)
+        if count == 0: return f'未找到 "{old[:40]}"'
+        content = content.replace(old, new)
+        open(path, 'w', encoding='utf-8').write(content)
+        return f'已替换 {count} 处'
+    except Exception as e:
+        return f'替换错误: {e}'
+
+def _replace_all_direct(params, dry_run=False):
+    parts = params.replace('\\n', '\n').split('|', 2)
+    if len(parts) < 3: return '格式: 文件模式|旧文字|新文字'
+    pattern, old, new = parts
+    import glob as _glob
+    files = _glob.glob('**/' + pattern, recursive=True)
+    results = []
+    for fp in files[:30]:
+        try:
+            content = open(fp, encoding='utf-8', errors='ignore').read()
+            count = content.count(old)
+            if count > 0:
+                if dry_run:
+                    results.append(f'[干跑] {fp}: {count}处')
+                else:
+                    open(fp, 'w', encoding='utf-8').write(content.replace(old, new))
+                    results.append(f'{fp}: {count}处')
+        except Exception: pass
+    return '\n'.join([f'共替换 {sum(1 for _ in results)} 个文件'] + results[:15]) if results else '未找到'
+
+def _write_file_direct_simple(params, dry_run=False):
+    parts = params.split('|', 1)
+    path, content = _resolve_path_simple(parts[0]), parts[1].replace('\\n', '\n') if len(parts) > 1 else ''
+    if dry_run: return f'[干跑] {path}: {len(content)}字符'
+    try:
+        open(path, 'w', encoding='utf-8').write(content)
+        return f'已写入 {path}'
+    except Exception as e:
+        return f'写入错误: {e}'
+
+def _list_files_direct_simple(pattern):
+    import glob as _glob
+    files = _glob.glob('**/' + (pattern or '*.py'), recursive=True)
+    return '\n'.join(files[:20]) + (f'\n...共{len(files)}个' if len(files) > 20 else '')
+
+def _run_test_direct(test_path):
+    import subprocess as _sp
+    try:
+        r = _sp.run(['python', '-X', 'utf8', '-m', 'pytest', test_path, '-v', '-q'], capture_output=True, text=True, timeout=60, cwd=os.path.dirname(os.path.abspath(__file__)) or '.')
+        output = r.stdout[-500:] + r.stderr[-300:]
+        if 'FAILED' in output or 'ERROR' in output:
+            return f'FAIL rc={r.returncode}\n{output[:800]}'
+        return f'通过 rc={r.returncode}'
+    except Exception as e:
+        return f'测试错误: {e}'
+
+def _git_diff_direct():
+    import subprocess as _sp
+    try:
+        r = _sp.run(['git', 'diff', '--stat'], capture_output=True, text=True, timeout=10)
+        return r.stdout.strip() or '(无修改)'
+    except: return 'git错误'
+
+def _git_status_direct():
+    import subprocess as _sp
+    try:
+        r = _sp.run(['git', 'status', '--short'], capture_output=True, text=True, timeout=10)
+        return r.stdout.strip() or '(干净)'
+    except: return 'git错误'
+
 def main():
     # 解析命令行参数
     parser = argparse.ArgumentParser(description='三言 Agent — 可读决策 DSL + 自主编程助手')
@@ -968,6 +1281,28 @@ def main():
         os.environ['AGENT_MAX_ROUNDS'] = str(args.rounds)
 
     evaluator = init_evaluator(api_key)
+
+    # --auto 使用新 AgentRuntime V2（系统决策引擎，替代 agent.san 补丁层）
+    if args.auto:
+        sandbox = evaluator.get_var('_sandbox') if evaluator.has_var('_sandbox') else None
+        rt = AgentRuntime(evaluator, sandbox)
+        rt.register('analyze', lambda p, d: _analyze_file_direct(p))
+        rt.register('find_symbol', lambda p, d: _find_symbol_direct(p))
+        rt.register('read_file', lambda p, d: _read_file_direct_simple(p))
+        rt.register('search_code', lambda p, d: _search_code_direct(p))
+        rt.register('replace_in_file', lambda p, d: _replace_in_file_direct(p, d))
+        rt.register('replace_all', lambda p, d: _replace_all_direct(p, d))
+        rt.register('write_file', lambda p, d: _write_file_direct_simple(p, d))
+        rt.register('list_files', lambda p, d: _list_files_direct_simple(p))
+        rt.register('run_test', lambda p, d: _run_test_direct(p))
+        rt.register('git_diff', lambda p, d: _git_diff_direct())
+        rt.register('git_status', lambda p, d: _git_status_direct())
+        rt.register('done', lambda p, d: p if p else '完成')
+        result = rt.run(args.question, max_rounds=args.rounds or 10, dry_run=args.dry_run)
+        print(f"\n→ {result['answer']}")
+        if args.report:
+            print(f"\n=== 报告 ===\n阶段: {result['memory']['stage']}\n工具: {len(result['memory']['history'])}次\n修改: {result['memory']['modified']}")
+        return
 
     # --resume: 续接上次任务
     if args.resume:
