@@ -207,16 +207,31 @@ def init_evaluator(api_key):
             return f'列文件错误: {ex}'
 
     def _read_file_direct(e, args):
-        """直接读取文件（用于 agent 工具调用）"""
-        path = str(e.eval(args[0])) if args else ''
+        """直接读取文件（用于 agent 工具调用），支持 路径 或 路径|起始行|结束行"""
+        raw = str(e.eval(args[0])) if args else ''
+        parts = raw.split('|')
+        path = parts[0].strip() if parts else ''
+        start_line = int(parts[1]) if len(parts) > 1 and parts[1].strip().isdigit() else 0
+        end_line = int(parts[2]) if len(parts) > 2 and parts[2].strip().isdigit() else 0
         if not path:
-            return '请指定文件路径'
+            return '请指定文件路径（可加 |起始行|结束行）'
         try:
             with open(path, encoding='utf-8', errors='ignore') as fh:
-                content = fh.read()
-            if len(content) > 5000:
-                content = content[:5000] + '\n...(已截断)'
-            return content
+                lines = fh.readlines()
+            if start_line > 0 or end_line > 0:
+                start = max(start_line - 1, 0) if start_line > 0 else 0
+                end = min(end_line, len(lines)) if end_line > 0 else len(lines)
+                if start >= len(lines):
+                    return f'{path} 只有 {len(lines)} 行'
+                lines = lines[start:end]
+                content = ''.join(lines)
+                prefix = f'[{start+1}-{end}] '
+            else:
+                content = ''.join(lines)
+                if len(content) > 3000:
+                    content = content[:3000] + f'\n...(已截断，共 {len(lines)} 行。用 路径|行号|行号 指定范围)'
+                prefix = ''
+            return prefix + content
         except FileNotFoundError:
             return f'文件不存在: {path}'
         except Exception as ex:
