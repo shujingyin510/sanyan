@@ -375,11 +375,18 @@ class AgentRuntime:
     
     def _extract_key(self, result):
         result_str = str(result)
-        for marker in ['⚠', '共替换', '已替换', '符号 ']:
+        # analyze/find_symbol: 返回完整摘要行
+        for marker in ['⚠', '符号 ']:
+            idx = result_str.find(marker)
+            if idx >= 0:
+                # 取到第一个换行结束
+                end = result_str.find('\n', idx)
+                return result_str[idx:end] if end > 0 else result_str[idx:idx+300]
+        for marker in ['共替换', '已替换']:
             idx = result_str.find(marker)
             if idx >= 0:
                 return result_str[idx:idx+200]
-        return result_str[:200]
+        return result_str[:300]
     
     def _needs_plan(self, task):
         return len(task) > 6 and any(w in task for w in ['改','修','加','新增','实现','重构','优化','替换'])
