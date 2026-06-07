@@ -11,11 +11,11 @@
 // 小米TokenPlan: https://token-plan-cn.xiaomimimo.com/v1/chat/completions
 // TokenPlan: https://token-plan-cn.xiaomimimo.com/v1/chat/completions (MIMO 模型)
 // Ollama:   http://localhost:11434/v1/chat/completions
-设 模型提供商 = "tokenplan"
-设 模型URL = "https://token-plan-cn.xiaomimimo.com/v1/chat/completions"
+设 模型提供商 = "deepseek"
+设 模型URL = "https://api.deepseek.com/v1/chat/completions"
 设 API密钥 = 环境变量("SANYAN_API_KEY")
 若 (等于(API密钥, 假) 或 等于(API密钥, "")) { 设 API密钥 = "sk-你的key" }
-设 模型名 = "mimo-v2.5-pro"
+设 模型名 = "deepseek-chat"
 设 超时秒数 = 60
 
 // === 决策阈值 ===
