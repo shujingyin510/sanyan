@@ -1000,8 +1000,10 @@ class AgentRuntime:
         self.graph.build()
         # 构建初始上下文
         ctx = self._build_context(task, 'init')
-        # 智能首轮：检测任务类型 → 直接走对应工具
+        # 智能首轮 + Plan Mode
         forced = self._force_tool(task)
+        if not forced and self._needs_plan(task):
+            ctx = self._enter_plan(task, ctx)
         if forced:
             tool, params = forced
             result = self.tools[tool](params, dry_run)
@@ -1009,8 +1011,15 @@ class AgentRuntime:
                 return {'answer': self._extract_key(result), 'memory': self.memory}
         
         for rnd in range(1, max_rounds + 1):
+            if self._token_exceeded(ctx):
+                ctx = self._compress_ctx(ctx)
             raw = self._llm_call(ctx)
             tool, params = self._parse_tool(raw)
+            
+            # Fail-Closed: 高风险操作硬拦截
+            if self._fail_closed(tool, params, dry_run):
+                ctx = self._reflect('操作被安全门控拦截', ctx)
+                continue
             
             # Constraints
             if self._constraint_violation(tool):
@@ -1148,6 +1157,30 @@ class AgentRuntime:
             if marker in result_str:
                 return result_str[result_str.index(marker):result_str.index(marker)+200]
         return result_str[:200]
+    
+    # ── V3 扩展: Plan Mode + Token Budget + Fail-Closed ──
+    
+    def _needs_plan(self, task):
+        return len(task) > 6 and any(w in task for w in ['改','修','加','新增','实现','重构','优化','替换'])
+
+    def _enter_plan(self, task, ctx):
+        self.memory['stage'] = 'plan_explore'
+        return ctx + '\n[Plan] 先探索代码(read_file/search_code/analyze)，再用 done|计划 确认后执行。'
+
+    def _token_exceeded(self, ctx):
+        return len(ctx) > 7000
+    
+    def _compress_ctx(self, ctx):
+        parts = ctx.split('\n')
+        head = [p for p in parts[:10] if '任务:' in p or 'Plan' in p]
+        return '(上下文已压缩)\n' + '\n'.join(head + parts[-30:])
+    
+    def _fail_closed(self, tool, params, dry_run):
+        if dry_run: return False
+        dangerous = ['rm -rf', 'del /f', 'format', 'DROP TABLE', 'DELETE FROM']
+        if any(w in str(params).lower() for w in dangerous):
+            return True
+        return False
 
 # ====== Tool 包装函数 (AgentRuntime V2) ======
 
