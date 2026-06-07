@@ -386,13 +386,15 @@ def init_evaluator(api_key):
             return f'git status 失败: {ex}'
 
     def _save_task_hook(e, args):
-        """保存任务状态到 SQLite — agent.san 每轮调用"""
+        """保存任务状态到 SQLite"""
         mem = {}
         if e.has_var('_任务记忆'):
-            mem = e.get_var('_任务记忆')
-            if hasattr(mem, 'to_payload'): mem = mem.to_payload()
+            raw = e.get_var('_任务记忆')
+            if hasattr(raw, 'to_payload'): raw = raw.to_payload()
+            if isinstance(raw, dict):
+                mem = {str(k): _to_json_safe(v) for k, v in raw.items()}
         tid = e.get_var('_当前任务ID') if e.has_var('_当前任务ID') else 0
-        if tid and isinstance(mem, dict):
+        if tid and mem:
             _save_task_state(tid, mem)
             return '已保存'
         return '无任务'
@@ -645,11 +647,24 @@ def _init_db():
     conn.commit()
     return conn
 
+def _to_json_safe(obj):
+    """递归转换 Sanyan 对象到 JSON 安全类型"""
+    if hasattr(obj, 'to_payload'):
+        return obj.to_payload()
+    if hasattr(obj, 'to_int'):
+        return obj.to_int()
+    if isinstance(obj, dict):
+        return {str(k): _to_json_safe(v) for k, v in obj.items()}
+    if isinstance(obj, list):
+        return [_to_json_safe(item) for item in obj]
+    return obj
+
 def _save_task_state(task_id, memory_dict):
     conn = sqlite3.connect(DB_PATH)
     conn.execute('UPDATE tasks SET updated_at=? WHERE id=?', (_time.time(), task_id))
     for k, v in memory_dict.items():
-        val_str = json.dumps(v, ensure_ascii=False) if not isinstance(v, str) else v
+        safe = _to_json_safe(v)
+        val_str = json.dumps(safe, ensure_ascii=False)
         conn.execute('INSERT OR REPLACE INTO task_memory VALUES (?,?,?)', (task_id, k, val_str))
     conn.commit(); conn.close()
 
