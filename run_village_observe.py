@@ -731,11 +731,17 @@ class Tee:
                 out = '      ' + _vpad(parts[0].strip(), 6) + ' — ' + parts[1]
         orig.write(out)
         log.write(out)
-        log.flush()
+        try:
+            log.flush()
+        except ValueError:
+            pass
 
     def flush(self):
         orig.flush()
-        log.flush()
+        try:
+            log.flush()
+        except ValueError:
+            pass  # 文件已关闭时忽略
 
 
 sys.stdout = Tee()
