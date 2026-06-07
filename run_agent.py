@@ -940,7 +940,7 @@ class AgentRuntime:
             prompt = self._build_prompt(task, scene)
             raw = self._llm_call(prompt)
             tool, params = self._parse_tool(raw)
-            print(f'[{self.round}] tool={tool or "?"}')
+            print(f'[{self.round}] raw={raw[:100]}')
 
             if not tool or tool not in self.tools:
                 decision = self._decide('', {}, scene)
