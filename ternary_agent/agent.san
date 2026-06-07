@@ -88,7 +88,21 @@
         设 msg = 取键(first, "message")
         设 content = 取键(msg, "content")
 
-        // 先尝试整体解析为 JSON
+        // JSON 模式清洗：去 ---END--- 尾标 + 控制字符
+        尝试 {
+            设 cleaned = 清理JSON(content)
+            若 (是字典(cleaned)) {
+                返回(字典(
+                    "cogState", 取键(cleaned, "cog"),
+                    "actState", 取键(cleaned, "act"),
+                    "answer", 取键(cleaned, "answer"),
+                    "tool", 取键(cleaned, "tool"),
+                    "params", 取键(cleaned, "params")
+                ))
+            }
+        } 捕获 (_) { }
+
+        // 回退：尝试整体解析为 JSON
         尝试 {
             设 parsed = 解析JSON(content)
             若 (是字典(parsed)) {
@@ -193,7 +207,6 @@
     若 (小于(brace, 0)) { 返回("") }
     
     设 tail = 子串(content, brace, 减(len, brace))
-    输出(连接("[DEBUG-JSON] tail=", 子串(tail, 0, 100)))
     
     // 尝试1：直接解析 tail
     尝试 {
