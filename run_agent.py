@@ -537,7 +537,9 @@ def init_evaluator(api_key):
                     if isinstance(node, _ast.FunctionDef):
                         try:
                             args_str = ', '.join(a.arg for a in node.args.args)
-                            result.append(f'def {node.name}({args_str}) :{node.lineno}')
+                            end_lineno = node.end_lineno or node.lineno
+                            lines = end_lineno - node.lineno + 1
+                            result.append(f'def {node.name}({args_str}) :{node.lineno}-{end_lineno}({lines}行)')
                         except Exception:
                             result.append(f'def {node.name}(...) :{node.lineno}')
                     elif isinstance(node, _ast.Import):
