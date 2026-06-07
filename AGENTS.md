@@ -222,6 +222,13 @@ python -X utf8 compile_llvmgen.py
 
 日常小改动、调试、提示词调优等一律不提交，等用户确认后再操作。
 
+**⚠ 推送规则**：功能开发中优先本地保存，不做 `git push`。只有功能全通且用户明确指令时才推送：
+```bash
+git add -A
+git commit -m "本地保存：xxx"   # 不加 --push
+```
+等多轮测试验证完再 `git push`。
+
 在项目目录下直接使用 `git`（bash 工具自动使用项目 workdir）：
 
 ```bash
