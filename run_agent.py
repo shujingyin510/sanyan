@@ -5,13 +5,15 @@
     python -X utf8 run_agent.py "任务" --auto           # 自主模式，跑完为止
     python -X utf8 run_agent.py "任务" --auto --dry-run # 只读不改
     python -X utf8 run_agent.py "任务" --auto --rounds 3
+    python -X utf8 run_agent.py --resume                # 续接上次任务
+    python -X utf8 run_agent.py --list-tasks            # 查看任务历史
 
     设置 API 密钥:
     set SANYAN_API_KEY=sk-xxx
     或修改 ternary_agent/agent_policy.san 中的 API密钥
 """
 
-import sys, os, argparse
+import sys, os, argparse, sqlite3, json, time as _time
 
 PROJECT_ROOT = os.path.dirname(os.path.abspath(__file__)) or '.'
 os.chdir(PROJECT_ROOT)
@@ -383,6 +385,34 @@ def init_evaluator(api_key):
         except Exception as ex:
             return f'git status 失败: {ex}'
 
+    def _save_task_hook(e, args):
+        """保存任务状态到 SQLite — agent.san 每轮调用"""
+        mem = {}
+        if e.has_var('_任务记忆'):
+            mem = e.get_var('_任务记忆')
+            if hasattr(mem, 'to_payload'): mem = mem.to_payload()
+        tid = e.get_var('_当前任务ID') if e.has_var('_当前任务ID') else 0
+        if tid and isinstance(mem, dict):
+            _save_task_state(tid, mem)
+            return '已保存'
+        return '无任务'
+
+    def _finish_task_hook(e, args):
+        """标记任务完成"""
+        tid = e.get_var('_当前任务ID') if e.has_var('_当前任务ID') else 0
+        status = str(e.eval(args[0])) if args else 'completed'
+        if tid:
+            _finish_task(tid, status)
+            return f'任务 {tid} {status}'
+        return '无任务'
+
+    def _new_task_hook(e, args):
+        """创建新任务"""
+        desc = str(e.eval(args[0])) if args else '未知'
+        tid = _create_task(desc)
+        e.set_var('_当前任务ID', tid)
+        return tid
+
     def _sandbox_eval(e, args):
         """在沙箱中求值代码，返回结果"""
         sandbox_tag = str(e.eval(args[0])) if args else ''
@@ -440,6 +470,9 @@ def init_evaluator(api_key):
     reg_op('跑测试钩子', _run_test)
     reg_op('git差异', _git_diff)
     reg_op('git状态', _git_status)
+    reg_op('保存任务状态', _save_task_hook)
+    reg_op('完成任务', _finish_task_hook)
+    reg_op('新建任务', _new_task_hook)
 
     agent_path = os.path.join('ternary_agent', 'agent.san')
     src = open(agent_path, encoding='utf-8').read()
@@ -589,6 +622,74 @@ def run_interactive(evaluator, api_key):
         print()
 
 
+
+
+# ====== 任务持久化 (SQLite) ======
+
+DB_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)) or '.', 'agent_state.db')
+
+def _init_db():
+    conn = sqlite3.connect(DB_PATH)
+    conn.execute('''CREATE TABLE IF NOT EXISTS tasks (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        description TEXT, status TEXT DEFAULT 'running',
+        created_at REAL, updated_at REAL
+    )''')
+    conn.execute('''CREATE TABLE IF NOT EXISTS task_memory (
+        task_id INTEGER, key TEXT, value TEXT, PRIMARY KEY (task_id, key)
+    )''')
+    conn.execute('''CREATE TABLE IF NOT EXISTS tool_history (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        task_id INTEGER, round_num INTEGER, tool TEXT, params TEXT, result TEXT, timestamp REAL
+    )''')
+    conn.commit()
+    return conn
+
+def _save_task_state(task_id, memory_dict):
+    conn = sqlite3.connect(DB_PATH)
+    conn.execute('UPDATE tasks SET updated_at=? WHERE id=?', (_time.time(), task_id))
+    for k, v in memory_dict.items():
+        val_str = json.dumps(v, ensure_ascii=False) if not isinstance(v, str) else v
+        conn.execute('INSERT OR REPLACE INTO task_memory VALUES (?,?,?)', (task_id, k, val_str))
+    conn.commit(); conn.close()
+
+def _create_task(description):
+    conn = sqlite3.connect(DB_PATH)
+    now = _time.time()
+    cur = conn.execute('INSERT INTO tasks (description, status, created_at, updated_at) VALUES (?,?,?,?)',
+                      (description, 'running', now, now))
+    conn.commit(); task_id = cur.lastrowid; conn.close()
+    return task_id
+
+def _finish_task(task_id, status='completed'):
+    conn = sqlite3.connect(DB_PATH)
+    conn.execute('UPDATE tasks SET status=?, updated_at=? WHERE id=?', (status, _time.time(), task_id))
+    conn.commit(); conn.close()
+
+def _load_task(task_id):
+    conn = sqlite3.connect(DB_PATH)
+    mem = {}
+    for row in conn.execute('SELECT key, value FROM task_memory WHERE task_id=?', (task_id,)):
+        mem[row[0]] = row[1]
+    desc = conn.execute('SELECT description FROM tasks WHERE id=?', (task_id,)).fetchone()
+    conn.close()
+    return (desc[0] if desc else ''), mem
+
+def _get_last_task():
+    conn = sqlite3.connect(DB_PATH)
+    row = conn.execute("SELECT id, description FROM tasks WHERE status='running' ORDER BY updated_at DESC LIMIT 1").fetchone()
+    conn.close()
+    return (row[0], row[1]) if row else (None, None)
+
+def _list_tasks():
+    conn = sqlite3.connect(DB_PATH)
+    print('\n=== SanyanAgent 任务历史 ===')
+    for row in conn.execute('SELECT id, description, status, created_at FROM tasks ORDER BY id DESC LIMIT 20'):
+        ts = _time.strftime('%m-%d %H:%M', _time.localtime(row[3]))
+        icon = {'running': 'R', 'completed': 'V', 'failed': 'X'}.get(row[2], '?')
+        print(f'  [{row[0]}] {icon} {row[2]:10s} {ts}  {row[1][:60]}')
+    conn.close()
+
 def main():
     # 解析命令行参数
     parser = argparse.ArgumentParser(description='三言 Agent — 可读决策 DSL + 自主编程助手')
@@ -597,6 +698,8 @@ def main():
     parser.add_argument('--rounds', type=int, default=0, help='最大轮次（覆盖策略配置）')
     parser.add_argument('--dry-run', action='store_true', help='只读不改，禁止文件写入')
     parser.add_argument('--report', action='store_true', help='完成后输出修改报告')
+    parser.add_argument('--resume', action='store_true', help='续接上次未完成任务')
+    parser.add_argument('--list-tasks', action='store_true', help='查看任务历史')
     args = parser.parse_args()
 
     # 三言代码：直接执行，跳过 Agent 和 LLM
@@ -629,6 +732,12 @@ def main():
                 print(f'错误: {ex}')
             return
 
+    # --list-tasks: 查看历史
+    _init_db()
+    if args.list_tasks:
+        _list_tasks()
+        return
+
     api_key = load_api_key()
     if not api_key or '你的' in api_key:
         print('请设置 API 密钥：set SANYAN_API_KEY=sk-xxx')
@@ -639,6 +748,20 @@ def main():
         os.environ['AGENT_MAX_ROUNDS'] = str(args.rounds)
 
     evaluator = init_evaluator(api_key)
+
+    # --resume: 续接上次任务
+    if args.resume:
+        tid, desc = _get_last_task()
+        if tid:
+            desc, mem = _load_task(tid)
+            evaluator.set_var('_当前任务ID', tid)
+            evaluator.set_var('_当前任务描述', desc)
+            run_once(evaluator, desc)
+            if args.report:
+                _print_report(evaluator)
+        else:
+            print('没有未完成的任务')
+        return
 
     if args.question:
         if args.auto:

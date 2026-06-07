@@ -253,3 +253,4 @@ build/_test_*.bin
 _test_*.bin
 *.log
 agent_decision.json
+agent_state.db
