@@ -259,6 +259,76 @@ def init_evaluator(api_key):
         except Exception as ex:
             return f'替换错误: {ex}'
 
+    def _search_code(e, args):
+        """搜索代码内容 — 全局搜索关键词"""
+        pattern = str(e.eval(args[0])) if args else ''
+        if not pattern:
+            return '请指定搜索关键词'
+        try:
+            import glob as _glob
+            import os as _os
+            results = []
+            exts = ['*.py', '*.san', '*.md']
+            for ext in exts:
+                for fp in _glob.glob('**/' + ext, recursive=True):
+                    if '__pycache__' in fp or '.pyc' in fp:
+                        continue
+                    try:
+                        with open(fp, encoding='utf-8', errors='ignore') as fh:
+                            for lineno, line in enumerate(fh, 1):
+                                if pattern.lower() in line.lower():
+                                    results.append(f'{fp}:{lineno}: {line.strip()[:120]}')
+                                    if len(results) >= 25:
+                                        break
+                    except Exception:
+                        pass
+                    if len(results) >= 25:
+                        break
+                if len(results) >= 25:
+                    break
+            if not results:
+                return f'未找到 "{pattern}"'
+            result = '\n'.join(results)
+            if len(results) >= 25:
+                result += f'\n  ... 结果已截断 (共 25 条)'
+            return result
+        except Exception as ex:
+            return f'搜索错误: {ex}'
+
+    def _run_test(e, args):
+        """运行测试文件"""
+        test_path = str(e.eval(args[0])) if args else ''
+        if not test_path:
+            return '请指定测试文件路径'
+        import subprocess as _sp
+        import os as _os
+        try:
+            if not _os.path.exists(test_path):
+                return f'测试文件不存在: {test_path}'
+            r = _sp.run(
+                ['python', '-X', 'utf8', '-m', 'pytest', test_path, '-v', '-q'],
+                capture_output=True, text=True, timeout=60,
+                cwd=_os.path.dirname(_os.path.abspath(__file__)) or '.'
+            )
+            output = r.stdout + r.stderr
+            if len(output) > 2000:
+                # 只保留首尾
+                output = output[:1200] + '\n...(截断)...\n' + output[-500:]
+            summary = ''
+            if 'FAILED' in output or 'ERROR' in output:
+                # 提取失败测试
+                for line in output.split('\n'):
+                    if 'FAILED' in line or 'ERROR' in line:
+                        summary += line.strip() + '\n'
+                        if len(summary) > 400:
+                            break
+            status = '通过' if r.returncode == 0 else '失败'
+            return f'[{status}] rc={r.returncode}\n{summary}\n{output[:800]}'
+        except _sp.TimeoutExpired:
+            return '测试超时 (60s)'
+        except Exception as ex:
+            return f'测试执行错误: {ex}'
+
     def _sandbox_eval(e, args):
         """在沙箱中求值代码，返回结果"""
         sandbox_tag = str(e.eval(args[0])) if args else ''
@@ -312,6 +382,8 @@ def init_evaluator(api_key):
     reg_op('读文件钩子', _read_file_direct)
     reg_op('写文件钩子', _write_file_direct)
     reg_op('替换写回', _replace_in_file)
+    reg_op('搜代码钩子', _search_code)
+    reg_op('跑测试钩子', _run_test)
 
     agent_path = os.path.join('ternary_agent', 'agent.san')
     src = open(agent_path, encoding='utf-8').read()
