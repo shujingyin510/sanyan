@@ -535,8 +535,11 @@ def init_evaluator(api_key):
                 tree = _ast.parse(code)
                 for node in _ast.walk(tree):
                     if isinstance(node, _ast.FunctionDef):
-                        args_str = ', '.join(a.arg for a in node.args.args)
-                        result.append(f'def {node.name}({args_str}) :{node.lineno}')
+                        try:
+                            args_str = ', '.join(a.arg for a in node.args.args)
+                            result.append(f'def {node.name}({args_str}) :{node.lineno}')
+                        except Exception:
+                            result.append(f'def {node.name}(...) :{node.lineno}')
                     elif isinstance(node, _ast.Import):
                         for a in node.names:
                             result.append(f'import {a.name} :{node.lineno}')
