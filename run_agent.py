@@ -242,7 +242,7 @@ def init_evaluator(api_key):
         raw = str(e.eval(args[0])) if args else ''
         parts = raw.split('|', 1)
         path = parts[0].strip() if parts else ''
-        content = parts[1] if len(parts) > 1 else ''
+        content = parts[1].replace('\\n', '\n') if len(parts) > 1 else ''
         if not path:
             return '请指定文件路径（格式: 路径|内容）'
         try:
@@ -253,7 +253,7 @@ def init_evaluator(api_key):
             return f'写文件错误: {ex}'
 
     def _replace_in_file(e, args):
-        """替换文件内容并写回，params 格式: 路径|旧文字|新文字"""
+        """替换文件内容并写回，params 格式: 路径|旧文字|新文字（\\n → 换行）"""
         raw = str(e.eval(args[0])) if args else ''
         parts = raw.split('|', 2)
         path = parts[0].strip() if parts else ''
@@ -261,6 +261,9 @@ def init_evaluator(api_key):
         new = parts[2] if len(parts) > 2 else ''
         if not path or not old:
             return '格式: 路径|旧文字|新文字'
+        # 转义：\\n → 真实换行
+        old = old.replace('\\n', '\n')
+        new = new.replace('\\n', '\n')
         try:
             with open(path, encoding='utf-8') as fh:
                 content = fh.read()
