@@ -249,3 +249,24 @@ class AgentRuntime:
             if marker in result_str:
                 return result_str[result_str.index(marker):result_str.index(marker)+200]
         return result_str[:200]
+    
+    def _needs_plan(self, task):
+        return len(task) > 6 and any(w in task for w in ['改','修','加','新增','实现','重构','优化','替换'])
+
+    def _enter_plan(self, task, ctx):
+        self.memory['stage'] = 'plan_explore'
+        return ctx + '\n[Plan] 先探索代码(read_file/search_code/analyze)，再用 done|计划 确认后执行。'
+
+    def _token_exceeded(self, ctx):
+        return len(ctx) > 7000
+    
+    def _compress_ctx(self, ctx):
+        parts = ctx.split('\n')
+        head = [p for p in parts[:10] if '任务:' in p or 'Plan' in p]
+        return '(上下文已压缩)\n' + '\n'.join(head + parts[-30:])
+    
+    def _fail_closed(self, tool, params, dry_run):
+        if dry_run: return False
+        if any(w in str(params).lower() for w in ['rm -rf', 'del /f', 'format', 'DROP TABLE', 'DELETE FROM']):
+            return True
+        return False
