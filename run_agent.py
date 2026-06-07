@@ -233,7 +233,7 @@ def init_evaluator(api_key):
                     return f'{path} 只有 {len(lines)} 行'
                 lines = lines[start:end]
                 content = ''.join(lines)
-                prefix = f'[{start+1}-{end}] '
+                prefix = f'[{start + 1}-{end}] '
             else:
                 content = ''.join(lines)
                 if len(content) > 3000:
@@ -305,6 +305,7 @@ def init_evaluator(api_key):
         try:
             import glob as _glob
             import os as _os
+
             results = []
             exts = ['*.py', '*.san', '*.md']
             for ext in exts:
@@ -340,13 +341,16 @@ def init_evaluator(api_key):
             return '请指定测试文件路径'
         import subprocess as _sp
         import os as _os
+
         try:
             if not _os.path.exists(test_path):
                 return f'测试文件不存在: {test_path}'
             r = _sp.run(
                 ['python', '-X', 'utf8', '-m', 'pytest', test_path, '-v', '-q'],
-                capture_output=True, text=True, timeout=60,
-                cwd=_os.path.dirname(_os.path.abspath(__file__)) or '.'
+                capture_output=True,
+                text=True,
+                timeout=60,
+                cwd=_os.path.dirname(_os.path.abspath(__file__)) or '.',
             )
             output = r.stdout + r.stderr
             if len(output) > 2000:
@@ -370,9 +374,15 @@ def init_evaluator(api_key):
     def _git_diff(e, args):
         """运行 git diff 查看当前修改"""
         import subprocess as _sp
+
         try:
-            r = _sp.run(['git', 'diff', '--stat'], capture_output=True, text=True, timeout=10,
-                       cwd=os.path.dirname(os.path.abspath(__file__)) or '.')
+            r = _sp.run(
+                ['git', 'diff', '--stat'],
+                capture_output=True,
+                text=True,
+                timeout=10,
+                cwd=os.path.dirname(os.path.abspath(__file__)) or '.',
+            )
             output = r.stdout.strip() or '(无修改)'
             if len(output) > 1500:
                 output = output[:1500] + '\n...(已截断)'
@@ -383,9 +393,15 @@ def init_evaluator(api_key):
     def _git_status(e, args):
         """运行 git status 查看文件状态"""
         import subprocess as _sp
+
         try:
-            r = _sp.run(['git', 'status', '--short'], capture_output=True, text=True, timeout=10,
-                       cwd=os.path.dirname(os.path.abspath(__file__)) or '.')
+            r = _sp.run(
+                ['git', 'status', '--short'],
+                capture_output=True,
+                text=True,
+                timeout=10,
+                cwd=os.path.dirname(os.path.abspath(__file__)) or '.',
+            )
             output = r.stdout.strip() or '(工作区干净)'
             return output
         except Exception as ex:
@@ -396,7 +412,8 @@ def init_evaluator(api_key):
         mem = {}
         if e.has_var('_任务记忆'):
             raw = e.get_var('_任务记忆')
-            if hasattr(raw, 'to_payload'): raw = raw.to_payload()
+            if hasattr(raw, 'to_payload'):
+                raw = raw.to_payload()
             if isinstance(raw, dict):
                 mem = {str(k): _to_json_safe(v) for k, v in raw.items()}
         tid = e.get_var('_当前任务ID') if e.has_var('_当前任务ID') else 0
@@ -451,6 +468,7 @@ def init_evaluator(api_key):
         text = ''.join(result)
         # 解析
         import json as _json
+
         try:
             parsed = _json.loads(text)
             # 还原 params 中的 \\n
@@ -473,6 +491,7 @@ def init_evaluator(api_key):
         if not path or os.path.exists(path):
             return path
         import glob as _glob
+
         matches = _glob.glob('**/' + path, recursive=True)
         if matches:
             return matches[0]
@@ -492,6 +511,7 @@ def init_evaluator(api_key):
         if not old:
             return '格式: 文件模式|旧文字|新文字'
         import glob as _glob
+
         files = _glob.glob('**/' + glob_pattern, recursive=True)
         files = [f for f in files[:50] if '__pycache__' not in f and '.pyc' not in f]
         results = []
@@ -532,6 +552,7 @@ def init_evaluator(api_key):
         if path.endswith('.py'):
             try:
                 import ast as _ast
+
                 tree = _ast.parse(code)
                 for node in _ast.walk(tree):
                     if isinstance(node, _ast.FunctionDef):
@@ -556,6 +577,7 @@ def init_evaluator(api_key):
         elif path.endswith('.san'):
             try:
                 from sugar.parser import parse_code
+
                 ast_nodes, _ = parse_code(code)
                 if isinstance(ast_nodes, list):
                     for stmt in ast_nodes[1:] if len(ast_nodes) > 1 else []:
@@ -580,9 +602,9 @@ def init_evaluator(api_key):
         if classes:
             summary += f', {len(classes)}类'
         # 自动统计大函数
-        big_funcs = [d for d in defs if '行)' in d and int(d.split('(')[-1].replace('行)','').replace('行','')) > 50]
+        big_funcs = [d for d in defs if '行)' in d and int(d.split('(')[-1].replace('行)', '').replace('行', '')) > 50]
         if big_funcs:
-            summary += f'\n⚠ >50行: {", ".join(d.split(" :")[0].replace("def ","") for d in big_funcs)}'
+            summary += f'\n⚠ >50行: {", ".join(d.split(" :")[0].replace("def ", "") for d in big_funcs)}'
         summary += '\n'
         return summary + '\n'.join([*defs[:15], '---', *imps[:8]])
 
@@ -592,6 +614,7 @@ def init_evaluator(api_key):
         if not symbol:
             return '请指定符号名'
         import glob as _glob
+
         results = []
         exts = ['*.py', '*.san']
         for ext in exts:
@@ -829,28 +852,28 @@ def run_interactive(evaluator, api_key):
         print()
 
 
-
-
 # ====== 任务持久化 (SQLite) ======
 
 DB_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)) or '.', 'agent_state.db')
 
+
 def _init_db():
     conn = sqlite3.connect(DB_PATH)
-    conn.execute('''CREATE TABLE IF NOT EXISTS tasks (
+    conn.execute("""CREATE TABLE IF NOT EXISTS tasks (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         description TEXT, status TEXT DEFAULT 'running',
         created_at REAL, updated_at REAL
-    )''')
-    conn.execute('''CREATE TABLE IF NOT EXISTS task_memory (
+    )""")
+    conn.execute("""CREATE TABLE IF NOT EXISTS task_memory (
         task_id INTEGER, key TEXT, value TEXT, PRIMARY KEY (task_id, key)
-    )''')
-    conn.execute('''CREATE TABLE IF NOT EXISTS tool_history (
+    )""")
+    conn.execute("""CREATE TABLE IF NOT EXISTS tool_history (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         task_id INTEGER, round_num INTEGER, tool TEXT, params TEXT, result TEXT, timestamp REAL
-    )''')
+    )""")
     conn.commit()
     return conn
+
 
 def _to_json_safe(obj):
     """递归转换 Sanyan 对象到 JSON 安全类型"""
@@ -864,6 +887,7 @@ def _to_json_safe(obj):
         return [_to_json_safe(item) for item in obj]
     return obj
 
+
 def _save_task_state(task_id, memory_dict):
     conn = sqlite3.connect(DB_PATH)
     conn.execute('UPDATE tasks SET updated_at=? WHERE id=?', (_time.time(), task_id))
@@ -871,20 +895,29 @@ def _save_task_state(task_id, memory_dict):
         safe = _to_json_safe(v)
         val_str = json.dumps(safe, ensure_ascii=False)
         conn.execute('INSERT OR REPLACE INTO task_memory VALUES (?,?,?)', (task_id, k, val_str))
-    conn.commit(); conn.close()
+    conn.commit()
+    conn.close()
+
 
 def _create_task(description):
     conn = sqlite3.connect(DB_PATH)
     now = _time.time()
-    cur = conn.execute('INSERT INTO tasks (description, status, created_at, updated_at) VALUES (?,?,?,?)',
-                      (description, 'running', now, now))
-    conn.commit(); task_id = cur.lastrowid; conn.close()
+    cur = conn.execute(
+        'INSERT INTO tasks (description, status, created_at, updated_at) VALUES (?,?,?,?)',
+        (description, 'running', now, now),
+    )
+    conn.commit()
+    task_id = cur.lastrowid
+    conn.close()
     return task_id
+
 
 def _finish_task(task_id, status='completed'):
     conn = sqlite3.connect(DB_PATH)
     conn.execute('UPDATE tasks SET status=?, updated_at=? WHERE id=?', (status, _time.time(), task_id))
-    conn.commit(); conn.close()
+    conn.commit()
+    conn.close()
+
 
 def _load_task(task_id):
     conn = sqlite3.connect(DB_PATH)
@@ -895,11 +928,15 @@ def _load_task(task_id):
     conn.close()
     return (desc[0] if desc else ''), mem
 
+
 def _get_last_task():
     conn = sqlite3.connect(DB_PATH)
-    row = conn.execute("SELECT id, description FROM tasks WHERE status='running' ORDER BY updated_at DESC LIMIT 1").fetchone()
+    row = conn.execute(
+        "SELECT id, description FROM tasks WHERE status='running' ORDER BY updated_at DESC LIMIT 1"
+    ).fetchone()
     conn.close()
     return (row[0], row[1]) if row else (None, None)
+
 
 def _list_tasks():
     conn = sqlite3.connect(DB_PATH)
@@ -911,14 +948,23 @@ def _list_tasks():
     conn.close()
 
 
-
 # ====== AgentRuntime V3 导入 ======
 from agent_runtime import AgentRuntime
-from agent_tools import (_analyze_file_direct, _find_symbol_direct, _read_file_direct_simple,
-    _search_code_direct, _replace_in_file_direct, _replace_all_direct,
-    _write_file_direct_simple, _list_files_direct_simple, _run_test_direct,
-    _git_diff_direct, _git_status_direct)
+from agent_tools import (
+    _analyze_file_direct,
+    _find_symbol_direct,
+    _read_file_direct_simple,
+    _search_code_direct,
+    _replace_in_file_direct,
+    _replace_all_direct,
+    _write_file_direct_simple,
+    _list_files_direct_simple,
+    _run_test_direct,
+    _git_diff_direct,
+    _git_status_direct,
+)
 # ======  End AgentRuntime imports ======
+
 
 def main():
     # 解析命令行参数
@@ -996,9 +1042,11 @@ def main():
         rt.register('git_status', lambda p, d: _git_status_direct())
         rt.register('done', lambda p, d: p if p else '完成')
         result = rt.run(args.question, max_rounds=args.rounds or 10, dry_run=args.dry_run)
-        print(f"\n→ {result['answer']}")
+        print(f'\n→ {result["answer"]}')
         if args.report:
-            print(f"\n=== 报告 ===\n阶段: {result['memory']['stage']}\n工具: {len(result['memory']['history'])}次\n修改: {result['memory']['modified']}")
+            print(
+                f'\n=== 报告 ===\n阶段: {result["memory"]["stage"]}\n工具: {len(result["memory"]["history"])}次\n修改: {result["memory"]["modified"]}'
+            )
         return
 
     # --resume: 续接上次任务

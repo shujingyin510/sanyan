@@ -216,9 +216,14 @@ def _gen_dialogue(ev, args):
         existing_trust = float(existing_trust.to_int())
     # #12 性格冲突倾向：性格组合天生容易擦枪走火
     conflict_affinity = {
-        '孤僻': 0.30, '直爽': 0.25, '爱打听': 0.20,
-        '精明': 0.15, '爽朗': 0.10, '稳重': 0.05,
-        '憨厚': 0.02, '和善': 0.02
+        '孤僻': 0.30,
+        '直爽': 0.25,
+        '爱打听': 0.20,
+        '精明': 0.15,
+        '爽朗': 0.10,
+        '稳重': 0.05,
+        '憨厚': 0.02,
+        '和善': 0.02,
     }
     p1_aff = conflict_affinity.get(pers1, 0.05)
     p2_aff = conflict_affinity.get(pers2, 0.05)

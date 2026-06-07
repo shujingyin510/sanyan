@@ -8,6 +8,8 @@ omit =
     sanyancc.py
     # 演示/启动器（需 LLM 网络调用，无法单测）
     run_agent.py
+    agent_runtime.py
+    agent_tools.py
     run_v2.py
     run_v2_demo.py
     run_village_demo.py

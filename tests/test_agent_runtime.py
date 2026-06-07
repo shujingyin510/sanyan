@@ -1,5 +1,7 @@
 """AgentRuntime V3 单元测试 — SymbolTable/MemoryStore/ProjectGraph/AgentRuntime"""
+
 import unittest, sys, os, json
+
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from agent_runtime import SymbolTable, MemoryStore, ProjectGraph, AgentRuntime
@@ -73,8 +75,10 @@ class TestAgentRuntime(unittest.TestCase):
         # Mock evaluator
         class MockEval:
             def get_var(self, name):
-                return {'模型名': 'deepseek-chat', '模型URL': 'https://api.example.com',
-                        'API密钥': 'sk-test'}.get(name, '')
+                return {'模型名': 'deepseek-chat', '模型URL': 'https://api.example.com', 'API密钥': 'sk-test'}.get(
+                    name, ''
+                )
+
             def has_var(self, name):
                 return name in ('模型名', '模型URL', 'API密钥')
 
@@ -120,12 +124,12 @@ class TestAgentRuntime(unittest.TestCase):
         self.rt.memory = {'same_tool_count': {}, 'modified': [], 'history': []}
         for i in range(5):
             self.rt._constraint_violation('read_file')
-        result = self.rt._constraint_violation("read_file")  # 第6次触发
+        result = self.rt._constraint_violation('read_file')  # 第6次触发
         self.assertTrue(result)
 
     def test_constraint_ok(self):
         self.rt.memory = {'same_tool_count': {}, 'modified': [], 'history': []}
-        result = self.rt._constraint_violation("read_file")  # 第6次触发
+        result = self.rt._constraint_violation('read_file')  # 第6次触发
         self.assertFalse(result)
 
     def test_build_context_init(self):
@@ -162,7 +166,7 @@ class TestAgentRuntime(unittest.TestCase):
     def test_fail_closed(self):
         self.assertTrue(self.rt._fail_closed('write_file', 'rm -rf /', False))
         self.assertFalse(self.rt._fail_closed('write_file', 'hello.txt|content', False))
-        self.assertTrue(self.rt._fail_closed("write_file", "rm -rf /", True))  # 干跑也拦截
+        self.assertTrue(self.rt._fail_closed('write_file', 'rm -rf /', True))  # 干跑也拦截
 
     def test_run_analyze_auto(self):
         """完整 run() 流程：analyze 任务自动完成"""
