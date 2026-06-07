@@ -580,7 +580,8 @@ def init_evaluator(api_key):
         if classes:
             summary += f', {len(classes)}类'
         summary += '\n'
-        return summary + '\n'.join(result[:35])
+        # 函数在前（更重要），导入在后
+        return summary + '\n'.join([*defs[:20], '---', *imps[:10]])
 
     def _find_symbol(e, args):
         """查找符号定义和引用"""
