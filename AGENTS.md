@@ -300,7 +300,7 @@ git status --short | grep "^??"
 
 ## 测试
 
-每次代码修改后必须运行全部测试（16 套）：
+每次代码修改后必须运行全部测试（17 套）：
 
 ```bash
 python -X utf8 tests/test_core.py -v      # 运行时核心单测 138 项
@@ -320,6 +320,7 @@ python -X utf8 tests/test_sugar_self_host.py -v # sugar.bin 自举验证 3 项
 python -X utf8 tests/test_vm.py -v        # VM 字节码测试 91 项
 python -X utf8 tests/test_c_vm.py -v      # C VM 测试 14 项（需 gcc）
 python -X utf8 tests/test_agent.py -v     # Agent 测试 31 项
+python -X utf8 tests/test_agent_runtime.py -v  # AgentRuntime V3 测试 27 项
 python -X utf8 tests/run_all.py           # 集成测试 46 项
 
 全部通过才算成功：
@@ -339,6 +340,7 @@ python -X utf8 tests/run_all.py           # 集成测试 46 项
 - test_vm.py 91/91
 - test_c_vm.py 14/14（含交叉验证，需 gcc）
 - test_agent.py 31/31
+- test_agent_runtime.py 27/27
 - run_all.py 46/46
 
 ### 覆盖率配置

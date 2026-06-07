@@ -2,6 +2,67 @@
 
 ---
 
+## [v3.27.0] — 2026-06-07
+
+### 新增
+- **AgentRuntime V3**：Python 原生决策引擎（`agent_runtime.py:283`行），LLM 只输出 `tool|params`，系统负责判断/反思/上下文工程
+- **AgentRuntime 工具层**：拆分到 `agent_tools.py:173`行，analyze/find_symbol/replace_all 等 12 个独立工具
+- **SymbolTable**：符号表缓存，查一次全局复用，`_force_tool()` 智能首轮绕过 LLM
+- **MemoryStore**：关键词检索记忆，替代全量 dump，只注入相关历史
+- **ProjectGraph**：文件依赖关系图，`build()` 解析 import 语句
+- **Plan Mode**：改/修/加类复杂任务先探索→确认→执行（`_enter_plan`）
+- **Token Budget**：超 7000 字符自动压缩上下文（`_token_exceeded`/`_compress_ctx`）
+- **Fail-Closed**：`rm -rf`/`DROP TABLE` 等危险命令硬拦截，干跑模式也生效
+- **Constraints**：同工具限 5 次、同文件修改限 5 个（`_constraint_violation`）
+- **Reflection**：测试失败→反馈 LLM→重试（最多 3 次）
+- **信任感知规则**：`信任阈值` 字段（低信任时权重 ×3）、`条件` 字段（信任高/中/低）
+- **必须全部匹配**：场景规则 AND 模式，`必须全部匹配:真` 时所有关键词全中才激活
+- **Agent 自毁保护**：修改自身配置（最大轮次/API 密钥等）→ 高风险 `NEED_HUMAN`
+- **`--auto` 模式**：全走 V3 新引擎
+- **`--dry-run` 干跑模式**：write_file/replace_in_file 返回预览不实际写
+- **`--report` 报告**：任务完成后输出修改摘要
+- **`--list-tasks` / `--resume`**：SQLite 任务持久化，跨会话续接
+- **小米 Token Plan**：新增 `tokenplan` 提供商（`token-plan-cn.xiaomimimo.com`）
+- **V3 单元测试**：`tests/test_agent_runtime.py` 27 项（SymbolTable/MemoryStore/ProjectGraph/AgentRuntime）
+
+### 变更
+- **run_agent.py 拆分**：1485→1072 行（-28%），V3 引擎独立为 `agent_runtime.py`，工具层独立为 `agent_tools.py`
+- **协议简化为 `tool|params`**：LLM 不再输出 JSON，只输出工具名和参数
+- **analyze 输出优化**：摘要前置（`⚠ >50行: ...`）、函数优先显示、行范围 `def name() :start-end(N行)`
+- **read_file 支持行范围**：`路径|起始行|结束行` 格式
+- **replace_in_file/write_file 支持 `\n` 转义**
+- **场景规则重排**：高风险规则优先匹配，`修改Agent配置` 排最前
+- **高风险规则自动 2× 加权**
+- **增益不足改为 continue**：多轮任务不被误挡
+- **最大轮次 5→10**
+- **LLM 超时 10→60 秒**，`http写` 支持从策略变量读取 `超时秒数`
+- **清理已合并文件**：删除 `prompts.san`/`llm_http.san`/`tool_sched.san`
+
+### 修复
+- **sugar/parser.py**：`tok.tok_type`→`tok.kind`（CI 崩溃）
+- **覆盖率 74.4%→76.4%**：排除 `repl.py`
+- **mypy 0 errors**
+- **ruff format 全通过**
+- **JSON 清理**：`清理JSON` Python 端处理控制字符、`---END---` 剥离
+- **JSON 缺 cog/act 默认值**：自动推断 AFFIRM/NEED_TOOL
+- **空工具纠正**：LLM 返回 `tool:""` 时→系统自动从上次结果提取答案
+- **agent.san 去重调度函数**（write_file/list_files 双份）
+- **`_git_status_direct` 补 `r = _sp.run(...)`**（5 份审阅交叉发现）
+- **bare `except:` → `except Exception:`**
+- **`_constraint_violation` 副作用修正**（先检查后计数）
+- **`_extract_key` 安全 `str.find`** 防 ValueError
+- **run() 工具调用加 try/except**
+
+### 文档
+- **AGENTS.md**：V3 架构图、文件结构更新、测试数 27 套
+- **README.md/README_EN.md**：Agent 编程能力章节、项目树补 `agent_runtime.py`/`agent_tools.py`、性能提示三级
+- **ternary_agent/README.md**：API 配置教程、V3 AgentRuntime 章节、已合并文件标记、7 家提供商列表
+- **CHANGELOG.md**：去重、测试数更新
+- **ARCHITECTURE.md**：行数修正（parser 143→156、LLVM 文件行数全更新）
+- **docs/manual.md/llvm.md**：版本号 v3.25→v3.26
+
+---
+
 ## [v3.26.0] — 2026-06-02
 
 ### 新增
