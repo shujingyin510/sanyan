@@ -956,6 +956,11 @@ class AgentRuntime:
                 self.memory['stage'] = '修改'
 
             decision = self._decide(tool, result, scene)
+            # analyze/find_symbol：结果非空直接完成
+            if tool in ('analyze', 'find_symbol') and result and '未找到' not in str(result):
+                return {'answer': self._extract_answer(tool, result), 'memory': self.memory}
+            if tool == 'done':
+                return {'answer': result if result else '完成', 'memory': self.memory}
             if decision == 'done':
                 return {'answer': self._extract_answer(tool, result), 'memory': self.memory}
             elif decision == 'retry':
