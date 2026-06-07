@@ -22,7 +22,8 @@
             字典("role", "user", "content", 用户消息)
         ),
         "temperature", 0.7,
-        "max_tokens", 1536
+        "max_tokens", 1536,
+        "response_format", 字典("type", "json_object")
     ))
     设 headers = 字典(
         "Content-Type", "application/json",
