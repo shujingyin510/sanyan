@@ -165,13 +165,5 @@ def _git_diff_direct():
 def _git_status_direct():
     import subprocess as _sp
     try:
-        r = _sp.run(['git', 'status', '--short'], capture_output=True, text=True, timeout=10)
-        return r.stdout.strip() or '(干净)'
-    except: return 'git错误'
-
-def main():
-    # 解析命令行参数
-    parser = argparse.ArgumentParser(description='三言 Agent — 可读决策 DSL + 自主编程助手')
-    parser.add_argument('question', nargs='?', default='', help='任务描述（留空进入交互模式）')
-    parser.add_argument('--auto', action='store_true', help='自主模式：不停轮直到完成')
-    parser.add_argument('--rounds', type=int, default=0, help='最大轮次（覆盖策略配置）')
+        return r.stdout.strip() or "(干净)"
+    except: return "git错误"

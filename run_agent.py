@@ -777,7 +777,6 @@ def run_interactive(evaluator, api_key):
                 print('[策略文件已更新，正在重新加载...]')
                 evaluator = init_evaluator(api_key)
                 mtimes = new_mtimes
-                mtimes = new_mtimes
         except OSError:
             pass
 
@@ -1017,17 +1016,7 @@ def main():
         return
 
     if args.question:
-        if args.auto:
-            # 自主模式：inject max rounds and auto flag into evaluator
-            if args.rounds > 0:
-                evaluator.set_var('最大轮次', args.rounds)
-            if args.dry_run:
-                evaluator.set_var('_干跑模式', True)
-            run_once(evaluator, args.question)
-            if args.report:
-                _print_report(evaluator)
-        else:
-            run_once(evaluator, args.question)
+        run_once(evaluator, args.question)
     else:
         run_interactive(evaluator, api_key)
 

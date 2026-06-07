@@ -202,16 +202,16 @@ class AgentRuntime:
         return f'{ctx}\n\n[反馈] {error_info}\n请修正方案后重试。'
     
     def _constraint_violation(self, tool):
-        """Constraints: 同工具限5次，同文件修改限3次"""
+        """Constraints: 同工具限5次，同文件修改限5个"""
         if not tool: return False
         sc = self.memory.setdefault('same_tool_count', {})
         sc[tool] = sc.get(tool, 0) + 1
-        if sc[tool] > 5:
+        if sc[tool] >= 5:
             print(f'[约束] {tool}已用{sc[tool]}次，超限')
             return True
         if tool in ('write_file', 'replace_in_file', 'replace_all'):
             modified = self.memory.get('modified', [])
-            if len(modified) > 5:
+            if len(modified) >= 5:
                 print('[约束] 已修改5个文件，请停止并用 done|回答 结束')
                 return True
         return False
