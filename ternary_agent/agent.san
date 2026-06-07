@@ -931,10 +931,23 @@
             设 _轮上下文 = 连接(_轮上下文, "\n[系统] 不要再解释你要做什么。直接用NEED_TOOL调工具(如read_file/search_code)。不要READY。")
             继续
         }
-        // 空工具纠正：LLM想调工具但没指定 → 强制READY（已有数据直接答）
+        // 空工具纠正：LLM想调工具但没指定 → 强制READY
         若 (且(字符串相等(act, "NEED_TOOL"), 等于(取长(取键(r, "tool")), 0))) {
             设 answer = 取键(r, "answer")
-            若 (等于(取长(answer), 0)) { 设 answer = "(从工具结果推断)" }
+            若 (等于(取长(answer), 0)) {
+                // 从上一轮工具结果里提取关键信息
+                设 hist = 取键(_任务记忆, "工具历史")
+                若 (大于(表长(hist), 0)) {
+                    设 last = 取(hist, 减(表长(hist), 1))
+                    设 lastResult = 取键(last, "结果")
+                    若 (字符串包含(lastResult, "⚠")) {
+                        设 idx = 查找(lastResult, "⚠")
+                        设 answer = 子串(lastResult, idx, 减(取长(lastResult), idx))
+                        若 (取长(answer) > 150) { 设 answer = 子串(answer, 0, 150) }
+                    }
+                }
+                若 (等于(取长(answer), 0)) { 设 answer = "(已完成)" }
+            }
             置键(r, "actState", "READY")
             置键(r, "answer", answer)
             设 act = "READY"
