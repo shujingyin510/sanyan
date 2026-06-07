@@ -166,7 +166,7 @@ def _git_diff_direct():
 def _git_status_direct():
     import subprocess as _sp
     try:
-        return r.stdout.strip() or "(干净)"
-    r = _sp.run(["git", "status", "--short"], capture_output=True, text=True, timeout=10)
+        r = _sp.run(['git', 'status', '--short'], capture_output=True, text=True, timeout=10)
+        return r.stdout.strip() or '(干净)'
     except Exception:
-        return "git错误"
+        return 'git错误'
