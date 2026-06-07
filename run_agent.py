@@ -1004,7 +1004,6 @@ class AgentRuntime:
         forced = self._force_tool(task)
         if forced:
             tool, params = forced
-            print(f'[auto] {tool}')
             result = self.tools[tool](params, dry_run)
             if '未找到' not in str(result):
                 return {'answer': self._extract_key(result), 'memory': self.memory}
@@ -1012,7 +1011,6 @@ class AgentRuntime:
         for rnd in range(1, max_rounds + 1):
             raw = self._llm_call(ctx)
             tool, params = self._parse_tool(raw)
-            print(f'[{rnd}] {tool or "?"}')
             
             # Constraints
             if self._constraint_violation(tool):
