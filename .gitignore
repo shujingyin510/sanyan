@@ -252,3 +252,4 @@ village_trust.html
 build/_test_*.bin
 _test_*.bin
 *.log
+agent_decision.json
