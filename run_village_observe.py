@@ -207,6 +207,22 @@ def _gen_dialogue(ev, args):
     )
     if not tone:
         tone = '平淡'
+    # #12 性格冲突倾向：某些性格组合天生更容易擦枪走火
+    conflict_affinity = {
+        '孤僻': 0.30, '直爽': 0.25, '爱打听': 0.20,
+        '精明': 0.15, '爽朗': 0.10, '稳重': 0.05,
+        '憨厚': 0.02, '和善': 0.02
+    }
+    p1_aff = conflict_affinity.get(pers1, 0.05)
+    p2_aff = conflict_affinity.get(pers2, 0.05)
+    conflict_chance = (p1_aff + p2_aff) / 2 * 0.15  # 乘0.15保持低频
+    # 低信任时冲突概率翻倍
+    if existing_trust < 0.3:
+        conflict_chance *= 2.0
+    if tone not in ('冲突', '欺骗') and random.random() < conflict_chance:
+        tone = '冲突'
+        if verbose:
+            print(f'  ┌─ 性格冲突触发: {pers1}({p1_aff:.2f}) + {pers2}({p2_aff:.2f}) → {conflict_chance*100:.1f}%')
     # 语气多样性：高互信时偏向积极语气，低互信时维持平淡/冲突
     existing_trust = 0.5
     tk = f'{min(n1, n2)}_{max(n1, n2)}'
