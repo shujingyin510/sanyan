@@ -222,11 +222,18 @@
     返回(在引号内)
 }
 
-// 去除 markdown 代码块包裹（```json...``` 或 ```...```）
+// 去除 markdown 代码块包裹（```json...``` 或 `\`\`\`...\`\`\``）和 ---END--- 尾标记
 定义 清理代码块 (text)
 {
     设 tlen = 取长(text)
-    若 (小于(tlen, 6)) { 返回(text) }
+    若 (小于(tlen, 3)) { 返回(text) }
+    
+    // 去掉 ---END--- 尾标记
+    设 endMark = 查找(text, "---END---")
+    若 (大于等于(endMark, 0)) {
+        设 text = 子串(text, 0, endMark)
+        设 tlen = 取长(text)
+    }
     
     // 去掉开头 ```json 或 ```
     设 start = 0
