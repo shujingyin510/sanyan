@@ -53,8 +53,7 @@ def _analyze_file_direct(path):
 
 
 def _find_symbol_direct(symbol):
-
-    results = []
+    results: list[str] = []
     for ext in ['*.py', '*.san']:
         for fp in _glob.glob('**/' + ext, recursive=True):
             if '__pycache__' in fp:

@@ -309,8 +309,7 @@ def init_evaluator(api_key):
             return '请指定搜索关键词'
         try:
             import glob as _glob
-
-            results = []
+            results: list[str] = []
             exts = ['*.py', '*.san', '*.md']
             for ext in exts:
                 for fp in _glob.glob('**/' + ext, recursive=True):
@@ -618,8 +617,7 @@ def init_evaluator(api_key):
         if not symbol:
             return '请指定符号名'
         import glob as _glob
-
-        results = []
+        results: list[str] = []
         exts = ['*.py', '*.san']
         for ext in exts:
             for fp in _glob.glob('**/' + ext, recursive=True):
