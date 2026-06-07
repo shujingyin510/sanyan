@@ -13,7 +13,12 @@
     或修改 ternary_agent/agent_policy.san 中的 API密钥
 """
 
-import sys, os, argparse, sqlite3, json, time as _time
+import sys
+import os
+import argparse
+import sqlite3
+import json
+import time as _time
 
 PROJECT_ROOT = os.path.dirname(os.path.abspath(__file__)) or '.'
 os.chdir(PROJECT_ROOT)
@@ -304,7 +309,6 @@ def init_evaluator(api_key):
             return '请指定搜索关键词'
         try:
             import glob as _glob
-            import os as _os
 
             results = []
             exts = ['*.py', '*.san', '*.md']
@@ -329,7 +333,7 @@ def init_evaluator(api_key):
                 return f'未找到 "{pattern}"'
             result = '\n'.join(results)
             if len(results) >= 25:
-                result += f'\n  ... 结果已截断 (共 25 条)'
+                result += '\n  ... 结果已截断 (共 25 条)'
             return result
         except Exception as ex:
             return f'搜索错误: {ex}'
@@ -1093,7 +1097,7 @@ def _print_report(evaluator):
         print('=' * 40)
         print(f'  任务: {str(task)[:80]}')
         print(f'  阶段: {str(stage)}')
-        print(f'  工具调用: {len(history)} 次' if hasattr(history, '__len__') else f'  工具调用: ? 次')
+        print(f'  工具调用: {len(history)} 次' if hasattr(history, '__len__') else '  工具调用: ? 次')
         if hasattr(files, '__len__') and len(files) > 0:
             print(f'  修改文件: {len(files)} 个')
             for f in files:

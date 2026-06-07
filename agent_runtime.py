@@ -3,7 +3,7 @@ SymbolTable缓存 + MemoryStore检索 + ProjectGraph + Planner + Reflection + Co
 + TernaryEngine: 三态决策 — Kleene传播 + 贝叶斯置信度 + 保护门控
 """
 
-import re, glob as _glob
+import glob as _glob
 
 # ====== TernaryEngine: 三态决策核心 ======
 
@@ -142,7 +142,6 @@ class SymbolTable:
     def lookup(self, symbol):
         if symbol in self._cache:
             return self._cache[symbol]
-        import glob as _glob
 
         defs, refs = [], []
         for ext in ['*.py', '*.san']:
@@ -214,7 +213,6 @@ class ProjectGraph:
     def build(self, files=None):
         if self._built:
             return
-        import glob as _glob
 
         files = files or _glob.glob('**/*.py', recursive=True)[:100]
         for fp in files:
@@ -346,7 +344,7 @@ class AgentRuntime:
             if tool in ('write_file', 'replace_in_file', 'replace_all'):
                 has_test = any(h['tool'] == 'run_test' for h in self.memory['history'])
                 if not has_test:
-                    ctx += f'\n[系统] 代码已修改，请run_test验证。'
+                    ctx += '\n[系统] 代码已修改，请run_test验证。'
 
             # Context Engineering: 注入选中的符号信息
             ctx = self._build_context(params, tool, result)
@@ -419,7 +417,8 @@ class AgentRuntime:
             model = str(getattr(self.ev, 'get_var', lambda x: 'deepseek-chat')('模型名')).strip()
             url = str(getattr(self.ev, 'get_var', lambda x: '')('模型URL')).strip()
             key = str(getattr(self.ev, 'get_var', lambda x: '')('API密钥')).strip()
-            import urllib.request as _req, json as _json
+            import urllib.request as _req
+            import json as _json
 
             sys_msg = '可用工具: analyze(查文件结构), find_symbol(查符号), read_file(读文件|起始行|结束行), search_code(搜索), replace_in_file(单替换 路径|旧|新), replace_all(批量 模式|旧|新), write_file(写 路径|内容), list_files(列), run_test(测试), git_diff(git差异), git_status(git状态), done(完成|回答)。\n只输出: tool|params。如 analyze|run_agent.py'
             body = _json.dumps(

@@ -1,6 +1,8 @@
 """Tool 包装函数 — AgentRuntime V3 工具层"""
 
-import os, ast, glob as _glob, subprocess as _sp, re as _re
+import os
+import glob as _glob
+import subprocess as _sp
 
 # ====== Tool 包装函数 ======
 
@@ -8,7 +10,6 @@ import os, ast, glob as _glob, subprocess as _sp, re as _re
 def _resolve_path_simple(path):
     if not path or os.path.exists(path):
         return path
-    import glob as _glob
 
     matches = _glob.glob('**/' + path, recursive=True)
     return matches[0] if matches else path
@@ -52,7 +53,6 @@ def _analyze_file_direct(path):
 
 
 def _find_symbol_direct(symbol):
-    import glob as _glob
 
     results = []
     for ext in ['*.py', '*.san']:
@@ -91,7 +91,6 @@ def _read_file_direct_simple(params):
 
 
 def _search_code_direct(pattern):
-    import glob as _glob
 
     results = []
     for ext in ['*.py', '*.san', '*.md']:
@@ -136,7 +135,6 @@ def _replace_all_direct(params, dry_run=False):
     if len(parts) < 3:
         return '格式: 文件模式|旧文字|新文字'
     pattern, old, new = parts
-    import glob as _glob
 
     files = _glob.glob('**/' + pattern, recursive=True)
     results = []
@@ -168,14 +166,12 @@ def _write_file_direct_simple(params, dry_run=False):
 
 
 def _list_files_direct_simple(pattern):
-    import glob as _glob
 
     files = _glob.glob('**/' + (pattern or '*.py'), recursive=True)
     return '\n'.join(files[:20]) + (f'\n...共{len(files)}个' if len(files) > 20 else '')
 
 
 def _run_test_direct(test_path):
-    import subprocess as _sp
 
     try:
         r = _sp.run(
@@ -194,7 +190,6 @@ def _run_test_direct(test_path):
 
 
 def _git_diff_direct():
-    import subprocess as _sp
 
     try:
         r = _sp.run(['git', 'diff', '--stat'], capture_output=True, text=True, timeout=10)
@@ -204,7 +199,6 @@ def _git_diff_direct():
 
 
 def _git_status_direct():
-    import subprocess as _sp
 
     try:
         r = _sp.run(['git', 'status', '--short'], capture_output=True, text=True, timeout=10)
