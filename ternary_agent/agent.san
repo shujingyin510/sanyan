@@ -92,13 +92,17 @@
         尝试 {
             设 cleaned = 清理JSON(content)
             若 (是字典(cleaned)) {
-                返回(字典(
-                    "cogState", 取键(cleaned, "cog"),
-                    "actState", 取键(cleaned, "act"),
-                    "answer", 取键(cleaned, "answer"),
-                    "tool", 取键(cleaned, "tool"),
-                    "params", 取键(cleaned, "params")
-                ))
+                设 cc = "AFFIRM"
+                设 aa = "NEED_TOOL"
+                设 ans = ""
+                设 tt = ""
+                设 pp = ""
+                尝试 { 设 cc = 取键(cleaned, "cog") } 捕获 (_) { }
+                尝试 { 设 aa = 取键(cleaned, "act") } 捕获 (_) { }
+                尝试 { 设 ans = 取键(cleaned, "answer") } 捕获 (_) { }
+                尝试 { 设 tt = 取键(cleaned, "tool") } 捕获 (_) { }
+                尝试 { 设 pp = 取键(cleaned, "params") } 捕获 (_) { }
+                返回(字典("cogState", cc, "actState", aa, "answer", ans, "tool", tt, "params", pp))
             }
         } 捕获 (_) { }
 
@@ -120,9 +124,12 @@
         尝试 {
             设 maybe = 提取尾部JSON(content)
             若 (是字典(maybe)) {
-                设 answer = 取键(maybe, "answer")
-                设 tool = 取键(maybe, "tool")
-                设 params = 取键(maybe, "params")
+                设 answer = ""
+                设 tool = ""
+                设 params = ""
+                尝试 { 设 answer = 取键(maybe, "answer") } 捕获 (_) { }
+                尝试 { 设 tool = 取键(maybe, "tool") } 捕获 (_) { }
+                尝试 { 设 params = 取键(maybe, "params") } 捕获 (_) { }
             若 (或(取长(tool) > 0, 取长(params) > 0)) {
                 // 末尾有 JSON 指令 → 解析使用
                 // 缺 cog/act 时智能推测：有 tool → AFFIRM/NEED_TOOL
