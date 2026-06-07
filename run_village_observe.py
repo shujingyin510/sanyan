@@ -198,11 +198,12 @@ def _gen_dialogue(ev, args):
     # 根据天气和关系决定对话语气方向
     rel_str = str(rel) if rel else '陌生人'
     # tone_hint = {'夫妻': '家常', '朋友': '随意', '邻居': '寒暄', '熟人': '客套', '陌生人': '客气'}.get(rel_str, '客气')
-    # 两步：先定语气，再生成（区分调侃/抱怨和真正冲突）
+    # 两步：先定语气，再生成。关键区分：
+    # 打趣=开玩笑（无恶意）、抱怨=对天气/生活不满（非对人）、冲突=直接针对对方人身攻击
     tone = llm_call(
         f'{n1}({role1},{pers1})和{n2}({role2},{pers2})在{period}{weather}天相遇。'
-        f'对话语气是：友好、打趣、抱怨、平淡？'
-        f'（打趣=开玩笑，抱怨=对事不对人）只答一个词。'
+        f'语气：友好、打趣、抱怨、冲突、平淡？'
+        f'（打趣=玩笑无恶意。抱怨=对天气/生活的牢骚，非针对对方。冲突=针对对方的人身攻击或翻旧账）只答一个词。'
     )
     if not tone:
         tone = '平淡'
@@ -213,12 +214,12 @@ def _gen_dialogue(ev, args):
     existing_trust = pt.get(tk, trust_map.get(rel_str, 0.10))
     if hasattr(existing_trust, 'to_int'):
         existing_trust = float(existing_trust.to_int())
-    # #11 保守决策：互信"可能"区间压制冲突语气（70%概率）
-    if existing_trust >= 0.3 and existing_trust < 0.7 and tone in ('冲突', '抱怨') and random.random() < 0.70:
-        tone = '平淡'
+    # #11 保守决策：互信"可能"区间有50%概率压制冲突语气
+    if existing_trust >= 0.3 and existing_trust < 0.7 and tone == '冲突' and random.random() < 0.50:
+        tone = '抱怨'  # 降级为抱怨（对事），不惩罚信任
     if tone == '平淡' and existing_trust > 0.5 and random.random() < 0.4:
         tone = random.choice(['友好', '打趣', '抱怨'])
-    elif tone == '平淡' and existing_trust < 0.2 and random.random() < 0.2:
+    elif tone == '平淡' and existing_trust < 0.2 and random.random() < 0.3:
         tone = '冲突'
     # #7 空间约束：同地点加成，异地惩罚
     loc_mult = 1.0
@@ -259,7 +260,7 @@ def _gen_dialogue(ev, args):
         '打趣': '说句玩笑打趣的话',
         '抱怨': '说句对天对事的抱怨',
         '平淡': '随便说句日常话',
-        '冲突': '说句带点牢骚的话',
+        '冲突': '说句带刺的话（针对对方，但不要太恶毒）',
     }.get(tone, '说句话')
     p1 = (
         f'{n1}是{role1}，性格{pers1}，正在{act1}。天气{weather}。'
@@ -274,7 +275,7 @@ def _gen_dialogue(ev, args):
             '打趣': '接话逗回去',
             '抱怨': '附和或劝解',
             '平淡': '随口接话',
-            '冲突': '回应两句',
+            '冲突': '回敬两句',
         }.get(tone, '回应')
         p2 = (
             f'{n2}是{role2}，性格{pers2}，正在{act2}。{n1}对你说："{line1}"。'
