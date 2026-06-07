@@ -54,7 +54,7 @@
 // _P代码示范: 几个完整场景
 设 _P代码示范 = '【批量替换】所有import time前加注释→{"cog":"AFFIRM","act":"NEED_TOOL","answer":"批量改","tool":"replace_all","params":"*.py|import time|# time\\nimport time"}【单文件】读→{"tool":"read_file","params":"AGENTS.md"}【修改】→{"tool":"replace_in_file","params":"AGENTS.md|v0.3|v0.4"}【搜索】→{"tool":"search_code","params":"def main"}【测试】→{"tool":"run_test","params":"tests/test_agent.py"}【检查】→{"tool":"git_diff","params":""}【完成】→{"act":"READY"}。'
 // _P要求: 输出格式要求
-设 _P要求 = '只输出JSON对象。tool非空时act=NEED_TOOL。工具:analyze,find_symbol,read_file,search_code,replace_in_file,replace_all,write_file,list_files,write_code,run_test,git_diff,git_status。完成act=READY加answer总结。不确定act=NEED_HUMAN。'
+设 _P要求 = '只输出JSON。analyze/find_symbol/read_file拿到结果后直接结合数据回答(READY)。要做事时NEED_TOOL。工具:analyze分析代码结构,find_symbol查符号,read_file读文件,search_code搜索,replace_in_file单替换,replace_all批量,write_file写,list_files列,write_code执行,run_test测试,git_diff看改动,git_status状态。'
 
 // 拼接为最终协议提示词
 设 协议提示词 = 连接(_P角色, _P三言语法, _P工具说明, _P代码示范, _P要求)
