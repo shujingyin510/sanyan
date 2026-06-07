@@ -12,6 +12,12 @@
                            UNCERT/CONFLICTED   +置信度    +置信度     /增益不足    /HUMAN
 ```
 
+**V3 AgentRuntime**（`--auto` 模式，Python 原生引擎）：
+```
+用户提问 → SymbolTable预加载 → _force_tool首轮 → LLM(tool|params)
+         → Fail-Closed拦截 → Token预算 → 执行 → Reflection → 上下文工程 → 循环
+```
+
 ### 文件结构
 
 | 文件 | 用途 |

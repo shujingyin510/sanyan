@@ -151,13 +151,13 @@ Agent 将 LLM 返回的 5 种认知态映射为三进制决策：
 | `agent.san` | v0.3 | 主程序，包含全部模块逻辑 |
 | `run_agent.py` | v0.3 | Python 启动器，注册中文别名 |
 | `agent_policy.san` | v0.3 | 策略配置（纯数据文件） |
-| `prompts.san` | v0.3 | 协议提示词模板 |
+| `prompts.san` | — | （已合并至 agent.san） |
 | `decision.san` | v0.3 | 决策核心（字典驱动版） |
-| `memory.san` | v0.3 | TTL 记忆系统 |
-| `llm_http.san` | v0.3 | HTTP 调用封装 |
-| `llm_iface.san` | v0.3 | LLM 接口层 |
-| `context_mgr.san` | v0.3 | 上下文管理器 |
-| `tool_sched.san` | v0.2 | 工具调度层 |
+| `memory.san` | — | （已合并至 agent.san） |
+| `llm_http.san` | — | （已合并至 agent.san） |
+| `llm_iface.san` | — | （已合并至 agent.san） |
+| `context_mgr.san` | — | （已合并至 agent.san） |
+| `tool_sched.san` | — | （已合并至 agent.san） |
 | `tests.san` | v0.2 | 11 项核心测试 |
 | `tests_all.san` | v0.2 | 11 项自测（决策/传播/投票/压缩/冲突） |
 | `tests_boundary.san` | v0.2 | 5 条边界测试 |
@@ -170,7 +170,17 @@ Agent 将 LLM 返回的 5 种认知态映射为三进制决策：
 | `runtime_v2/npc_demo.san` | v2 | NPC 30 天行为演示 |
 | `runtime_v2/tests_v2.san` | v2 | v2 测试集 |
 | `runtime_v2/village_game.san` | v3 | 桃花村 8 人村庄模拟 |
-| `protocol_versions.md` | — | 协议版本记录 |
+
+### V3 AgentRuntime（`--auto` 模式）
+独立于 agent.san 的 Python 原生引擎，`python -X utf8 run_agent.py "任务" --auto` 自动启用。
+
+| 组件 | 文件 | 说明 |
+|------|------|------|
+| AgentRuntime | `../agent_runtime.py` | V3 决策引擎：SymbolTable/MemoryStore/ProjectGraph |
+| Tool Wrappers | `../agent_tools.py` | analyze/find_symbol/replace_all 等 12 个工具 |
+| Smart First Round | `_force_tool()` | 检测任务类型，analyze/find_symbol 无需 LLM |
+| Context Engineering | `_build_context()` | 智能记忆检索替代全量 dump |
+| Reflection | `_reflect()` | 测试失败→反馈 LLM→重试 |
 
 ## 运行测试
 
