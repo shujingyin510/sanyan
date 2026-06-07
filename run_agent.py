@@ -952,6 +952,28 @@ class SymbolTable:
             if sym not in ('def', 'class', 'import', 'from', 'if', 'else', 'self', 'True', 'False'):
                 self.lookup(sym)
 
+class MemoryStore:
+    """智能记忆检索：关键词匹配，非全量dump"""
+    def __init__(self):
+        self.entries = []
+    def add(self, tool, params, result):
+        import re as _re
+        kw = _re.findall(r'[a-zA-Z_]\w{2,}', str(params) + str(result))
+        self.entries.append({'tool': tool, 'result': str(result)[:200], 'kw': set(kw)})
+    def context(self, query='', limit=3):
+        if not self.entries: return ''
+        qk = set(self._kw(query)) if query else set()
+        scored = []
+        for e in self.entries[-20:]:
+            s = len(qk & e.get('kw', set())) if qk else 1
+            if s > 0: scored.append((s, e))
+        scored.sort(key=lambda x: -x[0])
+        entries = [e for _, e in scored[:limit]] or self.entries[-limit:]
+        return '[记忆] ' + ' | '.join(f'{e["tool"]}:{str(e["result"])[:60]}' for e in entries)
+    def _kw(self, text):
+        import re as _re
+        return _re.findall(r'[a-zA-Z_]\w{2,}', text)
+
 class ProjectGraph:
     """项目图：文件依赖关系"""
     def __init__(self, root='.'):
@@ -984,7 +1006,7 @@ class AgentRuntime:
     def __init__(self, evaluator, sandbox):
         self.ev = evaluator; self.sandbox = sandbox
         self.tools = {}; self.symbols = SymbolTable()
-        self.graph = ProjectGraph()
+        self.graph = ProjectGraph(); self.mem = MemoryStore()
         self.memory = {}; self.reflections = []
     
     def register(self, name, handler):
@@ -1000,10 +1022,8 @@ class AgentRuntime:
         self.graph.build()
         # 构建初始上下文
         ctx = self._build_context(task, 'init')
-        # 智能首轮 + Plan Mode
+        # 智能首轮：检测任务类型 → 直接走对应工具
         forced = self._force_tool(task)
-        if not forced and self._needs_plan(task):
-            ctx = self._enter_plan(task, ctx)
         if forced:
             tool, params = forced
             result = self.tools[tool](params, dry_run)
@@ -1011,15 +1031,8 @@ class AgentRuntime:
                 return {'answer': self._extract_key(result), 'memory': self.memory}
         
         for rnd in range(1, max_rounds + 1):
-            if self._token_exceeded(ctx):
-                ctx = self._compress_ctx(ctx)
             raw = self._llm_call(ctx)
             tool, params = self._parse_tool(raw)
-            
-            # Fail-Closed: 高风险操作硬拦截
-            if self._fail_closed(tool, params, dry_run):
-                ctx = self._reflect('操作被安全门控拦截', ctx)
-                continue
             
             # Constraints
             if self._constraint_violation(tool):
@@ -1031,6 +1044,7 @@ class AgentRuntime:
             if tool in self.tools:
                 result = self.tools[tool](params, dry_run)
                 self.memory['history'].append({'tool': tool, 'params': params, 'result': str(result)[:300], 'round': rnd})
+                self.mem.add(tool, params, result)
                 if tool in ('write_file', 'replace_in_file', 'replace_all'):
                     self.memory['modified'].append(params.split('|')[0] if '|' in params else params)
             else:
@@ -1087,16 +1101,10 @@ class AgentRuntime:
         if self.memory.get('modified'):
             parts.append(f'\n已修改: {", ".join(self.memory["modified"][:5])}')
         
-        # 注入最近工具历史（精简）
-        recent = self.memory.get('history', [])[-3:]
-        if recent:
-            hist = '\n'.join(f'  {h["round"]}. {h["tool"]}: {str(h["result"])[:80]}' for h in recent)
-            parts.append(f'\n历史:\n{hist}')
-        
-        # 注入符号表提示
-        symbols = getattr(self, '_ctx_symbols', [])
-        if symbols:
-            parts.append(f'\n相关符号:\n{symbols}')
+        # 智能记忆检索
+        mem_ctx = self.mem.context(task_or_result + str(result))
+        if mem_ctx:
+            parts.append(f'\n{mem_ctx}')
         
         # 注入 Reflection
         if self.reflections:
@@ -1157,30 +1165,6 @@ class AgentRuntime:
             if marker in result_str:
                 return result_str[result_str.index(marker):result_str.index(marker)+200]
         return result_str[:200]
-    
-    # ── V3 扩展: Plan Mode + Token Budget + Fail-Closed ──
-    
-    def _needs_plan(self, task):
-        return len(task) > 6 and any(w in task for w in ['改','修','加','新增','实现','重构','优化','替换'])
-
-    def _enter_plan(self, task, ctx):
-        self.memory['stage'] = 'plan_explore'
-        return ctx + '\n[Plan] 先探索代码(read_file/search_code/analyze)，再用 done|计划 确认后执行。'
-
-    def _token_exceeded(self, ctx):
-        return len(ctx) > 7000
-    
-    def _compress_ctx(self, ctx):
-        parts = ctx.split('\n')
-        head = [p for p in parts[:10] if '任务:' in p or 'Plan' in p]
-        return '(上下文已压缩)\n' + '\n'.join(head + parts[-30:])
-    
-    def _fail_closed(self, tool, params, dry_run):
-        if dry_run: return False
-        dangerous = ['rm -rf', 'del /f', 'format', 'DROP TABLE', 'DELETE FROM']
-        if any(w in str(params).lower() for w in dangerous):
-            return True
-        return False
 
 # ====== Tool 包装函数 (AgentRuntime V2) ======
 
