@@ -201,8 +201,8 @@ def _gen_dialogue(ev, args):
     # 两步：先定语气，再生成（区分调侃/抱怨和真正冲突）
     tone = llm_call(
         f'{n1}({role1},{pers1})和{n2}({role2},{pers2})在{period}{weather}天相遇。'
-        f'对话语气是：友好、打趣、抱怨、平淡、冲突？'
-        f'（打趣=开玩笑，抱怨=对事不对人，冲突=对人发火）只答一个词。'
+        f'对话语气是：友好、打趣、抱怨、平淡？'
+        f'（打趣=开玩笑，抱怨=对事不对人）只答一个词。'
     )
     if not tone:
         tone = '平淡'
@@ -213,8 +213,8 @@ def _gen_dialogue(ev, args):
     existing_trust = pt.get(tk, trust_map.get(rel_str, 0.10))
     if hasattr(existing_trust, 'to_int'):
         existing_trust = float(existing_trust.to_int())
-    # #11 保守决策：互信"可能"区间压制冲突语气
-    if existing_trust >= 0.3 and existing_trust < 0.7 and tone in ('冲突', '抱怨') and random.random() < 0.35:
+    # #11 保守决策：互信"可能"区间压制冲突语气（70%概率）
+    if existing_trust >= 0.3 and existing_trust < 0.7 and tone in ('冲突', '抱怨') and random.random() < 0.70:
         tone = '平淡'
     if tone == '平淡' and existing_trust > 0.5 and random.random() < 0.4:
         tone = random.choice(['友好', '打趣', '抱怨'])
@@ -259,7 +259,7 @@ def _gen_dialogue(ev, args):
         '打趣': '说句玩笑打趣的话',
         '抱怨': '说句对天对事的抱怨',
         '平淡': '随便说句日常话',
-        '冲突': '说句带刺的抱怨话',
+        '冲突': '说句带点牢骚的话',
     }.get(tone, '说句话')
     p1 = (
         f'{n1}是{role1}，性格{pers1}，正在{act1}。天气{weather}。'
@@ -274,7 +274,7 @@ def _gen_dialogue(ev, args):
             '打趣': '接话逗回去',
             '抱怨': '附和或劝解',
             '平淡': '随口接话',
-            '冲突': '反驳或顶回去',
+            '冲突': '回应两句',
         }.get(tone, '回应')
         p2 = (
             f'{n2}是{role2}，性格{pers2}，正在{act2}。{n1}对你说："{line1}"。'
@@ -290,7 +290,7 @@ def _gen_dialogue(ev, args):
         '赞扬': 0.030,
         '交易': 0.015,
         '问候': 0.009,
-        '争吵': -0.090,
+        '争吵': -0.040,
         '欺骗': -0.240,
         '赠礼': 0.150,
         '闲聊': 0.003,
@@ -746,7 +746,7 @@ random.seed(_seed)
 print(f'桃花村 {max_days}天 输出到 village_log.txt  LLM:{"已启用" if has_llm else "未配置"}  随机种子: {_seed}')
 print()
 print('══ 配置说明 ══')
-print('基础Δ映射: 闲聊+0.003 问候+0.009 交易+0.015 赞扬+0.030 帮助+0.060 赠礼+0.150 争吵-0.090 欺骗-0.240')
+print('基础Δ映射: 闲聊+0.003 问候+0.009 交易+0.015 赞扬+0.030 帮助+0.060 赠礼+0.150 争吵-0.040 欺骗-0.240')
 print('三态阈值: 假<0.3  可能0.3~0.7  真≥0.7')
 print('性格加权: 两人性格系数取平均，缺失行为默认×1.0')
 print('天气加权: 下雨×0.7  阴天×1.0  晴天×1.2')
