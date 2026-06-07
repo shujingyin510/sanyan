@@ -622,7 +622,7 @@ def _print_report(evaluator):
         task = mem.get('任务描述', '') if isinstance(mem, dict) else ''
 
         print('\n' + '=' * 40)
-        print('  sanagent 任务报告')
+        print('  SanyanAgent 任务报告')
         print('=' * 40)
         print(f'  任务: {str(task)[:80]}')
         print(f'  阶段: {str(stage)}')
