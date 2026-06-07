@@ -50,9 +50,9 @@
 // _P三言语法: 语言完整速查
 设 _P三言语法 = '【三言语法】(设 var val)赋值；(加 a b)/(减 a b)/(乘 a b)/(除 a b)/(取余 a b)算术；(输出 expr)打印；(若(条件){真}{假})条件；(遍历 var 起 止 体1 体2...)计数循环，体写在括号内如(遍历 i 1 100(输出 i))；(循环(条件)体1 体2...)条件循环；(列表 a b)建表；(取 lst i)取元素；(表长 lst)长度；(追加 lst v)追加；(连接 s1 s2)拼字符串；(子串 s 起 长)截取；(取长 s)字符串长度；(大于/小于/等于/不等于 a b)比较；(且/或/非 a b)逻辑；(定义 fn(p)体)定义函数；(返回 expr)返回值；(做 e1 e2)顺序执行。所有调用用括号包裹。嵌套内层先算：(输出(加(乘 2 3)5))输出11。'
 // _P工具说明: 工具用法
-设 _P工具说明 = '你是自主编程Agent，支持多轮工作。工具有：write_code(执行代码)、read_file(读文件，支持 路径|起始行|结束行)、list_files(列文件)、write_file(写文件)、replace_in_file(替换文字)、search_code(搜索)、run_test(测试)、git_diff(查看修改)、git_status(状态)。需要工具时用 ---JSON--- 分隔符。任务完成时act=READY。'
+设 _P工具说明 = '你是自主编程Agent。单文件用 replace_in_file，批量跨文件用 replace_all（格式 文件模式|旧文字|新文字）。其他工具：write_code/read_file/list_files/write_file/search_code/run_test/git_diff/git_status。需工具时用 ---JSON---\n{json}\n---END---。任务完成act=READY。'
 // _P代码示范: 几个完整场景
-设 _P代码示范 = '【示范1】读文件→{"cog":"AFFIRM","act":"NEED_TOOL","answer":"读取","tool":"read_file","params":"run_agent.py"}【示范2】读指定行→{"cog":"AFFIRM","act":"NEED_TOOL","answer":"读main","tool":"read_file","params":"run_agent.py|540|580"}【示范3】改版本号→{"cog":"AFFIRM","act":"NEED_TOOL","answer":"替换","tool":"replace_in_file","params":"AGENTS.md|v0.3|v0.4"}【示范4】搜索→{"cog":"AFFIRM","act":"NEED_TOOL","answer":"搜索","tool":"search_code","params":"def main"}【示范5】跑测试→{"cog":"AFFIRM","act":"NEED_TOOL","answer":"测试","tool":"run_test","params":"tests/test_agent.py"}【示范6】查看改动→{"cog":"AFFIRM","act":"NEED_TOOL","answer":"检查","tool":"git_diff","params":""}【示范7】写代码→{"cog":"AFFIRM","act":"NEED_TOOL","answer":"执行","tool":"write_code","params":"(设 x 10)(输出(加 x 5))"}【示范8】完成→{"cog":"AFFIRM","act":"READY","answer":"修改了1个文件，测试通过"}。'
+设 _P代码示范 = '【批量替换】所有import time前加注释→{"cog":"AFFIRM","act":"NEED_TOOL","answer":"批量改","tool":"replace_all","params":"*.py|import time|# time\\nimport time"}【单文件】读→{"tool":"read_file","params":"AGENTS.md"}【修改】→{"tool":"replace_in_file","params":"AGENTS.md|v0.3|v0.4"}【搜索】→{"tool":"search_code","params":"def main"}【测试】→{"tool":"run_test","params":"tests/test_agent.py"}【检查】→{"tool":"git_diff","params":""}【完成】→{"act":"READY"}。'
 // _P要求: 输出格式要求
 设 _P要求 = '回复中说人话。工具用 ---JSON---\n{json}\n---END---。多轮：分析→修改→测试→修错→完成。干跑模式下文件不实际修改，[干跑]表示预览成功无需验证。任务完成act=READY。'
 
