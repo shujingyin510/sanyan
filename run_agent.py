@@ -137,6 +137,10 @@ def init_evaluator(api_key):
     from ops.registry import register as reg_op
 
     def _new_evaluator(e, args):
+        # 传递干跑模式到沙箱
+        if e.has_var('_干跑模式') and e.get_var('_干跑模式'):
+            sandbox_ref = e.get_var('_sandbox')
+            sandbox_ref.set_var('_干跑模式', True)
         return '_sandbox'
 
     def _list_files(e, args):
@@ -245,6 +249,9 @@ def init_evaluator(api_key):
         content = parts[1].replace('\\n', '\n') if len(parts) > 1 else ''
         if not path:
             return '请指定文件路径（格式: 路径|内容）'
+        dry = e.has_var('_干跑模式') and e.get_var('_干跑模式')
+        if dry:
+            return f'[干跑] 将写入 {path}（{len(content)}字符）'
         try:
             with open(path, 'w', encoding='utf-8') as fh:
                 fh.write(content)
@@ -264,6 +271,9 @@ def init_evaluator(api_key):
         # 转义：\\n → 真实换行
         old = old.replace('\\n', '\n')
         new = new.replace('\\n', '\n')
+        dry = e.has_var('_干跑模式') and e.get_var('_干跑模式')
+        if dry:
+            return f'[干跑] 将在 {path} 替换 {old[:40]} → {new[:40]}'
         try:
             with open(path, encoding='utf-8') as fh:
                 content = fh.read()
