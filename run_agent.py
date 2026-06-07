@@ -605,21 +605,28 @@ def main():
 def _print_report(evaluator):
     """输出修改报告"""
     try:
-        mem = evaluator.get_var('_任务记忆') if evaluator.has_var('_任务记忆') else None
+        mem = None
+        if evaluator.has_var('_ctx'):
+            ctx = evaluator.get_var('_ctx')
+            if isinstance(ctx, dict) and '_任务记忆' in ctx:
+                mem = ctx['_任务记忆']
+            elif hasattr(ctx, 'get'):
+                mem = ctx.get('_任务记忆', None)
         if mem is None:
+            print('\n(无任务记忆)')
             return
-        import time as _t
-        files = getattr(mem, 'get', lambda k, d=None: d)('修改文件列表', [])
-        history = getattr(mem, 'get', lambda k, d=None: d)('工具历史', [])
-        stage = getattr(mem, 'get', lambda k, d=None: d)('当前阶段', '未知')
-        task = getattr(mem, 'get', lambda k, d=None: d)('任务描述', '')
+        # Extract fields
+        files = mem.get('修改文件列表', []) if isinstance(mem, dict) else []
+        history = mem.get('工具历史', []) if isinstance(mem, dict) else []
+        stage = mem.get('当前阶段', '未知') if isinstance(mem, dict) else '未知'
+        task = mem.get('任务描述', '') if isinstance(mem, dict) else ''
 
         print('\n' + '=' * 40)
         print('  sanagent 任务报告')
         print('=' * 40)
         print(f'  任务: {str(task)[:80]}')
         print(f'  阶段: {str(stage)}')
-        print(f'  工具调用: {len(history) if hasattr(history, "__len__") else 0} 次')
+        print(f'  工具调用: {len(history)} 次' if hasattr(history, '__len__') else f'  工具调用: ? 次')
         if hasattr(files, '__len__') and len(files) > 0:
             print(f'  修改文件: {len(files)} 个')
             for f in files:
@@ -627,8 +634,8 @@ def _print_report(evaluator):
         else:
             print('  修改文件: 无')
         print('=' * 40)
-    except Exception:
-        pass
+    except Exception as ex:
+        print(f'\n(报告生成失败: {ex})')
 
 
 if __name__ == '__main__':
