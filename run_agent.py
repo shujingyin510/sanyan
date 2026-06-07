@@ -579,9 +579,12 @@ def init_evaluator(api_key):
         summary = f'{path}: {code.count(chr(10))}行, {len(defs)}函数, {len(imps)}导入'
         if classes:
             summary += f', {len(classes)}类'
+        # 自动统计大函数
+        big_funcs = [d for d in defs if '行)' in d and int(d.split('(')[-1].replace('行)','').replace('行','')) > 50]
+        if big_funcs:
+            summary += f'\n⚠ >50行: {", ".join(d.split(" :")[0].replace("def ","") for d in big_funcs)}'
         summary += '\n'
-        # 函数在前（更重要），导入在后
-        return summary + '\n'.join([*defs[:20], '---', *imps[:10]])
+        return summary + '\n'.join([*defs[:15], '---', *imps[:8]])
 
     def _find_symbol(e, args):
         """查找符号定义和引用"""
