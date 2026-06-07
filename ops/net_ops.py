@@ -14,7 +14,7 @@ except ImportError:
 from values import SanyanRuntimeError
 from ops.registry import register, register_alias
 
-HTTP_TIMEOUT = 10
+HTTP_TIMEOUT = 60
 
 # SSRF 防护：禁止访问的私有/保留 IP 范围
 _PRIVATE_NETS = [
@@ -86,7 +86,14 @@ def http_post(evaluator, args):
     try:
         body = data.encode('utf-8')
         req = _request.Request(url, data=body, method='POST', headers=headers)
-        resp = _request.urlopen(req, timeout=HTTP_TIMEOUT)
+        # 优先读策略配置的超时秒数，否则用默认值
+        timeout = HTTP_TIMEOUT
+        try:
+            if evaluator.has_var('超时秒数'):
+                timeout = int(evaluator.get_var('超时秒数'))
+        except Exception:
+            pass
+        resp = _request.urlopen(req, timeout=timeout)
         return resp.read().decode('utf-8', errors='replace')
     except (_error.URLError, _error.HTTPError, ValueError, OSError) as e:
         raise SanyanRuntimeError(f'HTTP POST 失败: {e}')
