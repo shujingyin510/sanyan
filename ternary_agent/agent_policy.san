@@ -50,7 +50,7 @@
 // _P三言语法: 语言完整速查
 设 _P三言语法 = '【三言语法】(设 var val)赋值；(加 a b)/(减 a b)/(乘 a b)/(除 a b)/(取余 a b)算术；(输出 expr)打印；(若(条件){真}{假})条件；(遍历 var 起 止 体1 体2...)计数循环，体写在括号内如(遍历 i 1 100(输出 i))；(循环(条件)体1 体2...)条件循环；(列表 a b)建表；(取 lst i)取元素；(表长 lst)长度；(追加 lst v)追加；(连接 s1 s2)拼字符串；(子串 s 起 长)截取；(取长 s)字符串长度；(大于/小于/等于/不等于 a b)比较；(且/或/非 a b)逻辑；(定义 fn(p)体)定义函数；(返回 expr)返回值；(做 e1 e2)顺序执行。所有调用用括号包裹。嵌套内层先算：(输出(加(乘 2 3)5))输出11。'
 // _P工具说明: 工具用法
-设 _P工具说明 = '你是自主编程Agent。单文件用 replace_in_file，批量跨文件用 replace_all（格式 文件模式|旧文字|新文字）。其他工具：write_code/read_file/list_files/write_file/search_code/run_test/git_diff/git_status。需工具时用 ---JSON---\n{json}\n---END---。任务完成act=READY。'
+设 _P工具说明 = '你是自主编程Agent。单文件用replace_in_file，批量用replace_all。analyze分析文件结构(函数/变量/导入)，find_symbol查找符号定义和引用。其他：write_code/read_file/list_files/write_file/search_code/run_test/git_diff/git_status。改代码前先用analyze了解结构，避免破坏。'
 // _P代码示范: 几个完整场景
 设 _P代码示范 = '【批量替换】所有import time前加注释→{"cog":"AFFIRM","act":"NEED_TOOL","answer":"批量改","tool":"replace_all","params":"*.py|import time|# time\\nimport time"}【单文件】读→{"tool":"read_file","params":"AGENTS.md"}【修改】→{"tool":"replace_in_file","params":"AGENTS.md|v0.3|v0.4"}【搜索】→{"tool":"search_code","params":"def main"}【测试】→{"tool":"run_test","params":"tests/test_agent.py"}【检查】→{"tool":"git_diff","params":""}【完成】→{"act":"READY"}。'
 // _P要求: 输出格式要求
@@ -71,7 +71,7 @@
 设 工具白名单 = 列表(
     "query_weather", "计算", "搜索", "write_code",
     "read_file", "list_files", "write_file", "replace_in_file",
-    "search_code", "run_test", "git_diff", "git_status", "replace_all"
+    "search_code", "run_test", "git_diff", "git_status", "replace_all", "analyze", "find_symbol"
 )
 
 // === 工具可靠性配置 ===
@@ -88,6 +88,8 @@
     "git_diff", 0.9,
     "git_status", 0.9,
     "replace_all", 0.5,
+    "analyze", 0.9,
+    "find_symbol", 0.85,
     "搜索", 0.75
 )
 

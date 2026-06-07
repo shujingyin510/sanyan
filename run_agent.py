@@ -519,6 +519,86 @@ def init_evaluator(api_key):
             return f'未找到 "{old[:40]}" 在 {glob_pattern} 中'
         return '\n'.join([f'共替换 {total} 处:'] + results)
 
+    def _analyze_file(e, args):
+        """分析文件结构：返回函数/变量/导入列表"""
+        path = str(e.eval(args[0])) if args else ''
+        path = _resolve_path(path)
+        try:
+            with open(path, encoding='utf-8', errors='ignore') as fh:
+                code = fh.read()
+        except Exception:
+            return f'无法读取: {path}'
+        result = []
+        if path.endswith('.py'):
+            try:
+                import ast as _ast
+                tree = _ast.parse(code)
+                for node in _ast.walk(tree):
+                    if isinstance(node, _ast.FunctionDef):
+                        args_str = ', '.join(a.arg for a in node.args.args)
+                        result.append(f'def {node.name}({args_str}) :{node.lineno}')
+                    elif isinstance(node, _ast.Import):
+                        for a in node.names:
+                            result.append(f'import {a.name} :{node.lineno}')
+                    elif isinstance(node, _ast.ImportFrom):
+                        mod = node.module or ''
+                        for a in node.names:
+                            result.append(f'from {mod} import {a.name} :{node.lineno}')
+                    elif isinstance(node, _ast.ClassDef):
+                        result.append(f'class {node.name} :{node.lineno}')
+            except Exception as ex:
+                result.append(f'(Python parse: {ex})')
+        elif path.endswith('.san'):
+            try:
+                from sugar.parser import parse_code
+                ast_nodes, _ = parse_code(code)
+                if isinstance(ast_nodes, list):
+                    for stmt in ast_nodes[1:] if len(ast_nodes) > 1 else []:
+                        if isinstance(stmt, list):
+                            if stmt[0] in ('def', '定义', 'fn'):
+                                name = stmt[1] if len(stmt) > 1 else '?'
+                                result.append(f'fn {name}')
+                            elif stmt[0] in ('set', '设'):
+                                name = stmt[1] if len(stmt) > 1 else '?'
+                                result.append(f'设 {name}')
+                            elif stmt[0] in ('import', '导入', 'include', '#include'):
+                                result.append(f'import {str(stmt[1])[:60]}')
+            except Exception as ex:
+                result.append(f'(Sanyan parse: {ex})')
+        if not result:
+            return f'{path}: (无结构信息)'
+        return f'{path} ({len(code)}字节, {code.count(chr(10))}行):\n' + '\n'.join(result[:40])
+
+    def _find_symbol(e, args):
+        """查找符号定义和引用"""
+        symbol = str(e.eval(args[0])) if args else ''
+        if not symbol:
+            return '请指定符号名'
+        import glob as _glob
+        results = []
+        exts = ['*.py', '*.san']
+        for ext in exts:
+            for fp in _glob.glob('**/' + ext, recursive=True):
+                if '__pycache__' in fp or '.pyc' in fp:
+                    continue
+                try:
+                    with open(fp, encoding='utf-8', errors='ignore') as fh:
+                        for lineno, line in enumerate(fh, 1):
+                            # Match function/class definitions
+                            if f'def {symbol}(' in line or f'class {symbol}' in line or f'定义 {symbol}' in line:
+                                results.insert(0, f'DEF {fp}:{lineno}: {line.strip()[:80]}')
+                            elif symbol in line and 'import' not in line.lower():
+                                results.append(f'REF {fp}:{lineno}: {line.strip()[:80]}')
+                        if len(results) > 30:
+                            break
+                except Exception:
+                    pass
+                if len(results) > 30:
+                    break
+        if not results:
+            return f'未找到符号: {symbol}'
+        return f'符号 {symbol} ({len(results)}处):\n' + '\n'.join(results[:25])
+
     def _sandbox_eval(e, args):
         """在沙箱中求值代码，返回结果"""
         sandbox_tag = str(e.eval(args[0])) if args else ''
@@ -581,6 +661,8 @@ def init_evaluator(api_key):
     reg_op('新建任务', _new_task_hook)
     reg_op('批量替换', _replace_all)
     reg_op('清理JSON', _clean_json)
+    reg_op('分析文件', _analyze_file)
+    reg_op('查找符号', _find_symbol)
 
     agent_path = os.path.join('ternary_agent', 'agent.san')
     src = open(agent_path, encoding='utf-8').read()
