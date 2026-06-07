@@ -217,8 +217,10 @@ def init_evaluator(api_key):
         raw = str(e.eval(args[0])) if args else ''
         parts = raw.split('|')
         path = parts[0].strip() if parts else ''
+        path = _resolve_path(path)
         start_line = int(parts[1]) if len(parts) > 1 and parts[1].strip().isdigit() else 0
         end_line = int(parts[2]) if len(parts) > 2 and parts[2].strip().isdigit() else 0
+        # read_file context
         if not path:
             return '请指定文件路径（可加 |起始行|结束行）'
         try:
@@ -248,7 +250,9 @@ def init_evaluator(api_key):
         raw = str(e.eval(args[0])) if args else ''
         parts = raw.split('|', 1)
         path = parts[0].strip() if parts else ''
+        path = _resolve_path(path)
         content = parts[1].replace('\\n', '\n') if len(parts) > 1 else ''
+        # write_file context
         if not path:
             return '请指定文件路径（格式: 路径|内容）'
         dry = e.has_var('_干跑模式') and e.get_var('_干跑模式')
@@ -266,6 +270,8 @@ def init_evaluator(api_key):
         raw = str(e.eval(args[0])) if args else ''
         parts = raw.split('|', 2)
         path = parts[0].strip() if parts else ''
+        path = _resolve_path(path)
+        # replace_in_file context
         old = parts[1] if len(parts) > 1 else ''
         new = parts[2] if len(parts) > 2 else ''
         if not path or not old:
@@ -415,6 +421,57 @@ def init_evaluator(api_key):
         e.set_var('_当前任务ID', tid)
         return tid
 
+    def _resolve_path(path):
+        """智能路径解析：相对路径找不到时自动搜索"""
+        if not path or os.path.exists(path):
+            return path
+        import glob as _glob
+        matches = _glob.glob('**/' + path, recursive=True)
+        if matches:
+            return matches[0]
+        prefixed = os.path.join('ternary_agent', path)
+        if os.path.exists(prefixed):
+            return prefixed
+        matches = _glob.glob('**/' + prefixed, recursive=True)
+        return matches[0] if matches else path
+
+    def _replace_all(e, args):
+        """批量替换：glob模式|旧文字|新文字"""
+        raw = str(e.eval(args[0])) if args else ''
+        parts = raw.split('|', 2)
+        glob_pattern = parts[0].strip() if parts else '*.py'
+        old = parts[1].replace('\\n', '\n') if len(parts) > 1 else ''
+        new = parts[2].replace('\\n', '\n') if len(parts) > 2 else ''
+        if not old:
+            return '格式: 文件模式|旧文字|新文字'
+        import glob as _glob
+        files = _glob.glob('**/' + glob_pattern, recursive=True)
+        files = [f for f in files[:50] if '__pycache__' not in f and '.pyc' not in f]
+        results = []
+        total = 0
+        for fp in files:
+            try:
+                with open(fp, encoding='utf-8', errors='ignore') as fh:
+                    content = fh.read()
+                count = content.count(old)
+                if count > 0:
+                    dry = e.has_var('_干跑模式') and e.get_var('_干跑模式')
+                    if dry:
+                        results.append(f'[干跑] {fp}: {count}处')
+                    else:
+                        content = content.replace(old, new)
+                        with open(fp, 'w', encoding='utf-8') as fh:
+                            fh.write(content)
+                        results.append(f'{fp}: {count}处')
+                    total += count
+                    if len(results) >= 15:
+                        break
+            except Exception:
+                pass
+        if not results:
+            return f'未找到 "{old[:40]}" 在 {glob_pattern} 中'
+        return '\n'.join([f'共替换 {total} 处:'] + results)
+
     def _sandbox_eval(e, args):
         """在沙箱中求值代码，返回结果"""
         sandbox_tag = str(e.eval(args[0])) if args else ''
@@ -475,6 +532,7 @@ def init_evaluator(api_key):
     reg_op('保存任务状态', _save_task_hook)
     reg_op('完成任务', _finish_task_hook)
     reg_op('新建任务', _new_task_hook)
+    reg_op('批量替换', _replace_all)
 
     agent_path = os.path.join('ternary_agent', 'agent.san')
     src = open(agent_path, encoding='utf-8').read()
