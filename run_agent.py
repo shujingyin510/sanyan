@@ -421,6 +421,53 @@ def init_evaluator(api_key):
         e.set_var('_当前任务ID', tid)
         return tid
 
+    def _clean_json(e, args):
+        """清理 JSON 文本中的非法控制字符 + ---END--- 尾标记"""
+        text = str(e.eval(args[0])) if args else ''
+        # 去 ---END---
+        idx = text.rfind('---END---')
+        if idx >= 0:
+            text = text[:idx]
+        # 去掉开头 ```json 或 ```
+        text = text.strip()
+        if text.startswith('```'):
+            end = text.find('\n') if text.find('\n') > 0 else len(text)
+            text = text[end:].strip()
+        # 去掉最终包裹的 ```
+        if text.endswith('```'):
+            text = text[:-3].strip()
+        # 裸换行 → \\n（修复 JSON 解析）
+        in_string = False
+        result = []
+        for c in text:
+            if c == '"':
+                in_string = not in_string
+            if c == '\n' and in_string:
+                result.append('\\n')
+            elif c == '\t' and in_string:
+                result.append('\\t')
+            else:
+                result.append(c)
+        text = ''.join(result)
+        # 解析
+        import json as _json
+        try:
+            parsed = _json.loads(text)
+            # 还原 params 中的 \\n
+            if isinstance(parsed, dict) and 'params' in parsed:
+                parsed['params'] = parsed['params'].replace('\\n', '\n')
+            return parsed
+        except Exception:
+            # 宽松解析：尝试去掉控制字符
+            try:
+                clean = text.replace('\n', ' ').replace('\r', ' ').replace('\t', ' ')
+                parsed = _json.loads(clean)
+                if isinstance(parsed, dict) and 'params' in parsed:
+                    parsed['params'] = parsed['params'].replace('\\n', '\n')
+                return parsed
+            except Exception:
+                return None
+
     def _resolve_path(path):
         """智能路径解析：相对路径找不到时自动搜索"""
         if not path or os.path.exists(path):
@@ -533,6 +580,7 @@ def init_evaluator(api_key):
     reg_op('完成任务', _finish_task_hook)
     reg_op('新建任务', _new_task_hook)
     reg_op('批量替换', _replace_all)
+    reg_op('清理JSON', _clean_json)
 
     agent_path = os.path.join('ternary_agent', 'agent.san')
     src = open(agent_path, encoding='utf-8').read()

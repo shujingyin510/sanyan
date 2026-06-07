@@ -185,7 +185,6 @@
         // 回退：找最后一个 {
         设 pos = 减(len, 1)
         循环 (大于等于(pos, 0)) {
-            // 跳过 } 直到找到 {
             若 (且(字符串相等(子串(content, pos, 1), "{"), 非(是引号内(content, pos)))) { 设 brace = pos; 跳出 }
             设 pos = 减(pos, 1)
         }
@@ -194,6 +193,7 @@
     若 (小于(brace, 0)) { 返回("") }
     
     设 tail = 子串(content, brace, 减(len, brace))
+    输出(连接("[DEBUG-JSON] tail=", 子串(tail, 0, 100)))
     
     // 尝试1：直接解析 tail
     尝试 {
@@ -201,11 +201,12 @@
         若 (是字典(parsed)) { 返回(parsed) }
     } 捕获 (_) { }
     
-    // 尝试2：去除 markdown 代码块标记后解析
+    // 尝试2：Python 端智能清理（处理换行/控制字符/标记）
     尝试 {
-        设 cleaned = 清理代码块(tail)
-        设 parsed = 解析JSON(cleaned)
-        若 (是字典(parsed)) { 返回(parsed) }
+        设 cleaned = 清理JSON(tail)
+        若 (且(不等于(cleaned, 假), 不等于(cleaned, ""))) {
+            若 (是字典(cleaned)) { 返回(cleaned) }
+        }
     } 捕获 (_) { }
     
     返回("")
