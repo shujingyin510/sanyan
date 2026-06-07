@@ -115,8 +115,13 @@ class AgentRuntime:
                 return {'answer': self._extract_key(result), 'memory': self.memory}
         
         for rnd in range(1, max_rounds + 1):
+            if self._token_exceeded(ctx):
+                ctx = self._compress_ctx(ctx)
             raw = self._llm_call(ctx)
             tool, params = self._parse_tool(raw)
+            if self._fail_closed(tool, params, dry_run):
+                ctx = self._reflect('操作被安全门控拦截: ' + tool, ctx)
+                continue
             
             # Constraints
             if self._constraint_violation(tool):

@@ -464,6 +464,8 @@ sanyan/
 ├── preprocess.py              # #include 预处理器
 ├── pyproject.toml             # 项目配置
 ├── repl.py                    # REPL 交互环境
+├── agent_runtime.py            # Agent V3 引擎
+├── agent_tools.py              # Agent V3 工具层
 ├── run_agent.py               # Agent 启动器
 ├── run_v2.py                  # v2 演示启动器
 ├── run_v2_demo.py             # v2 演示脚本

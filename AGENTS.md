@@ -16,9 +16,12 @@
 
 | 文件 | 用途 |
 |---|---|
-| `ternary_agent/agent.san` | Agent 核心逻辑（决策函数、记忆系统、追踪输出、规则引擎） |
+| `ternary_agent/agent.san` | Agent 核心逻辑（旧引擎，交互/单次模式） |
 | `ternary_agent/agent_policy.san` | 纯数据策略（配置、阈值、映射规则、天气数据、场景规则） |
-| `run_agent.py` | 启动器（单次/交互/热重载） |
+| `ternary_agent/decision.san` | 决策核心（信任感知规则匹配） |
+| `agent_runtime.py` | **V3 引擎**：SymbolTable、MemoryStore、ProjectGraph、AgentRuntime |
+| `agent_tools.py` | **V3 工具层**：analyze、find_symbol、replace_all 等 12 个工具 |
+| `run_agent.py` | 启动器（`--auto` 走 V3，默认走旧引擎） |
 
 ### 运行方式
 

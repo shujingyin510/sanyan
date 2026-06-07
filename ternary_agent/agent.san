@@ -554,15 +554,7 @@
     }
     若 (字符串相等(tool, "find_symbol")) {
         返回(列表(查找符号(params), 0.85))
-    }
-    若 (字符串相等(tool, "write_file")) {
-        // params 格式: 文件路径|文件内容
-        返回(列表(写文件钩子(params), 0.5))
-    }
-    若 (字符串相等(tool, "list_files")) {
-        // 直接用 Python hook，不走沙箱
-        返回(列表(列文件钩子(params), 0.9))
-    }
+     }
     返回(列表(连接("tool ", tool, " done"), 0.5))
 }
 
