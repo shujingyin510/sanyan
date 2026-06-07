@@ -30,7 +30,7 @@ export SANYAN_API_KEY=sk-你的密钥  # Linux/Mac
 设 模型名 = "deepseek-chat"
 ```
 
-支持 6 家：**DeepSeek** | **OpenAI** | **千问** | **Gemini** | **小米MIMO** | **Ollama**
+支持 7 家：**DeepSeek** | **OpenAI** | **千问** | **Gemini** | **小米MIMO** | **小米Token Plan** | **Ollama**
 
 ### 3. 启动
 

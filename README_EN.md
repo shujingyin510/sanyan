@@ -192,7 +192,7 @@ See [CHANGELOG.md](CHANGELOG.md) for the full version history.
 | **Ternary Reasoning** | LLM 5 cognitive states → ternary mapping → confidence propagation → safety gating → action dispatch |
 | **Code Generation** | `write_code` tool: LLM generates Sanyan code → sandbox evaluator → result returned. Supports fix-error-retry loops |
 | **File Operations** | `read_file` / `list_files` / `write_file` / `replace_in_file` — Agent can read, modify, and write project files |
-| **Multi-Provider** | DeepSeek / OpenAI / Qwen / Gemini / Xiaomi MIMO / Ollama — switch with one config line |
+| **Multi-Provider** | DeepSeek / OpenAI / Qwen / Gemini / Xiaomi MIMO / Xiaomi Token Plan / Ollama — switch with one config line |
 | **Probabilistic Ternary** | `TritValue.confidence`, Bayesian propagation, e.g. `真(0.9)` |
 | **Protocol Prompt** | 6-part structured prompt (role/syntax/tools/code/examples/constraints) for precise LLM steering |
 | **Chinese Decision Trace** | Human-readable per-step trace (LLM → mapping → propagation → action → answer) |

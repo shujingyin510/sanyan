@@ -381,7 +381,7 @@ tests/
 | **三态推理** | LLM 5 种认知态 → 三态映射 → 置信度传播 → 保护门控 → 动作分发 |
 | **LLM 编程能力** | `write_code` 工具：LLM 生成三言代码 → 沙箱求值器执行 → 结果回传，支持"执行→报错→修正"闭环 |
 | **文件操作工具** | `read_file` / `list_files` / `write_file` / `replace_in_file` — Agent 可自动读、改、写项目文件 |
-| **多提供商** | DeepSeek / OpenAI / 千问 / Gemini / 小米MIMO / Ollama 六家，一行配置切换 |
+| **多提供商** | DeepSeek / OpenAI / 千问 / Gemini / 小米MIMO / 小米Token Plan / Ollama 七家，一行配置切换 |
 | **概率三态** | `TritValue` 置信度字段，贝叶斯传播，`真(0.9)` 显示 |
 | **协议提示词** | 6 段结构化（角色/语法/工具/代码/示例/约束），LLM 指导精确可控 |
 | **中文决策追踪** | 每步输出可读中文（LLM → 映射 → 传播 → 动作 → 回答） |
