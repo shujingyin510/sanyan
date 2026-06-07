@@ -251,7 +251,7 @@ def init_evaluator(api_key):
             return '请指定文件路径（格式: 路径|内容）'
         dry = e.has_var('_干跑模式') and e.get_var('_干跑模式')
         if dry:
-            return f'[干跑] 将写入 {path}（{len(content)}字符）'
+            return f'[干跑] 将写入 {path}（{len(content)}字符）— 文件未实际修改，验证时内容不变'
         try:
             with open(path, 'w', encoding='utf-8') as fh:
                 fh.write(content)
@@ -273,7 +273,7 @@ def init_evaluator(api_key):
         new = new.replace('\\n', '\n')
         dry = e.has_var('_干跑模式') and e.get_var('_干跑模式')
         if dry:
-            return f'[干跑] 将在 {path} 替换 {old[:40]} → {new[:40]}'
+            return f'[干跑] 将在 {path} 替换 {old[:40]} → {new[:40]} — 文件未实际修改，验证时内容不变'
         try:
             with open(path, encoding='utf-8') as fh:
                 content = fh.read()
