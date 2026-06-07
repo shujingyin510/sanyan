@@ -109,14 +109,19 @@
                 设 answer = 取键(maybe, "answer")
                 设 tool = 取键(maybe, "tool")
                 设 params = 取键(maybe, "params")
-                若 (或(取长(tool) > 0, 取长(params) > 0)) {
-                    // 末尾有 JSON 指令 → 解析使用
-                    若 (取长(answer) == 0) {
-                        // answer 为空则用自然语言部分
-                        设 自然语言 = 提取自然语言(content)
-                        返回(字典("cogState", 取键(maybe, "cog"), "actState", 取键(maybe, "act"), "answer", 自然语言, "tool", tool, "params", params))
-                    }
-                    返回(字典("cogState", 取键(maybe, "cog"), "actState", 取键(maybe, "act"), "answer", answer, "tool", tool, "params", params))
+            若 (或(取长(tool) > 0, 取长(params) > 0)) {
+                // 末尾有 JSON 指令 → 解析使用
+                // 缺 cog/act 时智能推测：有 tool → AFFIRM/NEED_TOOL
+                设 cogVal = "AFFIRM"
+                设 actVal = "NEED_TOOL"
+                尝试 { 设 cogVal = 取键(maybe, "cog") } 捕获 (_) { }
+                尝试 { 设 actVal = 取键(maybe, "act") } 捕获 (_) { }
+                若 (取长(answer) == 0) {
+                    // answer 为空则用自然语言部分
+                    设 自然语言 = 提取自然语言(content)
+                    返回(字典("cogState", cogVal, "actState", actVal, "answer", 自然语言, "tool", tool, "params", params))
+                }
+                返回(字典("cogState", cogVal, "actState", actVal, "answer", answer, "tool", tool, "params", params))
                 }
             }
         } 捕获 (_e) { }
