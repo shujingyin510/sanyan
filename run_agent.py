@@ -570,7 +570,15 @@ def init_evaluator(api_key):
                 result.append(f'(Sanyan parse: {ex})')
         if not result:
             return f'{path}: (无结构信息)'
-        return f'{path} ({len(code)}字节, {code.count(chr(10))}行):\n' + '\n'.join(result[:40])
+        # 摘要在前：统计各类数量
+        defs = [r for r in result if r.startswith('def ')]
+        imps = [r for r in result if r.startswith('import ') or r.startswith('from ')]
+        classes = [r for r in result if r.startswith('class ')]
+        summary = f'{path}: {code.count(chr(10))}行, {len(defs)}函数, {len(imps)}导入'
+        if classes:
+            summary += f', {len(classes)}类'
+        summary += '\n'
+        return summary + '\n'.join(result[:35])
 
     def _find_symbol(e, args):
         """查找符号定义和引用"""
