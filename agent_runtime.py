@@ -131,7 +131,11 @@ class AgentRuntime:
             # Execute
             result = ''
             if tool in self.tools:
-                result = self.tools[tool](params, dry_run)
+                try:
+                    result = self.tools[tool](params, dry_run)
+                except Exception as e:
+                    result = f'工具执行异常: {e}'
+                    self.reflections.append({'round': rnd, 'tool': tool, 'error': str(e)[:300]})
                 self.memory['history'].append({'tool': tool, 'params': params, 'result': str(result)[:300], 'round': rnd})
                 self.mem.add(tool, params, result)
                 if tool in ('write_file', 'replace_in_file', 'replace_all'):
@@ -210,10 +214,11 @@ class AgentRuntime:
         """Constraints: 同工具限5次，同文件修改限5个"""
         if not tool: return False
         sc = self.memory.setdefault('same_tool_count', {})
-        sc[tool] = sc.get(tool, 0) + 1
-        if sc[tool] >= 5:
-            print(f'[约束] {tool}已用{sc[tool]}次，超限')
+        count = sc.get(tool, 0)
+        if count >= 5:
+            print(f'[约束] {tool}已用{count}次，超限')
             return True
+        sc[tool] = count + 1  # 通过后才计数
         if tool in ('write_file', 'replace_in_file', 'replace_all'):
             modified = self.memory.get('modified', [])
             if len(modified) >= 5:
@@ -251,8 +256,9 @@ class AgentRuntime:
     def _extract_key(self, result):
         result_str = str(result)
         for marker in ['⚠', '共替换', '已替换', '符号 ']:
-            if marker in result_str:
-                return result_str[result_str.index(marker):result_str.index(marker)+200]
+            idx = result_str.find(marker)
+            if idx >= 0:
+                return result_str[idx:idx+200]
         return result_str[:200]
     
     def _needs_plan(self, task):
@@ -271,7 +277,7 @@ class AgentRuntime:
         return '(上下文已压缩)\n' + '\n'.join(head + parts[-30:])
     
     def _fail_closed(self, tool, params, dry_run):
-        if dry_run: return False
-        if any(w in str(params).lower() for w in ['rm -rf', 'del /f', 'format', 'DROP TABLE', 'DELETE FROM']):
+        # 危险命令无论干跑与否都拦截
+        if any(w in str(params).lower() for w in ['rm -rf', 'del /f', 'format', 'DROP TABLE', 'DELETE FROM', '$(', '`']):
             return True
         return False

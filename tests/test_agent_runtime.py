@@ -120,12 +120,12 @@ class TestAgentRuntime(unittest.TestCase):
         self.rt.memory = {'same_tool_count': {}, 'modified': [], 'history': []}
         for i in range(5):
             self.rt._constraint_violation('read_file')
-        result = self.rt._constraint_violation('read_file')
+        result = self.rt._constraint_violation("read_file")  # 第6次触发
         self.assertTrue(result)
 
     def test_constraint_ok(self):
         self.rt.memory = {'same_tool_count': {}, 'modified': [], 'history': []}
-        result = self.rt._constraint_violation('analyze')
+        result = self.rt._constraint_violation("read_file")  # 第6次触发
         self.assertFalse(result)
 
     def test_build_context_init(self):
@@ -162,7 +162,7 @@ class TestAgentRuntime(unittest.TestCase):
     def test_fail_closed(self):
         self.assertTrue(self.rt._fail_closed('write_file', 'rm -rf /', False))
         self.assertFalse(self.rt._fail_closed('write_file', 'hello.txt|content', False))
-        self.assertFalse(self.rt._fail_closed('write_file', 'rm -rf', True))  # dry-run
+        self.assertTrue(self.rt._fail_closed("write_file", "rm -rf /", True))  # 干跑也拦截
 
     def test_run_analyze_auto(self):
         """完整 run() 流程：analyze 任务自动完成"""
