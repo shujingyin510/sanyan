@@ -931,6 +931,15 @@
             设 _轮上下文 = 连接(_轮上下文, "\n[系统] 不要再解释你要做什么。直接用NEED_TOOL调工具(如read_file/search_code)。不要READY。")
             继续
         }
+        // 空工具纠正：LLM想调工具但没指定 → 强制READY（已有数据直接答）
+        若 (且(字符串相等(act, "NEED_TOOL"), 等于(取长(取键(r, "tool")), 0))) {
+            设 answer = 取键(r, "answer")
+            若 (等于(取长(answer), 0)) { 设 answer = "(从工具结果推断)" }
+            置键(r, "actState", "READY")
+            置键(r, "answer", answer)
+            设 act = "READY"
+            输出("→ [纠正] 空工具 → READY")
+        }
 
         // LLM 失败降级：使用规则匹配生成响应
         若 (字符串相等(cog, "UNCERT") 且 字符串相等(act, "NEED_HUMAN") 且 字符串包含(取键(r, "answer"), "降级")) {
