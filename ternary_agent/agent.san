@@ -140,13 +140,34 @@
     设 len = 取长(content)
     若 (小于(len, 3)) { 返回("") }
     
-    // 策略1：先尝试整个 content 为 JSON（纯 JSON 响应）
+    // 策略1：先尝试整个 content 为 JSON
     尝试 {
         设 whole = 解析JSON(content)
         若 (是字典(whole)) { 返回(whole) }
     } 捕获 (_) { }
     
-    // 策略2：找 {"cog":" 或 {"cog": 标记（JSON 以 cog 字段开头）
+    // 策略2：---JSON--- ... ---END--- 分隔符
+    设 jsonStart = 查找(content, "---JSON---")
+    若 (大于等于(jsonStart, 0)) {
+        设 start = 加(jsonStart, 11)
+        设 jsonEnd = 查找(子串(content, start, 减(len, start)), "---END---")
+        若 (大于等于(jsonEnd, 0)) {
+            设 inside = 子串(content, start, jsonEnd)
+            尝试 {
+                设 parsed = 解析JSON(inside)
+                若 (是字典(parsed)) { 返回(parsed) }
+            } 捕获 (_) { }
+        } 否则 {
+            // 无 ---END--- 则从 ---JSON--- 到末尾
+            设 tail = 子串(content, start, 减(len, start))
+            尝试 {
+                设 parsed = 解析JSON(tail)
+                若 (是字典(parsed)) { 返回(parsed) }
+            } 捕获 (_) { }
+        }
+    }
+    
+    // 策略3：找 ["cog":" 标记
     设 markerA = 查找(content, "{\"cog\":")
     设 markerB = 查找(content, "{\"cog")
     设 brace = 减(1, 1)

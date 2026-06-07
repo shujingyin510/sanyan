@@ -1,15 +1,17 @@
-"""三言 Agent 启动器 - 支持单次/多轮对话
+"""三言 Agent 启动器 — 支持单次/多轮/自主模式
 用法:
-    python -X utf8 run_agent.py                     # 多轮对话
-    python -X utf8 run_agent.py "你的问题"           # 单次提问
+    python -X utf8 run_agent.py                        # 交互模式
+    python -X utf8 run_agent.py "你的问题"              # 单次提问
+    python -X utf8 run_agent.py "任务" --auto           # 自主模式，跑完为止
+    python -X utf8 run_agent.py "任务" --auto --dry-run # 只读不改
+    python -X utf8 run_agent.py "任务" --auto --rounds 3
 
-    设置 API 密钥（二选一）:
+    设置 API 密钥:
     set SANYAN_API_KEY=sk-xxx
     或修改 ternary_agent/agent_policy.san 中的 API密钥
 """
 
-import sys
-import os
+import sys, os, argparse
 
 PROJECT_ROOT = os.path.dirname(os.path.abspath(__file__)) or '.'
 os.chdir(PROJECT_ROOT)
@@ -534,9 +536,18 @@ def run_interactive(evaluator, api_key):
 
 
 def main():
+    # 解析命令行参数
+    parser = argparse.ArgumentParser(description='三言 Agent — 可读决策 DSL + 自主编程助手')
+    parser.add_argument('question', nargs='?', default='', help='任务描述（留空进入交互模式）')
+    parser.add_argument('--auto', action='store_true', help='自主模式：不停轮直到完成')
+    parser.add_argument('--rounds', type=int, default=0, help='最大轮次（覆盖策略配置）')
+    parser.add_argument('--dry-run', action='store_true', help='只读不改，禁止文件写入')
+    parser.add_argument('--report', action='store_true', help='完成后输出修改报告')
+    args = parser.parse_args()
+
     # 三言代码：直接执行，跳过 Agent 和 LLM
-    if len(sys.argv) > 1:
-        q = sys.argv[1].strip()
+    if args.question:
+        q = args.question.strip()
         if q.startswith('(') or '(设' in q or '(循环' in q or '(输出' in q or '(加' in q:
             from lexer import tokenize
             from parser import parse
@@ -569,12 +580,55 @@ def main():
         print('请设置 API 密钥：set SANYAN_API_KEY=sk-xxx')
         sys.exit(1)
 
+    # --rounds 覆盖策略配置
+    if args.rounds > 0:
+        os.environ['AGENT_MAX_ROUNDS'] = str(args.rounds)
+
     evaluator = init_evaluator(api_key)
 
-    if len(sys.argv) > 1:
-        run_once(evaluator, sys.argv[1])
+    if args.question:
+        if args.auto:
+            # 自主模式：inject max rounds and auto flag into evaluator
+            if args.rounds > 0:
+                evaluator.set_var('最大轮次', args.rounds)
+            if args.dry_run:
+                evaluator.set_var('_干跑模式', True)
+            run_once(evaluator, args.question)
+            if args.report:
+                _print_report(evaluator)
+        else:
+            run_once(evaluator, args.question)
     else:
         run_interactive(evaluator, api_key)
+
+
+def _print_report(evaluator):
+    """输出修改报告"""
+    try:
+        mem = evaluator.get_var('_任务记忆') if evaluator.has_var('_任务记忆') else None
+        if mem is None:
+            return
+        import time as _t
+        files = getattr(mem, 'get', lambda k, d=None: d)('修改文件列表', [])
+        history = getattr(mem, 'get', lambda k, d=None: d)('工具历史', [])
+        stage = getattr(mem, 'get', lambda k, d=None: d)('当前阶段', '未知')
+        task = getattr(mem, 'get', lambda k, d=None: d)('任务描述', '')
+
+        print('\n' + '=' * 40)
+        print('  sanagent 任务报告')
+        print('=' * 40)
+        print(f'  任务: {str(task)[:80]}')
+        print(f'  阶段: {str(stage)}')
+        print(f'  工具调用: {len(history) if hasattr(history, "__len__") else 0} 次')
+        if hasattr(files, '__len__') and len(files) > 0:
+            print(f'  修改文件: {len(files)} 个')
+            for f in files:
+                print(f'    - {str(f)}')
+        else:
+            print('  修改文件: 无')
+        print('=' * 40)
+    except Exception:
+        pass
 
 
 if __name__ == '__main__':

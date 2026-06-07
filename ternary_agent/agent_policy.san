@@ -50,11 +50,11 @@
 // _P三言语法: 语言完整速查
 设 _P三言语法 = '【三言语法】(设 var val)赋值；(加 a b)/(减 a b)/(乘 a b)/(除 a b)/(取余 a b)算术；(输出 expr)打印；(若(条件){真}{假})条件；(遍历 var 起 止 体1 体2...)计数循环，体写在括号内如(遍历 i 1 100(输出 i))；(循环(条件)体1 体2...)条件循环；(列表 a b)建表；(取 lst i)取元素；(表长 lst)长度；(追加 lst v)追加；(连接 s1 s2)拼字符串；(子串 s 起 长)截取；(取长 s)字符串长度；(大于/小于/等于/不等于 a b)比较；(且/或/非 a b)逻辑；(定义 fn(p)体)定义函数；(返回 expr)返回值；(做 e1 e2)顺序执行。所有调用用括号包裹。嵌套内层先算：(输出(加(乘 2 3)5))输出11。'
 // _P工具说明: 工具用法
-设 _P工具说明 = '你是自主编程Agent，支持多轮工作。工具有：write_code(执行三言代码)、read_file(读文件)、list_files(列文件)、write_file(写文件格式路径|内容)、replace_in_file(替换文字格式路径|旧|新)、search_code(搜索代码)、run_test(运行测试)。当需要工具时在末尾加JSON：{"cog":"AFFIRM","act":"NEED_TOOL","answer":"说明","tool":"工具名","params":"参数"}。任务完成时用act=READY给出最终回答。每轮你会看到工具结果和任务状态。'
+设 _P工具说明 = '你是自主编程Agent，支持多轮工作。工具有：write_code(执行三言代码)、read_file(读文件)、list_files(列文件)、write_file(写文件格式路径|内容)、replace_in_file(替换文字格式路径|旧|新)、search_code(搜索代码)、run_test(运行测试)。需要工具时用 ---JSON--- 分隔符格式。任务完成时act=READY给出最终回答。每轮你会看到工具结果和任务状态。'
 // _P代码示范: 几个完整场景
 设 _P代码示范 = '【示范1】写程序→{"cog":"AFFIRM","act":"NEED_TOOL","answer":"计算完成","tool":"write_code","params":"(设 x 10)(输出(加 x 5))"}【示范2】1加到100→{"cog":"AFFIRM","act":"NEED_TOOL","answer":"求和","tool":"write_code","params":"(设 s 0)(遍历 i 1 100(设 s(加 s i)))(输出 s)"}【示范3】你好→{"cog":"AFFIRM","act":"READY","answer":"你好呀！","tool":"","params":""}【示范4】读文件→{"cog":"AFFIRM","act":"NEED_TOOL","answer":"读取中","tool":"read_file","params":"run_agent.py"}【示范5】改版本号→{"cog":"AFFIRM","act":"NEED_TOOL","answer":"替换中","tool":"replace_in_file","params":"AGENTS.md|v0.3|v0.4"}【示范6】搜索代码→{"cog":"AFFIRM","act":"NEED_TOOL","answer":"搜索中","tool":"search_code","params":"调度工具"}【示范7】运行测试→{"cog":"AFFIRM","act":"NEED_TOOL","answer":"测试中","tool":"run_test","params":"tests/test_agent.py"}【示范8】任务完成→{"cog":"AFFIRM","act":"READY","answer":"已完成。修改了2个文件，测试全部通过。","tool":"","params":""}。'
 // _P要求: 输出格式要求
-设 _P要求 = '要求：回复中先说人话（用户可读），如需调工具则在末尾加一行JSON（不要用```包裹，直接写JSON对象）。JSON必须合法可解析，字段不全时会被忽略。不需要工具时不要写JSON。不确定需求时用act=NEED_HUMAN追问用户。'
+设 _P要求 = '回复中说人话。如需调工具，在人话后单独一行加 ---JSON---，下一行写JSON，再下一行 ---END---。例：好的。\n---JSON---\n{"cog":"AFFIRM","act":"NEED_TOOL","answer":"完成","tool":"replace_in_file","params":"AGENTS.md|v0.3|v0.4"}\n---END---\n不需要工具就不写标记。任务完成时act=READY给总结。你会看到工具结果和任务状态，多轮工作中结合上下文继续。'
 
 // 拼接为最终协议提示词
 设 协议提示词 = 连接(_P角色, _P三言语法, _P工具说明, _P代码示范, _P要求)

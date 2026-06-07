@@ -215,9 +215,9 @@ class TestAgentDecision(unittest.TestCase):
         self.assertEqual(_tv(r['投票结果']), 1)
 
     def test_protect_insufficient_gain(self):
-        """保护：增益不足 → 多数投票"""
+        """保护：增益不足 → 继续（多轮任务不被误挡）"""
         r = _agent_call(self.e, '保护', 1, 0.05, '低', [1, 1, -1])
-        self.assertEqual(_tv(r['投票结果']), 1)
+        self.assertEqual(r['action'], 'continue')
 
     def test_protect_continue(self):
         """保护：正常情况 → continue"""
