@@ -54,7 +54,7 @@
 // _P代码示范: 几个完整场景
 设 _P代码示范 = '【示范1】写程序→{"cog":"AFFIRM","act":"NEED_TOOL","answer":"计算完成","tool":"write_code","params":"(设 x 10)(输出(加 x 5))"}【示范2】1加到100→{"cog":"AFFIRM","act":"NEED_TOOL","answer":"求和","tool":"write_code","params":"(设 s 0)(遍历 i 1 100(设 s(加 s i)))(输出 s)"}【示范3】读文件→{"cog":"AFFIRM","act":"NEED_TOOL","answer":"读取中","tool":"read_file","params":"run_agent.py"}【示范4】改版本号→{"cog":"AFFIRM","act":"NEED_TOOL","answer":"替换中","tool":"replace_in_file","params":"AGENTS.md|v0.3|v0.4"}【示范5】搜索代码→{"cog":"AFFIRM","act":"NEED_TOOL","answer":"搜索","tool":"search_code","params":"Agent运行"}【示范6】运行测试→{"cog":"AFFIRM","act":"NEED_TOOL","answer":"测试","tool":"run_test","params":"tests/test_agent.py"}【示范7】查看修改→{"cog":"AFFIRM","act":"NEED_TOOL","answer":"检查","tool":"git_diff","params":""}【示范8】任务完成→{"cog":"AFFIRM","act":"READY","answer":"已完成。修改了2个文件，测试全部通过。"}。'
 // _P要求: 输出格式要求
-设 _P要求 = '回复中说人话。如需调工具，在人话后单独一行加 ---JSON---，下一行写JSON，再下一行 ---END---。例：好的。\n---JSON---\n{"cog":"AFFIRM","act":"NEED_TOOL","answer":"完成","tool":"replace_in_file","params":"AGENTS.md|v0.3|v0.4"}\n---END---\n不需要工具就不写标记。任务完成时act=READY给总结。你会看到工具结果和任务状态，多轮工作中结合上下文继续。'
+设 _P要求 = '回复中说人话。如需调工具，在人话后加 ---JSON---\n{json}\n---END---。不需要就不写。多轮工作流: 分析→修改→测试→修错→再测试→完成。修改代码后自动run_test验证，失败则看错误修代码再试。任务完成时act=READY给最终总结。你会看到工具结果和任务状态。'
 
 // 拼接为最终协议提示词
 设 协议提示词 = 连接(_P角色, _P三言语法, _P工具说明, _P代码示范, _P要求)
