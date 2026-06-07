@@ -54,7 +54,7 @@
 // _P代码示范: 几个完整场景
 设 _P代码示范 = '【批量替换】所有import time前加注释→{"cog":"AFFIRM","act":"NEED_TOOL","answer":"批量改","tool":"replace_all","params":"*.py|import time|# time\\nimport time"}【单文件】读→{"tool":"read_file","params":"AGENTS.md"}【修改】→{"tool":"replace_in_file","params":"AGENTS.md|v0.3|v0.4"}【搜索】→{"tool":"search_code","params":"def main"}【测试】→{"tool":"run_test","params":"tests/test_agent.py"}【检查】→{"tool":"git_diff","params":""}【完成】→{"act":"READY"}。'
 // _P要求: 输出格式要求
-设 _P要求 = '工具用 ---JSON---\n{json}\n---END---。核心规则：修改任何代码后必须立即run_test验证，测试失败则分析错误修复后重测，直到通过或明确放弃。批量改用replace_all。任务完成act=READY。'
+设 _P要求 = '不要说"我来做"然后READY。想做什么直接用NEED_TOOL调工具。修改代码后必须run_test。测试失败就修复重测。批量改用replace_all。全做完且测试通过才能READY。格式：---JSON---\n{json}\n---END---。'
 
 // 拼接为最终协议提示词
 设 协议提示词 = 连接(_P角色, _P三言语法, _P工具说明, _P代码示范, _P要求)
