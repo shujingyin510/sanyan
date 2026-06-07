@@ -1,4 +1,0 @@
-{
-  "最新轮次": null,
-  "轮次_1": "{'问题': '列出项目里的.san文件', '认知态': 'AFFIRM', '认知态中文': '确信', '执行态': 'NEED_TOOL', '映射值': 1, '上游': 1, '传播结果': 1, '动作': '调用工具:list_files', '回答': 'benchmark\\\\fibonacci.san\\nbenchmark\\\\fib_iter.san\\nbenchmark\\\\fizzbuzz.san\\nbenchmark\\\\primes.san\\nexamples\\\\circuit_sim.san\\nexamples\\\\data_cleaning.san\\nexamples\\\\fault_tolerant_control.san\\nexamples\\\\file_batch_process.san\\nexamples\\\\fizzbuzz.san\\nexamples\\\\greenhouse.san\\nexamples\\\\greenhouse_se.san\\nexamples\\\\guess_number.san\\nexamples\\\\health_check.san\\nexamples\\\\iot_state_machine.san\\nexamples\\\\npc_decision.san\\n  ... 还有 103 个文件，共 118 个', '置信度': 0.9, '规则场景': '未知', '规则风险': '低', '规则好感': 0, '时间戳': 1780494203}"
-}
