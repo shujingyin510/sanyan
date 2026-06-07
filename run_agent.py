@@ -934,13 +934,25 @@ class AgentRuntime:
         self.context = task
         self.memory = {'history': [], 'modified': [], 'stage': '分析', 'trust': 50}
         scene = self._match_scene(task)
+        # 智能首轮：查找类问题直接用find_symbol
+        self._auto_tool = None
+        if any(w in task for w in ['哪里','引用','定义','谁调','被调','find ']):
+            self._auto_tool = 'find_symbol'
+            # 提取第一个英文标识符
+            import re as _re
+            m = _re.search(r'[a-zA-Z_][a-zA-Z0-9_]*', task)
+            self._auto_params = m.group(0) if m else 'main'
 
         while self.round < max_rounds:
             self.round += 1
-            prompt = self._build_prompt(task, scene)
-            raw = self._llm_call(prompt)
-            tool, params = self._parse_tool(raw)
-            print(f'[{self.round}] raw={raw[:100]}')
+            # 首轮已确定工具
+            if self.round == 1 and self._auto_tool and self._auto_tool in self.tools:
+                tool, params = self._auto_tool, self._auto_params
+            else:
+                prompt = self._build_prompt(task, scene)
+                raw = self._llm_call(prompt)
+                tool, params = self._parse_tool(raw)
+            print(f'[{self.round}] LLM→ tool={tool or "?"}')
 
             if not tool or tool not in self.tools:
                 decision = self._decide('', {}, scene)
@@ -952,6 +964,7 @@ class AgentRuntime:
 
             result = self.tools[tool](params, dry_run)
             self.memory['history'].append({'tool': tool, 'params': params, 'result': str(result)[:300]})
+            print(f'  → {str(result)[:100]}')
             if tool in ('write_file', 'replace_in_file', 'replace_all'):
                 self.memory['modified'].append(params.split('|')[0] if '|' in params else params)
                 self.memory['stage'] = '修改'
@@ -969,7 +982,7 @@ class AgentRuntime:
 
             self.context += f'\n[工具: {tool}] {str(result)[:500]}'
 
-        return {'answer': f'已达{max_rounds}轮上限', 'memory': self.memory}
+            return {'answer': f'已达{max_rounds}轮上限', 'memory': self.memory}
 
     def _build_prompt(self, task, scene):
         mem_hint = ''
