@@ -510,6 +510,9 @@
     若 (字符串相等(tool, "git_status")) {
         返回(列表(git状态(params), 0.9))
     }
+    若 (字符串相等(tool, "replace_all")) {
+        返回(列表(批量替换(params), 0.5))
+    }
     若 (字符串相等(tool, "write_file")) {
         // params 格式: 文件路径|文件内容
         返回(列表(写文件钩子(params), 0.5))
