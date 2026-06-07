@@ -331,6 +331,30 @@ def init_evaluator(api_key):
         except Exception as ex:
             return f'测试执行错误: {ex}'
 
+    def _git_diff(e, args):
+        """运行 git diff 查看当前修改"""
+        import subprocess as _sp
+        try:
+            r = _sp.run(['git', 'diff', '--stat'], capture_output=True, text=True, timeout=10,
+                       cwd=os.path.dirname(os.path.abspath(__file__)) or '.')
+            output = r.stdout.strip() or '(无修改)'
+            if len(output) > 1500:
+                output = output[:1500] + '\n...(已截断)'
+            return output
+        except Exception as ex:
+            return f'git diff 失败: {ex}'
+
+    def _git_status(e, args):
+        """运行 git status 查看文件状态"""
+        import subprocess as _sp
+        try:
+            r = _sp.run(['git', 'status', '--short'], capture_output=True, text=True, timeout=10,
+                       cwd=os.path.dirname(os.path.abspath(__file__)) or '.')
+            output = r.stdout.strip() or '(工作区干净)'
+            return output
+        except Exception as ex:
+            return f'git status 失败: {ex}'
+
     def _sandbox_eval(e, args):
         """在沙箱中求值代码，返回结果"""
         sandbox_tag = str(e.eval(args[0])) if args else ''
@@ -386,6 +410,8 @@ def init_evaluator(api_key):
     reg_op('替换写回', _replace_in_file)
     reg_op('搜代码钩子', _search_code)
     reg_op('跑测试钩子', _run_test)
+    reg_op('git差异', _git_diff)
+    reg_op('git状态', _git_status)
 
     agent_path = os.path.join('ternary_agent', 'agent.san')
     src = open(agent_path, encoding='utf-8').read()
