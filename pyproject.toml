@@ -57,7 +57,7 @@ py-modules = [
     "ternary_core", "evaluator", "values", "runtime", "eval_utils",
     "commands", "param_matcher", "tail_call", "lexer", "parser", "preprocess",
     "skin", "sandbox", "compile_bytecode", "compile_llvmgen", "vm",
-    "type_checker", "debug_eval", "repl", "main", "lsp_server", "dap_server",
+     "type_checker", "repl", "main", "lsp_server", "dap_server",
     "sanfmt", "sanyancc", "doc_sync",
 ]
 
