@@ -376,6 +376,7 @@ class AgentRuntime:
     def _pre_analyze(self, task):
         """预分析：扫码任务中的文件和符号，构建结构化上下文"""
         import re as _re
+
         lines = []
         # 1. 提取.py/.san文件并分析结构
         files = _re.findall(r'[\w_/]+\.(?:py|san)', task)
