@@ -192,7 +192,11 @@ def _parse_with_sugar_san(code, evaluator):
             if iv == -1 or iv == 0:
                 return None
         return result
-    except (SanyanNameError, SanyanSyntaxError, SanyanTypeError, SanyanValueError, SyntaxError):
+    except (
+        SanyanNameError, SanyanSyntaxError, SanyanTypeError,
+        SanyanValueError, SanyanRuntimeError, SyntaxError,
+        ZeroDivisionError,  # sugar.san 解析引擎在CI环境的除零
+    ):
         return None
 
 
