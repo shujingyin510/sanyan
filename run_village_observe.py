@@ -14,6 +14,10 @@ from ternary_engine import TernaryEngine
 
 # 三态引擎：追踪村庄全局信任演化
 _village_ternary = TernaryEngine(max_hesitation=5, min_gain=0.03)
+# 每个 NPC 独立的信任追踪
+_npc_ternary = {}
+# 记忆链：谁对谁说了什么
+_memory_chain = []
 
 
 # 视觉宽度：中文字符占两个终端列宽
@@ -405,6 +409,12 @@ def _gen_dialogue(ev, args):
         f'{n1}↔{n2}={new_trust:.2f}',
         risk='低' if label in ('闲聊', '问候', '赞扬', '帮助', '赠礼') else '中',
     )
+    # 每人独立追踪 + 记忆链
+    for npc in (n1, n2):
+        if npc not in _npc_ternary:
+            _npc_ternary[npc] = TernaryEngine(max_hesitation=3, min_gain=0.03)
+        _npc_ternary[npc].step(f'{label}', f'{delta:+.3f}')
+    _memory_chain.append({'n1': n1, 'n2': n2, 'label': label, 'delta': delta, 'trust': new_trust})
 
     # ── #4 关系传递：A信任B高 + B信任C → A对C小量增益 ──
     chain_prop = []
@@ -992,6 +1002,20 @@ finally:
         with open('village_log.json', 'w', encoding='utf-8') as jf:
             json.dump(json_out, jf, ensure_ascii=False, indent=2)
         print('JSON 已导出到 village_log.json')
+        # ── 三态演化报告 ──
+        print(f'\n══ 三态演化报告 ══')
+        print(f'  全局: {_village_ternary.summary()}  犹豫{_village_ternary.hesitation}次')
+        for npc, eng in sorted(_npc_ternary.items()):
+            if eng.history:
+                print(f'  {npc[:4]:4s}: {eng.summary():>10s}  {eng.trit_display(*eng.history[-1])}')
+        if _memory_chain:
+            from collections import Counter
+            pairs = Counter(f'{m["n1"][:2]}↔{m["n2"][:2]}' for m in _memory_chain)
+            top = pairs.most_common(3)
+            print(f'  活跃组合: {", ".join(f"{p}({c}次)" for p,c in top)}')
+            conflicts = [m for m in _memory_chain if m['label'] == '争吵']
+            print(f'  冲突事件: {len(conflicts)}起' + (f' ({", ".join(c["n1"][:2]+"↔"+c["n2"][:2] for c in conflicts[:3])})' if conflicts else ''))
+        print('══════════════════')
         # ── #8 热力图：互信矩阵 ──
         if _trust_timeline:
             final = _trust_timeline[-1][1]
