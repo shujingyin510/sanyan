@@ -254,3 +254,4 @@ _test_*.bin
 *.log
 agent_decision.json
 agent_state.db
+publish/ternary_engine/dist/
