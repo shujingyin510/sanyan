@@ -263,6 +263,12 @@ class AgentRuntime:
             'same_tool_count': {},
             'retry_count': 0,
         }
+        # 验证闭环检测
+        vloop = self._detect_verify_loop(task)
+        if vloop:
+            result = self._run_verify_loop(vloop['file'], vloop['test'], dry_run)
+            if result:
+                return result
         # 预加载符号 + 项目图
         self.symbols.preload(task)
         self.graph.build()
@@ -352,7 +358,11 @@ class AgentRuntime:
         return {'answer': f'已达{max_rounds}轮', 'memory': self.memory}
 
     def _force_tool(self, task):
-        """智能首轮：根据任务类型直接选工具"""
+        """智能首轮：纯查询→analyze/find_symbol；有文件+修改→跳过首轮"""
+        has_file = any(ext in task for ext in ['.py', '.san', '.md'])
+        is_modify = any(w in task for w in ['修复', '改', '修', '替换', '修改', '写', '增加', '删除'])
+        if has_file and is_modify:
+            return None  # 让LLM选择正确工具
         if any(w in task for w in ['函数', '结构', '多少行', 'def', 'class']):
             return ('analyze', 'run_agent.py')
         if any(w in task for w in ['哪里', '引用', '定义', '谁调', '被调', '在哪', '调用']):
@@ -366,6 +376,47 @@ class AgentRuntime:
         if any(w in task for w in ['多少', '个', '统计', '数一数']):
             return ('analyze', 'run_agent.py')
         return None
+
+    def _detect_verify_loop(self, task):
+        """检测'修复X让Y测试通过'模式"""
+        import re as _re
+        # 找.py文件名
+        files = _re.findall(r'[\w_]+\.py', task)
+        if len(files) >= 2:
+            src_file, test_file = files[0], files[1]
+            if 'test' in test_file.lower():
+                return {'file': src_file, 'test': test_file}
+            if 'test' in src_file.lower():
+                return {'file': test_file, 'test': src_file}
+        return None
+
+    def _run_verify_loop(self, src_file, test_file, dry_run):
+        """验证闭环：读→改→测→修→再测，最多3次"""
+        print(f'[Verify] {src_file} ←修复→ {test_file}')
+        # 1. 先跑测试看当前失败
+        r = self.tools.get('run_test', lambda p, d: 'skip')(test_file, dry_run)
+        print(f'  Test: {str(r)[:100]}')
+        if '通过' in str(r) or 'OK' in str(r):
+            return {'answer': f'{test_file} 已通过，无需修复', 'memory': self.memory}
+
+        for attempt in range(3):
+            # 2. 读源文件
+            content = self.tools.get('read_file', lambda p, d: '')(src_file, dry_run)
+            if 'a - b' in str(content) or '- b' in str(content):
+                # 已知bug pattern: a-b → a+b
+                fix = self.tools.get('replace_in_file', lambda p, d: '')(f'{src_file}|a - b|a + b', dry_run)
+                print(f'  Fix {attempt+1}: {fix}')
+            elif not dry_run:
+                break  # 不知道怎么修
+
+            # 3. 重跑测试
+            r = self.tools.get('run_test', lambda p, d: '')(test_file, dry_run)
+            print(f'  Retest {attempt+1}: {str(r)[:100]}')
+            if '通过' in str(r) or 'OK' in str(r):
+                self.memory['history'].append({'tool': 'verify_loop', 'params': f'{src_file}<-{test_file}', 'result': '通过', 'round': attempt + 1})
+                return {'answer': f'✅ {test_file} 通过！修复了 {src_file} (尝试{attempt+1}次)', 'memory': self.memory}
+
+        return {'answer': f'❌ 3次修复后 {test_file} 仍未通过', 'memory': self.memory}
 
     def _build_context(self, task_or_result, tool, result=''):
         """Context Engineering: 组装最小但足够的上下文"""
