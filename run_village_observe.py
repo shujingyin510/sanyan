@@ -10,6 +10,11 @@ import time
 import signal
 import random
 
+from ternary_engine import TernaryEngine
+
+# 三态引擎：追踪村庄全局信任演化
+_village_ternary = TernaryEngine(max_hesitation=5, min_gain=0.03)
+
 
 # 视觉宽度：中文字符占两个终端列宽
 def _vpad(s, w):  # 把字符串垫到视觉宽度 w
@@ -393,6 +398,9 @@ def _gen_dialogue(ev, args):
     new_trust = max(0.01, min(1.0, old_trust + delta))
     trust_dict[trust_key] = new_trust
     ev._scopes[0]['NPC信任'] = trust_dict
+
+    # ── 三态追踪：村庄全局信任演化 ──
+    _village_ternary.step(f'对话({label})', f'{n1}↔{n2}={new_trust:.2f}', risk='低' if label in ('闲聊', '问候', '赞扬', '帮助', '赠礼') else '中')
 
     # ── #4 关系传递：A信任B高 + B信任C → A对C小量增益 ──
     chain_prop = []
@@ -840,6 +848,7 @@ try:
             print(
                 f'  凝聚力: {avg:.3f}(全部{len(vals)}对平均)  活跃:{active_avg:.3f}(已互动{len(active_vals)}对)  假:{false_n} 可能:{maybe_n} 真:{true_n}'
             )
+            print(f'  三态: {_village_ternary.summary()}  {_village_ternary.trit_display(*_village_ternary.history[-1]) if _village_ternary.history else ""}')
         # #3 每日矩阵（verbose 模式）
         if _verbose and _trust_timeline:
             td_now = _trust_timeline[-1][1]
