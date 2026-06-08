@@ -511,7 +511,7 @@ class VM:
             elif op == IS_STR:
                 self.stack.append(1 if isinstance(v, str) else -1)
             elif op == IS_LIST:
-                self.stack.append(1 if isinstance(v, (list, dict)) else -1)
+                self.stack.append(1 if isinstance(v, list) else -1)
         return True
 
     def _exec_string(self, op: int) -> bool:
@@ -541,6 +541,7 @@ class VM:
             s = str(self.stack.pop()) if self.stack else ''
             self.stack.append(list(s))
         elif op == STR_STARTSWITH:
+            # 栈: [..., 字符串, 前缀] — 前缀在栈顶
             pre = str(self.stack.pop()) if self.stack else ''
             s = str(self.stack.pop()) if self.stack else ''
             self.stack.append(1 if s.startswith(pre) else -1)
@@ -573,9 +574,13 @@ class VM:
             a = self.stack.pop() if self.stack else 0
             self.stack.append((a if isinstance(a, list) else [a]) + (b if isinstance(b, list) else [b]))
         elif op == LIST_NEW:
-            n = self.stack.pop() if self.stack and isinstance(self.stack[-1], int) else 0
-            if not isinstance(n, int):
-                n = int(n) if str(n).lstrip('-').replace('.', '').isdigit() else 0
+            n = self.stack.pop() if self.stack and isinstance(self.stack[-1], (int, float)) else 0
+            if not isinstance(n, (int, float)):
+                try:
+                    n = int(n)
+                except (ValueError, TypeError):
+                    n = 0
+            n = max(0, min(int(n), len(self.stack)))
             lst: list = []
             for _ in range(min(n, len(self.stack))):
                 lst.insert(0, self.stack.pop())

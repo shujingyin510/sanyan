@@ -47,6 +47,8 @@ def _trit_set(evaluator, args):
         idx = idx.to_int()
     if not isinstance(lst, list):
         raise SanyanTypeError('三态置 的第一个参数必须是列表')
+    if idx < 0 or idx >= len(lst):
+        raise SanyanValueError(f'三态置 索引 {idx} 越界（列表长度 {len(lst)}）')
     lst[idx] = val if isinstance(val, TritValue) else TritValue(val)
     return TritValue(0)
 
