@@ -488,7 +488,10 @@ class AgentRuntime:
 
     def _llm_call(self, prompt):
         """LLM 调用：多提供商 + 重试 + 超时"""
-        import urllib.request as _req, urllib.error as _err, json as _json, time as _t
+        import urllib.request as _req
+        import urllib.error as _err
+        import json as _json
+        import time as _t
 
         model = (getattr(self.ev, 'get_var', lambda x: '')('模型名') or 'deepseek-chat').strip()
         url = (getattr(self.ev, 'get_var', lambda x: '')('模型URL') or '').strip()
@@ -518,7 +521,11 @@ class AgentRuntime:
                 ensure_ascii=False,
             ).encode('utf-8')
             headers = {'Content-Type': 'application/json'}
-            parser = lambda d: d['candidates'][0]['content']['parts'][0]['text']
+
+            def _parse_gemini(d):
+                return d['candidates'][0]['content']['parts'][0]['text']
+
+            parser = _parse_gemini
         else:
             body = _json.dumps(
                 {
@@ -530,7 +537,11 @@ class AgentRuntime:
                 ensure_ascii=False,
             ).encode('utf-8')
             headers = {'Content-Type': 'application/json', 'Authorization': f'Bearer {key}'}
-            parser = lambda d: d['choices'][0]['message']['content']
+
+            def _parse_openai(d):
+                return d['choices'][0]['message']['content']
+
+            parser = _parse_openai
 
         # 重试 3 次
         for attempt in range(3):
@@ -538,7 +549,7 @@ class AgentRuntime:
                 req = _req.Request(url, data=body, headers=headers, method='POST')
                 resp = _json.loads(_req.urlopen(req, timeout=timeout).read().decode('utf-8'))
                 return parser(resp).strip()
-            except (_err.HTTPError, _err.URLError, OSError) as e:
+            except (_err.HTTPError, _err.URLError, OSError):
                 if attempt < 2:
                     _t.sleep(1.0 * (attempt + 1))
                 continue
