@@ -183,5 +183,81 @@ class TestAgentRuntime(unittest.TestCase):
         self.assertIn('符号', result['answer'])
 
 
+class TestAgentTools(unittest.TestCase):
+    """agent_tools.py 独立单测"""
+
+    def test_resolve_path_exists(self):
+        from agent_tools import _resolve_path_simple
+
+        self.assertEqual(_resolve_path_simple('run_agent.py'), 'run_agent.py')
+
+    def test_resolve_path_search(self):
+        from agent_tools import _resolve_path_simple
+
+        resolved = _resolve_path_simple('agent_tools.py')
+        self.assertTrue(resolved.endswith('agent_tools.py'))
+
+    def test_analyze_file(self):
+        from agent_tools import _analyze_file_direct
+
+        r = _analyze_file_direct('run_agent.py')
+        self.assertIn('⚠ >50行:', r)
+        self.assertIn('main()', r)
+
+    def test_find_symbol(self):
+        from agent_tools import _find_symbol_direct
+
+        r = _find_symbol_direct('main')
+        self.assertIn('DEF', r)
+
+    def test_read_file(self):
+        from agent_tools import _read_file_direct_simple
+
+        r = _read_file_direct_simple('run_agent.py|1|3')
+        self.assertIn('三言 Agent', r)
+
+    def test_read_file_no_range(self):
+        from agent_tools import _read_file_direct_simple
+
+        r = _read_file_direct_simple('run_agent.py')
+        self.assertTrue(len(r) > 100)
+
+    def test_search_code(self):
+        from agent_tools import _search_code_direct
+
+        r = _search_code_direct('def main')
+        self.assertIn('run_agent.py', r)
+
+    def test_replace_in_file_dry(self):
+        from agent_tools import _replace_in_file_direct
+
+        r = _replace_in_file_direct('run_agent.py|# 三言|# 三言|# Sanyan', dry_run=True)
+        self.assertIn('[干跑]', r)
+
+    def test_list_files(self):
+        from agent_tools import _list_files_direct_simple
+
+        r = _list_files_direct_simple('*.py')
+        self.assertIn('.py', r.lower())
+
+    def test_git_diff(self):
+        from agent_tools import _git_diff_direct
+
+        r = _git_diff_direct()
+        self.assertIsInstance(r, str)
+
+    def test_git_status(self):
+        from agent_tools import _git_status_direct
+
+        r = _git_status_direct()
+        self.assertIsInstance(r, str)
+
+    def test_sandbox_path(self):
+        from agent_tools import _resolve_path_simple
+
+        r = _resolve_path_simple('../../etc/passwd')
+        self.assertNotIn('..', r)
+
+
 if __name__ == '__main__':
     unittest.main()

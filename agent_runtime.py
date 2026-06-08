@@ -179,21 +179,31 @@ class SymbolTable:
 
 
 class MemoryStore:
-    """智能记忆检索：关键词匹配，非全量dump"""
+    """智能记忆检索：中英双语关键词匹配"""
 
     def __init__(self):
         self.entries = []
 
-    def add(self, tool, params, result):
+    def _extract_kw(self, text):
+        """提取关键词：英文标识符 + 中文双字片语"""
         import re as _re
 
-        kw = _re.findall(r'[a-zA-Z_]\w{2,}', str(params) + str(result))
-        self.entries.append({'tool': tool, 'result': str(result)[:200], 'kw': set(kw)})
+        kw = set(_re.findall(r'[a-zA-Z_]\w{2,}', str(text)))
+        # 中文双字滑动窗口
+        s = str(text)
+        for i in range(len(s) - 1):
+            if '\u4e00' <= s[i] <= '\u9fff' and '\u4e00' <= s[i + 1] <= '\u9fff':
+                kw.add(s[i : i + 2])
+        return kw
+
+    def add(self, tool, params, result):
+        kw = self._extract_kw(str(params)) | self._extract_kw(str(result))
+        self.entries.append({'tool': tool, 'result': str(result)[:200], 'kw': kw})
 
     def context(self, query='', limit=3):
         if not self.entries:
             return ''
-        qk = set(self._kw(query)) if query else set()
+        qk = self._extract_kw(query) if query else set()
         scored = []
         for e in self.entries[-20:]:
             s = len(qk & e.get('kw', set())) if qk else 1
@@ -202,11 +212,6 @@ class MemoryStore:
         scored.sort(key=lambda x: -x[0])
         entries = [e for _, e in scored[:limit]] or self.entries[-limit:]
         return '[记忆] ' + ' | '.join(f'{e["tool"]}:{str(e["result"])[:60]}' for e in entries)
-
-    def _kw(self, text):
-        import re as _re
-
-        return _re.findall(r'[a-zA-Z_]\w{2,}', text)
 
 
 class ProjectGraph:
@@ -559,9 +564,17 @@ class AgentRuntime:
         return len(ctx) > 7000
 
     def _compress_ctx(self, ctx):
+        """压缩上下文：用LLM摘要旧内容"""
         parts = ctx.split('\n')
-        head = [p for p in parts[:10] if '任务:' in p or 'Plan' in p]
-        return '(上下文已压缩)\n' + '\n'.join(head + parts[-30:])
+        # 保留任务行
+        head = [p for p in parts[:5] if '任务:' in p or 'Plan' in p]
+        # 试LLM摘要中间部分
+        middle = '\n'.join(parts[5:-20])
+        if len(middle) > 1000:
+            summary = self._llm_call(f'用一句话总结以下内容:\n{middle[:1500]}')
+            if summary and 'error' not in summary.lower():
+                head.append(f'[摘要] {summary[:200]}')
+        return '\n'.join(head + ['[最新]'] + parts[-20:])
 
     def _fail_closed(self, tool, params, dry_run):
         # 危险命令无论干跑与否都拦截

@@ -787,26 +787,15 @@ def _watch_files():
     }
 
 
-def run_interactive(evaluator, api_key):
-    print('三言 Agent v0.3.0 - 多轮对话（输入 exit 退出）')
-    print('  /解释 → 查看最近决策解释')
-    print('  /解释 N → 查看第N轮决策解释')
-    print('  修改 agent_policy.san 后自动重载')
+def run_interactive(evaluator, api_key, rt=None):
+    """交互模式 — V3 AgentRuntime 驱动"""
+    print('三言 Agent V3 - 多轮对话（输入 exit 退出）')
+    print('  /状态 → 三态决策摘要')
+    print('  /记忆 → 任务记忆')
     print()
-    mtimes = _watch_files()
     round_num = 0
     while True:
         round_num += 1
-        # 热重载检查：策略文件是否变更
-        try:
-            new_mtimes = _watch_files()
-            if new_mtimes != mtimes:
-                print('[策略文件已更新，正在重新加载...]')
-                evaluator = init_evaluator(api_key)
-                mtimes = new_mtimes
-        except OSError:
-            pass
-
         try:
             q = input(f'[{round_num}] > ').strip()
         except (EOFError, KeyboardInterrupt):
@@ -817,42 +806,18 @@ def run_interactive(evaluator, api_key):
         if q.lower() in ('exit', '退出', 'quit', 'q'):
             print('再见')
             break
-
-        # 特殊命令
-        if q.startswith('/解释'):
-            parts = q.split()
-            if len(parts) >= 2:
-                try:
-                    evaluator.eval(['解释决策', int(parts[1])])
-                except ValueError:
-                    print('用法: /解释 N')
-            else:
-                evaluator.eval(['最近决策'])
+        if q.startswith('/状态'):
+            print(f'  三态: {rt.ternary.summary()}' if rt else '  无引擎')
             continue
-
-        if q.startswith('/原因'):
-            parts = q.split()
-            if len(parts) >= 2:
-                try:
-                    evaluator.eval(['解释原因', int(parts[1])])
-                except ValueError:
-                    print('用法: /原因 N')
-            else:
-                print('用法: /原因 N')
+        if q.startswith('/记忆'):
+            print(f'  阶段: {rt.memory.get("stage","?")}' if rt else '')
+            print(f'  修改: {rt.memory.get("modified",[])}' if rt else '')
             continue
-
-        if q == '/策略':
-            evaluator.eval(['策略概览'])
-            continue
-
         try:
-            evaluator.eval(['Agent运行', q])
+            result = rt.run(q, max_rounds=15)
+            print(f'→ {result["answer"]}')
         except Exception as e:
             print(f'错误: {e}')
-        try:
-            evaluator.eval(['保存记忆'])
-        except Exception:
-            pass
         print()
 
 
@@ -1056,7 +1021,7 @@ def main():
             m = result['memory']
             print(f"\n=== 报告 ===\n阶段: {m['stage']}\n工具: {len(m['history'])}次\n修改: {m['modified']}")
     else:
-        run_interactive(evaluator, api_key)  # 交互模式暂留旧引擎
+            run_interactive(evaluator, api_key, rt)  # V3 引擎
 
 
 def _print_report(evaluator):
