@@ -9,6 +9,7 @@ import os
 
 import unittest
 from evaluator import SanyanEvaluator
+from values import SanyanValueError
 
 
 class TestCryptoOps(unittest.TestCase):
@@ -418,8 +419,8 @@ class TestContainerOpsExtended(unittest.TestCase):
         self.assertEqual(r.to_int(), -1)
 
     def test_get_out_of_range(self):
-        result = self.env.eval(['取', ['列表', '1', '2', '3'], '10'])
-        self.assertEqual(result, 0)
+        with self.assertRaises(SanyanValueError):
+            self.env.eval(['取', ['列表', '1', '2', '3'], '10'])
 
     def test_set_element(self):
         r = self.env.eval(['置元素', ['列表', '1', '2', '3'], '1', '99'])
