@@ -339,6 +339,9 @@ python -X utf8 tests/test_agent.py -v     # Agent 测试 31 项
 python -X utf8 tests/test_agent_runtime.py -v  # AgentRuntime V3 测试 27 项
 python -X utf8 tests/run_all.py           # 集成测试 46 项
 
+# 或一条命令跑全部（CI 用）
+python -m pytest tests/test_core.py tests/test_commands.py tests/test_parser.py tests/test_ops.py tests/test_ops_ext.py tests/test_lsp.py tests/test_package.py tests/test_iot.py tests/test_dp_python.py tests/test_self_host.py tests/test_sugar_self_host.py tests/test_vm.py tests/test_llvmgen.py tests/test_sugar_san.py --cov=. -q
+
 全部通过才算成功：
 - test_core.py 138/138（含闭包+三态测试）
 - test_commands.py 18/18
