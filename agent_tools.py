@@ -10,6 +10,9 @@ import subprocess as _sp
 def _resolve_path_simple(path):
     if not path or os.path.exists(path):
         return path
+    # 沙箱：禁止目录穿越
+    if '..' in path:
+        return path.replace('..', '_')
 
     matches = _glob.glob('**/' + path, recursive=True)
     return matches[0] if matches else path
