@@ -464,34 +464,48 @@ class AgentRuntime:
         return False
 
     def _llm_call(self, prompt):
-        try:
-            model = str(getattr(self.ev, 'get_var', lambda x: 'deepseek-chat')('模型名')).strip()
-            url = str(getattr(self.ev, 'get_var', lambda x: '')('模型URL')).strip()
-            key = str(getattr(self.ev, 'get_var', lambda x: '')('API密钥')).strip()
-            import urllib.request as _req
-            import json as _json
+        """LLM 调用：多提供商 + 重试 + 超时"""
+        import urllib.request as _req, urllib.error as _err, json as _json, time as _t
 
-            sys_msg = '可用工具: analyze(查文件结构), find_symbol(查符号), read_file(读文件|起始行|结束行), search_code(搜索), replace_in_file(单替换 路径|旧|新), replace_all(批量 模式|旧|新), write_file(写 路径|内容), list_files(列), run_test(测试), git_diff(git差异), git_status(git状态), done(完成|回答)。\n只输出: tool|params。如 analyze|run_agent.py'
-            body = _json.dumps(
-                {
-                    'model': model,
-                    'messages': [{'role': 'system', 'content': sys_msg}, {'role': 'user', 'content': prompt}],
-                    'temperature': 0.7,
-                    'max_tokens': 256,
-                },
-                ensure_ascii=False,
-            ).encode('utf-8')
-            req = _req.Request(
-                url,
-                data=body,
-                headers={'Content-Type': 'application/json', 'Authorization': f'Bearer {key}'},
-                method='POST',
-            )
-            return _json.loads(_req.urlopen(req, timeout=60).read().decode('utf-8'))['choices'][0]['message'][
-                'content'
-            ].strip()
-        except Exception as e:
-            return f'error|{e}'
+        model = (getattr(self.ev, 'get_var', lambda x: '')('模型名') or 'deepseek-chat').strip()
+        url = (getattr(self.ev, 'get_var', lambda x: '')('模型URL') or '').strip()
+        key = (getattr(self.ev, 'get_var', lambda x: '')('API密钥') or '').strip()
+        provider = (getattr(self.ev, 'get_var', lambda x: 'deepseek')('模型提供商') or 'deepseek').strip()
+        timeout = int(getattr(self.ev, 'get_var', lambda x: 60)('超时秒数') or 60)
+
+        sys_msg = '可用工具: analyze(查文件结构), find_symbol(查符号), read_file(读文件|起始行|结束行), search_code(搜索), replace_in_file(单替换 路径|旧|新), replace_all(批量 模式|旧|新), write_file(写 路径|内容), list_files(列), run_test(测试), git_diff(git差异), git_status(git状态), done(完成|回答)。\n只输出: tool|params。如 analyze|run_agent.py'
+
+        # Gemini 专用格式
+        if provider and 'gemini' in str(provider).lower():
+            url = f'https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={key}'
+            body = _json.dumps({
+                'system_instruction': {'parts': [{'text': sys_msg}]},
+                'contents': [{'parts': [{'text': prompt}]}],
+                'generationConfig': {'temperature': 0.7}
+            }, ensure_ascii=False).encode('utf-8')
+            headers = {'Content-Type': 'application/json'}
+            parser = lambda d: d['candidates'][0]['content']['parts'][0]['text']
+        else:
+            body = _json.dumps({
+                'model': model, 'max_tokens': 256, 'temperature': 0.7,
+                'messages': [{'role': 'system', 'content': sys_msg}, {'role': 'user', 'content': prompt}]
+            }, ensure_ascii=False).encode('utf-8')
+            headers = {'Content-Type': 'application/json', 'Authorization': f'Bearer {key}'}
+            parser = lambda d: d['choices'][0]['message']['content']
+
+        # 重试 3 次
+        for attempt in range(3):
+            try:
+                req = _req.Request(url, data=body, headers=headers, method='POST')
+                resp = _json.loads(_req.urlopen(req, timeout=timeout).read().decode('utf-8'))
+                return parser(resp).strip()
+            except (_err.HTTPError, _err.URLError, OSError) as e:
+                if attempt < 2:
+                    _t.sleep(1.0 * (attempt + 1))
+                continue
+            except Exception:
+                break
+        return 'error|LLM调用失败(3次重试)'
 
     def _parse_tool(self, raw):
         raw = raw.strip().replace('---END---', '').strip('{}"\' ')
