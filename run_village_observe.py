@@ -1003,18 +1003,22 @@ finally:
             json.dump(json_out, jf, ensure_ascii=False, indent=2)
         print('JSON 已导出到 village_log.json')
         # ── 三态演化报告 ──
-        print(f'\n══ 三态演化报告 ══')
+        print('\n══ 三态演化报告 ══')
         print(f'  全局: {_village_ternary.summary()}  犹豫{_village_ternary.hesitation}次')
         for npc, eng in sorted(_npc_ternary.items()):
             if eng.history:
                 print(f'  {npc[:4]:4s}: {eng.summary():>10s}  {eng.trit_display(*eng.history[-1])}')
         if _memory_chain:
             from collections import Counter
+
             pairs = Counter(f'{m["n1"][:2]}↔{m["n2"][:2]}' for m in _memory_chain)
             top = pairs.most_common(3)
-            print(f'  活跃组合: {", ".join(f"{p}({c}次)" for p,c in top)}')
+            print(f'  活跃组合: {", ".join(f"{p}({c}次)" for p, c in top)}')
             conflicts = [m for m in _memory_chain if m['label'] == '争吵']
-            print(f'  冲突事件: {len(conflicts)}起' + (f' ({", ".join(c["n1"][:2]+"↔"+c["n2"][:2] for c in conflicts[:3])})' if conflicts else ''))
+            print(
+                f'  冲突事件: {len(conflicts)}起'
+                + (f' ({", ".join(c["n1"][:2] + "↔" + c["n2"][:2] for c in conflicts[:3])})' if conflicts else '')
+            )
         print('══════════════════')
         # ── #8 热力图：互信矩阵 ──
         if _trust_timeline:
