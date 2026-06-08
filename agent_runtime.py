@@ -373,11 +373,60 @@ class AgentRuntime:
 
         return {'answer': f'❌ 3次修复后 {test_file} 仍未通过', 'memory': self.memory}
 
+    def _pre_analyze(self, task):
+        """预分析：扫码任务中的文件和符号，构建结构化上下文"""
+        import re as _re
+        lines = []
+        # 1. 提取.py/.san文件并分析结构
+        files = _re.findall(r'[\w_/]+\.(?:py|san)', task)
+        for f in files[:3]:
+            if f in self.tools:
+                continue
+            func = self.tools.get('analyze')
+            if not func:
+                continue
+            try:
+                r = func(f, False)
+                if r and '⚠' in str(r)[:50]:
+                    lines.append(f'[分析 {f}] {str(r)[:300]}')
+                elif r:
+                    lines.append(f'[分析 {f}] {str(r)[:150]}')
+            except Exception:
+                pass
+        # 2. 提取符号并查找定义
+        symbols = _re.findall(r'\b([A-Z][a-zA-Z_]{2,}|[a-z_]{3,20})\b', task)
+        for s in symbols[:3]:
+            if s in ('def', 'class', 'import', 'from', 'python', 'py', 'san'):
+                continue
+            func = self.tools.get('find_symbol')
+            if not func:
+                continue
+            try:
+                r = func(s, False)
+                if r and '未找到' not in str(r):
+                    count = str(r).count('DEF') + str(r).count('REF')
+                    lines.append(f'[符号 {s}] {count}处')
+            except Exception:
+                pass
+        # 3. 跨任务回忆
+        try:
+            recall = self.mem.recall(task)
+            if recall:
+                lines.append(recall)
+        except Exception:
+            pass
+        return '\n'.join(lines) if lines else ''
+
     def _build_context(self, task_or_result, tool, result=''):
-        """Context Engineering: 组装最小但足够的上下文"""
+        """Context Engineering: 预分析层 — 结构化上下文替代原始任务"""
         parts = []
         if tool == 'init':
             parts.append(f'任务: {task_or_result}')
+            # 预分析：扫描任务中提到的文件/符号
+            task = str(task_or_result)
+            pre = self._pre_analyze(task)
+            if pre:
+                parts.append(pre)
         else:
             parts.append(f'工具 [{tool}] 结果:\n{str(result)[:800]}')
 
