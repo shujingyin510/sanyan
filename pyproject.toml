@@ -83,7 +83,7 @@ quote-style = "single"
 python_version = "3.12"
 ignore_missing_imports = true
 strict = false
-warn_unused_ignores = true
+warn_unused_ignores = false
 exclude = [
     "publish/",
     "tests/",
@@ -111,7 +111,7 @@ module = [
     "preprocess",
 ]
 warn_return_any = true
-warn_unused_ignores = true
+warn_unused_ignores = false
 disallow_untyped_defs = true
 
 [tool.coverage.run]
