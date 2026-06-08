@@ -56,39 +56,94 @@ class SymbolTable:
 
 
 class MemoryStore:
-    """智能记忆检索：中英双语关键词匹配"""
+    """分层记忆：语义摘要(S) + 事件存储(E) + 时间衰减 + 跨任务回忆
+
+    S-Memory: LLM 一句话摘要，用于语义检索
+    E-Memory: 原始事件存储，按时间衰减
+    """
 
     def __init__(self):
-        self.entries = []
+        self.entries = []  # E-Memory: [{tool, result, kw, time, summary}]
+        self.semantic = []  # S-Memory: [(summary, keywords)]
+        self._summarizer = None  # lazy LLM ref
 
     def _extract_kw(self, text):
-        """提取关键词：英文标识符 + 中文双字片语"""
         import re as _re
 
         kw = set(_re.findall(r'[a-zA-Z_]\w{2,}', str(text)))
-        # 中文双字滑动窗口
         s = str(text)
         for i in range(len(s) - 1):
             if '\u4e00' <= s[i] <= '\u9fff' and '\u4e00' <= s[i + 1] <= '\u9fff':
                 kw.add(s[i : i + 2])
         return kw
 
+    def set_llm(self, llm_fn):
+        """注入 LLM 摘要函数"""
+        self._summarizer = llm_fn
+
     def add(self, tool, params, result):
+        import time as _t
+
         kw = self._extract_kw(str(params)) | self._extract_kw(str(result))
-        self.entries.append({'tool': tool, 'result': str(result)[:200], 'kw': kw})
+        entry = {
+            'tool': tool,
+            'result': str(result)[:200],
+            'kw': kw,
+            'time': _t.time(),
+            'summary': '',
+        }
+        # LLM 摘要：异步尝试
+        if self._summarizer:
+            try:
+                raw = str(params)[:100] + ' → ' + str(result)[:200]
+                entry['summary'] = self._summarizer(f'用5字以内概括: {raw}') or ''
+                if entry['summary']:
+                    self.semantic.append((entry['summary'], kw))
+            except Exception:
+                pass
+        self.entries.append(entry)
 
     def context(self, query='', limit=3):
         if not self.entries:
             return ''
         qk = self._extract_kw(query) if query else set()
         scored = []
-        for e in self.entries[-20:]:
-            s = len(qk & e.get('kw', set())) if qk else 1
-            if s > 0:
-                scored.append((s, e))
+        for i, e in enumerate(reversed(self.entries[-30:])):
+            # 关键词匹配分
+            ks = len(qk & e.get('kw', set())) if qk else 1
+            # 语义匹配分
+            ss = 0
+            if e.get('summary') and qk:
+                ss = len(qk & self._extract_kw(e['summary']))
+            # 时间衰减：每 60 秒权重减半
+            import time as _t
+
+            age = _t.time() - e.get('time', _t.time())
+            decay = max(0.1, 0.5 ** (age / 60))
+            score = (ks + ss * 2) * decay
+            if score > 0.05:
+                scored.append((score, e))
         scored.sort(key=lambda x: -x[0])
         entries = [e for _, e in scored[:limit]] or self.entries[-limit:]
-        return '[记忆] ' + ' | '.join(f'{e["tool"]}:{str(e["result"])[:60]}' for e in entries)
+        parts = [f'{e["tool"]}:{str(e["result"])[:60]}' for e in entries]
+        if entries and entries[0].get('summary'):
+            parts.insert(0, f'[摘要] {entries[0]["summary"]}')
+        return '[记忆] ' + ' | '.join(parts)
+
+    def recall(self, task, limit=3):
+        """跨任务回忆：找到与当前任务相关的历史"""
+        if not self.semantic:
+            return ''
+        tkw = self._extract_kw(task)
+        scored = []
+        for summary, kw in self.semantic[-50:]:
+            s = len(tkw & kw) if tkw else 0
+            if s > 0:
+                scored.append((s, summary))
+        scored.sort(key=lambda x: -x[0])
+        if scored:
+            return '[经验] ' + '; '.join(s for _, s in scored[:limit])
+        return ''
 
 
 class ProjectGraph:
@@ -134,6 +189,7 @@ class AgentRuntime:
         self.symbols = SymbolTable()
         self.graph = ProjectGraph()
         self.mem = MemoryStore()
+        self.mem.set_llm(self._llm_call)  # LLM 摘要记忆
         self.ternary = TernaryEngine()  # 三态决策引擎
         self.memory = {}
         self.reflections = []
@@ -334,7 +390,10 @@ class AgentRuntime:
         if mem_ctx:
             parts.append(f'\n{mem_ctx}')
 
-        # 注入 Reflection
+        # 跨任务回忆
+        recall = self.mem.recall(str(task_or_result))
+        if recall:
+            parts.append(f'\n{recall}')
         if self.reflections:
             last_ref = self.reflections[-1]
             parts.append(f'\n上次失败: {last_ref["tool"]} → {str(last_ref["error"])[:200]}')
