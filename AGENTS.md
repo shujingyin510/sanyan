@@ -239,6 +239,21 @@ git commit -m "本地保存：xxx"   # 不加 --push
 ```
 等多轮测试验证完再 `git push`。
 
+**⚠ 推送前强制自查**：`git push` 之前必须在本地跑通以下三条，绿了再推——不等 GitHub CI：
+
+```bash
+# 1. 格式 + Lint
+ruff format . && ruff check .
+
+# 2. 类型检查
+mypy .
+
+# 3. 测试 + 覆盖率
+python -m pytest tests/test_core.py tests/test_commands.py tests/test_parser.py tests/test_ops.py tests/test_ops_ext.py tests/test_lsp.py tests/test_package.py tests/test_iot.py tests/test_dp_python.py tests/test_self_host.py tests/test_sugar_self_host.py tests/test_vm.py tests/test_llvmgen.py tests/test_sugar_san.py --cov=. -q
+```
+
+三条全绿 → `git push`。任何一条红 → 本地修完再推。不等 CI 反馈循环。
+
 在项目目录下直接使用 `git`（bash 工具自动使用项目 workdir）：
 
 ```bash
