@@ -2,7 +2,10 @@
 三态温室决策 — TernaryEngine IoT 应用示例
 python -X utf8 examples/ternary_greenhouse.py
 """
-import sys, os
+
+import sys
+import os
+
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import random
 
@@ -47,7 +50,7 @@ for hour in range(6, 22, 2):
         elif t < 18:
             print(f'  决策: 开启暖气 ({t}°C)')
         else:
-            print(f'  决策: 维持正常')
+            print('  决策: 维持正常')
     else:
         print(f'  决策: 人工确认 (置信度 {conf:.2f})')
 
