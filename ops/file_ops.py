@@ -196,7 +196,9 @@ def _parse_with_sugar_san(code, evaluator):
         SanyanNameError, SanyanSyntaxError, SanyanTypeError,
         SanyanValueError, SanyanRuntimeError, SyntaxError,
         ZeroDivisionError,  # sugar.san 解析引擎在CI环境的除零
-    ):
+    ) as e:
+        import sys
+        print(f'[糖语法] {type(e).__name__}: {e}', file=sys.stderr)
         return None
 
 
