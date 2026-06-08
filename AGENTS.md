@@ -25,6 +25,7 @@
 | `ternary_agent/agent.san` | Agent 核心逻辑（旧引擎，交互/单次模式） |
 | `ternary_agent/agent_policy.san` | 纯数据策略（配置、阈值、映射规则、天气数据、场景规则） |
 | `ternary_agent/decision.san` | 决策核心（信任感知规则匹配） |
+| `ternary_engine.py` | **三元认知引擎**（Kleene×贝叶斯×门控，Agent/村庄/IoT共用） |
 | `agent_runtime.py` | **V3 引擎**：SymbolTable、MemoryStore、ProjectGraph、AgentRuntime |
 | `agent_tools.py` | **V3 工具层**：analyze、find_symbol、replace_all 等 12 个工具 |
 | `run_agent.py` | 启动器（`--auto` 走 V3，默认走旧引擎） |

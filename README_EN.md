@@ -1,19 +1,18 @@
-# Sanyan v3.27.0
+# Tri-State Cognitive Framework Sanyan v3.27.0
 
 [![VS Code Extension](https://img.shields.io/badge/VS%20Code-Syntax%20Highlight-%23007ACC?logo=visualstudiocode)](sanyan-vscode/README.md)
 [![CI](https://github.com/shujingyin510/sanyan/actions/workflows/test.yml/badge.svg)](https://github.com/shujingyin510/sanyan/actions)
 
-> **A programming language built for the real world.** Sensors glitch. Users hesitate. Networks fluctuate. The real world was never binary to begin with.
+> **A cognitive computing framework for uncertainty-oriented decision making.** The real world isn't binary — sensors glitch, users hesitate, code breaks. The Sanyan framework uses Kleene logic × Bayesian confidence × safety gating to let programs naturally express, propagate, and accumulate "not sure yet" — deferring decision until evidence is sufficient.
 
-[中文版](README.md) (Default — GitHub 首页展示中文)
+[中文版](README.md)
 
 ---
 
 ## What is Sanyan?
 
-Sanyan is a programming language with native three-valued logic. The real world is full of uncertainty — Sanyan expresses it with "maybe" instead of forcing a binary yes-or-no.
-
-Keywords can switch to any natural language. It's not just Chinese programming — it's native-language programming.
+Sanyan = **Ternary Language (DSL)** + **Ternary Engine (TernaryEngine)** + **Ternary Applications (Agent / IoT / Village)**.
+The language is the interface — the core is the Kleene three-value logic propagation + Bayesian confidence decay + protection gating decision engine.
 
 ---
 

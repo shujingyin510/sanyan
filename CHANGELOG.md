@@ -5,7 +5,9 @@
 ## [v3.27.0] — 2026-06-07
 
 ### 新增
-- **AgentRuntime V3**：Python 原生决策引擎（`agent_runtime.py:283`行），LLM 只输出 `tool|params`，系统负责判断/反思/上下文工程
+- **TernaryEngine 独立模块**：`ternary_engine.py`（131行），Kleene传播×贝叶斯置信度×保护门控，Agent/村庄/IoT 共用
+- **村庄三态追踪**：`run_village_observe.py` 接入 TernaryEngine，每日显示全局三态置信度
+- **MemoryStore 中文语义**：双字滑动窗口，英文标识符 + 中文片语同时匹配
 - **AgentRuntime 工具层**：拆分到 `agent_tools.py:173`行，analyze/find_symbol/replace_all 等 12 个独立工具
 - **SymbolTable**：符号表缓存，查一次全局复用，`_force_tool()` 智能首轮绕过 LLM
 - **MemoryStore**：关键词检索记忆，替代全量 dump，只注入相关历史

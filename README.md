@@ -1,9 +1,9 @@
-# 三言 Sanyan v3.27.0
+# 三态认知框架 Sanyan v3.27.0
 
 [![VS Code Extension](https://img.shields.io/badge/VS%20Code-%E8%AF%AD%E6%B3%95%E9%AB%98%E4%BA%AE-%23007ACC?logo=visualstudiocode)](sanyan-vscode/README.md)
 [![CI](https://github.com/shujingyin510/sanyan/actions/workflows/test.yml/badge.svg)](https://github.com/shujingyin510/sanyan/actions)
 
-> **处理真实世界的三值编程语言。** 传感器会失灵，用户会犹豫，网络会波动——真实世界从来不是非黑即白的。
+> **面向不确定性决策的认知计算框架。** 现实世界不是 0 和 1——传感器会失灵、用户会犹豫、代码会写错。三态框架用 Kleene 传播 × 贝叶斯置信度 × 保护门控，让程序原生表达、传播、积累"还不确定"，直到证据充足再决策。
 
 [English](README_EN.md)
 
@@ -11,8 +11,8 @@
 
 ## 一句话定位
 
-三言是一门内置三态逻辑的编程语言。真实世界充满不确定性，三言用"可能"来表达它，而不是强行归为对错。
-关键字可切换为任何自然语言——不只是中文编程，而是母语编程。
+三态认知框架 = **三态语言（DSL）** + **三态引擎（TernaryEngine）** + **三态应用（Agent / IoT / Village）**。
+语言只是接口层——真正的核心是 Kleene 三值逻辑传播 + 贝叶斯置信度衰减 + 保护门控的决策引擎。
 
 ---
 
@@ -464,6 +464,7 @@ sanyan/
 ├── preprocess.py              # #include 预处理器
 ├── pyproject.toml             # 项目配置
 ├── repl.py                    # REPL 交互环境
+├── ternary_engine.py           # 三态认知引擎（Kleene×贝叶斯×门控）
 ├── agent_runtime.py            # Agent V3 引擎
 ├── agent_tools.py              # Agent V3 工具层
 ├── run_agent.py               # Agent 启动器
