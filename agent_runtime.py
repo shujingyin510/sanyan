@@ -8,6 +8,7 @@ import glob as _glob
 
 from ternary_engine import TernaryEngine
 
+
 class SymbolTable:
     """符号表缓存：启动时扫全盘建索引，后续O(1)查"""
 

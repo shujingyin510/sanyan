@@ -400,7 +400,11 @@ def _gen_dialogue(ev, args):
     ev._scopes[0]['NPC信任'] = trust_dict
 
     # ── 三态追踪：村庄全局信任演化 ──
-    _village_ternary.step(f'对话({label})', f'{n1}↔{n2}={new_trust:.2f}', risk='低' if label in ('闲聊', '问候', '赞扬', '帮助', '赠礼') else '中')
+    _village_ternary.step(
+        f'对话({label})',
+        f'{n1}↔{n2}={new_trust:.2f}',
+        risk='低' if label in ('闲聊', '问候', '赞扬', '帮助', '赠礼') else '中',
+    )
 
     # ── #4 关系传递：A信任B高 + B信任C → A对C小量增益 ──
     chain_prop = []
@@ -848,7 +852,9 @@ try:
             print(
                 f'  凝聚力: {avg:.3f}(全部{len(vals)}对平均)  活跃:{active_avg:.3f}(已互动{len(active_vals)}对)  假:{false_n} 可能:{maybe_n} 真:{true_n}'
             )
-            print(f'  三态: {_village_ternary.summary()}  {_village_ternary.trit_display(*_village_ternary.history[-1]) if _village_ternary.history else ""}')
+            print(
+                f'  三态: {_village_ternary.summary()}  {_village_ternary.trit_display(*_village_ternary.history[-1]) if _village_ternary.history else ""}'
+            )
         # #3 每日矩阵（verbose 模式）
         if _verbose and _trust_timeline:
             td_now = _trust_timeline[-1][1]

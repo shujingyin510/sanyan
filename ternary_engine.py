@@ -128,4 +128,3 @@ class TernaryEngine:
     def trit_display(self, trit, conf):
         bars = {-1: '○○○', 0: '◐◐◐', 1: '●●●'}
         return f'{self.TRIT_NAMES.get(trit, "?")} {bars.get(trit, "???")} [{conf:.2f}]'
-
