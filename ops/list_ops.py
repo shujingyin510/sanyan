@@ -106,8 +106,10 @@ def _generic_get(evaluator, args):
     if isinstance(container, (list, ArrayValue)):
         try:
             return container[index]
-        except (IndexError, ValueError, TypeError):
-            return 0
+        except IndexError:
+            raise SanyanValueError(f'索引 {index} 越界（列表长度 {len(container)}）')
+        except (ValueError, TypeError):
+            raise SanyanTypeError(f'无效索引类型: {type(index).__name__}（需要整数）')
     raise SanyanTypeError('第一个参数必须是列表、数组或字典')
 
 

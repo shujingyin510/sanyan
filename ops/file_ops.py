@@ -192,7 +192,9 @@ def _parse_with_sugar_san(code, evaluator):
             if iv == -1 or iv == 0:
                 return None
         return result
-    except (SanyanNameError, SanyanSyntaxError, SanyanTypeError, SanyanValueError, SyntaxError):
+    except (SanyanNameError, SanyanSyntaxError, SanyanTypeError, SanyanValueError, SyntaxError) as e:
+        import sys
+        print(f'[糖语法解析] {e}', file=sys.stderr)
         return None
 
 

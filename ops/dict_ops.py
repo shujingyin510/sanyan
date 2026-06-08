@@ -55,7 +55,9 @@ def _dict_get(evaluator, args):
     try:
         return d[key]
     except KeyError:
-        raise SanyanKeyError(f'键不存在: {key}')
+        keys = list(d.keys())[:10]
+        hint = f'（可用键: {keys}）' if keys else '（字典为空）'
+        raise SanyanKeyError(f'键不存在: {key!r} {hint}')
 
 
 def _dict_set(evaluator, args):

@@ -113,8 +113,6 @@ class Commands:
             if return_type:
                 check_type(result, return_type, f'返回值 ({op})')
             return result
-        except SanyanError:
-            raise
         finally:
             if evaluator.call_stack:
                 evaluator.call_stack.pop()

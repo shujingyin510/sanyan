@@ -22,7 +22,7 @@ class IotOps:
             try:
                 return TritValue.from_string(str(val))
             except (ValueError, KeyError):
-                return TritValue(0)
+                raise SanyanValueError(f'无法将 "{val}" 转换为三态值（合法值: 真/假/可能/+/-/开/关）')
 
         def sync_device(name, state):
             """同步更新旧 dicts 和新 registry。"""
