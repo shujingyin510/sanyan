@@ -145,6 +145,7 @@ class SymbolTable:
         if self._indexed:
             return
         import re as _re
+
         for ext in ['*.py', '*.san']:
             for fp in _glob.glob('**/' + ext, recursive=True):
                 if '__pycache__' in fp or len(fp) > 80:
@@ -391,6 +392,7 @@ class AgentRuntime:
     def _detect_verify_loop(self, task):
         """检测'修复X让Y测试通过'模式"""
         import re as _re
+
         # 找.py文件名
         files = _re.findall(r'[\w_]+\.py', task)
         if len(files) >= 2:
@@ -416,16 +418,26 @@ class AgentRuntime:
             if 'a - b' in str(content) or '- b' in str(content):
                 # 已知bug pattern: a-b → a+b
                 fix = self.tools.get('replace_in_file', lambda p, d: '')(f'{src_file}|a - b|a + b', dry_run)
-                print(f'  Fix {attempt+1}: {fix}')
+                print(f'  Fix {attempt + 1}: {fix}')
             elif not dry_run:
                 break  # 不知道怎么修
 
             # 3. 重跑测试
             r = self.tools.get('run_test', lambda p, d: '')(test_file, dry_run)
-            print(f'  Retest {attempt+1}: {str(r)[:100]}')
+            print(f'  Retest {attempt + 1}: {str(r)[:100]}')
             if '通过' in str(r) or 'OK' in str(r):
-                self.memory['history'].append({'tool': 'verify_loop', 'params': f'{src_file}<-{test_file}', 'result': '通过', 'round': attempt + 1})
-                return {'answer': f'✅ {test_file} 通过！修复了 {src_file} (尝试{attempt+1}次)', 'memory': self.memory}
+                self.memory['history'].append(
+                    {
+                        'tool': 'verify_loop',
+                        'params': f'{src_file}<-{test_file}',
+                        'result': '通过',
+                        'round': attempt + 1,
+                    }
+                )
+                return {
+                    'answer': f'✅ {test_file} 通过！修复了 {src_file} (尝试{attempt + 1}次)',
+                    'memory': self.memory,
+                }
 
         return {'answer': f'❌ 3次修复后 {test_file} 仍未通过', 'memory': self.memory}
 
@@ -497,18 +509,26 @@ class AgentRuntime:
         # Gemini 专用格式
         if provider and 'gemini' in str(provider).lower():
             url = f'https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={key}'
-            body = _json.dumps({
-                'system_instruction': {'parts': [{'text': sys_msg}]},
-                'contents': [{'parts': [{'text': prompt}]}],
-                'generationConfig': {'temperature': 0.7}
-            }, ensure_ascii=False).encode('utf-8')
+            body = _json.dumps(
+                {
+                    'system_instruction': {'parts': [{'text': sys_msg}]},
+                    'contents': [{'parts': [{'text': prompt}]}],
+                    'generationConfig': {'temperature': 0.7},
+                },
+                ensure_ascii=False,
+            ).encode('utf-8')
             headers = {'Content-Type': 'application/json'}
             parser = lambda d: d['candidates'][0]['content']['parts'][0]['text']
         else:
-            body = _json.dumps({
-                'model': model, 'max_tokens': 256, 'temperature': 0.7,
-                'messages': [{'role': 'system', 'content': sys_msg}, {'role': 'user', 'content': prompt}]
-            }, ensure_ascii=False).encode('utf-8')
+            body = _json.dumps(
+                {
+                    'model': model,
+                    'max_tokens': 256,
+                    'temperature': 0.7,
+                    'messages': [{'role': 'system', 'content': sys_msg}, {'role': 'user', 'content': prompt}],
+                },
+                ensure_ascii=False,
+            ).encode('utf-8')
             headers = {'Content-Type': 'application/json', 'Authorization': f'Bearer {key}'}
             parser = lambda d: d['choices'][0]['message']['content']
 

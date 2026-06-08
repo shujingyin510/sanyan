@@ -810,8 +810,8 @@ def run_interactive(evaluator, api_key, rt=None):
             print(f'  三态: {rt.ternary.summary()}' if rt else '  无引擎')
             continue
         if q.startswith('/记忆'):
-            print(f'  阶段: {rt.memory.get("stage","?")}' if rt else '')
-            print(f'  修改: {rt.memory.get("modified",[])}' if rt else '')
+            print(f'  阶段: {rt.memory.get("stage", "?")}' if rt else '')
+            print(f'  修改: {rt.memory.get("modified", [])}' if rt else '')
             continue
         try:
             result = rt.run(q, max_rounds=15)
@@ -1016,12 +1016,12 @@ def main():
 
     if args.question:
         result = rt.run(args.question, max_rounds=max_r, dry_run=args.dry_run)
-        print(f"\n→ {result['answer']}")
+        print(f'\n→ {result["answer"]}')
         if args.report:
             m = result['memory']
-            print(f"\n=== 报告 ===\n阶段: {m['stage']}\n工具: {len(m['history'])}次\n修改: {m['modified']}")
+            print(f'\n=== 报告 ===\n阶段: {m["stage"]}\n工具: {len(m["history"])}次\n修改: {m["modified"]}')
     else:
-            run_interactive(evaluator, api_key, rt)  # V3 引擎
+        run_interactive(evaluator, api_key, rt)  # V3 引擎
 
 
 def _print_report(evaluator):
