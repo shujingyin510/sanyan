@@ -1,6 +1,6 @@
 # Agent 可读决策 DSL
 
-[English](#english)
+[English](README_EN.md)
 
 > **一句话**：基于三元引擎的 LLM Agent——每步决策带置信度，不确定时自动门控拦截。
 
@@ -64,9 +64,9 @@ python -X utf8 run_agent.py "修复 _test_verify.py 让测试通过" --auto
 | `ternary_engine.py` | 三态决策引擎（Kleene + 贝叶斯 + 门控） | 131 |
 | `agent_runtime.py` | V3 运行时（SymbolTable / MemoryStore / ProjectGraph） | 492 |
 | `agent_tools.py` | 工具层（12 个纯函数） | 170 |
-| `agent_policy.san` | 策略配置（模型 / 阈值 / 场景规则，热重载） | — |
-| `decision.san` | 旧引擎决策核心（待迁移） | — |
-| `agent.san` | 旧引擎主循环（交互模式） | — |
+| `agent_policy.san` | 策略配置（模型 / 阈值 / 场景规则，热重载） | 194 |
+| `decision.san` | 旧引擎决策核心（待迁移） | 185 |
+| `agent.san` | 旧引擎主循环（交互模式） | 1242 |
 
 ---
 
@@ -118,26 +118,4 @@ python -X utf8 run_agent.py --list-tasks          # 历史
 python -X utf8 run_village_observe.py --days=5
 ```
 
-NPC 自主生活 + LLM 对话 + 三态信任演变。
-
----
-
-## English
-
-**Ternary Cognitive Agent** — LLM-driven, confidence-gated, autonomous programming.
-
-```
-User Task → Pre-analyze → LLM decides tool → TernaryEngine.step() → Execute → Reflect → Loop
-```
-
-| File | Role |
-|------|------|
-| `ternary_engine.py` | Kleene + Bayesian + safety gating |
-| `agent_runtime.py` | SymbolTable / MemoryStore / ProjectGraph |
-| `agent_tools.py` | 12 pure function tools |
-| `agent_policy.san` | Hot-reload config |
-
-```bash
-pip install ternary-engine
-python -X utf8 run_agent.py "analyze run_agent.py" --auto
-```
+NPC 自主生活 + LLM 对话 + 三态信任演变。SVG 图表 + JSON 导出。
