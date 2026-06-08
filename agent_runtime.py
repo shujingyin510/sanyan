@@ -471,7 +471,15 @@ class AgentRuntime:
         url = (getattr(self.ev, 'get_var', lambda x: '')('模型URL') or '').strip()
         key = (getattr(self.ev, 'get_var', lambda x: '')('API密钥') or '').strip()
         provider = (getattr(self.ev, 'get_var', lambda x: 'deepseek')('模型提供商') or 'deepseek').strip()
-        timeout = int(getattr(self.ev, 'get_var', lambda x: 60)('超时秒数') or 60)
+        timeout = 60
+        try:
+            raw_timeout = getattr(self.ev, 'get_var', lambda x: 60)('超时秒数')
+            if hasattr(raw_timeout, 'to_payload'):
+                timeout = int(float(str(raw_timeout.to_payload())))
+            else:
+                timeout = int(str(raw_timeout))
+        except Exception:
+            pass
 
         sys_msg = '可用工具: analyze(查文件结构), find_symbol(查符号), read_file(读文件|起始行|结束行), search_code(搜索), replace_in_file(单替换 路径|旧|新), replace_all(批量 模式|旧|新), write_file(写 路径|内容), list_files(列), run_test(测试), git_diff(git差异), git_status(git状态), done(完成|回答)。\n只输出: tool|params。如 analyze|run_agent.py'
 

@@ -1029,48 +1029,34 @@ def main():
 
     evaluator = init_evaluator(api_key)
 
-    # --auto 使用新 AgentRuntime V2（系统决策引擎，替代 agent.san 补丁层）
-    if args.auto:
-        sandbox = evaluator.get_var('_sandbox') if evaluator.has_var('_sandbox') else None
-        rt = AgentRuntime(evaluator, sandbox)
-        rt.register('analyze', lambda p, d: _analyze_file_direct(p))
-        rt.register('find_symbol', lambda p, d: _find_symbol_direct(p))
-        rt.register('read_file', lambda p, d: _read_file_direct_simple(p))
-        rt.register('search_code', lambda p, d: _search_code_direct(p))
-        rt.register('replace_in_file', lambda p, d: _replace_in_file_direct(p, d))
-        rt.register('replace_all', lambda p, d: _replace_all_direct(p, d))
-        rt.register('write_file', lambda p, d: _write_file_direct_simple(p, d))
-        rt.register('list_files', lambda p, d: _list_files_direct_simple(p))
-        rt.register('run_test', lambda p, d: _run_test_direct(p))
-        rt.register('git_diff', lambda p, d: _git_diff_direct())
-        rt.register('git_status', lambda p, d: _git_status_direct())
-        rt.register('done', lambda p, d: p if p else '完成')
-        result = rt.run(args.question, max_rounds=args.rounds or 10, dry_run=args.dry_run)
-        print(f'\n→ {result["answer"]}')
-        if args.report:
-            print(
-                f'\n=== 报告 ===\n阶段: {result["memory"]["stage"]}\n工具: {len(result["memory"]["history"])}次\n修改: {result["memory"]["modified"]}'
-            )
-        return
-
-    # --resume: 续接上次任务
-    if args.resume:
-        tid, desc = _get_last_task()
-        if tid:
-            desc, mem = _load_task(tid)
-            evaluator.set_var('_当前任务ID', tid)
-            evaluator.set_var('_当前任务描述', desc)
-            run_once(evaluator, desc)
-            if args.report:
-                _print_report(evaluator)
-        else:
-            print('没有未完成的任务')
-        return
+    # 统一引擎：AgentRuntime V3（--auto 和非 auto 都走这里）
+    sandbox = evaluator.get_var('_sandbox') if evaluator.has_var('_sandbox') else None
+    rt = AgentRuntime(evaluator, sandbox)
+    for name, func in [
+        ('analyze', lambda p, d: _analyze_file_direct(p)),
+        ('find_symbol', lambda p, d: _find_symbol_direct(p)),
+        ('read_file', lambda p, d: _read_file_direct_simple(p)),
+        ('search_code', lambda p, d: _search_code_direct(p)),
+        ('replace_in_file', lambda p, d: _replace_in_file_direct(p, d)),
+        ('replace_all', lambda p, d: _replace_all_direct(p, d)),
+        ('write_file', lambda p, d: _write_file_direct_simple(p, d)),
+        ('list_files', lambda p, d: _list_files_direct_simple(p)),
+        ('run_test', lambda p, d: _run_test_direct(p)),
+        ('git_diff', lambda p, d: _git_diff_direct()),
+        ('git_status', lambda p, d: _git_status_direct()),
+        ('done', lambda p, d: p if p else '完成'),
+    ]:
+        rt.register(name, func)
+    max_r = args.rounds or 15
 
     if args.question:
-        run_once(evaluator, args.question)
+        result = rt.run(args.question, max_rounds=max_r, dry_run=args.dry_run)
+        print(f"\n→ {result['answer']}")
+        if args.report:
+            m = result['memory']
+            print(f"\n=== 报告 ===\n阶段: {m['stage']}\n工具: {len(m['history'])}次\n修改: {m['modified']}")
     else:
-        run_interactive(evaluator, api_key)
+        run_interactive(evaluator, api_key)  # 交互模式暂留旧引擎
 
 
 def _print_report(evaluator):
