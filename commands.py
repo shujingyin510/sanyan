@@ -6,7 +6,7 @@
 
 from __future__ import annotations
 from typing import Any, TYPE_CHECKING
-from values import SanyanError, SanyanSyntaxError, check_type
+from values import SanyanSyntaxError, check_type
 from ternary_core import TritValue
 from ops.registry import register
 from tail_call import detect_tail_call, run_tail_call, run_normal, is_tail_call
