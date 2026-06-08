@@ -342,6 +342,7 @@ class VM:
                     print(val)
         return True
 
+    # ── 算术: ADD, SUB, MUL, DIV, MOD, NEG, POW ────────────────
     def _exec_arithmetic(self, op: int) -> bool:
         """算术运算：ADD, SUB, MUL, DIV, MOD"""
         b = self.stack.pop() if self.stack else 0
@@ -377,6 +378,7 @@ class VM:
             return False
         return True
 
+    # ── 位运算: BIT_AND, BIT_OR, BIT_XOR, BIT_NOT, SHIFT_L, SHIFT_R ─
     def _exec_bitwise(self, op: int) -> bool:
         """位运算和字节操作：BIT_AND~BIT_TST, SHIFT_L/R, LO_BYTE~MRG_BYT"""
         b = self.stack.pop() if self.stack else 0
