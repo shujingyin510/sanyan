@@ -15,9 +15,9 @@ from ternary_engine import TernaryEngine
 # 三态引擎：追踪村庄全局信任演化
 _village_ternary = TernaryEngine(max_hesitation=5, min_gain=0.03)
 # 每个 NPC 独立的信任追踪
-_npc_ternary = {}
+_npc_ternary: dict = {}
 # 记忆链：谁对谁说了什么
-_memory_chain = []
+_memory_chain: list = []
 
 
 # 视觉宽度：中文字符占两个终端列宽
@@ -1012,8 +1012,8 @@ finally:
             from collections import Counter
 
             pairs = Counter(f'{m["n1"][:2]}↔{m["n2"][:2]}' for m in _memory_chain)
-            top = pairs.most_common(3)
-            print(f'  活跃组合: {", ".join(f"{p}({c}次)" for p, c in top)}')
+            top_pairs = pairs.most_common(3)
+            print(f'  活跃组合: {", ".join(f"{p}({c}次)" for p, c in top_pairs)}')
             conflicts = [m for m in _memory_chain if m['label'] == '争吵']
             print(
                 f'  冲突事件: {len(conflicts)}起'
