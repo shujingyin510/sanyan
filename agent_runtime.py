@@ -134,42 +134,48 @@ class TernaryEngine:
 
 
 class SymbolTable:
-    """符号表缓存：查一次，全局复用"""
+    """符号表缓存：启动时扫全盘建索引，后续O(1)查"""
 
     def __init__(self):
-        self._cache = {}  # symbol → {'def': [(file,line)], 'ref': [(file,line)]}
+        self._cache = {}
+        self._indexed = False
 
-    def lookup(self, symbol):
-        if symbol in self._cache:
-            return self._cache[symbol]
-
-        defs, refs = [], []
+    def build_all(self):
+        """一次性扫描全项目，建立所有符号索引"""
+        if self._indexed:
+            return
+        import re as _re
         for ext in ['*.py', '*.san']:
             for fp in _glob.glob('**/' + ext, recursive=True):
-                if '__pycache__' in fp:
+                if '__pycache__' in fp or len(fp) > 80:
                     continue
                 try:
                     with open(fp, encoding='utf-8', errors='ignore') as fh:
                         for lineno, line in enumerate(fh, 1):
-                            if f'def {symbol}(' in line or f'class {symbol}' in line or f'定义 {symbol}' in line:
-                                defs.append((fp, lineno))
-                            elif symbol in line and 'import' not in line.lower():
-                                refs.append((fp, lineno))
+                            # 函数/类定义
+                            m = _re.search(r'\b(?:def|class|定义)\s+([a-zA-Z_]\w*)', line)
+                            if m:
+                                sym = m.group(1)
+                                entry = self._cache.setdefault(sym, {'def': [], 'ref': []})
+                                if len(entry['def']) < 5:
+                                    entry['def'].append((fp, lineno))
+                            else:
+                                # 引用（非导入行）
+                                for m2 in _re.finditer(r'\b([a-zA-Z_]\w{2,})\b', line):
+                                    if 'import' in line.lower():
+                                        continue
+                                    sym = m2.group(1)
+                                    entry = self._cache.setdefault(sym, {'def': [], 'ref': []})
+                                    if len(entry['ref']) < 10:
+                                        entry['ref'].append((fp, lineno))
                 except Exception:
                     pass
-                if len(defs) + len(refs) > 30:
-                    break
-        self._cache[symbol] = {'def': defs[:10], 'ref': refs[:20]}
-        return self._cache[symbol]
+        self._indexed = True
 
-    def preload(self, task):
-        """从任务中预提取符号并缓存"""
-        import re as _re
-
-        for m in _re.finditer(r'[a-zA-Z_][a-zA-Z0-9_]{1,20}', task):
-            sym = m.group(0)
-            if sym not in ('def', 'class', 'import', 'from', 'if', 'else', 'self', 'True', 'False'):
-                self.lookup(sym)
+    def lookup(self, symbol):
+        if not self._indexed:
+            self.build_all()
+        return self._cache.get(symbol, {'def': [], 'ref': []})
 
 
 class MemoryStore:
@@ -269,8 +275,8 @@ class AgentRuntime:
             result = self._run_verify_loop(vloop['file'], vloop['test'], dry_run)
             if result:
                 return result
-        # 预加载符号 + 项目图
-        self.symbols.preload(task)
+        # 预加载符号索引（启动一次，后续O(1)查）
+        self.symbols.build_all()
         self.graph.build()
         # 构建初始上下文
         ctx = self._build_context(task, 'init')

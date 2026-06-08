@@ -21,9 +21,9 @@ class TestSymbolTable(unittest.TestCase):
         result = st.lookup('xyznonexistent123')
         self.assertEqual(len(result['def']), 0)
 
-    def test_preload(self):
+    def test_build_all(self):
         st = SymbolTable()
-        st.preload('修复 main 函数的 bug')
+        st.build_all()
         result = st.lookup('main')
         self.assertGreaterEqual(len(result['def']), 1)
 
