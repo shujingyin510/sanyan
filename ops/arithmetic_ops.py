@@ -198,8 +198,9 @@ def _op_mod(evaluator, args):
         prec = a_prec
     a_int = BT.to_int(a_trits)
     b_int = BT.to_int(b_trits)
-    # 截断取整（与 C 语言一致），而非 Python 的向下取整
-    q = int(a_int / b_int)
+    # 使用 Python // 地板除：余数始终非负，与 Python % 行为一致
+    # 字节码编译器等依赖此行为（如发射i16 用 mod 将负偏移量映射到 [0, 65536)）
+    q = a_int // b_int
     q_trits = BT.from_int(q)
     remainder = TernaryALU.sub(a_trits, TernaryALU.multiply(q_trits, b_trits))
     r_int = BT.to_int(remainder)

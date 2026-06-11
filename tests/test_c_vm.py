@@ -163,7 +163,7 @@ class TestCVMCrossValidation(unittest.TestCase):
         self._compile_and_compare('(输出 (非 1))', '-1')
 
     def test_not_zero(self):
-        self._compile_and_compare('(输出 (非 0))', '1')
+        self._compile_and_compare('(输出 (非 0))', '0')
 
     def test_string(self):
         self._compile_and_compare('(输出 "hello")', 'hello')
