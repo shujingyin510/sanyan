@@ -97,11 +97,12 @@ class Commands:
             from values import SanyanRuntimeError
 
             raise SanyanRuntimeError('命令调用超过了最大递归深度')
+        pushed = False
         evaluator.call_stack.append((op, args))
+        pushed = True
         try:
             params, body, param_types, return_type, defaults, rest_param = resolve_command(evaluator, op)
             args = match_params(params, op, args, defaults, rest_param)
-            # 可变参数: 如果 rest_param 存在且 args 有 bundle，加到 params 列表末尾
             if rest_param and len(args) > len(params):
                 params = list(params) + [rest_param]
             evaluated_args = evaluate_args(evaluator, params, args, param_types)
@@ -114,7 +115,7 @@ class Commands:
                 check_type(result, return_type, f'返回值 ({op})')
             return result
         finally:
-            if evaluator.call_stack:
+            if pushed:
                 evaluator.call_stack.pop()
             evaluator.call_depth -= 1
 

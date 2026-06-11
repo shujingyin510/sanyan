@@ -390,10 +390,8 @@ class SanyanEvaluator(SanyanRuntime):
             for a in args:
                 if isinstance(a, (int, float, str, list, dict)) and not isinstance(a, SrcNode):
                     simpl.append(a)
-                elif isinstance(a, str) and len(a) >= 2 and a[0] in ('"', "'", '\u201c'):
-                    simpl.append(a)  # 字符串字面量
                 else:
-                    simpl.append(None)  # 变量/表达式，跳过检查
+                    simpl.append(None)
             if any(v is not None for v in simpl) and all(v is not None for v in simpl):
                 err = check_types(op, args, simpl)
                 if err:

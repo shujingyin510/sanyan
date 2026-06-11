@@ -590,9 +590,9 @@ def ternary_sqrt(x_trits: list, precision: Optional[int] = None) -> list:
         raise SanyanValueError('sqrt: negative argument')
     # 初始猜测：x/2 或 1（取决于 x 是否大于 1），全部在定点域计算
     if x_int > scale:
-        guess = BT.from_int(int(round(x_int / 2)))
+        guess = BT.from_int(int(round(x_int / 2)), precision)
     else:
-        guess = BT.from_int(scale)  # 1.0 在定点的表示
+        guess = BT.from_int(scale, precision)
     half = _half_at_precision(precision)
     for _ in range(20):
         div = TernaryALU.fixed_div(x_trits, guess, precision)
@@ -629,7 +629,7 @@ def ternary_log(x_trits: list, precision: Optional[int] = None) -> list:
     one = _int_at_precision(1, precision)
     # 初始猜测：x/3 或 0.5（取决于 x 是否大于 2），全部在定点域
     if x_int > 2 * scale:
-        guess = BT.from_int(int(round(x_int / 3)))
+        guess = BT.from_int(int(round(x_int / 3)), precision)
     else:
         guess = _half_at_precision(precision)
     for _ in range(30):
