@@ -206,13 +206,11 @@ def _parse_with_sugar_san(code, evaluator):
 
 
 def _parse_code(code, evaluator):
-    """解析代码：#include 预处理 → sugar.san 自举解析 → SugarConverter → S-表达式降级。"""
+    """解析代码：#include 预处理 → SugarConverter → sugar.san 自举解析 → S-表达式降级。"""
     from preprocess import preprocess_includes
 
     code = preprocess_includes(code)
-    ast = _parse_with_sugar_san(code, evaluator)
-    if ast is not None:
-        return ast
+    # 优先 Python 原生 SugarConverter（跨平台一致性最优）
     try:
         from sugar import SugarConverter
 
@@ -221,6 +219,11 @@ def _parse_code(code, evaluator):
             return ast
     except SyntaxError:
         pass
+    # 备选：sugar.san 自举解析器（如果可用）
+    ast = _parse_with_sugar_san(code, evaluator)
+    if ast is not None:
+        return ast
+    # 最后：S-表达式降级
     from lexer import tokenize
     from parser import parse
 
