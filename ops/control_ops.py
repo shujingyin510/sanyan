@@ -1,4 +1,4 @@
-"""控制流操作：若、做、循环、遍历、返回、跳出、异常处理"""
+"""控制流操作：若、做、循环、遍历、返回、跳出、异常处理、三态匹配"""
 
 from ternary_core import BT, TritValue, ArrayValue
 from values import ReturnException, BreakException, ContinueException, SanyanError, SanyanSyntaxError, SanyanValueError
@@ -289,6 +289,152 @@ class ControlOps:
                 break
         return result if result is not None else TritValue(0)
 
+    @staticmethod
+    def ternary_match(evaluator, args):
+        """匹配3(值) { 真→..., 可能→..., 假→... } — 三态模式匹配。
+
+        显式三态分支语法，比判()更清晰：
+        - 真分支：值为真(1)时执行
+        - 可能分支：值为可能(0)时执行
+        - 假分支：值为假(-1)时执行
+
+        支持置信度守卫：真(>0.8)→... 表示只在置信度>0.8时匹配
+        """
+        if len(args) < 2:
+            raise SanyanSyntaxError('匹配3 需要值和至少一个分支')
+
+        val = evaluator.eval(args[0])
+
+        # 解析分支：args[1:] 是 [模式1, 体1, 模式2, 体2, ...]
+        branches = args[1:]
+
+        for i in range(0, len(branches), 2):
+            if i + 1 >= len(branches):
+                break
+
+            pattern_node = branches[i]
+            body_node = branches[i + 1]
+
+            # 解析模式
+            pattern_str = ''
+            confidence_threshold = None
+
+            if isinstance(pattern_node, str):
+                pattern_str = pattern_node
+            elif isinstance(pattern_node, list):
+                # 支持 真(>0.8) 格式
+                if len(pattern_node) >= 1:
+                    pattern_str = pattern_node[0] if isinstance(pattern_node[0], str) else str(pattern_node[0])
+                if len(pattern_node) >= 2:
+                    # 第二个元素是置信度守卫表达式
+                    conf_guard = pattern_node[1]
+                    if isinstance(conf_guard, str):
+                        # 解析 >0.8 格式
+                        if conf_guard.startswith('>') or conf_guard.startswith('>='):
+                            op = conf_guard[:2] if conf_guard.startswith('>=') else '>'
+                            threshold = float(conf_guard[2:]) if conf_guard.startswith('>=') else float(conf_guard[1:])
+                            confidence_threshold = ('>', threshold)
+                        elif conf_guard.startswith('<') or conf_guard.startswith('<='):
+                            op = conf_guard[:2] if conf_guard.startswith('<=') else '<'
+                            threshold = float(conf_guard[2:]) if conf_guard.startswith('<=') else float(conf_guard[1:])
+                            confidence_threshold = ('<', threshold)
+                    elif isinstance(conf_guard, (int, float)):
+                        confidence_threshold = ('>', float(conf_guard))
+
+            # 匹配模式
+            matched = False
+            int_val = val.to_int() if isinstance(val, TritValue) else (1 if val else 0)
+
+            if pattern_str in ('真', 'true', '1'):
+                matched = int_val == 1
+            elif pattern_str in ('假', 'false', '-1'):
+                matched = int_val == -1
+            elif pattern_str in ('可能', 'maybe', '0'):
+                matched = int_val == 0
+            elif pattern_str in ('默认', 'default', '_'):
+                matched = True
+            else:
+                # 尝试值匹配
+                try:
+                    pattern_val = evaluator.eval(pattern_node)
+                    if isinstance(val, TritValue) and isinstance(pattern_val, TritValue):
+                        matched = val.to_int() == pattern_val.to_int()
+                    else:
+                        matched = str(val) == str(pattern_val)
+                except Exception:
+                    matched = False
+
+            # 检查置信度守卫
+            if matched and confidence_threshold is not None:
+                if isinstance(val, TritValue):
+                    conf = val.confidence
+                    op, threshold = confidence_threshold
+                    if op == '>':
+                        matched = conf > threshold
+                    elif op == '>=':
+                        matched = conf >= threshold
+                    elif op == '<':
+                        matched = conf < threshold
+                    elif op == '<=':
+                        matched = conf <= threshold
+                else:
+                    matched = False
+
+            if matched:
+                return evaluator.eval(body_node)
+
+        return TritValue(0)
+
+    @staticmethod
+    def ternary_match_confidence(evaluator, args):
+        """匹配信度(值, 阈值) { 高→..., 中→..., 低→... } — 按置信度区间匹配。
+
+        根据置信度值分三档：
+        - 高：置信度 > 阈值（默认0.7）
+        - 中：置信度在 [1-阈值, 阈值] 之间
+        - 低：置信度 < 1-阈值
+        """
+        if len(args) < 2:
+            raise SanyanSyntaxError('匹配信度 需要值和阈值')
+
+        val = evaluator.eval(args[0])
+        threshold_val = evaluator.eval(args[1])
+        threshold = threshold_val.to_float() if isinstance(threshold_val, TritValue) else float(threshold_val)
+
+        if not isinstance(val, TritValue):
+            # 非三态值，默认高置信度
+            conf = 1.0
+        else:
+            conf = val.confidence
+
+        # 确定置信度区间
+        if conf > threshold:
+            level = '高'
+        elif conf < (1 - threshold):
+            level = '低'
+        else:
+            level = '中'
+
+        # 解析分支
+        branches = args[2:]
+        for i in range(0, len(branches), 2):
+            if i + 1 >= len(branches):
+                break
+
+            pattern_node = branches[i]
+            body_node = branches[i + 1]
+
+            pattern_str = ''
+            if isinstance(pattern_node, str):
+                pattern_str = pattern_node
+            elif isinstance(pattern_node, list) and pattern_node:
+                pattern_str = pattern_node[0] if isinstance(pattern_node[0], str) else str(pattern_node[0])
+
+            if pattern_str in (level, '默认', 'default', '_'):
+                return evaluator.eval(body_node)
+
+        return TritValue(0)
+
 
 # 注册控制流操作
 register('if', ControlOps.if_op)
@@ -308,3 +454,7 @@ register('set', ControlOps.define_var)
 register('export', ControlOps.export_op)
 register('assert', ControlOps.assert_op)
 register('do_while', ControlOps.do_while_op)
+register('匹配3', ControlOps.ternary_match)
+register('匹配信度', ControlOps.ternary_match_confidence)
+register('ternary_match', ControlOps.ternary_match)
+register('match_confidence', ControlOps.ternary_match_confidence)

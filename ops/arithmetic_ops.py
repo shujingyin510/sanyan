@@ -82,18 +82,36 @@ def _op_add(evaluator, args):
     """加法：支持数字加法和字符串连接。"""
     vals = [_to_tritvalue(evaluator.eval(arg)) for arg in args]
     if all(isinstance(v, TritValue) for v in vals):
-        trits_list = [v.value for v in vals]
-        precs_list = [v.precision for v in vals]
-        aligned, prec = _align_trits(trits_list, precs_list)
-        result = _fold_ternary('add', aligned)
-        return TritValue(result, prec, confidence=propagated_confidence(*vals))
-    parts = []
-    for val in vals:
-        if isinstance(val, TritValue):
-            parts.append(str(val.to_float() if val.is_float() else val.to_int()))
-        else:
-            parts.append(str(val))
-    return ''.join(parts)
+        # 全部是 TritValue 时：区分数字加法和字符串拼接
+        if all(v.is_numeric() for v in vals):
+            trits_list = [v.value for v in vals]
+            precs_list = [v.precision for v in vals]
+            aligned, prec = _align_trits(trits_list, precs_list)
+            result = _fold_ternary('add', aligned)
+            return TritValue(result, prec, confidence=propagated_confidence(*vals))
+        if all(v.is_string() for v in vals):
+            parts = [v.to_payload() for v in vals]
+            return TritValue(''.join(parts), confidence=propagated_confidence(*vals))
+        raise SanyanTypeError('加 的参数类型不匹配：不能混合数字和字符串')
+    # 混合类型：全部是字符串或可转字符串时才拼接
+    has_string = any(isinstance(v, str) or (isinstance(v, TritValue) and v.is_string()) for v in vals)
+    has_numeric = any(isinstance(v, (int, float)) or (isinstance(v, TritValue) and v.is_numeric()) for v in vals)
+    if has_string and has_numeric:
+        raise SanyanTypeError('加 的参数类型不匹配：不能混合数字和字符串')
+    if has_string:
+        parts = []
+        for val in vals:
+            if isinstance(val, TritValue):
+                if val.is_string():
+                    parts.append(val.to_payload())
+                else:
+                    parts.append(str(val.to_float() if val.is_float() else val.to_int()))
+            elif isinstance(val, str):
+                parts.append(val)
+            else:
+                parts.append(str(val))
+        return ''.join(parts)
+    raise SanyanTypeError('加 的参数类型不匹配')
 
 
 def _op_sub(evaluator, args):
@@ -180,7 +198,8 @@ def _op_mod(evaluator, args):
         prec = a_prec
     a_int = BT.to_int(a_trits)
     b_int = BT.to_int(b_trits)
-    q = a_int // b_int
+    # 截断取整（与 C 语言一致），而非 Python 的向下取整
+    q = int(a_int / b_int)
     q_trits = BT.from_int(q)
     remainder = TernaryALU.sub(a_trits, TernaryALU.multiply(q_trits, b_trits))
     r_int = BT.to_int(remainder)

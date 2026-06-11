@@ -66,7 +66,7 @@ def _equals_op(evaluator, args):
     b = evaluator.eval(args[1])
     if isinstance(a, TritValue) and isinstance(b, TritValue):
         return TritValue(1 if a.symbol == b.symbol else -1)
-    return TritValue(1 if a == b else 0)
+    return TritValue(1 if a == b else -1)
 
 
 # ── 注册 ──

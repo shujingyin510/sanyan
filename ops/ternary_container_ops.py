@@ -1,8 +1,8 @@
-"""三态容器操作: 列表、字典，每个元素带独立置信度"""
+"""三态容器操作: 列表、字典，每个元素带独立置信度、链式信度传播"""
 
 from ternary_core import TritValue
-from values import SanyanSyntaxError, SanyanTypeError, SanyanValueError
-from ops.registry import register
+from values import SanyanSyntaxError, SanyanTypeError, SanyanValueError, SanyanRuntimeError
+from ops.registry import register, register_alias
 
 
 def _trit_list(evaluator, args):
@@ -137,3 +137,209 @@ register('trit_list_map', _trit_list_map)
 register('trit_dict', _trit_dict)
 register('trit_key_get', _trit_key_get)
 register('trit_key_set', _trit_key_set)
+
+
+# ── 链式信度传播操作 ──
+
+
+def _chain(evaluator, args):
+    """链(步骤1, 步骤2, ...) — 链式执行，置信度逐级传播。
+
+    每个步骤返回的置信度会乘到后续步骤的置信度上。
+    任一步骤返回假(-1)时链中断，返回可能(0)时降低后续置信度。
+
+    示例：链(传感器读数, 数据清洗, 结果验证)
+    """
+    if not args:
+        return TritValue(0)
+
+    chain_conf = 1.0
+    last_result = TritValue(0)
+
+    for step in args:
+        result = evaluator.eval(step)
+
+        if isinstance(result, TritValue):
+            last_result = result
+            # 置信度传播：当前置信度 × 步骤置信度
+            chain_conf *= result.confidence
+
+            # 用 to_int() 获取整数值，而非 value[0]（多位数时 value[0] 是最高位 trit）
+            int_val = result.to_int()
+
+            # 如果步骤返回假，链中断
+            if int_val == -1:
+                return TritValue(-1, confidence=chain_conf)
+
+            # 如果步骤返回可能，降低后续置信度
+            if int_val == 0:
+                chain_conf *= 0.8
+        else:
+            # 非三态值视为真
+            last_result = TritValue(1, confidence=chain_conf)
+
+    # 返回最终结果，置信度为链式传播后的值
+    if isinstance(last_result, TritValue):
+        return TritValue(last_result.value, confidence=chain_conf)
+    return TritValue(1, confidence=chain_conf)
+
+
+def _chain_or_break(evaluator, args):
+    """链断(步骤1, 步骤2, ...) — 链式执行，假值中断并抛出异常。
+
+    与链()类似，但假值会抛出 SanyanRuntimeError 而非静默返回。
+    """
+    if not args:
+        return TritValue(0)
+
+    chain_conf = 1.0
+
+    for i, step in enumerate(args):
+        result = evaluator.eval(step)
+
+        if isinstance(result, TritValue):
+            chain_conf *= result.confidence
+
+            int_val = result.to_int()
+            if int_val == -1:
+                raise SanyanRuntimeError(f'链断: 步骤 {i + 1} 返回假，链中断')
+
+            if int_val == 0:
+                chain_conf *= 0.8
+        else:
+            chain_conf *= 1.0
+
+    return TritValue(1, confidence=chain_conf)
+
+
+def _unwrap(evaluator, args):
+    """解包(值 [, 默认值]) — 解包三态值，可能时返回默认值。
+
+    - 真(1) → 返回值
+    - 假(-1) → 抛出异常
+    - 可能(0) → 返回默认值（未指定则抛出异常）
+    """
+    if len(args) < 1:
+        raise SanyanSyntaxError('解包 需要至少一个参数')
+
+    val = evaluator.eval(args[0])
+
+    if not isinstance(val, TritValue):
+        return val
+
+    int_val = val.to_int()
+    if int_val == 1:
+        return val
+    elif int_val == -1:
+        raise SanyanRuntimeError(f'解包失败: 值为假 (置信度: {val.confidence:.2f})')
+    else:
+        # 可能
+        if len(args) >= 2:
+            return evaluator.eval(args[1])
+        raise SanyanRuntimeError(f'解包失败: 值为可能 (置信度: {val.confidence:.2f})')
+
+
+def _unwrap_or(evaluator, args):
+    """或解(值, 默认值) — 解包三态值，可能/假时返回默认值。"""
+    if len(args) != 2:
+        raise SanyanSyntaxError('或解 需要两个参数')
+
+    val = evaluator.eval(args[0])
+    default = evaluator.eval(args[1])
+
+    if not isinstance(val, TritValue):
+        return val
+
+    if val.to_int() == 1:
+        return val
+    else:
+        return default
+
+
+def _try_chain(evaluator, args):
+    """尝试链(步骤1, 步骤2, ..., 默认值) — 链式执行，失败时返回默认值。
+
+    每个步骤尝试执行，失败时跳过并继续下一步。
+    全部失败时返回默认值。
+    """
+    if len(args) < 1:
+        raise SanyanSyntaxError('尝试链 需要至少一个参数')
+
+    default = TritValue(0)
+    steps = args
+
+    # 如果最后一个参数是默认值标记
+    if len(args) >= 2:
+        last = args[-1]
+        if isinstance(last, list) and last and last[0] == '默认':
+            steps = args[:-1]
+            default = evaluator.eval(last[1]) if len(last) > 1 else TritValue(0)
+
+    for step in steps:
+        try:
+            result = evaluator.eval(step)
+            if isinstance(result, TritValue) and result.to_int() == 1:
+                return result
+        except Exception:
+            continue
+
+    return default
+
+
+def _confidence_guard(evaluator, args):
+    """信度守卫(值, 阈值) { 高→..., 低→... } — 置信度门控。
+
+    根据置信度阈值决定执行哪个分支：
+    - 高：置信度 >= 阈值
+    - 低：置信度 < 阈值
+    """
+    if len(args) < 2:
+        raise SanyanSyntaxError('信度守卫 需要值和阈值')
+
+    val = evaluator.eval(args[0])
+    threshold_val = evaluator.eval(args[1])
+    threshold = threshold_val.to_float() if isinstance(threshold_val, TritValue) else float(threshold_val)
+
+    if not isinstance(val, TritValue):
+        conf = 1.0
+    else:
+        conf = val.confidence
+
+    # 解析分支
+    branches = args[2:]
+    for i in range(0, len(branches), 2):
+        if i + 1 >= len(branches):
+            break
+
+        pattern_node = branches[i]
+        body_node = branches[i + 1]
+
+        pattern_str = ''
+        if isinstance(pattern_node, str):
+            pattern_str = pattern_node
+        elif isinstance(pattern_node, list) and pattern_node:
+            pattern_str = pattern_node[0] if isinstance(pattern_node[0], str) else str(pattern_node[0])
+
+        if pattern_str in ('高', 'high', '通过'):
+            if conf >= threshold:
+                return evaluator.eval(body_node)
+        elif pattern_str in ('低', 'low', '失败'):
+            if conf < threshold:
+                return evaluator.eval(body_node)
+
+    return TritValue(0)
+
+
+register('链', _chain)
+register('链断', _chain_or_break)
+register('解包', _unwrap)
+register('或解', _unwrap_or)
+register('尝试链', _try_chain)
+register('信度守卫', _confidence_guard)
+
+register_alias('chain', '链')
+register_alias('chain_or_break', '链断')
+register_alias('unwrap', '解包')
+register_alias('unwrap_or', '或解')
+register_alias('try_chain', '尝试链')
+register_alias('confidence_guard', '信度守卫')

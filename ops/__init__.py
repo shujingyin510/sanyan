@@ -1,7 +1,7 @@
 """三言内置操作模块。
 
 每个子模块实现一类操作：
-  control_ops     — 控制流（if/loop/for/try/judge）
+  control_ops     — 控制流（if/loop/for/try/judge/匹配3）
   logic_ops       — 三态逻辑（and/or/not）
   comparison_ops  — 比较运算（eq/gt/lt/ne/gte/lte/ngt/nlt）
   arithmetic_ops  — 算术运算（add/sub/mul/div/mod/pow/digit）
@@ -24,7 +24,8 @@
   system_ops      — 系统命令与环境变量
   time_ops        — 时间戳与计时
   unicode_ops     — URL/Unicode 编码
-  concurrent_ops  — 并发与锁
+  concurrent_ops  — 并发与锁（并发融合/竞速/全部）
+  ternary_generic_ops — 三态泛型容器（三态集/三态图/三态队列/三态栈）
   sandbox_ops     — 沙箱安全
   dispatcher      — 操作分派器
   registry        — 操作注册表

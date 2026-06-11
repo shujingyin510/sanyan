@@ -207,7 +207,7 @@ class TestComparison(unittest.TestCase):
     def test_not_zero(self):
         vm = _make_vm(_push_i(0) + [NOT] + _halt())
         vm.run()
-        self.assertEqual(vm.stack, [1])
+        self.assertEqual(vm.stack, [0])  # 三值逻辑: NOT(0)=可能(0)
 
     def test_not_nonzero(self):
         vm = _make_vm(_push_i(42) + [NOT] + _halt())

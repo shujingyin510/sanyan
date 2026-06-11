@@ -33,6 +33,17 @@
 - 每个 `ops/*.py` 模块通过 `register()` 注册操作到 `_OP_DISPATCH` 表
 - **`_DISPATCH_NOT_FOUND` 哨兵**: 区分"操作未找到"和"操作返回None"（2026-06-02 修复）
 
+### 操作模块 (`ops/`)
+- `type_ops.py` — 类型判断/转换/三态值构造（170 行）
+- `ternary_source_ops.py` — 来源/证据链/冲突模型/置信度操作（280 行）
+- `ternary_util_ops.py` — 三态工具操作：移位/翻转/压缩/解析/枚举/信念（150 行）
+- `control_ops.py` — 控制流：若/循环/遍历/返回/异常/匹配3/匹配信度（460 行）
+- `concurrent_ops.py` — 并发：并发融合/竞速/全部/锁（284 行）
+- `ternary_container_ops.py` — 三态容器：链/链断/解包/或解/尝试链/信度守卫（340 行）
+- `ternary_generic_ops.py` — 泛型容器：三态集/三态图/三态队列/三态栈（666 行）
+- `data_pipeline_ops.py` — 数据管线：三态数据/管线/清洗/聚合/验证（469 行）
+- `web_ops.py` — Web框架：三态Web服务器/路由/中间件（414 行）
+
 ### 词法分析 (`lexer.py` + `sugar/lexer.py`)
 - `lexer.py` — S 表达式词法分析器，识别 token 类型
 - `sugar/lexer.py` — 糖语法词法分析器，全角映射、关键字识别

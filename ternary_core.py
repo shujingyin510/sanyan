@@ -48,6 +48,12 @@ class BT:
 
     @staticmethod
     def from_str(s: str) -> list:
+        """将平衡三进制字符串转为 trit 列表。"""
+        if not s:
+            return [0]
+        for c in s:
+            if c not in BT.REVERSE:
+                raise ValueError(f"非法三进制字符: '{c}'（只允许 +, 0, -）")
         return [BT.REVERSE[c] for c in s]
 
     @staticmethod
@@ -148,7 +154,7 @@ class TernaryALU:
 
     @staticmethod
     def multiply(a: list, b: list) -> list:
-        """平衡三进制乘法：大数走快速路径，小数走移位加。"""
+        """平衡三进制乘法：小数走移位加，大数走 Python 整数精确路径。"""
         if TernaryALU.is_zero(a) or TernaryALU.is_zero(b):
             return [0]
         a_int = BT.to_int(a)

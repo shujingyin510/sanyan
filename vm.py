@@ -452,7 +452,7 @@ class VM:
         """比较与逻辑运算指令：三值逻辑 + 三态传播"""
         if op == NOT:
             a = self.stack.pop()
-            r = -1 if isinstance(a, int) and a > 0 else 1
+            r = -1 if isinstance(a, int) and a > 0 else (0 if isinstance(a, int) and a == 0 else 1)
             self.stack.append(self._ternary_result(r, a) if isinstance(a, TritValue) else r)
         elif op == OR:
             b = self.stack.pop()
@@ -483,7 +483,7 @@ class VM:
         else:
             b = self.stack.pop()
             a = self.stack.pop()
-            if not isinstance(a, type(b)) and not (isinstance(a, int) and isinstance(b, int)):
+            if not (isinstance(a, (int, float)) and isinstance(b, (int, float))):
                 self.stack.append(-1)
             elif op == GT:
                 self.stack.append(self._ternary_result(1 if a > b else -1, a, b))
@@ -534,7 +534,8 @@ class VM:
             a = str(self.stack.pop()) if self.stack else ''
             self.stack.append(a + b)
         elif op == ORD:
-            self.stack.append(ord(str(self.stack.pop())[0]) if self.stack else 0)
+            v = str(self.stack.pop())[:1] if self.stack else ''
+            self.stack.append(ord(v) if v else 0)
         elif op == STR_FIND:
             sub = str(self.stack.pop()) if self.stack else ''
             s = str(self.stack.pop()) if self.stack else ''
@@ -576,7 +577,7 @@ class VM:
             a = self.stack.pop() if self.stack else 0
             self.stack.append((a if isinstance(a, list) else [a]) + (b if isinstance(b, list) else [b]))
         elif op == LIST_NEW:
-            n = self.stack.pop() if self.stack and isinstance(self.stack[-1], (int, float)) else 0
+            n = self.stack.pop() if self.stack else 0
             if not isinstance(n, (int, float)):
                 try:
                     n = int(n)
@@ -615,9 +616,12 @@ class VM:
     def _exec_dict(self, op: int) -> bool:
         """字典操作指令：DICT, DICT_GET, DICT_SET, DICT_HAS, DICT_KEYS"""
         if op == DICT:
-            n = self.stack.pop() if self.stack and isinstance(self.stack[-1], int) else 0
+            n = self.stack.pop() if self.stack else 0
             if not isinstance(n, int):
-                n = int(n) if str(n).lstrip('-').replace('.', '').isdigit() else 0
+                try:
+                    n = int(n)
+                except (ValueError, TypeError):
+                    n = 0
             d: dict = {}
             for _ in range(n):
                 if len(self.stack) < 2:
