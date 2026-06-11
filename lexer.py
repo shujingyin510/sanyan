@@ -43,6 +43,25 @@ def tokenize(code: str) -> list:
             tokens.append(')')
             i += 1
             continue
+        # 全角运算符映射（与 sugar tokenizer FULLWIDTH_MAP 对齐）
+        if c == '＋':
+            current += '+'; i += 1; continue
+        if c == '－':
+            current += '-'; i += 1; continue
+        if c == '＊':
+            current += '*'; i += 1; continue
+        if c == '／':
+            current += '/'; i += 1; continue
+        if c == '％':
+            current += '%'; i += 1; continue
+        if c == '＝':
+            current += '='; i += 1; continue
+        if c == '＜':
+            current += '<'; i += 1; continue
+        if c == '＞':
+            current += '>'; i += 1; continue
+        if c == '．':
+            current += '.'; i += 1; continue
         if c == '：':
             obj = current if current else (tokens[-1] if tokens and tokens[-1] not in ('(', ')', '.') else '')
             current = ''

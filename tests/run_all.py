@@ -83,7 +83,7 @@ def main():
         print('失败的测试:')
         for filepath, output in failed:
             print(f'  [{filepath}]')
-            for line in output.split('\n')[:10]:
+            for line in output.split('\n'):
                 print(f'    {line}')
     return len(failed)
 
