@@ -457,7 +457,10 @@ class VM:
         elif op == OR:
             b = self.stack.pop()
             a = self.stack.pop()
-            r = 1 if (isinstance(a, int) and a > 0) or (isinstance(b, int) and b > 0) else -1
+            # Kleene 三值 OR: max(a, b)
+            ra = a if isinstance(a, int) else 0
+            rb = b if isinstance(b, int) else 0
+            r = max(ra, rb) if isinstance(a, int) and isinstance(b, int) else -1
             # 或: 取 max 信度
             if isinstance(a, TritValue) and isinstance(b, TritValue):
                 self.stack.append(TritValue(r, confidence=max(a.confidence, b.confidence)))
@@ -470,7 +473,10 @@ class VM:
         elif op == AND:
             b = self.stack.pop()
             a = self.stack.pop()
-            r = 1 if (isinstance(a, int) and a > 0) and (isinstance(b, int) and b > 0) else -1
+            # Kleene 三值 AND: min(a, b)
+            ra = a if isinstance(a, int) else 0
+            rb = b if isinstance(b, int) else 0
+            r = min(ra, rb) if isinstance(a, int) and isinstance(b, int) else -1
             # 且: 取 min 信度
             if isinstance(a, TritValue) and isinstance(b, TritValue):
                 self.stack.append(TritValue(r, confidence=min(a.confidence, b.confidence)))
@@ -815,15 +821,14 @@ class VM:
 
         vm = cls(code, max(vc, VM.VAR_MAX), exports)
 
-        # 执行模块初始化代码（设置全局变量：操作码值、OP映射等）
-        # 初始化代码从 PC=0 开始，执行到代码末尾自动退出
+        # 执行模块初始化代码（内置常量等）
+        # 初始化从 PC=0 开始执行到 HALT，后续 run() 从 HALT 之后继续
         vm._run_inner()
-        vm.pc = 0
-        vm.halted = False
         return vm
 
     def run(self) -> None:
-        """执行字节码直到 HALT 或代码结束。"""
+        """执行字节码直到 HALT 或代码结束。从当前 PC 开始（通常 from_bin 初始化后 PC 在 HALT 之后）。"""
+        self.halted = False
         self._run_inner()
 
 

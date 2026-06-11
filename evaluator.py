@@ -331,7 +331,7 @@ class SanyanEvaluator(SanyanRuntime):
                 return TritValue(float(s)) if '.' in s else TritValue(int(s))
         first = node[0]
         if isinstance(first, FunctionValue):
-            return Commands.call(self, first.func_name, first.args)  # type: ignore[attr-defined]
+            return first.call(self, node[1:])
         if isinstance(first, ModuleValue):
             target, method = node[1], node[2:]
             return first.get_attr(target)(self, method)  # type: ignore[attr-defined]
