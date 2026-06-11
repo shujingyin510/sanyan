@@ -109,7 +109,7 @@ def _generic_get(evaluator, args):
         except IndexError:
             try:
                 raise SanyanValueError(f'索引 {index} 越界（列表长度 {len(container)}）')
-            except (TypeError, ValueError):
+            except TypeError:
                 raise SanyanValueError('索引越界（列表访问失败）')
         except (ValueError, TypeError):
             raise SanyanTypeError(f'无效索引类型: {type(index).__name__}（需要整数）')
