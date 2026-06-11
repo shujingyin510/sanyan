@@ -253,12 +253,18 @@ def main():
         if not os.path.exists(bin_path) or os.path.getmtime(bin_path) < os.path.getmtime(filepath):
             os.makedirs('build', exist_ok=True)
             from compile_bytecode import compile_san
+            try:
+                compile_san(filepath, bin_path)
+            except Exception:
+                use_eval = True  # 编译失败回退求值器
 
-            compile_san(filepath, bin_path)
-        from vm import VM as SanyanVM
-
-        SanyanVM.from_bin(bin_path)
-        sys.exit(0)
+        if not use_eval:
+            from vm import VM as SanyanVM
+            try:
+                SanyanVM.from_bin(bin_path)
+                sys.exit(0)
+            except Exception:
+                use_eval = True  # VM 执行失败也回退
 
     # Python 求值器模式
     env, result, ast = _run_evaluator(code, profiling)
