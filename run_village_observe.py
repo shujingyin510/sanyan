@@ -41,6 +41,7 @@ from sugar.parser import parse_code  # noqa: E402
 from evaluator import SanyanEvaluator  # noqa: E402
 from ops.file_ops import clear_cache  # noqa: E402
 from values import ReturnException, TritValue  # noqa: E402
+from eval_utils import to_float  # noqa: E402
 
 clear_cache()
 
@@ -536,7 +537,7 @@ def _gen_dialogue(ev, args):
         if hasattr(_v, 'is_dict') and hasattr(_v, 'to_payload') and _v.is_dict():
             _v = _v.to_payload()
         day = _v.get('天数', 0) if isinstance(_v, dict) else 0
-        d = str(day.to_int() if hasattr(day, 'to_int') else day)
+        d = str(to_float(day))
         # 加权摘要（始终显示，无加权时标 ×1.0）
         parts = []
         if mult_vals:
@@ -720,7 +721,7 @@ def _night_events(ev, args):
             if hasattr(_v, 'is_dict') and hasattr(_v, 'to_payload') and _v.is_dict():
                 _v = _v.to_payload()
             day = _v.get('天数', 0) if isinstance(_v, dict) else 0
-            d = str(day.to_int() if hasattr(day, 'to_int') else day)
+            d = str(to_float(day))
             _event_memory.setdefault(d, []).append(f'{n1}与{n2}: {event[1]}(δ={delta_e:+.3f})[冲突池]')
             _event_memory.setdefault('_chain', []).append(
                 {'day': d, 'type': event[1], 'n1': n1, 'n2': n2, 'delta': delta_e}
@@ -849,7 +850,7 @@ try:
         vals = []
         for v in td_now.values():
             try:
-                vals.append(float(v.to_int()) if hasattr(v, 'to_int') else float(v))
+                vals.append(to_float(v))
             except Exception:
                 pass
         if vals:
@@ -882,7 +883,7 @@ try:
                                 k = f'{min(n1, n2)}_{max(n1, n2)}'
                                 v_raw = td_now.get(k, 0)
                                 try:
-                                    v = float(v_raw.to_int()) if hasattr(v_raw, 'to_int') else float(v_raw)
+                                    v = to_float(v_raw)
                                 except Exception:
                                     v = 0.0
                                 row += _vpad(f'{v:.2f}', 7)
@@ -900,15 +901,6 @@ except SystemExit:
 finally:
     # ── 宏观趋势分析 ──
     if _trust_timeline and len(_trust_timeline) >= 2:
-
-        def _to_f(v):  # 浮点保护：处理 TritValue 或 int
-            try:
-                if hasattr(v, 'to_int'):
-                    return float(v.to_int())
-                return float(v)
-            except Exception:
-                return 0.0
-
         print()
         print('══ 宏观趋势分析 ══')
         first = _trust_timeline[0][1]
@@ -923,8 +915,8 @@ finally:
         shown = 0
         unchanged_list = []
         for k in sorted(common):
-            v0 = _to_f(first.get(k, 0))
-            vn = _to_f(last.get(k, 0))
+            v0 = to_float(first.get(k, 0))
+            vn = to_float(last.get(k, 0))
             delta = vn - v0
             if abs(delta) < 0.004:
                 unchanged_list.append(f'  {k:<{max_k_len}} {v0:.3f}→{vn:.3f} ({delta:+.3f})')
@@ -939,15 +931,15 @@ finally:
         # 末天新出现 / 首天后消失的关系（同一列宽）
         if new_keys:
             for k in sorted(new_keys):
-                print(f'  {k:<{max_k_len}} 新增={_to_f(last[k]):.3f}')
+                print(f'  {k:<{max_k_len}} 新增={to_float(last[k]):.3f}')
         if gone_keys:
             for k in sorted(gone_keys):
-                print(f'  {k:<{max_k_len}} 消失 (原{_to_f(first[k]):.3f})')
+                print(f'  {k:<{max_k_len}} 消失 (原{to_float(first[k]):.3f})')
         # 统计：仅按 common 键计算总变动
         total_days = len(_trust_timeline)
-        total_delta = sum(_to_f(last.get(k, 0)) - _to_f(first.get(k, 0)) for k in common)
-        warm = sum(1 for v in last.values() if _to_f(v) >= 0.6)
-        cold = sum(1 for v in last.values() if _to_f(v) < 0.3)
+        total_delta = sum(to_float(last.get(k, 0)) - to_float(first.get(k, 0)) for k in common)
+        warm = sum(1 for v in last.values() if to_float(v) >= 0.6)
+        cold = sum(1 for v in last.values() if to_float(v) < 0.3)
         print(
             f'  共 {total_days} 天，{len(common)} 组持续关系'
             + (f'（+{len(new_keys)} 新增/-{len(gone_keys)} 消失）' if (new_keys or gone_keys) else '')
@@ -995,7 +987,7 @@ finally:
             json_out.append(
                 {
                     'day': day,
-                    'trust': {k: float(_to_f(v)) for k, v in snap.items()},
+                    'trust': {k: float(to_float(v)) for k, v in snap.items()},
                     'events': day_events,
                 }
             )
@@ -1039,7 +1031,7 @@ finally:
                             row += _vpad('---', M_W)
                         else:
                             key = f'{min(n1, n2)}_{max(n1, n2)}'
-                            v = _to_f(final.get(key, 0))
+                            v = to_float(final.get(key, 0))
                             if v >= 0.7:
                                 mark = f'{v:.2f}●'
                             elif v >= 0.3:

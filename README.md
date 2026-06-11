@@ -1,4 +1,4 @@
-# 三态认知框架 Sanyan v3.27.0
+# 三态认知框架 Sanyan v3.29.0
 
 [![VS Code Extension](https://img.shields.io/badge/VS%20Code-%E8%AF%AD%E6%B3%95%E9%AB%98%E4%BA%AE-%23007ACC?logo=visualstudiocode)](sanyan-vscode/README.md)
 [![CI](https://github.com/shujingyin510/sanyan/actions/workflows/test.yml/badge.svg)](https://github.com/shujingyin510/sanyan/actions)
@@ -418,22 +418,25 @@ tests/
 
 ### Agent 可读决策 DSL
 
-> 详见 [ternary_agent/README.md](ternary_agent/README.md) — 完整架构、数据流图、v0.1→v0.3 演进路线。
+> 详见 [ternary_agent/README.md](ternary_agent/README.md) — v5 架构、三阶段设计、补丁目录。
 
 | 特性 | 说明 |
 |---|---|
-| **三态推理** | LLM 5 种认知态 → 三态映射 → 置信度传播 → 保护门控 → 动作分发 |
-| **LLM 编程能力** | `write_code` 工具：LLM 生成三言代码 → 沙箱求值器执行 → 结果回传，支持"执行→报错→修正"闭环 |
-| **文件操作工具** | `read_file` / `list_files` / `write_file` / `replace_in_file` — Agent 可自动读、改、写项目文件 |
-| **多提供商** | DeepSeek / OpenAI / 千问 / Gemini / 小米MIMO / 小米Token Plan / Ollama 七家，一行配置切换 |
-| **概率三态** | `TritValue` 置信度字段，贝叶斯传播，`真(0.9)` 显示 |
-| **协议提示词** | 6 段结构化（角色/语法/工具/代码/示例/约束），LLM 指导精确可控 |
-| **中文决策追踪** | 每步输出可读中文（LLM → 映射 → 传播 → 动作 → 回答） |
-| **声明式策略** | `agent_policy.san` 纯数据 + 18 条场景规则，非程序员可直接编辑 |
-| **自解释决策** | `解释决策(N)` 6 步推理链 + `解释原因()` 5 层解释 |
-| **热重载** | 修改策略文件后自动重载，无需重启 |
-| **记忆系统** | TTL 过期 + 上下文压缩 + 冲突检测 |
-| **村庄观察器** | NPC 自主生活模拟 → 三态信任演变 → SVG 图表 + JSON 日志 |
+| **三态推理** | LLM 认知态 → 三态映射 → Kleene 传播 → 贝叶斯置信度 → 保护门控 |
+| **多假设并行** | Top-3 候选方案同时探索，锦标赛选优，早停淘汰死假设 |
+| **任务分解** | 大任务自动递归拆解，每层有界上下文（4000 token 硬限） |
+| **工具依赖图** | P1: 工具链合法性预校验，过滤无效组合 |
+| **能力注册表** | P9: 任务需求 vs 工具能力匹配，误选率 -50% |
+| **多样性控制** | P8: 关键词聚类去重，避免 5≈1 假多样化 |
+| **失败分类** | P3: 6 类 FailureMode（空/缺/格式/超时/逻辑/循环），精准重试 |
+| **自适应阈值** | P4: 50 轮后从历史自动调参，消除硬编码 |
+| **语义缓存** | P5: 相似任务直接复用，命中率 ~15% |
+| **可观测性** | P7: 全链路指标（早停率/缓存命中/LLM 比较次数/成本预测） |
+| **成本预测** | P10: 历史数据模型替代 LLM 猜测，准确率 +20% |
+| **执行回放** | P11: 完整运行记录 + diff 对比，Debug 效率 +300% |
+| **经验学习** | 工具成功率统计 + 遗忘衰减 + 模块风险评估 |
+| **多提供商** | DeepSeek / OpenAI / 千问 / Gemini / 小米MIMO / Token Plan / Ollama 七家 |
+| **声明式策略** | `agent_policy.san` 纯数据 + 场景规则，热重载 |
 
 使用方式：
 

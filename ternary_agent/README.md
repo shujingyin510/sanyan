@@ -32,37 +32,89 @@ python -X utf8 run_agent.py "把AGENTS.md里v0.3改成v0.4" --dry-run
 用户任务
   │
   ├─ _force_tool()        智能首轮：检测"函数"→直接 analyze，省一次 LLM
-  ├─ _pre_analyze()       预分析：扫码文件结构 + 符号表 + 跨任务回忆
+  ├─ SemanticCache        P5: 语义缓存，重复任务零成本
   │
   ▼
-  LLM 决定下一步工具 ──→ TernaryEngine.step()
-  │                        ├─ classify()   分类：AFFIRM/NEGATE/UNCERT
-  │                        ├─ map_trit()   映射：1/0/-1
-  │                        ├─ propagate()  Kleene 传播
-  │                        ├─ confidence() 贝叶斯置信度衰减
-  │                        └─ protect()    门控：高风险+不确定=拦截
+  DecompositionEngine    Phase 0: 任务分解 → 递归拆解 → 每层摘要
+  │  ├─ ComplexityClassifier  复杂度分级（simple/medium/complex）
+  │  ├─ BoundedContext        有界上下文（硬限 4000 token）
+  │  └─ ToolDependencyGraph   P1: 工具链合法性校验
   │
   ▼
-  执行工具 ──→ MemoryStore.add()
-              │  ├─ 关键词提取（英文标识符 + 中文双字片语）
-              │  ├─ LLM 5字摘要 → S-Memory 语义检索
-              │  └─ 时间衰减（60秒权重减半）
-              │
-              ▼
-              反思 ──→ 继续 / 修正 / 完成
+  HypothesisGenerator    Phase 1: 多假设生成
+  │  ├─ LLM 生成 5 个候选方案
+  │  ├─ P1 依赖图过滤    工具顺序合法性
+  │  ├─ P9 能力匹配过滤  任务需求 vs 工具能力
+  │  └─ P8 多样性去重    关键词聚类，避免 5≈1
+  │
+  ▼
+  Tournament             Phase 1: 锦标赛
+  │  ├─ P2 并行早停      每假设执行 2 步，低置信度淘汰
+  │  ├─ 经典淘汰         置信度差距 / 步骤差距 / LLM 兜底
+  │  ├─ P3 失败分类      6 类 FailureMode + 重试策略
+  │  └─ P4 自适应阈值    50 轮后从历史自动调参
+  │
+  ▼
+  Execute 最优假设 ──→ TernaryEngine.step()
+  │                    ├─ classify()   分类：AFFIRM/NEGATE/UNCERT
+  │                    ├─ map_trit()   映射：1/0/-1
+  │                    ├─ propagate()  Kleene 传播
+  │                    ├─ confidence() 贝叶斯置信度衰减
+  │                    └─ protect()    门控：高风险+不确定=拦截
+  │
+  ▼
+  ResourceManager        Phase 2: 资源统一管控
+  │  ├─ tool_reliability()    工具可靠性（时间衰减）
+  │  ├─ P7 MetricsCollector   全链路可观测指标
+  │  ├─ P10 CostPredictor     成本预测（历史数据）
+  │  └─ P11 ReplayEngine      执行回放 + diff 对比
+  │
+  ▼
+  反思 ──→ 继续 / 修正 / 完成
 ```
 
 ### 文件分层
 
-| 文件 | 职责 | 行数 |
+| 文件 | 职责 | 补丁 |
 |------|------|------|
-| `ternary_engine.py` | 三态决策引擎（Kleene + 贝叶斯 + 门控） | 131 |
-| `agent_runtime.py` | V3 运行时（SymbolTable / MemoryStore / ProjectGraph / 预分析） | 492 |
-| `agent_tools.py` | 工具层（12 个工具，纯函数，0 外部依赖） | 170 |
-| `agent_policy.san` | 策略配置（模型 / 阈值 / 场景规则，热重载） | 194 |
-| `decision.san` | 旧引擎决策核心（三态传播/保护/投票，待迁移） | 185 |
-| `agent.san` | 旧引擎主循环（交互模式，待迁移） | 1242 |
-| `run_agent.py` | 启动器（CLI 参数 + 双引擎切换） | 1068 |
+| `ternary_engine.py` | 三态决策引擎（Kleene + 贝叶斯 + 门控） | — |
+| `agent_tool_graph.py` | 工具依赖图 + 能力注册表 + 任务能力提取 | P1+P9 |
+| `agent_decompose.py` | 任务分解引擎 + 有界上下文 + 复杂度分类器 | Phase 0 |
+| `agent_hypothesis.py` | 多假设 + 多样性控制 + 锦标赛 + 失败分类 + 自适应阈值 | P2+P3+P4+P8 |
+| `agent_resource.py` | 资源统一管控 + 语义缓存 + 可观测 + 成本预测 + 回放 | P5+P7+P10+P11 |
+| `agent_runtime.py` | V5 运行时（三阶段全集成） | — |
+| `agent_tools.py` | 工具层（12 个工具，纯函数，0 外部依赖） | — |
+| `agent_policy.san` | 策略配置（模型 / 阈值 / 场景规则，热重载） | — |
+| `decision.san` | 旧引擎决策核心（待迁移） | — |
+| `run_agent.py` | 启动器（CLI 参数 + 双引擎切换） | — |
+
+### 测试覆盖
+
+| 模块 | 测试文件 | 项数 |
+|------|----------|------|
+| Agent 决策 | `test_agent.py` | 31 |
+| AgentRuntime V5 | `test_agent_runtime.py` | 39 |
+| Agent V5 新模块 | `test_agent_v5.py` | 158 |
+| **合计** | | **228** |
+
+### P6 Prompt 缓存
+
+- system_prompt 稳定化（缓存一次，不含可变内容）
+- BoundedContext.build() 复用同一对象引用
+- 部署侧配置：OpenAI/Anthropic/vLLM 各自的 prefix caching
+
+### 架构演进
+
+```
+v3.0: 单轮决策 + 工具调用
+v3.1: + 多假设并行（多路径探索）
+v3.2: + 经验学习（ExperienceStore）
+v3.3: + 上下文压缩（TokenBudget）
+v5.0: 三阶段重构
+       Phase 0: 任务分解 + 有界上下文 + 工具依赖图[P1] + 能力注册[P9]
+       Phase 1: 多假设 + 多样性[P8] + 锦标赛[P2] + 失败分类[P3] + 自适应阈值[P4]
+       Phase 2: 资源管控 + 缓存[P5] + 可观测[P7] + 成本预测[P10] + 执行回放[P11]
+```
 
 ---
 
@@ -162,6 +214,6 @@ NPC 自主生活 + LLM 驱动对话 + TernaryEngine 三态信任演变 + SVG 图
 
 ```bash
 python -X utf8 tests/test_agent.py -v          # 31 项：决策流水线（映射/传播/投票/保护/规则）
-python -X utf8 tests/test_agent_runtime.py -v  # 27 项：V3 引擎（SymbolTable/MemoryStore/约束/工具）
+python -X utf8 tests/test_agent_runtime.py -v  # 39 项：V5 引擎（SymbolTable/MemoryStore/约束/工具/分解/锦标赛）
 python -X utf8 tests/run_all.py                # 46 项集成测试
 ```

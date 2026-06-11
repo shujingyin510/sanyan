@@ -242,7 +242,9 @@ def _init_ops() -> None:
     import ops.ternary_time_ops  # noqa: F401
     import ops.ternary_container_ops  # noqa: F401
     import ops.ternary_math_ops  # noqa: F401
-    import ops.ternary_generic_ops  # noqa: F401
+    import ops.ternary_set_ops  # noqa: F401
+    import ops.ternary_graph_ops  # noqa: F401
+    import ops.ternary_queue_ops  # noqa: F401
     import ops.ternary_source_ops  # noqa: F401
     import ops.ternary_util_ops  # noqa: F401
     import ops.web_ops  # noqa: F401

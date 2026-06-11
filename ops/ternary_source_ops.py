@@ -332,3 +332,18 @@ def _consensus(evaluator, args):
 
 
 register('consensus', _consensus)
+
+# 中文别名
+from ops.registry import register_alias as _ra  # noqa: E402
+
+_ra('来源', 'source')
+_ra('来源链', 'source_chain')
+_ra('检测冲突', 'detect_conflict')
+_ra('冲突合并', 'conflict_merge')
+_ra('贝叶斯更新', 'bayes_update')
+_ra('融合', 'fuse')
+_ra('共识', 'consensus')
+_ra('断言信度', 'assert_confidence')
+_ra('量化', 'quantize')
+_ra('反量化', 'dequantize')
+_ra('表决', 'majority_vote')

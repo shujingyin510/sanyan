@@ -6,7 +6,7 @@
 from ternary_core import BT, TernaryALU, TritValue
 from ternary_core import _int_at_precision, ternary_log, ternary_exp
 from values import SanyanSyntaxError, SanyanValueError, SanyanTypeError
-from ops.registry import register
+from ops.registry import register, register_alias
 from eval_utils import propagated_confidence
 
 _DEFAULT_PRECISION = 16
@@ -466,3 +466,12 @@ def _op_to_oct(evaluator, args):
 register('to_hex', _op_to_hex)
 register('to_bin', _op_to_bin)
 register('to_oct', _op_to_oct)
+
+# 中文别名
+_ra = register_alias
+_ra('加', 'add')
+_ra('减', 'sub')
+_ra('乘', 'mul')
+_ra('除', 'div')
+_ra('余', 'mod')
+_ra('幂', 'pow')

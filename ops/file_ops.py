@@ -13,7 +13,7 @@ from values import (
     ModuleValue,
 )
 from skin import SkinManager
-from ops.registry import register
+from ops.registry import register, register_alias
 
 
 # 项目根目录：文件操作不允许超越此目录
@@ -403,3 +403,8 @@ register('write_file', FileOps.write_file_op)
 register('write_binary', FileOps.write_binary_op)
 register('load', FileOps._load_file)
 register('import', FileOps.import_module)
+
+# 中文别名
+_ra = register_alias
+_ra('读文件', 'read_file')
+_ra('写文件', 'write_file')

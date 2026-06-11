@@ -3,7 +3,7 @@
 from ternary_core import BT, TritValue, ArrayValue
 from values import ReturnException, BreakException, ContinueException, SanyanError, SanyanSyntaxError, SanyanValueError
 from ops.list_ops import _as_list
-from ops.registry import register
+from ops.registry import register, register_alias
 
 
 class ControlOps:
@@ -458,3 +458,15 @@ register('匹配3', ControlOps.ternary_match)
 register('匹配信度', ControlOps.ternary_match_confidence)
 register('ternary_match', ControlOps.ternary_match)
 register('match_confidence', ControlOps.ternary_match_confidence)
+
+# 中文别名
+_ra = register_alias
+_ra('若', 'if')
+_ra('做', 'do')
+_ra('循环', 'loop')
+_ra('遍历', 'for')
+_ra('设', 'set')
+_ra('跳出', 'break')
+_ra('继续', 'continue')
+_ra('尝试', 'try')
+_ra('判', 'judge')

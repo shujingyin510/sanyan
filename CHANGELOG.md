@@ -2,6 +2,36 @@
 
 ---
 
+## [v3.29.0] — 2026-06-11
+
+### 新增
+- **TritValue 歧义修复**：int 列表必须所有元素 ∈ {-1,0,1} 才视为 trit 值，避免 `[1,2,3]` 被误判为平衡三进制数
+- **ops 双语别名补全**：arithmetic/string/control/file 等模块补齐中文别名（加/减/乘/除/余/幂/连接/取长/查找/替换/子串/分割/去空白/大写/小写/前缀/后缀/若/做/循环/遍历/设/跳出/继续/尝试/判/读文件/写文件）
+- **P6 Prompt 缓存**：system_prompt 稳定化（缓存一次，不含可变内容）
+- **数学函数覆盖**：ternary_core.py sin/cos/tan/sqrt/exp/log/log10 + 辅助函数测试（55项）
+- **测试全量补全**：1251 项 Python 测试 + 46 项 .san 测试，全部核心模块 ≥ 90% 覆盖率
+- **TritValue 修复**：`TritValue([1,2,3])` 不再被误判为平衡三进制数值
+
+### 变更
+- **ops/ternary_generic_ops.py 拆分**：694行→3个模块（ternary_set_ops 187行 + ternary_graph_ops 184行 + ternary_queue_ops 176行）
+- **evaluator.py P6 集成**：system_prompt 缓存稳定化
+- **ternary_engine.py**：重命名为 ternary_engine.py（保持向后兼容）
+
+### 修复
+- **ternary_core.py:342**：TritValue int 列表检查逻辑修复，只有 {-1,0,1} 元素才视为 trit
+- **ops/string_ops.py**：`_unwrap_str` 支持所有类型转字符串
+- **ops/data_pipeline_ops.py**：`TernaryAggregator.average/sum` 支持 TritValue 类型
+- **ops/ternary_generic_ops.py**：三态队列/栈出队/弹栈返回元素而非列表
+
+### 文档
+- **AGENTS.md**：ops 双语注册规则 + 测试数量更新（20套）+ V5 架构图
+- **README.md**：Agent 特性表更新 + 测试数量
+- **README_EN.md**：同步英文版
+- **ARCHITECTURE.md**：文件结构更新（拆分后的模块）
+- **docs/roadmap.md**：标记已完成项
+
+---
+
 ## [v3.28.0] — 2026-06-11
 
 ### 新增

@@ -12,11 +12,26 @@
                            UNCERT/CONFLICTED   +置信度    +置信度     /增益不足    /HUMAN
 ```
 
-**V3 AgentRuntime**（`--auto` 模式，Python 原生引擎）：
+**V5 AgentRuntime**（`--auto` 模式，Python 原生引擎）：
 ```
-用户提问 → SymbolTable预加载 → _force_tool首轮 → LLM(tool|params)
-         → Fail-Closed拦截 → Token预算 → 执行 → Reflection → 上下文工程 → 循环
+用户提问 → SymbolTable预加载 → SemanticCache缓存检查 → DecompositionEngine任务分解
+         → HypothesisGenerator多假设生成 → Tournament锦标赛选优
+         → HypothesisExecutor执行最优假设 → TernaryEngine三态决策
+         → ResourceManager经验/Token/可观测 → 完成
 ```
+
+**补丁目录（P1-P11）**：
+- P1: 工具依赖图（ToolDependencyGraph）
+- P2: 并行早停（Tournament._parallel_phase）
+- P3: 失败分类（FailureClassifier, 6类FailureMode）
+- P4: 自适应阈值（ThresholdTuner）
+- P5: 语义缓存（SemanticCache）
+- P6: Prompt缓存（部署侧配置）
+- P7: 可观测性（MetricsCollector）
+- P8: 多样性控制（DiversityController）
+- P9: 能力注册表（ToolCapabilityRegistry + TaskCapabilityExtractor）
+- P10: 成本预测（CostPredictor）
+- P11: 执行回放（ReplayEngine + ActionLog）
 
 ### 文件结构
 
@@ -26,9 +41,13 @@
 | `ternary_agent/agent_policy.san` | 纯数据策略（配置、阈值、映射规则、天气数据、场景规则） |
 | `ternary_agent/decision.san` | 决策核心（信任感知规则匹配） |
 | `ternary_engine.py` | **三元认知引擎**（Kleene×贝叶斯×门控，Agent/村庄/IoT共用） |
-| `agent_runtime.py` | **V3 引擎**：SymbolTable、MemoryStore、ProjectGraph、AgentRuntime |
-| `agent_tools.py` | **V3 工具层**：analyze、find_symbol、replace_all 等 12 个工具 |
-| `run_agent.py` | 启动器（`--auto` 走 V3，默认走旧引擎） |
+| `agent_tool_graph.py` | **P1+P9**: 工具依赖图 + 能力注册表 + 任务能力提取 |
+| `agent_decompose.py` | **Phase 0**: 任务分解引擎 + 有界上下文 + 复杂度分类器 |
+| `agent_hypothesis.py` | **Phase 1**: 多假设 + 多样性(P8) + 锦标赛(P2) + 失败分类(P3) + 自适应阈值(P4) |
+| `agent_resource.py` | **Phase 2**: 资源统一管控 + 语义缓存(P5) + 可观测(P7) + 成本(P10) + 回放(P11) |
+| `agent_runtime.py` | **V5 引擎**: SymbolTable、MemoryStore、ProjectGraph、AgentRuntime |
+| `agent_tools.py` | **工具层**: analyze、find_symbol、replace_all 等 12 个工具 |
+| `run_agent.py` | 启动器（`--auto` 走 V5，默认走旧引擎） |
 
 ### 运行方式
 
@@ -323,7 +342,7 @@ git status --short | grep "^??"
 
 ## 测试
 
-每次代码修改后必须运行全部测试（17 套）：
+每次代码修改后必须运行全部测试（20 套）：
 
 ```bash
 python -X utf8 tests/test_core.py -v      # 运行时核心单测 138 项
@@ -343,11 +362,23 @@ python -X utf8 tests/test_sugar_self_host.py -v # sugar.bin 自举验证 3 项
 python -X utf8 tests/test_vm.py -v        # VM 字节码测试 91 项
 python -X utf8 tests/test_c_vm.py -v      # C VM 测试 14 项（需 gcc）
 python -X utf8 tests/test_agent.py -v     # Agent 测试 31 项
-python -X utf8 tests/test_agent_runtime.py -v  # AgentRuntime V3 测试 27 项
+python -X utf8 tests/test_agent_runtime.py -v  # AgentRuntime V5 测试 39 项
+python -X utf8 tests/test_agent_v5.py -v  # Agent V5 新模块测试 158 项
+python -X utf8 tests/test_lang_core.py -v # 语言核心测试 96 项
+python -X utf8 tests/test_new_features.py -v # 新功能测试 47 项
+python -X utf8 tests/test_lang_core_ext.py -v # 语言核心扩展测试 51 项
+python -X utf8 tests/test_coverage_boost.py -v # 覆盖率补全测试 170 项
+python -X utf8 tests/test_coverage_boost2.py -v # 覆盖率补全第二轮 77 项
+python -X utf8 tests/test_coverage_boost3.py -v # 覆盖率补全第三轮 70 项
+python -X utf8 tests/test_coverage_boost4.py -v # 覆盖率补全第四轮 51 项
+python -X utf8 tests/test_coverage_boost5.py -v # 覆盖率补全第五轮 49 项
+python -X utf8 tests/test_coverage_boost6.py -v # 覆盖率补全第六轮 83 项
+python -X utf8 tests/test_coverage_boost7.py -v # 覆盖率补全第七轮 38 项
+python -X utf8 tests/test_math_coverage.py -v # 数学函数覆盖测试 55 项
 python -X utf8 tests/run_all.py           # 集成测试 46 项
 
 # 或一条命令跑全部（CI 用）
-python -m pytest tests/test_core.py tests/test_commands.py tests/test_parser.py tests/test_ops.py tests/test_ops_ext.py tests/test_lsp.py tests/test_package.py tests/test_iot.py tests/test_dp_python.py tests/test_self_host.py tests/test_sugar_self_host.py tests/test_vm.py tests/test_llvmgen.py tests/test_sugar_san.py --cov=. -q
+python -m pytest tests/test_core.py tests/test_commands.py tests/test_parser.py tests/test_ops.py tests/test_ops_ext.py tests/test_lsp.py tests/test_package.py tests/test_iot.py tests/test_dp_python.py tests/test_self_host.py tests/test_sugar_self_host.py tests/test_vm.py tests/test_llvmgen.py tests/test_sugar_san.py tests/test_agent.py tests/test_agent_runtime.py tests/test_agent_v5.py tests/test_lang_core.py tests/test_new_features.py tests/test_lang_core_ext.py tests/test_coverage_boost.py tests/test_coverage_boost2.py tests/test_coverage_boost3.py tests/test_coverage_boost4.py tests/test_coverage_boost5.py tests/test_coverage_boost6.py tests/test_coverage_boost7.py tests/test_math_coverage.py --cov=. -q
 
 全部通过才算成功：
 - test_core.py 138/138（含闭包+三态测试）
@@ -366,7 +397,19 @@ python -m pytest tests/test_core.py tests/test_commands.py tests/test_parser.py 
 - test_vm.py 91/91
 - test_c_vm.py 14/14（含交叉验证，需 gcc）
 - test_agent.py 31/31
-- test_agent_runtime.py 27/27
+- test_agent_runtime.py 39/39
+- test_agent_v5.py 158/158
+- test_lang_core.py 96/96
+- test_new_features.py 47/47
+- test_lang_core_ext.py 51/51
+- test_coverage_boost.py 170/170
+- test_coverage_boost2.py 77/77
+- test_coverage_boost3.py 70/70
+- test_coverage_boost4.py 51/51
+- test_coverage_boost5.py 49/49
+- test_coverage_boost6.py 83/83
+- test_coverage_boost7.py 38/38
+- test_math_coverage.py 55/55
 - run_all.py 46/46
 
 ### 覆盖率配置
@@ -453,6 +496,51 @@ python doc_sync.py
 - **错误信息说明**（第 18 节）需与 `values.py` 中 `Sanyan*` 异常类一致
 
 ## 代码约定
+
+### 操作注册双语规则
+
+**注册操作时必须同时注册中英文双语名。** 每个 `ops/*.py` 文件末尾必须包含：
+
+```python
+# 中文别名
+from ops.registry import register_alias as _ra
+_ra('中文名', 'english_name')
+```
+
+**示例**（`ternary_source_ops.py`）：
+```python
+register('source', _source_op)
+register('source_chain', _source_chain_op)
+# ... 其他操作 ...
+
+# 中文别名
+_ra('来源', 'source')
+_ra('来源链', 'source_chain')
+_ra('检测冲突', 'detect_conflict')
+_ra('冲突合并', 'conflict_merge')
+_ra('贝叶斯更新', 'bayes_update')
+_ra('融合', 'fuse')
+_ra('共识', 'consensus')
+_ra('断言信度', 'assert_confidence')
+_ra('量化', 'quantize')
+_ra('反量化', 'dequantize')
+_ra('表决', 'majority_vote')
+```
+
+**原因**：三言是母语编程语言，用户可能使用中文或英文操作名。缺少任一语言的别名都会导致 `SanyanNameError: 未定义的操作` 错误。
+
+**检查方法**：运行以下命令验证所有操作都有双语名：
+```bash
+python -X utf8 -c "
+from ops.registry import has_op
+pairs = [('source', '来源'), ('detect_conflict', '检测冲突'), ...]
+missing = []
+for en, cn in pairs:
+    if not has_op(en): missing.append(f'{en} 缺')
+    if not has_op(cn): missing.append(f'{cn} 缺')
+print('全部OK' if not missing else '\n'.join(missing))
+"
+```
 
 ### 注释
 

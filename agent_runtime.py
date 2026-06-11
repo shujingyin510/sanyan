@@ -1,12 +1,23 @@
-"""AgentRuntime V3: 全栈决策引擎
-SymbolTable缓存 + MemoryStore检索 + ProjectGraph + Planner + Reflection + Constraints
-+ TernaryEngine: 三态决策 — Kleene传播 + 贝叶斯置信度 + 保护门控
+"""AgentRuntime V5: 全栈决策引擎
+Phase 0: 任务分解 + 有界上下文 + 工具依赖图(P1) + 能力注册(P9)
+Phase 1: 多假设 + 多样性(P8) + 锦标赛(P2) + 失败分类(P3) + 自适应阈值(P4)
+Phase 2: 经验 + Token预算 + 压缩 + 缓存(P5) + 可观测(P7) + 成本(P10) + 回放(P11)
 """
 
 import glob as _glob
 
 
 from ternary_engine import TernaryEngine
+from agent_hypothesis import (
+    HypothesisGenerator,
+    Tournament,
+    HypothesisExecutor,
+    FailureClassifier,
+    FailureMode,
+)
+from agent_resource import ResourceManager
+from agent_tool_graph import ToolDependencyGraph, ToolCapabilityRegistry, TaskCapabilityExtractor
+from agent_decompose import DecompositionEngine, BoundedContext
 
 
 class SymbolTable:
@@ -180,7 +191,7 @@ class ProjectGraph:
 
 
 class AgentRuntime:
-    """Agent V3: SymbolTable + ContextEngineering + Planner + Reflection"""
+    """Agent V5: 全栈决策引擎 — Phase 0/1/2 完整集成"""
 
     def __init__(self, evaluator, sandbox):
         self.ev = evaluator
@@ -189,10 +200,25 @@ class AgentRuntime:
         self.symbols = SymbolTable()
         self.graph = ProjectGraph()
         self.mem = MemoryStore()
-        self.mem.set_llm(self._llm_call)  # LLM 摘要记忆
-        self.ternary = TernaryEngine()  # 三态决策引擎
+        self.mem.set_llm(self._llm_call)
+        self.ternary = TernaryEngine()
         self.memory = {}
         self.reflections = []
+        # Phase 0: 任务分解 + 工具图 + 能力注册
+        self.decomposition_engine = DecompositionEngine(self._llm_call, self)
+        self.tool_graph = ToolDependencyGraph()
+        self.cap_registry = ToolCapabilityRegistry()
+        self.cap_extractor = TaskCapabilityExtractor(self.cap_registry)
+        # Phase 1: 多假设 + 锦标赛 + 失败分类
+        self.hypothesis_generator = HypothesisGenerator(self.tool_graph, self.cap_registry)
+        self.tournament = Tournament(self._llm_call)
+        self.failure_classifier = FailureClassifier()
+        self.executor = None  # 延迟初始化
+        # Phase 2: 资源统一管控
+        self.resource = ResourceManager()
+        # P6: Prompt 缓存 — 稳定化 system_prompt
+        self._system_prompt = None
+        self._system_prompt_hash = None
 
     def register(self, name, handler):
         self.tools[name] = handler
@@ -213,93 +239,108 @@ class AgentRuntime:
             result = self._run_verify_loop(vloop['file'], vloop['test'], dry_run)
             if result:
                 return result
-        # 预加载符号索引（启动一次，后续O(1)查）
+        # P5: 语义缓存快速通道
+        cached = self.resource.semantic_cache.lookup(task)
+        if cached:
+            self.resource.metrics.record_cache_hit()
+            print('  [缓存命中]')
+            return {'answer': cached, 'memory': self.memory}
+        # 预加载
         self.symbols.build_all()
         self.graph.build()
-        # 构建初始上下文
-        ctx = self._build_context(task, 'init')
-        # 智能首轮：检测任务类型 → 直接走对应工具
+        # 初始化执行器
+        self.executor = HypothesisExecutor(self.tools, self.failure_classifier, self.resource)
+        # 构建上下文
+        ctx = BoundedContext(budget=4000)
+        ctx.set_task(task)
+        # 智能首轮
         forced = self._force_tool(task)
         if forced:
             tool, params = forced
             result = self.tools[tool](params, dry_run)
             trit, conf, gate, cog = self.ternary.step(tool, result)
             print(f'  [{cog}]→{self.ternary.trit_display(trit, conf)}')
+            module = self._extract_module(params)
+            self.resource.record_tool_use(tool, trit == 1, module, cog)
             if '未找到' not in str(result):
+                self.resource.semantic_cache.store(task, self._extract_key(result))
                 return {
                     'answer': self._extract_key(result),
                     'memory': self.memory,
                     'ternary': f'{cog}→{self.ternary.summary()}',
                 }
 
-        for rnd in range(1, max_rounds + 1):
-            if self._token_exceeded(ctx):
-                ctx = self._compress_ctx(ctx)
-            raw = self._llm_call(ctx)
-            tool, params = self._parse_tool(raw)
-            if self._fail_closed(tool, params, dry_run):
-                ctx = self._reflect('操作被安全门控拦截: ' + tool, ctx)
+        # Phase 1: 生成假设 + 锦标赛
+        hypotheses = self.hypothesis_generator.generate(self._llm_call, task, ctx, self.resource)
+        self.resource.metrics.total_hypotheses = len(hypotheses)
+        best_hypothesis = None
+        if len(hypotheses) > 1:
+            best_hypothesis = self.tournament.run(hypotheses, task, ctx, self.executor)
+            print(f'  [锦标赛] 最优: H{best_hypothesis.id} conf={best_hypothesis.confidence:.2f}')
+        elif hypotheses:
+            best_hypothesis = hypotheses[0]
+
+        # 主循环：执行最优假设的工具链
+        if best_hypothesis:
+            return self._execute_hypothesis(best_hypothesis, task, ctx, max_rounds, dry_run)
+
+        # 兜底：无假设时走原有逻辑
+        return self._run_legacy(task, max_rounds, dry_run)
+
+    def _execute_hypothesis(self, hypothesis, task, ctx, max_rounds, dry_run):
+        """执行假设的工具链"""
+        run_id = self.resource.replay_engine.create_run(task)
+        for step, tool_name in enumerate(hypothesis.tools_used):
+            if not self.resource.check_tokens(500):
+                print('  [预算耗尽]')
+                break
+            if tool_name not in self.tools:
                 continue
-
-            # Constraints
-            if self._constraint_violation(tool):
-                ctx = self._reflect(f'约束: {tool}已达上限', ctx)
-                continue
-
-            # Execute
-            result = ''
-            if tool in self.tools:
-                try:
-                    result = self.tools[tool](params, dry_run)
-                except Exception as e:
-                    result = f'工具执行异常: {e}'
-                    self.reflections.append({'round': rnd, 'tool': tool, 'error': str(e)[:300]})
-                # 三态决策：每步工具调用后评估
-                trit, conf, gate, cog = self.ternary.step(tool, result)
-                print(f'  [{cog}]→{self.ternary.trit_display(trit, conf)} {self.ternary.summary()}')
-                if gate['action'] == 'block':
-                    print(f'  [门控] {gate["reason"]}')
-                    break
-                self.memory['history'].append(
-                    {
-                        'tool': tool,
-                        'params': params,
-                        'result': str(result)[:300],
-                        'round': rnd,
-                        'trit': trit,
-                        'conf': conf,
-                    }
-                )
-                self.mem.add(tool, params, result)
-                if tool in ('write_file', 'replace_in_file', 'replace_all'):
-                    self.memory['modified'].append(params.split('|')[0] if '|' in params else params)
-            else:
-                result = f'未知工具: {tool}'
-
-            # Auto-complete hooks
-            if tool in ('analyze', 'find_symbol') and '未找到' not in str(result):
-                return {'answer': self._extract_key(result), 'memory': self.memory}
-            if tool == 'done':
-                return {'answer': params if params else '完成', 'memory': self.memory}
-
-            # Reflection: run_test failed?
-            if tool == 'run_test' and ('FAIL' in str(result) or '失败' in str(result)):
-                self.reflections.append({'round': rnd, 'tool': tool, 'error': str(result)[:300]})
-                self.memory['retry_count'] += 1
-                if self.memory['retry_count'] < 4:
-                    ctx = self._reflect(f'测试失败:\n{str(result)[:500]}', ctx)
-                    continue
-
-            # 修改后未测试 → 自动后续
-            if tool in ('write_file', 'replace_in_file', 'replace_all'):
-                has_test = any(h['tool'] == 'run_test' for h in self.memory['history'])
-                if not has_test:
-                    ctx += '\n[系统] 代码已修改，请run_test验证。'
-
-            # Context Engineering: 注入选中的符号信息
-            ctx = self._build_context(params, tool, result)
-
-        return {'answer': f'已达{max_rounds}轮', 'memory': self.memory}
+            try:
+                result = self.tools[tool_name](ctx.build(), dry_run)
+            except Exception as e:
+                result = f'工具执行异常: {e}'
+            mode = self.failure_classifier.classify(tool_name, {}, result)
+            trit = (
+                1
+                if mode == FailureMode.SUCCESS
+                else -1
+                if mode in (FailureMode.LOGIC_ERROR, FailureMode.LOGIC_LOOP)
+                else 0
+            )
+            conf = 0.9 if mode == FailureMode.SUCCESS else 0.8 if mode in (FailureMode.LOGIC_ERROR,) else 0.4
+            # P11: 记录每一步
+            self.resource.replay_engine.record_action(run_id, step, tool_name, '', result, hypothesis.confidence)
+            # P3: 失败归因
+            module = self._extract_module(tool_name)
+            self.resource.record_tool_use(tool_name, trit == 1, module, mode.value)
+            # 三态决策
+            _, _, gate, cog = self.ternary.step(tool_name, result)
+            print(f'  [{cog}]→{self.ternary.trit_display(trit, conf)} {tool_name}')
+            ctx.add_tool_result(str(result)[:500])
+            self.memory['history'].append(
+                {
+                    'tool': tool_name,
+                    'params': '',
+                    'result': str(result)[:300],
+                    'round': step + 1,
+                    'trit': trit,
+                    'conf': conf,
+                }
+            )
+            if gate['action'] == 'block':
+                print(f'  [门控] {gate["reason"]}')
+                break
+            if tool_name in ('write_file', 'replace_in_file', 'replace_all'):
+                self.memory['modified'].append(tool_name)
+        # P5: 存入缓存
+        answer = self._extract_key(self.memory['history'][-1]['result']) if self.memory['history'] else '完成'
+        self.resource.semantic_cache.store(task, answer)
+        # P7: 指标
+        self.resource.metrics.record_cost(hypothesis.estimated_cost, len(hypothesis.evidence))
+        # 持久化
+        self.resource.save()
+        return {'answer': answer, 'memory': self.memory, 'hypothesis': hypothesis.to_dict()}
 
     def _force_tool(self, task):
         """智能首轮：纯查询→analyze/find_symbol；有文件+修改→跳过首轮"""
@@ -472,7 +513,7 @@ class AgentRuntime:
         return False
 
     def _llm_call(self, prompt):
-        """LLM 调用：多提供商 + 重试 + 超时"""
+        """LLM 调用：多提供商 + 重试 + 超时 + P6 Prompt 缓存"""
         import urllib.request as _req
         import urllib.error as _err
         import json as _json
@@ -492,7 +533,17 @@ class AgentRuntime:
         except Exception:
             pass
 
-        sys_msg = '可用工具: analyze(查文件结构), find_symbol(查符号), read_file(读文件|起始行|结束行), search_code(搜索), replace_in_file(单替换 路径|旧|新), replace_all(批量 模式|旧|新), write_file(写 路径|内容), list_files(列), run_test(测试), git_diff(git差异), git_status(git状态), done(完成|回答)。\n只输出: tool|params。如 analyze|run_agent.py'
+        # P6: 稳定化 system_prompt — 不含时间戳等可变内容
+        if self._system_prompt is None:
+            self._system_prompt = (
+                '可用工具: analyze(查文件结构), find_symbol(查符号), '
+                'read_file(读文件|起始行|结束行), search_code(搜索), '
+                'replace_in_file(单替换 路径|旧|新), replace_all(批量 模式|旧|新), '
+                'write_file(写 路径|内容), list_files(列), run_test(测试), '
+                'git_diff(git差异), git_status(git状态), done(完成|回答)。\n'
+                '只输出: tool|params。如 analyze|run_agent.py'
+            )
+        sys_msg = self._system_prompt
 
         # Gemini 专用格式
         if provider and 'gemini' in str(provider).lower():
@@ -556,11 +607,9 @@ class AgentRuntime:
 
     def _extract_key(self, result):
         result_str = str(result)
-        # analyze/find_symbol: 返回完整摘要行
         for marker in ['⚠', '符号 ']:
             idx = result_str.find(marker)
             if idx >= 0:
-                # 取到第一个换行结束
                 end = result_str.find('\n', idx)
                 return result_str[idx:end] if end > 0 else result_str[idx : idx + 300]
         for marker in ['共替换', '已替换']:
@@ -568,6 +617,64 @@ class AgentRuntime:
             if idx >= 0:
                 return result_str[idx : idx + 200]
         return result_str[:300]
+
+    def _extract_module(self, params):
+        """从工具参数中提取模块名"""
+        if not params:
+            return ''
+        path = params.split('|')[0]
+        if '.' in path:
+            return path.rsplit('.', 1)[0]
+        return path
+
+    def _run_legacy(self, task, max_rounds, dry_run):
+        """兜底：无假设时走原有 LLM 循环"""
+        ctx = self._build_context(task, 'init')
+        for rnd in range(1, max_rounds + 1):
+            if len(ctx) > 7000:
+                ctx = self._compress_ctx(ctx)
+            raw = self._llm_call(ctx)
+            tool, params = self._parse_tool(raw)
+            if self._fail_closed(tool, params, dry_run):
+                continue
+            if self._constraint_violation(tool):
+                continue
+            result = ''
+            if tool in self.tools:
+                try:
+                    result = self.tools[tool](params, dry_run)
+                except Exception as e:
+                    result = f'工具执行异常: {e}'
+                trit, conf, gate, cog = self.ternary.step(tool, result)
+                print(f'  [{cog}]→{self.ternary.trit_display(trit, conf)}')
+                self.memory['history'].append(
+                    {
+                        'tool': tool,
+                        'params': params,
+                        'result': str(result)[:300],
+                        'round': rnd,
+                        'trit': trit,
+                        'conf': conf,
+                    }
+                )
+                self.mem.add(tool, params, result)
+                if gate['action'] == 'block':
+                    break
+                if tool in ('write_file', 'replace_in_file', 'replace_all'):
+                    self.memory['modified'].append(params.split('|')[0] if '|' in params else params)
+            else:
+                result = f'未知工具: {tool}'
+            if tool in ('analyze', 'find_symbol') and '未找到' not in str(result):
+                return {'answer': self._extract_key(result), 'memory': self.memory}
+            if tool == 'done':
+                return {'answer': params if params else '完成', 'memory': self.memory}
+            if tool == 'run_test' and ('FAIL' in str(result) or '失败' in str(result)):
+                self.memory['retry_count'] += 1
+                if self.memory['retry_count'] < 4:
+                    ctx = self._reflect(f'测试失败:\n{str(result)[:500]}', ctx)
+                    continue
+            ctx = self._build_context(params, tool, result)
+        return {'answer': f'已达{max_rounds}轮', 'memory': self.memory}
 
     def _needs_plan(self, task):
         return len(task) > 6 and any(w in task for w in ['改', '修', '加', '新增', '实现', '重构', '优化', '替换'])

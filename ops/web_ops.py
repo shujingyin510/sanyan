@@ -11,7 +11,9 @@ from ops.registry import register, register_alias
 class TernaryRequest:
     """三态请求：HTTP请求对象，带置信度信息"""
 
-    def __init__(self, method: str, path: str, headers: Dict[str, str], body: str = '', query: Dict[str, str] = None):
+    def __init__(
+        self, method: str, path: str, headers: Dict[str, str], body: str = '', query: Optional[Dict[str, str]] = None
+    ):
         self.method = method
         self.path = path
         self.headers = headers
@@ -36,7 +38,7 @@ class TernaryRequest:
 class TernaryResponse:
     """三态响应：HTTP响应对象，带置信度信息"""
 
-    def __init__(self, status: int = 200, body: str = '', headers: Dict[str, str] = None):
+    def __init__(self, status: int = 200, body: str = '', headers: Optional[Dict[str, str]] = None):
         self.status = status
         self.body = body
         self.headers = headers or {}
@@ -179,7 +181,7 @@ class TernaryMiddleware:
     @staticmethod
     def rate_limit(max_requests: int, window_seconds: int = 60):
         """速率限制中间件"""
-        requests = {}
+        requests: Dict[str, List[float]] = {}
 
         def middleware(request: TernaryRequest, response: TernaryResponse):
             client_ip = request.headers.get('X-Forwarded-For', '127.0.0.1')
@@ -264,7 +266,12 @@ class TernaryServer:
         return response
 
     def handle_request(
-        self, method: str, path: str, headers: Dict[str, str] = None, body: str = '', query: Dict[str, str] = None
+        self,
+        method: str,
+        path: str,
+        headers: Optional[Dict[str, str]] = None,
+        body: str = '',
+        query: Optional[Dict[str, str]] = None,
     ) -> TernaryResponse:
         """处理HTTP请求"""
         request = TernaryRequest(method, path, headers or {}, body, query)

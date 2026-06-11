@@ -294,11 +294,11 @@ class TritValue:
             return v
 
         key = (
-            (value, precision, confidence)
+            (value, precision, confidence, source)
             if isinstance(value, (int, float))
-            else (_hashable(value), precision, confidence)
+            else (_hashable(value), precision, confidence, source)
             if isinstance(value, list)
-            else (value, precision, confidence)
+            else (value, precision, confidence, source)
         )
         with cls._pool_lock:
             if key in cls._pool:
@@ -339,7 +339,7 @@ class TritValue:
             self._payload = value  # type: ignore[assignment]
             self.value = []
             self.symbol = ''
-        elif isinstance(value, list) and value and isinstance(value[0], int):
+        elif isinstance(value, list) and value and isinstance(value[0], int) and all(x in (-1, 0, 1) for x in value):
             self.value = value
             self.symbol = BT.to_str(value)
         elif isinstance(value, list):

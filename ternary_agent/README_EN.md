@@ -32,18 +32,42 @@ python -X utf8 run_agent.py "replace v0.3 with v0.4" --dry-run
 User Task
   │
   ├─ _force_tool()        Smart first round (analyze/find_symbol, skip LLM)
-  ├─ _pre_analyze()       Pre-analysis (file structure + symbols + recall)
+  ├─ SemanticCache        P5: semantic cache, zero-cost for repeated tasks
   │
   ▼
-  LLM chooses tool ──→ TernaryEngine.step()
-  │                      ├─ classify()   AFFIRM/NEGATE/UNCERT
-  │                      ├─ map_trit()   -1/0/1
-  │                      ├─ propagate()  Kleene logic
-  │                      ├─ confidence() Bayesian decay
-  │                      └─ protect()    safety gate
+  DecompositionEngine    Phase 0: task decomposition → recursive split → per-layer summary
+  │  ├─ ComplexityClassifier  complexity grading (simple/medium/complex)
+  │  ├─ BoundedContext        bounded context (hard limit 4000 tokens)
+  │  └─ ToolDependencyGraph   P1: tool chain legality validation
   │
   ▼
-  Execute ──→ MemoryStore (keywords + LLM summary + time decay)
+  HypothesisGenerator    Phase 1: multi-hypothesis generation
+  │  ├─ LLM generates 5 candidate plans
+  │  ├─ P1 dependency graph filter    tool order legality
+  │  ├─ P9 capability match filter    task needs vs tool capabilities
+  │  └─ P8 diversity dedup            keyword clustering, avoid 5≈1
+  │
+  ▼
+  Tournament             Phase 1: tournament
+  │  ├─ P2 parallel early stop    execute 2 steps per hypothesis, kill low-confidence
+  │  ├─ classic elimination       confidence gap / step gap / LLM fallback
+  │  ├─ P3 failure classification 6 FailureModes + retry strategy
+  │  └─ P4 adaptive threshold     auto-tune from history after 50 rounds
+  │
+  ▼
+  Execute best ──→ TernaryEngine.step()
+  │                 ├─ classify()   AFFIRM/NEGATE/UNCERT
+  │                 ├─ map_trit()   -1/0/1
+  │                 ├─ propagate()  Kleene logic
+  │                 ├─ confidence() Bayesian decay
+  │                 └─ protect()    safety gate
+  │
+  ▼
+  ResourceManager        Phase 2: unified resource management
+  │  ├─ tool_reliability()    tool reliability (time decay)
+  │  ├─ P7 MetricsCollector   full-chain observability metrics
+  │  ├─ P10 CostPredictor     cost prediction (historical data)
+  │  └─ P11 ReplayEngine      execution replay + diff comparison
   │
   ▼
   Reflect ──→ continue / fix / done
@@ -51,14 +75,25 @@ User Task
 
 ## File Layers
 
-| File | Role | Lines |
-|------|------|-------|
-| `ternary_engine.py` | Decision engine (Kleene + Bayesian + gating) | 131 |
-| `agent_runtime.py` | V3 runtime (SymbolTable / MemoryStore / ProjectGraph) | 492 |
-| `agent_tools.py` | Tool layer (12 pure functions, zero dependencies) | 170 |
-| `agent_policy.san` | Policy config (model / thresholds / rules, hot-reload) | 194 |
-| `decision.san` | Legacy decision core (to be migrated) | 185 |
-| `agent.san` | Legacy main loop (interactive mode) | 1242 |
+| File | Role | Patches |
+|------|------|---------|
+| `ternary_engine.py` | Decision engine (Kleene + Bayesian + gating) | — |
+| `agent_tool_graph.py` | Tool dependency graph + capability registry + task capability extraction | P1+P9 |
+| `agent_decompose.py` | Task decomposition engine + bounded context + complexity classifier | Phase 0 |
+| `agent_hypothesis.py` | Multi-hypothesis + diversity control + tournament + failure classification + adaptive threshold | P2+P3+P4+P8 |
+| `agent_resource.py` | Unified resource management + semantic cache + observability + cost prediction + replay | P5+P7+P10+P11 |
+| `agent_runtime.py` | V5 runtime (full Phase 0/1/2 integration) | — |
+| `agent_tools.py` | Tool layer (12 pure functions, zero dependencies) | — |
+| `agent_policy.san` | Policy config (model / thresholds / rules, hot-reload) | — |
+
+## Test Coverage
+
+| Module | Test File | Count |
+|--------|-----------|-------|
+| Agent decisions | `test_agent.py` | 31 |
+| AgentRuntime V5 | `test_agent_runtime.py` | 39 |
+| Agent V5 new modules | `test_agent_v5.py` | 158 |
+| **Total** | | **228** |
 
 ## Tools
 
@@ -118,7 +153,8 @@ NPC life + LLM dialogue + TernaryEngine trust tracking + SVG charts.
 
 ```bash
 python -X utf8 tests/test_agent.py -v          # 31 tests
-python -X utf8 tests/test_agent_runtime.py -v  # 27 tests
+python -X utf8 tests/test_agent_runtime.py -v  # 39 tests (V5: decomposition + tournament)
+python -X utf8 tests/run_all.py                # 46 integration tests
 ```
 
 ---

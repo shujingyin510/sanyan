@@ -1,7 +1,7 @@
 """三态数据管线：ETL清洗、聚合、脏数据处理"""
 
 import time
-from typing import Any, Callable, Dict, List, Tuple
+from typing import Any, Callable, Dict, List, Optional, Tuple
 from ternary_core import TritValue
 from values import SanyanSyntaxError, SanyanTypeError, SanyanValueError
 from ops.registry import register, register_alias
@@ -10,7 +10,7 @@ from ops.registry import register, register_alias
 class TernaryData:
     """三态数据单元：带置信度的数据值"""
 
-    def __init__(self, value: Any, confidence: float = 1.0, source: str = '', timestamp: float = None):
+    def __init__(self, value: Any, confidence: float = 1.0, source: str = '', timestamp: Optional[float] = None):
         self.value = value
         self.confidence = max(0.0, min(1.0, confidence))
         self.source = source
@@ -153,14 +153,14 @@ class TernaryCleaner:
         return TernaryData(data.value, normalized, data.source, data.timestamp)
 
     @staticmethod
-    def deduplicate(data_list: List[TernaryData], key: Callable = None) -> List[TernaryData]:
+    def deduplicate(data_list: List[TernaryData], key: Optional[Callable] = None) -> List[TernaryData]:
         """去重（保留置信度最高的）"""
         if key is None:
 
             def key(x):
                 return str(x.value)
 
-        seen = {}
+        seen: Dict[str, TernaryData] = {}
         for item in data_list:
             k = key(item)
             if k not in seen or item.confidence > seen[k].confidence:
@@ -234,7 +234,7 @@ class TernaryAggregator:
     @staticmethod
     def group_by(data_list: List[TernaryData], key_func: Callable) -> Dict[str, List[TernaryData]]:
         """分组"""
-        groups = {}
+        groups: Dict[str, List[TernaryData]] = {}
         for item in data_list:
             k = str(key_func(item))
             groups.setdefault(k, []).append(item)

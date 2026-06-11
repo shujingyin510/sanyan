@@ -172,3 +172,17 @@ def _belief_set_op(evaluator, args):
 
 register('belief', _belief_op)
 register('belief_set', _belief_set_op)
+
+# 中文别名
+from ops.registry import register_alias as _ra  # noqa: E402
+
+_ra('三态移位', 'trit_shift')
+_ra('三态翻转', 'trit_flip')
+_ra('三态压缩', 'trit_compress')
+_ra('三态解压', 'trit_decompress')
+_ra('解析十六进制', 'parse_hex')
+_ra('解析二进制', 'parse_bin')
+_ra('枚举', 'enum')
+_ra('结构体', 'struct')
+_ra('信念', 'belief')
+_ra('信念集', 'belief_set')

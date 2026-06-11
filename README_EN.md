@@ -1,4 +1,4 @@
-# Tri-State Cognitive Framework Sanyan v3.27.0
+# Tri-State Cognitive Framework Sanyan v3.29.0
 
 [![VS Code Extension](https://img.shields.io/badge/VS%20Code-Syntax%20Highlight-%23007ACC?logo=visualstudiocode)](sanyan-vscode/README.md)
 [![CI](https://github.com/shujingyin510/sanyan/actions/workflows/test.yml/badge.svg)](https://github.com/shujingyin510/sanyan/actions)
@@ -184,21 +184,27 @@ See [CHANGELOG.md](CHANGELOG.md) for the full version history.
 
 ---
 
-### Agent: Readable Decision DSL
+### Agent: Readable Decision DSL (v5)
+
+> See [ternary_agent/README.md](ternary_agent/README.md) — v5 architecture, three-phase design, patch catalog.
 
 | Feature | Description |
 |---|---|
-| **Ternary Reasoning** | LLM 5 cognitive states → ternary mapping → confidence propagation → safety gating → action dispatch |
-| **Code Generation** | `write_code` tool: LLM generates Sanyan code → sandbox evaluator → result returned. Supports fix-error-retry loops |
-| **File Operations** | `read_file` / `list_files` / `write_file` / `replace_in_file` — Agent can read, modify, and write project files |
-| **Multi-Provider** | DeepSeek / OpenAI / Qwen / Gemini / Xiaomi MIMO / Xiaomi Token Plan / Ollama — switch with one config line |
-| **Probabilistic Ternary** | `TritValue.confidence`, Bayesian propagation, e.g. `真(0.9)` |
-| **Protocol Prompt** | 6-part structured prompt (role/syntax/tools/code/examples/constraints) for precise LLM steering |
-| **Chinese Decision Trace** | Human-readable per-step trace (LLM → mapping → propagation → action → answer) |
-| **Declarative Policy** | `agent_policy.san` pure data + 18 scene rules, editable by non-programmers |
-| **Self-Explaining** | `解释决策(N)` 6-step reasoning chain + `解释原因()` 5-layer explanation |
-| **Hot Reload** | Auto-reloads when policy file changes, no restart needed |
-| **Village Observer** | NPC autonomous life simulation → ternary trust evolution → SVG chart + JSON log |
+| **Ternary Reasoning** | LLM cognitive states → ternary mapping → Kleene propagation → Bayesian confidence → safety gating |
+| **Multi-Hypothesis** | Top-3 candidates explored in parallel, tournament selects best, early stop kills dead hypotheses |
+| **Task Decomposition** | Auto-recursive task splitting, bounded context per layer (4000 token hard limit) |
+| **Tool Dependency Graph** | P1: pre-validate tool chain legality, filter invalid combinations |
+| **Capability Registry** | P9: task needs vs tool capability matching, -50% misselection rate |
+| **Diversity Control** | P8: keyword clustering dedup, avoid 5≈1 pseudo-diversity |
+| **Failure Classification** | P3: 6 FailureModes (empty/missing/schema/timeout/logic/loop), precise retry |
+| **Adaptive Threshold** | P4: auto-tune from history after 50 rounds, eliminate hardcoded values |
+| **Semantic Cache** | P5: similar tasks reused directly, ~15% hit rate |
+| **Observability** | P7: full-chain metrics (early stop/cache hit/LLM compare/cost prediction) |
+| **Cost Prediction** | P10: historical data model replaces LLM guessing, +20% accuracy |
+| **Execution Replay** | P11: complete run log + diff comparison, +300% debug efficiency |
+| **Experience Learning** | Tool success rate stats + time decay + module risk assessment |
+| **Multi-Provider** | DeepSeek / OpenAI / Qwen / Gemini / Xiaomi MIMO / Token Plan / Ollama |
+| **Declarative Policy** | `agent_policy.san` pure data + scene rules, hot-reload |
 
 ```bash
 # Interactive mode (multi-turn, hot reload)
@@ -207,8 +213,8 @@ python -X utf8 run_agent.py
 # Single-shot programming (LLM generates code → executes → returns result)
 python -X utf8 run_agent.py "calculate sum from 1 to 1000"
 
-# Direct code execution (no LLM)
-python -X utf8 run_agent.py "(set x 10)(print (add x 5))"
+# Autonomous (read → modify → test → fix → loop)
+python -X utf8 run_agent.py "fix _test_verify.py so tests pass" --auto
 
 # File operations
 python -X utf8 run_agent.py "replace v0.3 with v0.4 in AGENTS.md"

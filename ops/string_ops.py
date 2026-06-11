@@ -157,4 +157,18 @@ register('lower', StringOps.string_lower)
 register('startswith', StringOps.string_startswith)
 register('endswith', StringOps.string_endswith)
 register_alias('len', 'length')
+
+# 中文别名
+_ra = register_alias
+_ra('连接', 'concat')
+_ra('取长', 'length')
+_ra('查找', 'find')
+_ra('替换', 'replace')
+_ra('子串', 'substring')
+_ra('分割', 'split')
+_ra('去空白', 'trim')
+_ra('大写', 'upper')
+_ra('小写', 'lower')
+_ra('前缀', 'startswith')
+_ra('后缀', 'endswith')
 register_alias('substr', 'substring')

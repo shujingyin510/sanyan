@@ -120,3 +120,13 @@ def ensure_trit(v: Any) -> Any:
     if isinstance(v, str):
         return TritValue(v)
     return v  # list/dict/None 保持原样
+
+
+def to_float(v: Any) -> float:
+    """将 TritValue 或 raw 值转为 float。用于三态值的浮点保护。"""
+    try:
+        if hasattr(v, 'to_int'):
+            return float(v.to_int())
+        return float(v)
+    except Exception:
+        return 0.0
