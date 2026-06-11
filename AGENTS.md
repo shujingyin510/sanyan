@@ -70,6 +70,13 @@ Agent 功能通过端到端 mock 测试验证（mock `http写` 返回模拟 LLM 
 - **死代码移除**: 两个连续的 `传播后 == -1` 分支合并为一个
 - **`好感要求` 安全读取**: `_V` 未定义时 try/catch 保护，默认好感=50
 
+### 自举修复（2026-06-11）
+
+- **`字列` 皮肤映射冲突**: `language/chinese.json` 中 `字列` 映射到 `str_to_list`（字符串拆字符），但 `bytecode_compiler.san` 函数体内用它表达 `dict_keys`（字典键列表）。导入时函数体不执行故不触发；self-compile 时求值器执行函数体，`(字列 ov)` → `str_to_list(ov)` → `list(str(dict))` → `{` → KeyError。改为 `字典键列表`（皮肤正确解析为 `dict_keys`）根除
+- **`stdlib/bytecode_compiler.bin` 重编**: 源码变更后字节码更新（SHA256 `b828d68d...`）
+- **`stdlib/sugar.bin` 重编**: 同步 bytecode_compiler 更新（SHA256 `7f0b9635...`）
+- **`tests/test_ops_ext.py::test_dict_keys`**: 同根因 `字列` → `字典键列表`
+
 ---
 
 ## 村庄观察器（`run_village_observe.py`，详情见 `docs/village_observer.md`）

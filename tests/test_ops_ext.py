@@ -399,7 +399,7 @@ class TestContainerOpsExtended(unittest.TestCase):
         self.env = SanyanEvaluator()
 
     def test_dict_keys(self):
-        r = self.env.eval(['字列', ['字典', '"a"', '1', '"b"', '2']])
+        r = self.env.eval(['字典键列表', ['字典', '"a"', '1', '"b"', '2']])
         self.assertEqual(sorted(r), ['a', 'b'])
 
     def test_list_concat(self):

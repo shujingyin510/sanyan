@@ -8,7 +8,6 @@ import time
 from typing import Any, Dict, Optional
 from ternary_core import TritValue, ArrayValue
 from runtime import SanyanRuntime
-from commands import Commands
 from values import FunctionValue, ModuleValue, SrcNode, SanyanError, SanyanNameError, SanyanSyntaxError, SanyanTypeError
 from eval_utils import (
     parse_string_literal,

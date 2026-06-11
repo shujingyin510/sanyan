@@ -36,6 +36,11 @@
 - **ops/data_pipeline_ops.py**：`TernaryData.__str__` 支持字符串转换
 - **ops/data_pipeline_ops.py**：`TernaryAggregator.average/sum` 支持 TritValue 类型
 - **ops/ternary_generic_ops.py**：三态队列/栈出队/弹栈返回元素而非列表
+- **stdlib/bytecode_compiler.san**：`字列` → `字典键列表`（行55-56），修复皮肤映射冲突——`字列` 在 `language/chinese.json` 中解析为 `str_to_list`，导致 self-compile 时 `(字列 ov)` 把 dict 转字符串拆字符，首个字符 `{` 触发 KeyError。`字典键列表` 正确解析为 `dict_keys`
+- **stdlib/bytecode_compiler.bin**：重编（6298B，SHA256 `b828d68d...`）
+- **stdlib/sugar.bin**：重编（9839B，SHA256 `7f0b9635...`），同步 bytecode_compiler 变更
+- **tests/test_ops_ext.py::test_dict_keys**：`字列` → `字典键列表`，同根因修复
+- **evaluator.py**：移除未使用的 `commands.Commands` 导入
 
 ### 文档
 - **docs/roadmap.md**：更新已完成/待实现状态
