@@ -71,9 +71,7 @@ def compile_source(source: str, output_path: str, vars_table: dict | None = None
     # 检测 S-表达式输入（以 ( 开头且括号平衡），直接用 S-表达式解析器
     ast = None
     sugar_ast = None
-    is_sexpr = (
-        source.strip().startswith('(') and source.count('(') == source.count(')')
-    ) or (
+    is_sexpr = (source.strip().startswith('(') and source.count('(') == source.count(')')) or (
         source.strip().startswith('\uff08') and source.count('\uff08') == source.count('\uff09')
     )
 
