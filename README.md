@@ -670,8 +670,11 @@ sanyan/
 │   ├── test_commands.py       # 命令模块单测（18 项）
 │   ├── test_sugar_san.py      # sugar.san 测试（45 项）
 │   ├── test_llvmgen.py        # LLVM 代码生成测试（53 项）
-│   ├── test_self_host.py      # 字节码编译器自举验证（5 项）
+│   ├── test_self_host.py      # 字节码编译器自举验证（8 项，含 Level 2 + Level 3）
 │   ├── test_sugar_self_host.py # sugar.bin 自举验证（3 项）
+│   ├── test_effect_types.py    # 效应类型测试（30 项，确定/不确定）
+│   ├── test_diff_fuzz.py       # 差分模糊测试（12 项，四后端一致）
+│   ├── test_disasm.py          # 反汇编器测试（6 项）
 │   ├── test_vm.py             # VM 字节码测试（91 项）
 │   ├── test_c_vm.py           # C VM 测试（14 项，需 gcc）
 │   ├── test_agent.py          # Agent 测试（31 项）

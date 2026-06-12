@@ -2,6 +2,35 @@
 
 ---
 
+## [v3.30.0] — 2026-06-12
+
+### 新增
+- **效应类型系统**：`确定[X]`/`不确定[X]` 编译期类型检查，5文件改动 + 30项测试
+- **四后端差分模糊测试**：Python VM/C VM/LLVM 三后端一致性验证，12项测试全通过
+- **自举 Level 2**：A→B→C 不动点验证（VM 加载编译器自举，B==C逐字节一致）
+- **自举 Level 3**：318行C种子VM（`csrc/sanyan_vm_seed.c`），零依赖纯syscall，35 opcode
+- **自举 Level 4**：617行x86_64 NASM汇编VM（`csrc/sanyan_vm_l4.asm`），35 opcode全实现
+- **ISA v2**：LOAD16/STORE16/CALL32/PUSH_STR16/CLOSURE 5个新opcode
+- **哈希字典**：FNV-1a哈希 + 开放寻址，O(1)替代O(n)
+- **反汇编器**：`disasm.py`，支持--hex/--brief/--export，6项测试
+- **字节码验证器**：`verify.py`，JMP/LOAD/STORE边界检查
+
+### 修复
+- **C VM编译修复**（10项）：`obj_type`/嵌套函数/`rt_trit_confidence`/`rt_float_t`重复
+- **LLVM 死循环修复**：`llvmgen/compiler.py` `_parse_all_sexprs` 死循环
+- **字节码编译器修复**：负数识别（`全部数字`/`文本转整数`）+ 函数体编译（去掉isList守卫）
+- **Level 4 汇编安全加固**（30+项）：栈下溢/变量越界/类型检查/UTF-8四字节/空指针/DICT_HAS rsi
+- **10个已知bug**：`(乘5 -2)` VM返回0、`(定义f0(p0)27)` VM空输出、C VM `--run`多打印、LLVM比较二值、求值器OR未注册等
+
+### 测试
+- `test_effect_types.py` 30项
+- `test_diff_fuzz.py` 12项
+- `test_disasm.py` 6项
+- `test_self_host.py` 8项（含Level 2 + Level 3）
+- 全量CI：pytest 1650+ 通过
+
+---
+
 ## [v3.29.0] — 2026-06-11
 
 ### 新增

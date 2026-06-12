@@ -225,3 +225,36 @@ ternary_agent/
 - **字典查找替代 if-else**: 映射规则、中文名、天气数据全部用字典
 - **自解释**: Agent 能用中文解释自己为什么这么决策
 - **热重载**: 修改策略文件后自动生效，无需重启
+
+## 自举工具链 (Bootstrap Toolchain)
+
+### 层级
+
+| 层级 | 状态 | 实现 | 说明 |
+|------|------|------|------|
+| Level 0 | ✅ | Python evaluator | 宿主编译器 |
+| Level 1 | ✅ | `bytecode_compiler.san` | 编译器用三言写 |
+| Level 2 | ✅ | `test_self_host.py` | A→B→C 不动点验证 |
+| Level 3 | ✅ | `csrc/sanyan_vm_seed.c` | 318行C种子VM |
+| Level 4 | ✅ | `csrc/sanyan_vm_l4.asm` | 617行x86_64 NASM种子 |
+
+### 工具
+
+| 工具 | 文件 | 说明 |
+|------|------|------|
+| 反汇编器 | `disasm.py` | 支持 `--hex`/`--brief`/`--export` |
+| 字节码验证器 | `verify.py` | JMP/LOAD/STORE 边界检查 |
+
+### ISA v2 (指令集扩展)
+
+| opcode | 编号 | 说明 |
+|--------|------|------|
+| LOAD16 | 0x3B | 2字节变量索引 |
+| STORE16 | 0x3C | 2字节变量索引 |
+| CALL32 | 0x3D | 4字节函数地址 |
+| PUSH_STR16 | 0x3E | 2字节字符串长度 |
+| CLOSURE | 0x3F | 创建堆闭包对象 |
+
+### 效应类型
+
+`确定[X]`/`不确定[X]` 编译期类型检查，表达不确定性约束。信度≥0.99视为确定。
