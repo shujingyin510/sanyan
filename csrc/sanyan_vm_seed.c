@@ -275,7 +275,8 @@ void _start() {
     s32 argc = *(s32*)(sp_reg);
     char** argv = (char**)(sp_reg + 8);
 
-    sp=0; pc=0; halt=0; csp=0;
+    sp=0; pc=0; halt=0; csp=0; SYS3(SYS_write,1,(u64)"START
+",6);
     /* bootstrap test: always output a marker */
     SYS3(SYS_write, 1, (u64)"SEED_OK
 ", 8);
@@ -286,9 +287,11 @@ void _start() {
         SYS3(SYS_read, 0, cod, CM); cs=CM;
     }
 
-    vm_run();  /* 初始化代码 (PC=0 → HALT) */
+    SYS3(SYS_write,1,(u64)"RUN1
+",5); vm_run();  /* 初始化代码 (PC=0 → HALT) */
     halt=0;
-    vm_run();  /* 主程序 (HALT 之后) */
+    SYS3(SYS_write,1,(u64)"RUN1
+",5); vm_run();  /* 主程序 (HALT 之后) */
 
     SYS1(SYS_exit, 0);
 }
