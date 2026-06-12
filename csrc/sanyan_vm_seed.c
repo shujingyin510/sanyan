@@ -227,6 +227,21 @@ static void vm_run() {
                          for (u32 i=0;i<VM;i++) var[i]=cstk[csp].sv[i]; }
             else { halt=1; } break;
 
+        case 0x0E: /* PRINT */
+            { void* v=pp();
+              if (IS_INT(v)) {
+                  s32 val=UNTAG(v); u8 neg=0; u8 buf[32]; s32 p=31; buf[p]=0;
+                  if (val<0) { neg=1; val=-val; }
+                  if (val==0) buf[--p]='0';
+                  else while (val>0) { buf[--p]=(u8)(48+(val%10)); val/=10; }
+                  if (neg) buf[--p]='-';
+                  buf[--p]='\n';
+                  SYS3(SYS_write, 1, (u64)(buf+p), (u64)(32-p));
+              } else if (!IS_INT(v) && ((Obj*)v)->t==T_STR) {
+                  Str* s=(Str*)v; SYS3(SYS_write, 1, (u64)s->data, s->len);
+                  SYS3(SYS_write, 1, (u64)n, 1);
+              } } break;
+
         case 0x30: /* WRITE_BINARY ¡ª µ¯ byte_list, path */
             { void* bl=pp(); void* pt=pp();
               if (bl&&pt&&!IS_INT(bl)&&!IS_INT(pt))
