@@ -68,6 +68,8 @@ PUSH_I:
     movsxd rax,dword[r10+r9]; add r9,4
     lea rax,[rax*2+1]; cmp r8,512; jae .halt; mov[r13+r8*8],rax; inc r8; jmp dispatch
 
+CLOSURE: jmp dispatch  ; TODO: closure object creation
+
 PUSH_STR16:
     movzx ecx,word[r10+r9]; add r9,2; mov edx,ecx; lea rsi,[r10+r9]; xor edi,edi; jmp .clp_common
 PUSH_STR:
@@ -569,6 +571,8 @@ jmp_tbl:
         dd RET - jmp_tbl
     %elif i == 0x30
         dd WRBIN - jmp_tbl
+    %elif i == 0x3F
+        dd CLOSURE - jmp_tbl
     %elif i == 0x3e
         dd PUSH_STR16 - jmp_tbl
     %elif i == 0x3d

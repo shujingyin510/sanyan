@@ -227,26 +227,12 @@ static void vm_run() {
                          for (u32 i=0;i<VM;i++) var[i]=cstk[csp].sv[i]; }
             else { halt=1; } break;
 
-        case 0x0E: /* PRINT */
-            { void* v=pp();
-              if (IS_INT(v)) {
-                  s32 val=UNTAG(v); u8 neg=0; u8 buf[32]; s32 p=31; buf[p]=0;
-                  if (val<0) { neg=1; val=-val; }
-                  if (val==0) buf[--p]='0';
-                  else while (val>0) { buf[--p]=(u8)(48+(val%10)); val/=10; }
-                  if (neg) buf[--p]='-';
-                  buf[--p]='\n';
-                  SYS3(SYS_write, 1, (u64)(buf+p), (u64)(32-p));
-              } else if (!IS_INT(v) && ((Obj*)v)->t==T_STR) {
-                  Str* s=(Str*)v; SYS3(SYS_write, 1, (u64)s->data, s->len);
-                  SYS3(SYS_write, 1, (u64)n, 1);
-              } } break;
-
         case 0x30: /* WRITE_BINARY — 弹 byte_list, path */
             { void* bl=pp(); void* pt=pp();
               if (bl&&pt&&!IS_INT(bl)&&!IS_INT(pt))
                   file_write((Str*)pt, (List*)bl); } break;
 
+        case 0x3F: /* CLOSURE */ { void* fn=pp(); u32 nc=(u32)UNTAG(pp()); void* cl=halloc(20+nc*8); *(u32*)cl=4; ((u32*)cl)[1]=(u32)(u64)fn; ((u32*)cl)[2]=nc; u32 j; for(j=0;j<nc;j++) ((void**)((u8*)cl+12))[j]=pp(); ps(cl); } break;
         case 0xFF: halt=1; break; /* HALT */
         default: break; /* 未知 opcode: 安全跳过 */
         }
@@ -271,11 +257,11 @@ static s32 load(const char* p) {
  *   栈布局: [argc(8B)] [argv[0](8B)] [argv[1](8B)] ...
  *   rsp 指向 argc */
 void _start() {
-    s32 argc; char** argv;
-    __asm__ volatile("mov (%%rsp), %0; lea 8(%%rsp), %1" : "=r"(argc), "=r"(argv));
+    register u64 sp_reg asm("rsp");
+    s32 argc = *(s32*)(sp_reg);
+    char** argv = (char**)(sp_reg + 8);
 
-    sp=0; pc=0; halt=0; csp=0; SYS3(SYS_write,1,(u64)"START
-",6);
+    sp=0; pc=0; halt=0; csp=0;
 
     if (argc > 1) {
         if (load(argv[1]) < 0) SYS1(SYS_exit, 1);
@@ -283,24 +269,9 @@ void _start() {
         SYS3(SYS_read, 0, cod, CM); cs=CM;
     }
 
-    vm_run(); SYS3(SYS_write,1,(u64)"RUN1
-",5);
+    vm_run();  /* 初始化代码 (PC=0 → HALT) */
     halt=0;
-    vm_run(); SYS3(SYS_write,1,(u64)"RUN2
-",5);
-
-    SYS1(SYS_exit, 0);
-}
-
- else {
-        SYS3(SYS_read, 0, cod, CM); cs=CM;
-    }
-
-    SYS3(SYS_write,1,(u64)"RUN1
-",5); vm_run();  /* 初始化代码 (PC=0 → HALT) */
-    halt=0;
-    SYS3(SYS_write,1,(u64)"RUN1
-",5); vm_run();  /* 主程序 (HALT 之后) */
+    vm_run();  /* 主程序 (HALT 之后) */
 
     SYS1(SYS_exit, 0);
 }
