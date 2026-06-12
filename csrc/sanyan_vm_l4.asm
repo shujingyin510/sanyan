@@ -40,49 +40,15 @@ dispatch:
     cmp byte[rel halted],0; jne .ret
     cmp r9d,r11d; jae .halt
     movzx eax,byte[r10+r9]; inc r9
-    cmp al,0x00; je dispatch
-    cmp al,0xFF; je .halt
-    cmp al,0x01; je PUSH_I
-    cmp al,0x2D; je PUSH_STR
-    cmp al,0x07; je LOAD
-    cmp al,0x08; je STORE
-    cmp al,0x02; je ADD
-    cmp al,0x03; je SUB
-    cmp al,0x04; je MUL
-    cmp al,0x05; je DIV
-    cmp al,0x06; je MOD
-    cmp al,0x13; je GT
-    cmp al,0x14; je LT
-    cmp al,0x15; je EQ
-    cmp al,0x17; je GTE
-    cmp al,0x19; je CONCAT
-    cmp al,0x1A; je STRLEN
-    cmp al,0x1B; je STRSUB
-    cmp al,0x1C; je STREQ
-    cmp al,0x31; je ORD
-    cmp al,0x27; je LIST_NEW
-    cmp al,0x25; je LIST_GET
-    cmp al,0x2A; je LIST_LEN
-    cmp al,0x26; je SET_ELEM
-    cmp al,0x28; je LIST_CAT
-    cmp al,0x29; je SLICE
-    cmp al,0x1D; je DICT
-    cmp al,0x1E; je DICT_GET
-    cmp al,0x1F; je DICT_SET
-    cmp al,0x20; je DICT_HAS
-    cmp al,0x32; je DICT_KEYS
-    cmp al,0x21; je IS_NUM
-    cmp al,0x22; je IS_STR
-    cmp al,0x23; je IS_LIST
-    cmp al,0x09; je JMP
-    cmp al,0x0A; je JZ
-    cmp al,0x33; je JMP32
-    cmp al,0x0C; je CALL
-    cmp al,0x0D; je RET
-    cmp al,0x30; je WRBIN
-    jmp dispatch
+    ; 跳转表: 256 × 2 字节偏移 (见文件末尾 jmp_tbl)
+    ; 未知 opcode → .nop_handler (jmp dispatch)
+    movsx rax,word[rel jmp_tbl+rax*2]
+    lea rbx,[rel jmp_tbl]
+    add rbx,rax
+    jmp rbx
 .halt: mov byte[rel halted],1
 .ret:  ret
+.nop_handler: jmp dispatch
 
 ; ═══════════════════════════════════════════════════════════════
 ; 基础 opcode
@@ -478,6 +444,100 @@ load_bin:
     mov edi,ebx; mov eax,3; syscall; xor eax,eax; ret
 .lbc:mov edi,ebx; mov eax,3; syscall
 .lbf:mov eax,-1; ret
+
+; ═══════════════════════════════════════════════════════════════
+; 跳转表: 256 × 2 字节偏移，dispatch 用 movsx rax,word[rel jmp_tbl+op*2] 索引
+; 每项 = handler_label - jmp_tbl，16-bit 有符号 (handler 必须在 ±32KB 内)
+; ═══════════════════════════════════════════════════════════════
+jmp_tbl:
+%assign i 0
+%rep 256
+    %if i == 0x01
+        dw PUSH_I - jmp_tbl
+    %elif i == 0x2D
+        dw PUSH_STR - jmp_tbl
+    %elif i == 0x07
+        dw LOAD - jmp_tbl
+    %elif i == 0x08
+        dw STORE - jmp_tbl
+    %elif i == 0x02
+        dw ADD - jmp_tbl
+    %elif i == 0x03
+        dw SUB - jmp_tbl
+    %elif i == 0x04
+        dw MUL - jmp_tbl
+    %elif i == 0x05
+        dw DIV - jmp_tbl
+    %elif i == 0x06
+        dw MOD - jmp_tbl
+    %elif i == 0x13
+        dw GT - jmp_tbl
+    %elif i == 0x14
+        dw LT - jmp_tbl
+    %elif i == 0x15
+        dw EQ - jmp_tbl
+    %elif i == 0x17
+        dw GTE - jmp_tbl
+    %elif i == 0x19
+        dw CONCAT - jmp_tbl
+    %elif i == 0x1A
+        dw STRLEN - jmp_tbl
+    %elif i == 0x1B
+        dw STRSUB - jmp_tbl
+    %elif i == 0x1C
+        dw STREQ - jmp_tbl
+    %elif i == 0x31
+        dw ORD - jmp_tbl
+    %elif i == 0x27
+        dw LIST_NEW - jmp_tbl
+    %elif i == 0x25
+        dw LIST_GET - jmp_tbl
+    %elif i == 0x2A
+        dw LIST_LEN - jmp_tbl
+    %elif i == 0x26
+        dw SET_ELEM - jmp_tbl
+    %elif i == 0x28
+        dw LIST_CAT - jmp_tbl
+    %elif i == 0x29
+        dw SLICE - jmp_tbl
+    %elif i == 0x1D
+        dw DICT - jmp_tbl
+    %elif i == 0x1E
+        dw DICT_GET - jmp_tbl
+    %elif i == 0x1F
+        dw DICT_SET - jmp_tbl
+    %elif i == 0x20
+        dw DICT_HAS - jmp_tbl
+    %elif i == 0x32
+        dw DICT_KEYS - jmp_tbl
+    %elif i == 0x21
+        dw IS_NUM - jmp_tbl
+    %elif i == 0x22
+        dw IS_STR - jmp_tbl
+    %elif i == 0x23
+        dw IS_LIST - jmp_tbl
+    %elif i == 0x09
+        dw JMP - jmp_tbl
+    %elif i == 0x0A
+        dw JZ - jmp_tbl
+    %elif i == 0x33
+        dw JMP32 - jmp_tbl
+    %elif i == 0x0C
+        dw CALL - jmp_tbl
+    %elif i == 0x0D
+        dw RET - jmp_tbl
+    %elif i == 0x30
+        dw WRBIN - jmp_tbl
+    %elif i == 0xFF
+        dw .halt - jmp_tbl
+    %elif i == 0x00
+        dw .nop_handler - jmp_tbl
+    %else
+        dw .nop_handler - jmp_tbl
+    %endif
+%assign i i+1
+%endrep
+jmp_tbl_end:
 
 ; ═══════════════════════════════════════════════════════════════
 ; BSS
