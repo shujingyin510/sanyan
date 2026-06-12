@@ -92,8 +92,15 @@ static List* list_slice(List* l, u32 s, u32 c) { if(s>=l->len)return list_new(0)
 
 /* ── 字典 ── */
 static s32 key_eq(void* a, void* b) { if(IS_INT(a)&&IS_INT(b))return UNTAG(a)==UNTAG(b); if(!IS_INT(a)&&!IS_INT(b)&&((Obj*)a)->t==T_STR&&((Obj*)b)->t==T_STR)return str_eq((Str*)a,(Str*)b); return 0; }
+/* round up to next power of 2 */
+static u32 next_pow2(u32 n) { n--; n|=n>>1; n|=n>>2; n|=n>>4; n|=n>>8; n|=n>>16; return n+1; }
+/* FNV-1a hash for strings, multiplicative for ints */
+static u32 dict_hash(void* k) {
+    if (IS_INT(k)) { u32 v=(u32)UNTAG(k); v^=v>>16; v*=0x85ebca6b; v^=v>>13; v*=0xc2b2ae35; v^=v>>16; return v; }
+    Str* s=(Str*)k; u32 h=2166136261u; u32 i; for(i=0;i<s->len;i++){h^=s->data[i];h*=16777619;} return h;
+}
 static Dict* dict_new(u32 n_pairs) { u32 cap=next_pow2(n_pairs*2); if(cap<8) cap=8; Dict* d=halloc(16+cap*2*8); d->t=T_DICT; d->cap=cap; d->size=0; d->tomb=0; u32 i; for(i=0;i<cap*2;i++) d->kv[i]=0; return d; }
-static void  dict_set(Dict* d, void* k, void* v) { /* 覆盖已存在的 key */ for(u32 i=0;i<d->cnt*2;i+=2)if(d->kv[i]&&key_eq(d->kv[i],k)){d->kv[i+1]=v;return;} /* 找空位 */ for(u32 i=0;i<d->cnt*2;i+=2)if(!d->kv[i]){d->kv[i]=k;d->kv[i+1]=v;return;} }
+static void dict_set(Dict* d, void* k, void* v) { u32 cap=d->cap, mask=cap-1, idx=dict_hash(k)&mask; u32 n=0; while(n<cap) { void* ek=d->kv[idx*2]; if(!ek||ek==(void*)1) { d->kv[idx*2]=k; if(!ek) d->size++; d->kv[idx*2+1]=v; return; } if(key_eq(ek,k)) { d->kv[idx*2+1]=v; return; } idx=(idx+1)&mask; n++; } }
 static void* dict_get(Dict* d, void* k) { u32 cap=d->cap, mask=cap-1, idx=dict_hash(k)&mask; u32 n=0; while(n<cap) { void* ek=d->kv[idx*2]; if(!ek) return 0; if(ek!=(void*)1&&key_eq(ek,k)) return d->kv[idx*2+1]; idx=(idx+1)&mask; n++; } return 0; }
 static s32 dict_has(Dict* d, void* k) { return dict_get(d,k)?1:0; }
 static List* dict_keys(Dict* d) { u32 nz=d->size; List* l=list_new(nz); u32 j=0,i; for(i=0;i<d->cap&&j<nz;i++) { void* ek=d->kv[i*2]; if(ek&&ek!=(void*)1) l->items[j++]=ek; } return l; }
@@ -192,9 +199,9 @@ static void vm_run() {
         case 0x28: b=pp(); a=pp(); ps(list_cat((List*)a,(List*)b)); break; /* LIST_CONCAT */
         case 0x29: b=pp(); a=pp(); r=pp(); ps(list_slice((List*)r,(u32)UNTAG(a),(u32)UNTAG(b))); break; /* SLICE */
 
-        case 0x1D: /* DICT — 弹 n*2 个 k-v 对 */
-            n = (u32)UNTAG(pp()); { u32 m=n*2; Dict* d=dict_new(n);
-            for (u32 i=0; i<m; i+=2) { void* v=pp(); void* k=pp(); d->kv[m-2-i]=k; d->kv[m-1-i]=v; }
+        case 0x1D: /* DICT — hash-based */
+            { u32 np=(u32)UNTAG(pp()); Dict* d=dict_new(np);
+            u32 ii; for(ii=0;ii<np*2;ii+=2) { void* vv=pp(); void* kk=pp(); dict_set(d,kk,vv); }
             ps(d); } break;
         case 0x1E: b=pp(); a=pp(); ps(dict_get((Dict*)a,b)); break; /* DICT_GET */
         case 0x1F: { void* v=pp(); b=pp(); a=pp(); dict_set((Dict*)a,b,v); } break; /* DICT_SET */
