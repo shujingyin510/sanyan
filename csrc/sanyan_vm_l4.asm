@@ -144,7 +144,7 @@ CALL:
 
 RET:
     test r14,r14; jz .halt_vm
-    sub r14,2; mov r9,[r15+r14*8]; mov r8,[r15+r14*8+8]; jmp dispatch
+    sub r14,2; mov r9,[r15+r14*8]; cmp r9d,r11d; jae dispatch; mov r8,[r15+r14*8+8]; jmp dispatch
 .halt_vm: mov byte[rel halted],1; jmp dispatch
 
 ; ═══════════════════════════════════════════════════════════════
@@ -165,7 +165,8 @@ LIST_GET:
 .lgd:mov[r13+r8*8],rax;inc r8;jmp dispatch
 
 LIST_LEN:
-    dec r8;mov rax,[r13+r8*8];mov eax,[rax+4];lea rax,[rax*2+1];mov[r13+r8*8],rax;inc r8;jmp dispatch
+    dec r8;mov rax,[r13+r8*8];test al,1;jnz .llb;cmp dword[rax],2;jne .llb;mov eax,[rax+4];lea rax,[rax*2+1];mov[r13+r8*8],rax;inc r8;jmp dispatch
+.llb: inc r8; jmp dispatch
 
 SET_ELEM:
     cmp r8,3;jb dispatch;dec r8;mov rax,[r13+r8*8];dec r8;mov rbx,[r13+r8*8];sar rbx,1;dec r8;mov rcx,[r13+r8*8];test cl,1;jnz .sed;cmp dword[rcx],2;jne .sed
@@ -273,7 +274,7 @@ DICT_SET:
 
 DICT_HAS:
     cmp r8,2;jb dispatch;dec r8;mov rsi,[r13+r8*8];dec r8;mov rdi,[r13+r8*8]
-    mov edx,[rdi+8];xor eax,eax
+    push rsi;mov edx,[rdi+8];xor eax,eax
 .dhlp:cmp eax,edx;jae .dhno
     cmp qword[rdi+16+rax*8],0;je .dhemp
     push rax;push rdi;mov rdi,[rdi+16+rax*8];mov rsi,[rsp+16];call key_cmp
@@ -284,7 +285,7 @@ DICT_HAS:
 .dhyes:pop rsi;mov qword[r13+r8*8],1;inc r8;jmp dispatch
 
 DICT_KEYS:
-    cmp r8,1;jb dispatch;dec r8;mov rdi,[r13+r8*8];push rdi;mov edx,[rdi+8];xor ecx,ecx;xor eax,eax
+    cmp r8,1;jb dispatch;dec r8;mov rdi,[r13+r8*8];test rdi,rdi;jz dispatch;test dil,1;jnz dispatch;cmp dword[rdi],3;jne dispatch;push rdi;mov edx,[rdi+8];xor ecx,ecx;xor eax,eax
 .dkc:cmp eax,edx;jae .dkcd;cmp qword[rdi+16+rax*8],0;je .dkcn;inc ecx
 .dkcn:inc eax;jmp .dkc
 .dkcd:lea edi,[ecx*8+16];call halloc
