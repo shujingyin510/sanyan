@@ -2,6 +2,7 @@
 
 import os
 import hashlib
+import sys
 
 
 import unittest
@@ -177,8 +178,7 @@ class TestBootstrapLevel3(unittest.TestCase):
     组合 Level 2 不动点验证 → 完整 Level 3 自举。
     """
 
-    @unittest.skipIf(os.name != 'posix' or sys.platform == 'win32',
-                     'C VM 种子仅支持 Linux (syscall)，Windows 跳过')
+    @unittest.skipIf(os.name != 'posix' or sys.platform == 'win32', 'C VM 种子仅支持 Linux (syscall)，Windows 跳过')
     def test_seed_vm_runs_bytecode(self):
         """编译 C VM 种子，执行简单字节码验证正确性"""
         import subprocess
@@ -186,7 +186,8 @@ class TestBootstrapLevel3(unittest.TestCase):
 
         seed_src = os.path.join(
             os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
-            'csrc', 'sanyan_vm_seed.c',
+            'csrc',
+            'sanyan_vm_seed.c',
         )
         self.assertTrue(os.path.exists(seed_src), f'种子源码不存在: {seed_src}')
 
@@ -195,18 +196,20 @@ class TestBootstrapLevel3(unittest.TestCase):
 
             # 编译 C VM
             result = subprocess.run(
-                ['gcc', seed_src, '-o', seed_exe, '-nostdlib', '-Os',
-                 '-fno-builtin', '-lgcc', '-Wno-main', '-s'],
-                capture_output=True, text=True, timeout=30,
+                ['gcc', seed_src, '-o', seed_exe, '-nostdlib', '-Os', '-fno-builtin', '-lgcc', '-Wno-main', '-s'],
+                capture_output=True,
+                text=True,
+                timeout=30,
             )
             if result.returncode != 0:
                 # 尝试 tcc
                 result = subprocess.run(
                     ['tcc', seed_src, '-o', seed_exe],
-                    capture_output=True, text=True, timeout=30,
+                    capture_output=True,
+                    text=True,
+                    timeout=30,
                 )
-            self.assertEqual(result.returncode, 0,
-                             f'C VM 编译失败:\n{result.stderr[:500]}')
+            self.assertEqual(result.returncode, 0, f'C VM 编译失败:\n{result.stderr[:500]}')
             self.assertTrue(os.path.exists(seed_exe), '可执行文件未生成')
 
             # 用 C VM 执行简单字节码程序
@@ -220,11 +223,14 @@ class TestBootstrapLevel3(unittest.TestCase):
             # C VM 输出
             cvm = subprocess.run(
                 [seed_exe, bin_path],
-                capture_output=True, text=True, timeout=10,
+                capture_output=True,
+                text=True,
+                timeout=10,
             )
 
             # Python VM 输出（用于对比）
             import io
+
             old = sys.stdout
             sys.stdout = io.StringIO()
             vm = PyVM.from_bin(bin_path)
@@ -233,11 +239,9 @@ class TestBootstrapLevel3(unittest.TestCase):
             sys.stdout = old
 
             cvm_out = cvm.stdout.strip()
-            self.assertEqual(cvm_out, py_out,
-                             f'C VM 输出不匹配: CVM={cvm_out!r} PY={py_out!r}')
+            self.assertEqual(cvm_out, py_out, f'C VM 输出不匹配: CVM={cvm_out!r} PY={py_out!r}')
 
-    @unittest.skipIf(os.name != 'posix' or sys.platform == 'win32',
-                     'C VM 种子仅支持 Linux')
+    @unittest.skipIf(os.name != 'posix' or sys.platform == 'win32', 'C VM 种子仅支持 Linux')
     def test_seed_vm_size(self):
         """验证种子二进制在 8KB 以内"""
         import subprocess
@@ -245,7 +249,8 @@ class TestBootstrapLevel3(unittest.TestCase):
 
         seed_src = os.path.join(
             os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
-            'csrc', 'sanyan_vm_seed.c',
+            'csrc',
+            'sanyan_vm_seed.c',
         )
 
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -254,15 +259,24 @@ class TestBootstrapLevel3(unittest.TestCase):
                 if compiler == 'tcc':
                     args = ['tcc', seed_src, '-o', seed_exe]
                 else:
-                    args = ['gcc', seed_src, '-o', seed_exe, '-nostdlib', '-Os',
-                            '-fno-builtin', '-lgcc', '-Wno-main', '-s']
+                    args = [
+                        'gcc',
+                        seed_src,
+                        '-o',
+                        seed_exe,
+                        '-nostdlib',
+                        '-Os',
+                        '-fno-builtin',
+                        '-lgcc',
+                        '-Wno-main',
+                        '-s',
+                    ]
 
                 result = subprocess.run(args, capture_output=True, text=True, timeout=30)
                 if result.returncode == 0:
                     size = os.path.getsize(seed_exe)
                     if compiler == 'tcc':
-                        self.assertLess(size, 4096,
-                                        f'TCC 编译二进制过大: {size} bytes (目标 < 4KB)')
+                        self.assertLess(size, 4096, f'TCC 编译二进制过大: {size} bytes (目标 < 4KB)')
                     break  # 任一种编译器通过即可
 
             self.assertTrue(os.path.exists(seed_exe), '无法编译种子 VM')
