@@ -277,7 +277,7 @@ class TestBootstrapLevel3(unittest.TestCase):
                 if result.returncode == 0:
                     size = os.path.getsize(seed_exe)
                     if compiler == 'tcc':
-                        self.assertLess(size, 4096, f'TCC')
+                        self.assertLess(size, 4096, 'TCC 编译二进制过大')
                     break  # success with one compiler is enough
             else:
                 self.skipTest('无法编译种子 VM (需要 tcc 或 gcc)')
