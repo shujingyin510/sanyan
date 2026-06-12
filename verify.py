@@ -17,7 +17,6 @@ import struct
 import sys
 import os
 from dataclasses import dataclass, field
-from typing import Optional
 
 # ═══════════════════════════════════════════════════════════════
 # 操作码元信息
@@ -125,50 +124,50 @@ OP_SIZE = {
 }
 
 OP_NAMES = {
-    NOP: "NOP",
-    PUSH_I: "PUSH_I",
-    ADD: "ADD",
-    SUB: "SUB",
-    MUL: "MUL",
-    DIV: "DIV",
-    MOD: "MOD",
-    LOAD: "LOAD",
-    STORE: "STORE",
-    JMP: "JMP",
-    JZ: "JZ",
-    JNZ: "JNZ",
-    CALL: "CALL",
-    RET: "RET",
-    PRINT: "PRINT",
-    GT: "GT",
-    LT: "LT",
-    EQ: "EQ",
-    NE: "NE",
-    GTE: "GTE",
-    LTE: "LTE",
-    CONCAT: "CONCAT",
-    STRLEN: "STRLEN",
-    STRSUB: "STRSUB",
-    STREQ: "STREQ",
-    DICT: "DICT",
-    DICT_GET: "DICT_GET",
-    DICT_SET: "DICT_SET",
-    DICT_HAS: "DICT_HAS",
-    IS_NUM: "IS_NUM",
-    IS_STR: "IS_STR",
-    IS_LIST: "IS_LIST",
-    SAME: "SAME",
-    LIST_GET: "LIST_GET",
-    SET_ELEMENT: "SET_ELEM",
-    LIST_NEW: "LIST_NEW",
-    LIST_CONCAT: "LIST_CAT",
-    SLICE: "SLICE",
-    LIST_LEN: "LIST_LEN",
-    WRITE_BINARY: "WRBIN",
-    ORD: "ORD",
-    DICT_KEYS: "DICT_KEYS",
-    JMP32: "JMP32",
-    HALT: "HALT",
+    NOP: 'NOP',
+    PUSH_I: 'PUSH_I',
+    ADD: 'ADD',
+    SUB: 'SUB',
+    MUL: 'MUL',
+    DIV: 'DIV',
+    MOD: 'MOD',
+    LOAD: 'LOAD',
+    STORE: 'STORE',
+    JMP: 'JMP',
+    JZ: 'JZ',
+    JNZ: 'JNZ',
+    CALL: 'CALL',
+    RET: 'RET',
+    PRINT: 'PRINT',
+    GT: 'GT',
+    LT: 'LT',
+    EQ: 'EQ',
+    NE: 'NE',
+    GTE: 'GTE',
+    LTE: 'LTE',
+    CONCAT: 'CONCAT',
+    STRLEN: 'STRLEN',
+    STRSUB: 'STRSUB',
+    STREQ: 'STREQ',
+    DICT: 'DICT',
+    DICT_GET: 'DICT_GET',
+    DICT_SET: 'DICT_SET',
+    DICT_HAS: 'DICT_HAS',
+    IS_NUM: 'IS_NUM',
+    IS_STR: 'IS_STR',
+    IS_LIST: 'IS_LIST',
+    SAME: 'SAME',
+    LIST_GET: 'LIST_GET',
+    SET_ELEMENT: 'SET_ELEM',
+    LIST_NEW: 'LIST_NEW',
+    LIST_CONCAT: 'LIST_CAT',
+    SLICE: 'SLICE',
+    LIST_LEN: 'LIST_LEN',
+    WRITE_BINARY: 'WRBIN',
+    ORD: 'ORD',
+    DICT_KEYS: 'DICT_KEYS',
+    JMP32: 'JMP32',
+    HALT: 'HALT',
 }
 
 
@@ -177,7 +176,7 @@ class VerifyError:
     addr: int
     opcode: int
     msg: str
-    severity: str = "error"  # "error" | "warning"
+    severity: str = 'error'  # "error" | "warning"
 
 
 @dataclass
@@ -197,7 +196,7 @@ class VerifyResult:
         self.errors.append(VerifyError(addr, op, msg))
 
     def add_warning(self, addr: int, op: int, msg: str):
-        self.warnings.append(VerifyError(addr, op, msg, "warning"))
+        self.warnings.append(VerifyError(addr, op, msg, 'warning'))
 
 
 def verify(data: bytes) -> VerifyResult:
@@ -205,12 +204,12 @@ def verify(data: bytes) -> VerifyResult:
     result = VerifyResult()
 
     if len(data) < 10:
-        result.add_error(0, 0, "文件过小 (< 10 字节)")
+        result.add_error(0, 0, '文件过小 (< 10 字节)')
         return result
 
-    magic, ver, vc, sz = struct.unpack_from("<4sBBI", data, 0)
-    if magic != b"SAN0":
-        result.add_error(0, 0, f"无效 magic: {magic!r}")
+    magic, ver, vc, sz = struct.unpack_from('<4sBBI', data, 0)
+    if magic != b'SAN0':
+        result.add_error(0, 0, f'无效 magic: {magic!r}')
         return result
 
     result.code_size = sz
@@ -218,7 +217,7 @@ def verify(data: bytes) -> VerifyResult:
 
     code = data[10 : 10 + sz]
     if len(code) < sz:
-        result.add_error(0, 0, f"代码不完整: 声明 {sz} 字节，实际 {len(code)}")
+        result.add_error(0, 0, f'代码不完整: 声明 {sz} 字节，实际 {len(code)}')
         return result
 
     # ── 从头扫描所有指令 ──
@@ -230,7 +229,7 @@ def verify(data: bytes) -> VerifyResult:
 
         # 检查 1: 操作码合法性
         if op not in OP_SIZE:
-            result.add_warning(addr, op, "未知操作码")
+            result.add_warning(addr, op, '未知操作码')
             i += 1
             addr += 1
             continue
@@ -238,12 +237,12 @@ def verify(data: bytes) -> VerifyResult:
         # 检查 2: 操作数边界
         if op == PUSH_I:
             if i + 5 > len(code):
-                result.add_error(addr, op, "PUSH_I 操作数越界")
+                result.add_error(addr, op, 'PUSH_I 操作数越界')
                 break
 
         elif op == PUSH_STR:
             if i + 1 >= len(code):
-                result.add_error(addr, op, "PUSH_STR 缺少长度字节")
+                result.add_error(addr, op, 'PUSH_STR 缺少长度字节')
                 break
             strlen = code[i + 1]
             total = 2 + strlen * 2
@@ -251,58 +250,56 @@ def verify(data: bytes) -> VerifyResult:
                 result.add_error(
                     addr,
                     op,
-                    f"PUSH_STR len={strlen} 越界 (需要 {total} 字节，剩余 {len(code)-i})",
+                    f'PUSH_STR len={strlen} 越界 (需要 {total} 字节，剩余 {len(code) - i})',
                 )
                 break
 
         elif op in (LOAD, STORE):
             if i + 2 > len(code):
-                result.add_error(addr, op, "LOAD/STORE 操作数越界")
+                result.add_error(addr, op, 'LOAD/STORE 操作数越界')
                 break
             idx = code[i + 1]
             if idx >= 256:
-                result.add_error(addr, op, f"LOAD/STORE idx={idx} 越界 (max 255)")
+                result.add_error(addr, op, f'LOAD/STORE idx={idx} 越界 (max 255)')
 
         elif op in (JMP, JZ, JNZ):
             if i + 3 > len(code):
-                result.add_error(addr, op, "JMP/JZ/JNZ 操作数越界")
+                result.add_error(addr, op, 'JMP/JZ/JNZ 操作数越界')
                 break
-            offset = struct.unpack_from("<h", code, i + 1)[0]
+            offset = struct.unpack_from('<h', code, i + 1)[0]
             target = addr + 3 + offset
             # 检查 3: 跳转目标
             if target < 0 or target > sz:
                 result.add_error(
                     addr,
                     op,
-                    f"跳转目标 {target} (offset={offset:+d}) 越界 [0,{sz})",
+                    f'跳转目标 {target} (offset={offset:+d}) 越界 [0,{sz})',
                 )
             else:
                 result.reached_instructions.add(target)
 
         elif op == JMP32:
             if i + 5 > len(code):
-                result.add_error(addr, op, "JMP32 操作数越界")
+                result.add_error(addr, op, 'JMP32 操作数越界')
                 break
-            offset = struct.unpack_from("<i", code, i + 1)[0]
+            offset = struct.unpack_from('<i', code, i + 1)[0]
             target = addr + 5 + offset
             if target < 0 or target > sz:
                 result.add_error(
                     addr,
                     op,
-                    f"JMP32 跳转目标 {target} (offset={offset:+d}) 越界 [0,{sz})",
+                    f'JMP32 跳转目标 {target} (offset={offset:+d}) 越界 [0,{sz})',
                 )
             else:
                 result.reached_instructions.add(target)
 
         elif op == CALL:
             if i + 3 > len(code):
-                result.add_error(addr, op, "CALL 操作数越界")
+                result.add_error(addr, op, 'CALL 操作数越界')
                 break
-            target = struct.unpack_from("<H", code, i + 1)[0]
+            target = struct.unpack_from('<H', code, i + 1)[0]
             if target >= sz:
-                result.add_error(
-                    addr, op, f"CALL 目标 {target} 越界 [0,{sz})"
-                )
+                result.add_error(addr, op, f'CALL 目标 {target} 越界 [0,{sz})')
             else:
                 result.reached_instructions.add(target)
                 # 检查 4: CALL 参数扫描安全
@@ -313,7 +310,7 @@ def verify(data: bytes) -> VerifyResult:
                     result.add_warning(
                         addr,
                         op,
-                        f"CALL 参数扫描从 {target} 出发越过代码末尾",
+                        f'CALL 参数扫描从 {target} 出发越过代码末尾',
                     )
 
         # 确定指令长度
@@ -334,59 +331,56 @@ def verify(data: bytes) -> VerifyResult:
         unreached = [a for a in range(addr, sz, 2) if a not in result.reached_instructions]
         if unreached:
             start = min(unreached)
-            end = max(unreached)
-            result.add_warning(
-                addr, 0, f"代码末尾 {sz - addr} 字节不可达 (起始地址 {start:04X})"
-            )
+            result.add_warning(addr, 0, f'代码末尾 {sz - addr} 字节不可达 (起始地址 {start:04X})')
 
     return result
 
 
 def verify_file(path: str, quiet: bool = False) -> VerifyResult:
     """验证 .bin 文件。"""
-    with open(path, "rb") as f:
+    with open(path, 'rb') as f:
         data = f.read()
     result = verify(data)
     result.filename = path
 
     if not quiet:
-        print(f"文件: {path}")
-        print(f"  变量数: {result.var_count}")
-        print(f"  代码大小: {result.code_size} 字节")
-        print(f"  可达指令: {len(result.reached_instructions)}")
+        print(f'文件: {path}')
+        print(f'  变量数: {result.var_count}')
+        print(f'  代码大小: {result.code_size} 字节')
+        print(f'  可达指令: {len(result.reached_instructions)}')
 
         if result.errors:
-            print(f"\n  ❌ 错误 ({len(result.errors)}):")
+            print(f'\n  ❌ 错误 ({len(result.errors)}):')
             for e in result.errors:
-                print(f"    [{e.addr:04X}] {OP_NAMES.get(e.opcode, f'0x{e.opcode:02X}')}: {e.msg}")
+                print(f'    [{e.addr:04X}] {OP_NAMES.get(e.opcode, f"0x{e.opcode:02X}")}: {e.msg}')
 
         if result.warnings:
-            print(f"\n  ⚠️  警告 ({len(result.warnings)}):")
+            print(f'\n  ⚠️  警告 ({len(result.warnings)}):')
             for w in result.warnings:
-                print(f"    [{w.addr:04X}] {OP_NAMES.get(w.opcode, f'0x{w.opcode:02X}')}: {w.msg}")
+                print(f'    [{w.addr:04X}] {OP_NAMES.get(w.opcode, f"0x{w.opcode:02X}")}: {w.msg}')
 
         if result.ok:
-            print("\n  ✅ 验证通过")
+            print('\n  ✅ 验证通过')
         else:
-            print(f"\n  ❌ 验证失败 ({len(result.errors)} 个错误)")
+            print(f'\n  ❌ 验证失败 ({len(result.errors)} 个错误)')
 
     return result
 
 
 def main():
     if len(sys.argv) < 2:
-        print("用法: python verify.py <file.bin> [--quiet]")
+        print('用法: python verify.py <file.bin> [--quiet]')
         sys.exit(1)
 
     path = sys.argv[1]
     if not os.path.exists(path):
-        print(f"文件不存在: {path}")
+        print(f'文件不存在: {path}')
         sys.exit(1)
 
-    quiet = "--quiet" in sys.argv
+    quiet = '--quiet' in sys.argv
     result = verify_file(path, quiet)
     sys.exit(0 if result.ok else 1)
 
 
-if __name__ == "__main__":
+if __name__ == '__main__':
     main()
