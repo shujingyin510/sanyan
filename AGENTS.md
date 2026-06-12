@@ -939,3 +939,44 @@ python -X utf8 tests/test_diff_fuzz.py -v  # 12 项测试
 | `llvmgen/compiler.py` | 修复 `_parse_all_sexprs` 死循环 |
 | `stdlib/bytecode_compiler.san` | 负数识别 + 函数体修复 |
 | `stdlib/bytecode_compiler.bin` | 重新编译（6400→6398 字节） |
+
+### ISA v2 扩展（2026-06-12）
+
+新增 4 个 opcode 突破 ISA 上限：
+
+| opcode | 编号 | 说明 |
+|--------|------|------|
+| LOAD16 | 0x3B | 2 字节变量索引（max 65535） |
+| STORE16 | 0x3C | 2 字节变量索引 |
+| CALL32 | 0x3D | 4 字节函数地址（>64KB code） |
+| PUSH_STR16 | 0x3E | 2 字节字符串长度（>255 字符） |
+| CLOSURE | 0x3F | 创建堆闭包对象 `{T=4, fn, n, vals[]}` |
+
+**改动文件**：
+| 文件 | 改动 |
+|------|------|
+| `csrc/sanyan_vm_l4.asm` | 汇编 VM 全实现 + 跳转表更新 |
+| `csrc/sanyan_vm_seed.c` | C VM 加 CLOSURE opcode |
+| `disasm.py` / `verify.py` | opcode 表同步 |
+
+### 哈希字典（2026-06-12）
+
+字典从线性 O(n) 升级为 FNV-1a 哈希 + 开放寻址 O(1)。
+
+**Dict 结构体**：`{u32 t, u32 cap, u32 size, u32 tomb, void* kv[]}`
+
+**改动**：`csrc/sanyan_vm_seed.c` — dict_new/dict_set/dict_get/dict_has/dict_keys 全部重写
+
+### 工具（2026-06-12）
+
+| 工具 | 文件 | 用途 |
+|------|------|------|
+| 反汇编器 | `disasm.py` | `--hex/--brief/--export`，6 项测试 |
+| 字节码验证器 | `verify.py` | JMP/LOAD/STORE 边界检查，0 errors |
+
+### 测试更新（2026-06-12）
+
+- `tests/test_disasm.py` — 反汇编器测试 6 项
+- `tests/test_self_host.py` — 自举测试 8 项（含 Level 2 + Level 3）
+- `tests/test_effect_types.py` — 效应类型 30 项
+- `tests/test_diff_fuzz.py` — 差分模糊 12 项
