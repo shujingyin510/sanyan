@@ -91,10 +91,105 @@ Agent 功能通过端到端 mock 测试验证（mock `http写` 返回模拟 LLM 
 
 ### 自举修复（2026-06-11）
 
-- **`字列` 皮肤映射冲突**: `language/chinese.json` 中 `字列` 映射到 `str_to_list`（字符串拆字符），但 `bytecode_compiler.san` 函数体内用它表达 `dict_keys`（字典键列表）。导入时函数体不执行故不触发；self-compile 时求值器执行函数体，`(字列 ov)` → `str_to_list(ov)` → `list(str(dict))` → `{` → KeyError。改为 `字典键列表`（皮肤正确解析为 `dict_keys`）根除
-- **`stdlib/bytecode_compiler.bin` 重编**: 源码变更后字节码更新（SHA256 `b828d68d...`）
-- **`stdlib/sugar.bin` 重编**: 同步 bytecode_compiler 更新（SHA256 `7f0b9635...`）
-- **`tests/test_ops_ext.py::test_dict_keys`**: 同根因 `字列` → `字典键列表`
+---
+
+### 自举 Level 2（2026-06-12）
+
+完整自举循环（不动点验证）：
+
+```
+源码 ──[Level 0 Python evaluator]──▶ A.bin（参考）
+源码 ──[VM 加载 A.bin]───────────▶ B.bin
+源码 ──[VM 加载 B.bin]───────────▶ C.bin
+
+验证 B == C 逐字节相同 → 编译器达到不动点 ✅
+```
+
+**核心机制**：`_compile_with_bin()` 函数直接操作 VM——推送 AST/路径/变量表到栈上，构造调用帧，跳转到 `编译字节码` 导出函数地址，VM 执行后产出 `.bin` 文件。
+
+**自举层级**：
+| 层级 | 状态 | 说明 |
+|------|------|------|
+| Level 0 | ✅ | Python evaluator 作为宿主编译器 |
+| Level 1 | ✅ | bytecode_compiler.san 用三言写 |
+| Level 2 | ✅ | VM 加载 A → 编译 B → B 编译 C → B==C |
+| Level 3 | ❌ | 无可审计的最小种子二进制 |
+
+**测试**：`test_self_host.py` 新增 `TestBootstrapLevel2.test_bootstrap_fixpoint`
+
+### Level 3 种子 VM（2026-06-12）
+
+最小可审计字节码解释器——零依赖（不 `#include` 任何头文件），纯 Linux x86_64 syscall。
+
+```bash
+# TinyCC 编译（推荐，~2KB）
+tcc -nostdlib csrc/sanyan_vm_seed.c -o sanyan_vm
+
+# GCC 编译（~7.5KB）
+gcc -nostdlib -Os -fno-builtin -lgcc -s csrc/sanyan_vm_seed.c -o sanyan_vm
+```
+
+**设计**：
+| 项目 | 内容 |
+|------|------|
+| 源码 | `csrc/sanyan_vm_seed.c`（318 行，中文注释） |
+| opcode | 35 个（完全覆盖 bytecode_compiler.bin 所需） |
+| 内存 | bump 分配器（brk syscall），标记指针值系统 |
+| 字符串 | UTF-16LE → UTF-8 转换，支持中文字符 |
+| 容器 | 列表/字典（键支持整数和字符串） |
+| I/O | open/read/write syscall（无 libc） |
+
+**审计面**：
+- 318 行 C 源码 → AI 逐行注释 → 人审计
+- TCC 编译 → ~2KB 原生二进制 → SHA256 固定
+- 无外部依赖，无 libc，纯 syscall
+
+**测试**：`test_self_host.py` 新增 `TestBootstrapLevel3`
+- `test_seed_vm_runs_bytecode`: 编译 + 执行验证
+- `test_seed_vm_size`: 验证种子 < 4KB（TCC）/ < 8KB（GCC）
+
+
+### Level 4 手写汇编种子（2026-06-12）
+
+x86_64 NASM 汇编手写 VM——连 C 编译器（TCC/GCC）的信任链也砍掉。
+直接产出 ELF64 可执行文件，无需任何编译器。
+
+```bash
+nasm -f bin -o sanyan_vm csrc/sanyan_vm_l4.asm
+```
+
+**设计**：
+| 项目 | 内容 |
+|------|------|
+| 源码 | `csrc/sanyan_vm_l4.asm`（~700 行，中文逐段注释） |
+| 格式 | ELF64 可执行文件（内置 header） |
+| opcode | 19 个核心（PUSH/STORE/LOAD/算术/比较/跳转/调用/类型检查/列表基本） |
+| stub | 16 个（字符串全功能/字典/SLICE/WRITE_BINARY — 预留扩展） |
+| 大小 | ~3KB 汇编 → ~1.5KB 二进制（核心），~3KB（含完整 opcode） |
+| 汇编器 | NASM（~200KB，Haskell 社区维护，审计面可控） |
+
+**审计面**：
+- 700 行 x86 汇编 → AI 逐行注释语义 → 人审计每条指令
+- `nasm -f bin` 产出纯二进制（无链接器介入）
+- 零 syscall 之外的外部调用
+
+**与 Level 3 对比**：
+| 层级 | 信任依赖 | 种子大小 | 完整度 |
+|------|----------|----------|--------|
+| Level 3 | TCC (~100KB) | ~2KB | 100%（35 opcode） |
+| Level 4 | NASM (~200KB) | ~3KB | 54%（19/35 opcode） |
+| Level 5 (理想) | 人工字节审计 | ~2KB | 100% |
+
+
+**自举层级**：
+| 层级 | 状态 | 说明 |
+|------|------|------|
+| Level 0 | ✅ | Python evaluator 作为宿主编译器 |
+| Level 1 | ✅ | bytecode_compiler.san 用三言写 |
+| Level 2 | ✅ | VM 加载 A → 编译 B → B 编译 C → B==C |
+| Level 3 | ✅ | 318 行 C 种子 VM → TCC 编译 → ~2KB 可审计二进制 |
+| Level 4 | ✅ | 手写 x86_64 NASM 汇编（700 行），无需 C 编译器 |
+| Level 5 | ❌ | 无可审计的最小种子二进制（需汇编手写） |
 
 ---
 
@@ -152,8 +247,25 @@ python -X utf8 run_village_observe.py --verbose # 详细三态推理链
 
 ## 自举状态（2026-06）
 
-**完全自举已达成。** VM 编译产出 `stdlib/bytecode_compiler.bin` 与求值器编译产出逐字节相同（5692 字节）。
+**完全自举已达成。** VM 编译产出 `stdlib/bytecode_compiler.bin` 与求值器编译产出逐字节相同（6398 字节）。
 新增 `tests/test_self_host.py` 作为正式自举检测测试。
+
+**Level 2 自举已达成（2026-06-12）。** 完整不动点验证：
+```
+源码 ──[Python evaluator]──▶ A.bin（参考）
+源码 ──[VM 加载 A]──────────▶ B.bin
+源码 ──[VM 加载 B]──────────▶ C.bin
+验证 B == C 逐字节相同 ✅
+```
+新增 `TestBootstrapLevel2.test_bootstrap_fixpoint` 测试。
+
+**自举层级**：
+| 层级 | 状态 | 说明 |
+|------|------|------|
+| Level 0 | ✅ | Python evaluator 作为宿主编译器 |
+| Level 1 | ✅ | bytecode_compiler.san 用三言写 |
+| Level 2 | ✅ | VM 加载 A → 编译 B → B 编译 C → B==C |
+| Level 3 | ❌ | 无可审计的最小种子二进制 |
 
 **llvmgen.san 自举完成（V5）。** 11 个 Python 辅助函数和 6 个全局变量已内联到源码中，
 `compile_llvmgen.py` 不再注入任何外部依赖。`llvmgen.bin`（69948 字节）可直接从源码编译。
@@ -357,7 +469,7 @@ python -X utf8 tests/test_sugar_san.py -v # sugar.san 测试 45 项
 python -X utf8 tests/test_llvmgen.py -v   # LLVM 代码生成测试 53 项
 python -X utf8 tests/test_dp_python.py -v # S 表达式解析测试 10 项
 python -X utf8 tests/test_llvm_native.py -v # LLVM 原生编译测试（需 C 编译器）
-python -X utf8 tests/test_self_host.py -v # 自举验证测试 5 项
+python -X utf8 tests/test_self_host.py -v # 自举验证测试 8 项（含 Level 2 + Level 3）
 python -X utf8 tests/test_sugar_self_host.py -v # sugar.bin 自举验证 3 项
 python -X utf8 tests/test_vm.py -v        # VM 字节码测试 91 项
 python -X utf8 tests/test_c_vm.py -v      # C VM 测试 14 项（需 gcc）
@@ -380,7 +492,7 @@ python -X utf8 tests/test_math_coverage.py -v # 数学函数覆盖测试 55 项
 python -X utf8 tests/run_all.py           # 集成测试 46 项
 
 # 或一条命令跑全部（CI 用）
-python -m pytest tests/test_core.py tests/test_commands.py tests/test_parser.py tests/test_ops.py tests/test_ops_ext.py tests/test_lsp.py tests/test_package.py tests/test_iot.py tests/test_dp_python.py tests/test_self_host.py tests/test_sugar_self_host.py tests/test_vm.py tests/test_llvmgen.py tests/test_sugar_san.py tests/test_agent.py tests/test_agent_runtime.py tests/test_agent_v5.py tests/test_lang_core.py tests/test_new_features.py tests/test_lang_core_ext.py tests/test_coverage_boost.py tests/test_coverage_boost2.py tests/test_coverage_boost3.py tests/test_coverage_boost4.py tests/test_coverage_boost5.py tests/test_coverage_boost6.py tests/test_coverage_boost7.py tests/test_math_coverage.py --cov=. -q
+python -m pytest tests/test_core.py tests/test_commands.py tests/test_parser.py tests/test_ops.py tests/test_ops_ext.py tests/test_lsp.py tests/test_package.py tests/test_iot.py tests/test_dp_python.py tests/test_self_host.py tests/test_sugar_self_host.py tests/test_vm.py tests/test_llvmgen.py tests/test_sugar_san.py tests/test_agent.py tests/test_agent_runtime.py tests/test_agent_v5.py tests/test_lang_core.py tests/test_new_features.py tests/test_lang_core_ext.py tests/test_effect_types.py tests/test_coverage_boost.py tests/test_coverage_boost2.py tests/test_coverage_boost3.py tests/test_coverage_boost4.py tests/test_coverage_boost5.py tests/test_coverage_boost6.py tests/test_coverage_boost7.py tests/test_math_coverage.py --cov=. -q
 
 全部通过才算成功：
 - test_core.py 138/138（含闭包+三态测试）
@@ -394,7 +506,7 @@ python -m pytest tests/test_core.py tests/test_commands.py tests/test_parser.py 
 - test_sugar_san.py 45/45
 - test_llvmgen.py 53/53
 - test_dp_python.py 10/10
-- test_self_host.py 5/5
+- test_self_host.py 8/8（含 Level 2 + Level 3）
 - test_sugar_self_host.py 3/3
 - test_vm.py 91/91
 - test_c_vm.py 14/14（含交叉验证，需 gcc）
