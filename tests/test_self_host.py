@@ -213,15 +213,19 @@ class TestBootstrapLevel3(unittest.TestCase):
                 ['tcc', seed_src, '-o', seed_exe],
             ]:
                 try:
-                    result = subprocess.run(compiler_args, capture_output=True, text=True, timeout=30)
+                    result = subprocess.run(compiler_args, capture_output=True, timeout=30)
                 except FileNotFoundError:
                     continue
                 if result.returncode == 0:
                     compiled = True
                     break
+                # 编译失败: 输出 stderr (可能含非 UTF-8 字节)
+                try:
+                    err_msg = result.stderr.decode('utf-8', errors='replace')
+                except Exception:
+                    err_msg = str(result.stderr[:200])
             if not compiled:
-                self.skipTest('无法编译种子 VM (需要 gcc 或 tcc)')
-
+                self.skipTest(f'无法编译种子 VM (gcc/tcc 均失败)\nstderr: {err_msg[:300]}')
             # 用 C VM 执行简单字节码程序
             from compile_bytecode import compile_source
             from vm import VM as PyVM
@@ -289,7 +293,7 @@ class TestBootstrapLevel3(unittest.TestCase):
                     ]
 
                 try:
-                    result = subprocess.run(args, capture_output=True, text=True, timeout=30)
+                    result = subprocess.run(args, capture_output=True, timeout=30)
                 except FileNotFoundError:
                     continue  # compiler not found, try next
                 if result.returncode == 0:
