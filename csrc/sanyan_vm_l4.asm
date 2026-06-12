@@ -66,13 +66,15 @@ dispatch:
 ; ═══════════════════════════════════════════════════════════════
 PUSH_I:
     movsxd rax,dword[r10+r9]; add r9,4
-    lea rax,[rax*2+1]; cmp r8,512; jae dispatch; mov[r13+r8*8],rax; inc r8; jmp dispatch
+    lea rax,[rax*2+1]; cmp r8,512; jae .halt; mov[r13+r8*8],rax; inc r8; jmp dispatch
 
+PUSH_STR16:
+    movzx ecx,word[r10+r9]; add r9,2; mov edx,ecx; lea rsi,[r10+r9]; xor edi,edi; jmp .clp_common
 PUSH_STR:
     movzx ecx,byte[r10+r9]; inc r9        ; ecx = char_count
     mov edx,ecx; lea rsi,[r10+r9]
     xor edi,edi                            ; utf8_len
-.clp:test edx,edx; jz .cld
+.clp_common: clp:test edx,edx; jz .cld
     movzx eax,word[rsi]; add rsi,2; dec edx
     cmp eax,0x80; jb .c1
     cmp eax,0x800; jb .c2
@@ -116,6 +118,9 @@ PUSH_STR:
 
 LOAD:  movzx eax,byte[r10+r9];inc r9;cmp eax,63;ja dispatch;mov rax,[r12+rax*8];cmp r8,511;ja dispatch;mov[r13+r8*8],rax;inc r8;jmp dispatch
 STORE: movzx eax,byte[r10+r9];inc r9;cmp eax,63;ja dispatch;dec r8;mov rbx,[r13+r8*8];mov[r12+rax*8],rbx;jmp dispatch
+
+LOAD16: movzx eax,word[r10+r9];add r9,2;cmp eax,65535;ja dispatch;mov rax,[r12+rax*8];cmp r8,511;ja .halt;mov[r13+r8*8],rax;inc r8;jmp dispatch
+STORE16: movzx eax,word[r10+r9];add r9,2;cmp eax,65535;ja dispatch;dec r8;mov rbx,[r13+r8*8];mov[r12+rax*8],rbx;jmp dispatch
 
 ADD: cmp r8,2;jb dispatch;dec r8;mov rax,[r13+r8*8];dec r8;mov rbx,[r13+r8*8];sar rax,1;sar rbx,1;add rax,rbx;lea rax,[rax*2+1];mov[r13+r8*8],rax;inc r8;jmp dispatch
 SUB: cmp r8,2;jb dispatch;dec r8;mov rax,[r13+r8*8];dec r8;mov rbx,[r13+r8*8];sar rax,1;sar rbx,1;sub rbx,rax;lea rbx,[rbx*2+1];mov[r13+r8*8],rbx;inc r8;jmp dispatch
@@ -564,6 +569,14 @@ jmp_tbl:
         dd RET - jmp_tbl
     %elif i == 0x30
         dd WRBIN - jmp_tbl
+    %elif i == 0x3e
+        dd PUSH_STR16 - jmp_tbl
+    %elif i == 0x3d
+        dd CALL32 - jmp_tbl
+    %elif i == 0x3c
+        dd STORE16 - jmp_tbl
+    %elif i == 0x3b
+        dd LOAD16 - jmp_tbl
     %elif i == 0xFF
         dd .halt - jmp_tbl
     %elif i == 0x00
