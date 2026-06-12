@@ -253,6 +253,7 @@ def main():
         if not os.path.exists(bin_path) or os.path.getmtime(bin_path) < os.path.getmtime(filepath):
             os.makedirs('build', exist_ok=True)
             from compile_bytecode import compile_san
+
             try:
                 compile_san(filepath, bin_path)
             except Exception:
@@ -260,6 +261,7 @@ def main():
 
         if not use_eval:
             from vm import VM as SanyanVM
+
             try:
                 SanyanVM.from_bin(bin_path)
                 sys.exit(0)

@@ -142,7 +142,7 @@ def parse(tokens: list, source: str = '') -> Optional[Union[list, str]]:
             if _peek() is None:
                 raise SanyanSyntaxError(_error("未闭合的 '(' —— 缺少 ')'"))
             _next()  # 跳过 ')'
-            return L if L else None
+            return L  # 空列表 () 也保留，不转 None（否则破坏函数参数列表等语法）
         elif token == ')':
             raise SanyanSyntaxError(_error("意外的 ')' —— 括号不匹配"))
         else:
