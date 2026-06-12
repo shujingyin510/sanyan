@@ -16,6 +16,7 @@ phdr:
     dq file_end, mem_end, 0x1000
 
 _start:
+    cld
     pop rcx; mov rsi,rsp
     lea r13,[rel stack]; xor r8d,r8d
     lea r12,[rel vars]; lea r15,[rel cstk]; xor r14d,r14d
@@ -55,7 +56,7 @@ dispatch:
 ; ═══════════════════════════════════════════════════════════════
 PUSH_I:
     movsxd rax,dword[r10+r9]; add r9,4
-    lea rax,[rax*2+1]; mov[r13+r8*8],rax; inc r8; jmp dispatch
+    lea rax,[rax*2+1]; cmp r8,512; jae dispatch; mov[r13+r8*8],rax; inc r8; jmp dispatch
 
 PUSH_STR:
     movzx ecx,byte[r10+r9]; inc r9        ; ecx = char_count
@@ -83,6 +84,16 @@ PUSH_STR:
     cmp eax,0x80; jb .s1
     cmp eax,0x800; jb .s2
     mov ecx,eax; shr eax,12; or al,0xE0; mov[rdi+rbx],al; inc rbx
+    mov eax,ecx; shr eax,6; and al,0x3F; or al,0x80; mov[rdi+rbx],al; inc rbx
+    mov eax,ecx; and al,0x3F; or al,0x80; mov[rdi+rbx],al; inc rbx
+    cmp eax,0x10000; jb .s3
+    ; 4 byte: 0xF0|(cp>>18), 0x80|((cp>>12)&0x3F), 0x80|((cp>>6)&0x3F), 0x80|(cp&0x3F)
+    mov ecx,eax; shr eax,18; or al,0xF0; mov[rdi+rbx],al; inc rbx
+    mov eax,ecx; shr eax,12; and al,0x3F; or al,0x80; mov[rdi+rbx],al; inc rbx
+    mov eax,ecx; shr eax,6; and al,0x3F; or al,0x80; mov[rdi+rbx],al; inc rbx
+    mov eax,ecx; and al,0x3F; or al,0x80; mov[rdi+rbx],al; inc rbx
+    jmp .slp
+.s3:mov ecx,eax; shr eax,12; or al,0xE0; mov[rdi+rbx],al; inc rbx
     mov eax,ecx; shr eax,6; and al,0x3F; or al,0x80; mov[rdi+rbx],al; inc rbx
     mov eax,ecx; and al,0x3F; or al,0x80; mov[rdi+rbx],al; inc rbx
     jmp .slp
@@ -124,7 +135,7 @@ JZ:    movsx eax,word[r10+r9];add r9,2;dec r8;mov rbx,[r13+r8*8];sar rbx,1;test 
 JMP32: movsxd rax,dword[r10+r9];add r9,4;add r9,rax;jmp dispatch
 
 CALL:
-    movzx eax,word[r10+r9]; add r9,2; test eax,eax; jz dispatch
+    mov eax,dword[r10+r9]; add r9,4; test eax,eax; jz dispatch
     mov ecx,eax; xor edx,edx
 .cn:cmp byte[r10+rcx],0x08; jne .cd; inc edx; add ecx,2; jmp .cn
 .cd:
@@ -162,28 +173,31 @@ SET_ELEM:
 .sed:jmp dispatch
 
 LIST_CAT:
-    ; 从 VM 栈取两个值，用原生栈保存，不污染 VM 寄存器(r10/r11)
+    ; 用 sub rsp,32 分配临时空间保存 a*,b*,total
     dec r8;mov rax,[r13+r8*8]   ; List* b
     dec r8;mov rbx,[r13+r8*8]   ; List* a
-    push rax;push rbx           ; 原生栈: [sp]=a, [sp+8]=b
+    sub rsp,32
+    mov[rsp],rbx                ; [rsp+0]=a*
+    mov[rsp+8],rax              ; [rsp+8]=b*
     mov ecx,[rbx+4];add ecx,[rax+4]
-    push rax;push rcx           ; 保存 b*, total
+    mov[rsp+16],rcx             ; [rsp+16]=total
     lea edi,[ecx*8+16];call halloc
-    pop rcx;pop rdx             ; rcx=total, rdx=b*
-    pop rsi                     ; rsi=a*
+    mov rcx,[rsp+16]            ; rcx=total (halloc clobbered ecx)
+    mov rsi,[rsp]               ; rsi=a*
+    mov rdx,[rsp+8]             ; rdx=b*
     mov dword[rax],2;mov[rax+4],ecx;mov[rax+8],ecx
     ; copy a items
     mov ecx,[rsi+4];xor edi,edi
 .lca:cmp edi,ecx;jae .lcad;mov rbx,[rsi+16+rdi*8];mov[rax+16+rdi*8],rbx;inc edi;jmp .lca
 .lcad:
-    mov ecx,[rsi+4]             ; len_a = offset for b items
-    ; copy b items — 用 rdx(b*) 和 ecx(offset)
-    push rsi;mov esi,ecx        ; 借用 esi 存 offset(安全寄存器)
+    ; copy b items, offset = [rsp+0]+4 = len_a
+    mov r10d,[rsi+4]            ; len_a = offset (safe: r10 restored before dispatch)
     mov ecx,[rdx+4];xor edi,edi
 .lcb:cmp edi,ecx;jae .lcbd
-    mov rbx,[rdx+16+rdi*8];mov[rax+16+rsi*8+rdi*8],rbx;inc edi;jmp .lcb
+    mov rbx,[rdx+16+rdi*8];mov[rax+16+r10*8+rdi*8],rbx;inc edi;jmp .lcb
 .lcbd:
-    pop rsi;pop rbx             ; 清理栈: pop a*, pop 最外层 push 的 a*
+    add rsp,32
+    lea r10,[rel code_buf];mov r11d,[rel code_len]  ; restore r10,r11
     mov[r13+r8*8],rax;inc r8;jmp dispatch
 
 SLICE:
@@ -216,8 +230,8 @@ key_cmp:
 
 DICT:
     dec r8;mov rax,[r13+r8*8];sar rax,1;mov ecx,eax;shl ecx,1
-    lea edi,[ecx*8+8];call halloc
-    mov dword[rax],3;mov[rax+4],ecx
+    lea edi,[ecx*8+16];call halloc
+    mov dword[rax],3;mov[rax+4],ecx;mov[rax+8],ecx
     mov edx,ecx
 .dlp:test edx,edx;jz .dd;sub edx,2
     dec r8;mov rbx,[r13+r8*8];dec r8;mov rdi,[r13+r8*8]
@@ -365,7 +379,14 @@ ORD:
 .of:cmp edi,ecx;jae .oz
     movzx eax,byte[rsi+rdi];test al,0x80;jz .ord1
     cmp al,0xE0;jb .ord2
-    movzx eax,byte[rsi+rdi];and eax,0x0F;shl eax,12
+    cmp al,0xF0;jb .ord3
+    ; 4 byte: 0xF0-0xF7
+    movzx eax,byte[rsi+rdi];and eax,0x07;shl eax,18
+    movzx edx,byte[rsi+rdi+1];and edx,0x3F;shl edx,12;or eax,edx
+    movzx edx,byte[rsi+rdi+2];and edx,0x3F;shl edx,6;or eax,edx
+    movzx edx,byte[rsi+rdi+3];and edx,0x3F;or eax,edx
+    jmp .op
+.ord3: movzx eax,byte[rsi+rdi];and eax,0x0F;shl eax,12
     movzx edx,byte[rsi+rdi+1];and edx,0x3F;shl edx,6;or eax,edx
     movzx edx,byte[rsi+rdi+2];and edx,0x3F;or eax,edx;jmp .op
 .ord2:movzx eax,byte[rsi+rdi];and eax,0x1F;shl eax,6
@@ -417,7 +438,7 @@ halloc:
     add edi,7; and edi,-8             ; 对齐
     add[rel heap_ptr],rdi             ; heap_ptr += size
     cmp[rel heap_ptr],rax
-    jb .oom
+    ; skip jb check (redundant, handled by heap_end check below)
     mov rcx,[rel heap_end]
     cmp[rel heap_ptr],rcx
     jbe .ok
