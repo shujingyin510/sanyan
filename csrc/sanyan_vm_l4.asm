@@ -148,7 +148,7 @@ CALL:
     mov eax,dword[r10+r9]; add r9,4; test eax,eax; jz dispatch
     cmp r14,126; jae dispatch
     mov ecx,eax; xor edx,edx
-.cn:lea ebx,[ecx+1]; cmp ebx,r11d; jae .bad_call; cmp byte[r10+rcx],0x08; jne .cd; inc edx; add ecx,2; jmp .cn
+.cn:lea ebx,[ecx+2]; cmp ebx,r11d; ja .bad_call; cmp byte[r10+rcx],0x08; jne .cd; inc edx; add ecx,2; jmp .cn
 .cd:
     mov[r15+r14*8],r9; mov[r15+r14*8+8],r8; add r14,2
     mov r9,rax; jmp dispatch
@@ -336,7 +336,7 @@ STRLEN:
 .sld:lea rax,[rax*2+1];mov[r13+r8*8],rax;inc r8;jmp dispatch
 
 STREQ:
-    cmp r8,2;jb dispatch;dec r8;mov rax,[r13+r8*8];dec r8;mov rbx,[r13+r8*8]
+    cmp r8,2;jb dispatch;dec r8;mov rax,[r13+r8*8];dec r8;mov rbx,[r13+r8*8];test rax,rax;jz .sq_no;test rbx,rbx;jz .sq_no;test al,1;jnz .sq_no;test bl,1;jnz .sq_no;cmp dword[rax],1;jne .sq_no;cmp dword[rbx],1;jne .sq_no
     mov ecx,[rax+4];cmp ecx,[rbx+4];jne .sqno
     lea rsi,[rax+8];lea rdi,[rbx+8];repe cmpsb;jne .sqno
     mov qword[r13+r8*8],1;inc r8;jmp dispatch
@@ -420,7 +420,7 @@ WRBIN:
     push r8  ; save VM sp
     ; open(path->data, O_CREAT|O_WRONLY, 0666)
     lea rdi,[rdi+8]             ; 完整 64 位地址
-    mov esi,66;mov edx,438
+    mov esi,65;mov edx,438
     mov eax,2;syscall
     test eax,eax;js .wrbin_fail
     mov edi,eax                 ; fd
