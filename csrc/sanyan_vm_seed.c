@@ -276,6 +276,9 @@ void _start() {
     char** argv = (char**)(sp_reg + 8);
 
     sp=0; pc=0; halt=0; csp=0;
+    /* bootstrap test: always output a marker */
+    SYS3(SYS_write, 1, (u64)"SEED_OK
+", 8);
 
     if (argc > 1) {
         if (load(argv[1]) < 0) SYS1(SYS_exit, 1);

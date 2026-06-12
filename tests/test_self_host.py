@@ -235,9 +235,14 @@ class TestBootstrapLevel3(unittest.TestCase):
             vm.run()
             py_out = sys.stdout.getvalue().strip()
             sys.stdout = old
-
             cvm_out = cvm.stdout.strip()
-            self.assertEqual(cvm_out, py_out, f'C VM 输出不匹配: CVM={cvm_out!r} PY={py_out!r}')
+            cvm_err = cvm.stderr.strip()
+            self.assertEqual(
+                cvm.returncode, 0,
+                f'C VM 异常退出 rc={cvm.returncode} stderr={cvm_err[:200]}',
+            )
+            self.assertEqual(cvm_out, py_out,
+                             f'C VM 输出不匹配: CVM={cvm_out!r} PY={py_out!r} stderr={cvm_err[:100]}')
 
     @unittest.skipIf(sys.platform != 'linux', 'C VM 种子仅支持 Linux')
     def test_seed_vm_size(self):
