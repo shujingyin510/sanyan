@@ -133,10 +133,10 @@ STORE: movzx eax,byte[r10+r9];inc r9;dec r8;mov rbx,[r13+r8*8];mov[r12+rax*8],rb
 ADD: dec r8;mov rax,[r13+r8*8];dec r8;mov rbx,[r13+r8*8];sar rax,1;sar rbx,1;add rax,rbx;lea rax,[rax*2+1];mov[r13+r8*8],rax;inc r8;jmp dispatch
 SUB: dec r8;mov rax,[r13+r8*8];dec r8;mov rbx,[r13+r8*8];sar rax,1;sar rbx,1;sub rbx,rax;lea rbx,[rbx*2+1];mov[r13+r8*8],rbx;inc r8;jmp dispatch
 MUL: dec r8;mov rax,[r13+r8*8];dec r8;mov rbx,[r13+r8*8];sar rax,1;sar rbx,1;imul rbx,rax;lea rbx,[rbx*2+1];mov[r13+r8*8],rbx;inc r8;jmp dispatch
-DIV: dec r8;mov rax,[r13+r8*8];dec r8;mov rbx,[r13+r8*8];sar rax,1;test rax,rax;jz .dz;sar rbx,1;cqo;idiv rax;mov rbx,rax;jmp .dp
+DIV: dec r8;mov rax,[r13+r8*8];dec r8;mov rbx,[r13+r8*8];sar rax,1;test rax,rax;jz .dz;mov rcx,rax;mov rax,rbx;sar rax,1;cqo;idiv rcx;mov rbx,rax;jmp .dp
 .dz:xor rbx,rbx
 .dp:lea rbx,[rbx*2+1];mov[r13+r8*8],rbx;inc r8;jmp dispatch
-MOD: dec r8;mov rax,[r13+r8*8];dec r8;mov rbx,[r13+r8*8];sar rax,1;test rax,rax;jz .mz;sar rbx,1;cqo;idiv rax;mov rbx,rdx;jmp .mp
+MOD: dec r8;mov rax,[r13+r8*8];dec r8;mov rbx,[r13+r8*8];sar rax,1;test rax,rax;jz .mz;mov rcx,rax;mov rax,rbx;sar rax,1;cqo;idiv rcx;mov rbx,rdx;jmp .mp
 .mz:xor rbx,rbx
 .mp:lea rbx,[rbx*2+1];mov[r13+r8*8],rbx;inc r8;jmp dispatch
 
@@ -265,7 +265,9 @@ DICT_GET:
     cmp qword[rdi+16+rax*8],0;je .dgemp
     push rax;push rdi;push rsi
     mov rdi,[rdi+16+rax*8];call key_cmp
-    pop rsi;pop rdi;pop rax;test rax,rax;jnz .dgf
+    mov ecx,eax                  ; 结果存 ecx，不被 pop 破坏
+    pop rsi;pop rdi;pop rax
+    test ecx,ecx;jnz .dgf
 .dgemp:inc eax;jmp .dglp
 .dgnf:xor eax,eax;mov[r13+r8*8],rax;inc r8;jmp dispatch
 .dgf:mov rax,[rdi+16+rax*8+8];mov[r13+r8*8],rax;inc r8;jmp dispatch
@@ -279,7 +281,8 @@ DICT_SET:
     cmp qword[rcx+16+rdi*8],0;je .dsemp
     push rax;push rcx;push rdi
     mov rsi,rbx;mov rdi,[rcx+16+rdi*8];call key_cmp
-    pop rdi;pop rcx;pop rax;test rax,rax;jnz .dsover
+    mov esi,eax
+    pop rdi;pop rcx;pop rax;test esi,esi;jnz .dsover
 .dsemp:inc edi;jmp .dslp
 .dsover:mov[rcx+16+rdi*8+8],rax;jmp dispatch
 .dsnew:xor edi,edi
@@ -293,8 +296,9 @@ DICT_HAS:
     mov edx,[rdi+8];xor eax,eax
 .dhlp:cmp eax,edx;jae .dhno
     cmp qword[rdi+16+rax*8],0;je .dhemp
-    push rax;push rdi;mov rdi,[rdi+16+rax*8];call key_cmp;pop rdi;pop rax
-    test rax,rax;jnz .dhyes
+    push rax;push rdi;mov rdi,[rdi+16+rax*8];call key_cmp
+    mov ecx,eax;pop rdi;pop rax
+    test ecx,ecx;jnz .dhyes
 .dhemp:inc eax;jmp .dhlp
 .dhno:mov qword[r13+r8*8],-1;inc r8;jmp dispatch
 .dhyes:mov qword[r13+r8*8],1;inc r8;jmp dispatch
@@ -426,13 +430,16 @@ WRBIN:
     mov eax,1;mov rsi,rdx;mov edx,r8d;syscall
     pop rdx;pop rsi;pop rcx;sub ecx,r8d;cmp ecx,0;je .wbc
     lea rsi,[rsi+r8*8];xor r8d,r8d;jmp .wbl
-.wbc:add rsp,128;mov eax,3;syscall;jmp dispatch
+.wbc:add rsp,128;mov eax,3;syscall
+    pop r8                       ; restore VM sp
+    jmp dispatch
 
 ; ═══════════════════════════════════════════════════════════════
 ; halloc: bump allocator, 返回 rax = 分配地址
 ; 修复: 正确保存旧 heap_ptr，正确边界检查
 ; ═══════════════════════════════════════════════════════════════
 halloc:
+    push rcx                           ; 保存 rcx (调用者关键数据)
     cmp qword[rel heap_ptr],0; jne .init_done
     mov eax,12; xor edi,edi; syscall  ; brk(0)
     mov[rel heap_ptr],rax
@@ -440,18 +447,19 @@ halloc:
     mov eax,12; syscall               ; brk(cur+256K)
     mov[rel heap_end],rax
 .init_done:
-    mov rax,[rel heap_ptr]            ; rax = 当前分配起始地址
+    mov rax,[rel heap_ptr]            ; rax = 分配起始地址
     add edi,7; and edi,-8             ; 对齐
     add[rel heap_ptr],rdi             ; heap_ptr += size
-    cmp[rel heap_ptr],rax             ; 新 heap_ptr > 旧? (向前推进)
-    jb .oom                           ; 溢出 (向后?)
+    cmp[rel heap_ptr],rax
+    jb .oom
     mov rcx,[rel heap_end]
     cmp[rel heap_ptr],rcx
-    jbe .ok                           ; heap_ptr <= heap_end
+    jbe .ok
 .oom:
     mov eax,60; mov edi,1; syscall    ; exit(1)
 .ok:
-    ret                                ; rax = 分配起始地址
+    pop rcx                            ; 恢复
+    ret
 
 ; ═══════════════════════════════════════════════════════════════
 ; load_bin
