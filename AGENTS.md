@@ -161,11 +161,10 @@ nasm -f bin -o sanyan_vm csrc/sanyan_vm_l4.asm
 **设计**：
 | 项目 | 内容 |
 |------|------|
-| 源码 | `csrc/sanyan_vm_l4.asm`（~700 行，中文逐段注释） |
+| 源码 | `csrc/sanyan_vm_l4.asm`（617 行，中文逐段注释） |
 | 格式 | ELF64 可执行文件（内置 header） |
-| opcode | 19 个核心（PUSH/STORE/LOAD/算术/比较/跳转/调用/类型检查/列表基本） |
-| stub | 16 个（字符串全功能/字典/SLICE/WRITE_BINARY — 预留扩展） |
-| 大小 | ~3KB 汇编 → ~1.5KB 二进制（核心），~3KB（含完整 opcode） |
+| opcode | 35 个（全部实现，无 stub） |
+| 大小 | ~3KB 汇编 → ~3KB 二进制 |
 | 汇编器 | NASM（~200KB，Haskell 社区维护，审计面可控） |
 
 **审计面**：
@@ -177,7 +176,7 @@ nasm -f bin -o sanyan_vm csrc/sanyan_vm_l4.asm
 | 层级 | 信任依赖 | 种子大小 | 完整度 |
 |------|----------|----------|--------|
 | Level 3 | TCC (~100KB) | ~2KB | 100%（35 opcode） |
-| Level 4 | NASM (~200KB) | ~3KB | 54%（19/35 opcode） |
+| Level 4 | NASM (~200KB) | ~3KB | 100%（35 opcode） |
 | Level 5 (理想) | 人工字节审计 | ~2KB | 100% |
 
 
@@ -188,7 +187,7 @@ nasm -f bin -o sanyan_vm csrc/sanyan_vm_l4.asm
 | Level 1 | ✅ | bytecode_compiler.san 用三言写 |
 | Level 2 | ✅ | VM 加载 A → 编译 B → B 编译 C → B==C |
 | Level 3 | ✅ | 318 行 C 种子 VM → TCC 编译 → ~2KB 可审计二进制 |
-| Level 4 | ✅ | 手写 x86_64 NASM 汇编（700 行），无需 C 编译器 |
+| Level 4 | ✅ | 手写 x86_64 NASM 汇编（617 行），无需 C 编译器 |
 | Level 5 | ❌ | 无可审计的最小种子二进制（需汇编手写） |
 
 ---
