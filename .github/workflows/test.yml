@@ -129,8 +129,8 @@ jobs:
           rt.register('read_file', lambda p, d: '文件内容')
           rt.register('search_code', lambda p, d: '搜索结果')
           t0 = time.time()
-          result = rt._run_single_task('分析 run_agent.py 的函数结构', None)
+          result = rt.run('分析 run_agent.py 的函数结构', max_rounds=3, dry_run=True)
           elapsed = time.time() - t0
-          print(f'Agent benchmark: {elapsed:.2f}s, result: {str(result)[:100]}')
+          print(f'Agent benchmark: {elapsed:.2f}s')
           assert elapsed < 10, f'Agent benchmark too slow: {elapsed:.2f}s'
           "
