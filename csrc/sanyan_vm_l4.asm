@@ -162,7 +162,7 @@ RET:
 ; 列表
 ; ═══════════════════════════════════════════════════════════════
 LIST_NEW:
-    cmp r8,1;jb dispatch;dec r8;mov rax,[r13+r8*8];sar rax,1;mov ecx,eax
+    cmp r8,1;jb dispatch;dec r8;mov rax,[r13+r8*8];sar rax,1;mov ecx,eax;cmp ecx,8192;ja dispatch
     lea edi,[ecx*8+16];call halloc
     mov dword[rax],2;mov[rax+4],ecx;mov[rax+8],ecx
     mov edx,ecx
@@ -241,7 +241,7 @@ key_cmp:
 .kcint:sar rdi,1;sar rsi,1;cmp rdi,rsi;sete al;movzx eax,al;ret
 
 DICT:
-    dec r8;mov rax,[r13+r8*8];sar rax,1;mov ecx,eax;shl ecx,1
+    dec r8;mov rax,[r13+r8*8];sar rax,1;mov ecx,eax;cmp ecx,4096;ja dispatch;shl ecx,1
     lea edi,[ecx*8+16];call halloc
     mov dword[rax],3;mov[rax+4],ecx;mov[rax+8],ecx
     mov edx,ecx
@@ -284,7 +284,7 @@ DICT_SET:
 .dsnn:inc edi;jmp .dsn
 
 DICT_HAS:
-    cmp r8,2;jb dispatch;dec r8;mov rsi,[r13+r8*8];dec r8;mov rdi,[r13+r8*8]
+    cmp r8,2;jb dispatch;dec r8;mov rsi,[r13+r8*8];dec r8;mov rdi,[r13+r8*8];test rdi,rdi;jz .dhno;test dil,1;jnz .dhno;cmp dword[rdi],3;jne .dhno
     push rsi;mov edx,[rdi+8];xor eax,eax
 .dhlp:cmp eax,edx;jae .dhno
     cmp qword[rdi+16+rax*8],0;je .dhemp
