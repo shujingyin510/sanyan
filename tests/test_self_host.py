@@ -178,7 +178,7 @@ class TestBootstrapLevel3(unittest.TestCase):
     组合 Level 2 不动点验证 → 完整 Level 3 自举。
     """
 
-    @unittest.skipIf(os.name != 'posix' or sys.platform == 'win32', 'C VM 种子仅支持 Linux (syscall)，Windows 跳过')
+    @unittest.skipIf(sys.platform != 'linux', 'C VM 种子仅支持 Linux (syscall)，此平台跳过')
     def test_seed_vm_runs_bytecode(self):
         """编译 C VM 种子，执行简单字节码验证正确性"""
         import subprocess
@@ -241,7 +241,7 @@ class TestBootstrapLevel3(unittest.TestCase):
             cvm_out = cvm.stdout.strip()
             self.assertEqual(cvm_out, py_out, f'C VM 输出不匹配: CVM={cvm_out!r} PY={py_out!r}')
 
-    @unittest.skipIf(os.name != 'posix' or sys.platform == 'win32', 'C VM 种子仅支持 Linux')
+    @unittest.skipIf(sys.platform != 'linux', 'C VM 种子仅支持 Linux')
     def test_seed_vm_size(self):
         """验证种子二进制在 8KB 以内"""
         import subprocess
