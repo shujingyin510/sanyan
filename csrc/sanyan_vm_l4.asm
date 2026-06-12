@@ -8,9 +8,19 @@ org 0
 ehdr:
     db 0x7F,'E','L','F', 2,1,1,0
     times 8 db 0
-    dw 2, 0x3E; dd 1
-    dq _start; dq phdr-ehdr; dq 0; dd 0
-    dw 64,56,1,0,0,0
+    dw 2
+    dw 0x3E
+    dd 1
+    dq _start
+    dq phdr-ehdr
+    dq 0
+    dd 0
+    dw 64
+    dw 56
+    dw 1
+    dw 0
+    dw 0
+    dw 0
 phdr:
     dd 1,7; dq 0,ehdr,ehdr
     dq file_end, mem_end, 0x1000
@@ -41,7 +51,7 @@ dispatch:
     cmp byte[rel halted],0; jne .ret
     cmp r9d,r11d; jae .halt
     movzx eax,byte[r10+r9]; inc r9
-    ; 跳转表: 256 × 2 字节偏移 (见文件末尾 jmp_tbl)
+    ; 跳转表: 256 × 4 字节偏移 (dd) (见文件末尾 jmp_tbl)
     ; 未知 opcode → .nop_handler (jmp dispatch)
     movsxd rax,dword[rel jmp_tbl+rax*4]
     lea rbx,[rel jmp_tbl]
@@ -136,6 +146,7 @@ JMP32: movsxd rax,dword[r10+r9];add r9,4;add r9,rax;jmp dispatch
 
 CALL:
     mov eax,dword[r10+r9]; add r9,4; test eax,eax; jz dispatch
+    cmp r14,126; jae dispatch
     mov ecx,eax; xor edx,edx
 .cn:lea ebx,[ecx+1]; cmp ebx,r11d; jae .bad_call; cmp byte[r10+rcx],0x08; jne .cd; inc edx; add ecx,2; jmp .cn
 .cd:
@@ -144,7 +155,7 @@ CALL:
 
 RET:
     test r14,r14; jz .halt_vm
-    sub r14,2; mov r9,[r15+r14*8]; cmp r9d,r11d; jae dispatch; mov r8,[r15+r14*8+8]; jmp dispatch
+    sub r14,2; mov r9,[r15+r14*8]; cmp r9d,r11d; jae .halt_vm; mov r8,[r15+r14*8+8]; jmp dispatch
 .halt_vm: mov byte[rel halted],1; jmp dispatch
 
 ; ═══════════════════════════════════════════════════════════════
@@ -322,7 +333,6 @@ STRLEN:
 .s2:add edx,2;inc eax;jmp .slp
 .s1:inc edx;inc eax;jmp .slp
 .sl_bad:inc r8;jmp dispatch
-.sl_bad:inc r8;jmp dispatch
 .sld:lea rax,[rax*2+1];mov[r13+r8*8],rax;inc r8;jmp dispatch
 
 STREQ:
@@ -412,7 +422,7 @@ WRBIN:
     lea rdi,[rdi+8]             ; 完整 64 位地址
     mov esi,66;mov edx,438
     mov eax,2;syscall
-    test eax,eax;js dispatch
+    test eax,eax;js .wrbin_fail
     mov edi,eax                 ; fd
     mov ecx,[rbx+4];cmp ecx,0;je .wbc
     lea rsi,[rbx+16]
@@ -443,9 +453,7 @@ halloc:
 .init_done:
     mov rax,[rel heap_ptr]            ; rax = 分配起始地址
     add edi,7; and edi,-8             ; 对齐
-    add[rel heap_ptr],rdi             ; heap_ptr += size
-    cmp[rel heap_ptr],rax
-    ; skip jb check (redundant, handled by heap_end check below)
+    add[rel heap_ptr],rdi             ; heap_ptr += size (redundant, handled by heap_end check below)
     mov rcx,[rel heap_end]
     cmp[rel heap_ptr],rcx
     jbe .ok
@@ -474,7 +482,7 @@ load_bin:
 .lbf:mov eax,-1; ret
 
 ; ═══════════════════════════════════════════════════════════════
-; 跳转表: 256 × 2 字节偏移，dispatch 用 movsx rax,word[rel jmp_tbl+op*2] 索引
+; 跳转表: 256 × 4 字节偏移 (dd)，dispatch 用 movsx rax,word[rel jmp_tbl+op*2] 索引
 ; 每项 = handler_label - jmp_tbl，16-bit 有符号 (handler 必须在 ±32KB 内)
 ; ═══════════════════════════════════════════════════════════════
 jmp_tbl:
