@@ -43,7 +43,7 @@ dispatch:
     movzx eax,byte[r10+r9]; inc r9
     ; 跳转表: 256 × 2 字节偏移 (见文件末尾 jmp_tbl)
     ; 未知 opcode → .nop_handler (jmp dispatch)
-    movsx rax,word[rel jmp_tbl+rax*2]
+    movsxd rax,dword[rel jmp_tbl+rax*4]
     lea rbx,[rel jmp_tbl]
     add rbx,rax
     jmp rbx
@@ -137,7 +137,7 @@ JMP32: movsxd rax,dword[r10+r9];add r9,4;add r9,rax;jmp dispatch
 CALL:
     mov eax,dword[r10+r9]; add r9,4; test eax,eax; jz dispatch
     mov ecx,eax; xor edx,edx
-.cn:cmp byte[r10+rcx],0x08; jne .cd; inc edx; add ecx,2; jmp .cn
+.cn:lea ebx,[ecx+1]; cmp ebx,r11d; jae .bad_call; cmp byte[r10+rcx],0x08; jne .cd; inc edx; add ecx,2; jmp .cn
 .cd:
     mov[r15+r14*8],r9; mov[r15+r14*8+8],r8; add r14,2
     mov r9,rax; jmp dispatch
@@ -159,7 +159,7 @@ LIST_NEW:
 .lnd:mov[r13+r8*8],rax;inc r8;jmp dispatch
 
 LIST_GET:
-    dec r8;mov rax,[r13+r8*8];sar rax,1;dec r8;mov rbx,[r13+r8*8]
+    dec r8;mov rax,[r13+r8*8];sar rax,1;dec r8;mov rbx,[r13+r8*8];test bl,1;jnz .lgz;cmp dword[rbx],2;jne .lgz;
     cmp eax,[rbx+4];jae .lgz;mov rax,[rbx+16+rax*8];jmp .lgd
 .lgz:xor eax,eax
 .lgd:mov[r13+r8*8],rax;inc r8;jmp dispatch
@@ -168,7 +168,7 @@ LIST_LEN:
     dec r8;mov rax,[r13+r8*8];mov eax,[rax+4];lea rax,[rax*2+1];mov[r13+r8*8],rax;inc r8;jmp dispatch
 
 SET_ELEM:
-    dec r8;mov rax,[r13+r8*8];dec r8;mov rbx,[r13+r8*8];sar rbx,1;dec r8;mov rcx,[r13+r8*8]
+    dec r8;mov rax,[r13+r8*8];dec r8;mov rbx,[r13+r8*8];sar rbx,1;dec r8;mov rcx,[r13+r8*8];test cl,1;jnz .sed;cmp dword[rcx],2;jne .sed
     cmp ebx,[rcx+4];jae .sed;mov[rcx+16+rbx*8],rax
 .sed:jmp dispatch
 
@@ -239,7 +239,7 @@ DICT:
 .dd:mov[r13+r8*8],rax;inc r8;jmp dispatch
 
 DICT_GET:
-    dec r8;mov rsi,[r13+r8*8];dec r8;mov rdi,[r13+r8*8]
+    dec r8;mov rsi,[r13+r8*8];dec r8;mov rdi,[r13+r8*8];test dil,1;jnz .dgnf;cmp dword[rdi],3;jne .dgnf
     mov edx,[rdi+8];xor eax,eax
 .dglp:cmp eax,edx;jae .dgnf
     cmp qword[rdi+16+rax*8],0;je .dgemp
@@ -284,11 +284,11 @@ DICT_HAS:
 .dhyes:mov qword[r13+r8*8],1;inc r8;jmp dispatch
 
 DICT_KEYS:
-    dec r8;mov rdi,[r13+r8*8];mov edx,[rdi+8];xor ecx,ecx;xor eax,eax
+    dec r8;mov rdi,[r13+r8*8];push rdi;mov edx,[rdi+8];xor ecx,ecx;xor eax,eax
 .dkc:cmp eax,edx;jae .dkcd;cmp qword[rdi+16+rax*8],0;je .dkcn;inc ecx
 .dkcn:inc eax;jmp .dkc
 .dkcd:lea edi,[ecx*8+16];call halloc
-    mov dword[rax],2;mov[rax+4],ecx;mov[rax+8],ecx
+    pop rdi;mov dword[rax],2;mov[rax+4],ecx;mov[rax+8],ecx
     xor esi,esi;xor edx,edx
 .dkf:cmp edx,[rdi+8];jae .dkd
     mov rbx,[rdi+16+rdx*8];test rbx,rbx;jz .dkn
@@ -312,13 +312,16 @@ CONCAT:
     mov[r13+r8*8],rax;inc r8;jmp dispatch
 
 STRLEN:
-    dec r8;mov rbx,[r13+r8*8];mov ecx,[rbx+4]
+    dec r8;mov rbx,[r13+r8*8];test bl,1;jnz .sl_bad;cmp dword[rbx],1;jne .sl_bad;mov ecx,[rbx+4]
     xor eax,eax;xor edx,edx
 .slp:cmp edx,ecx;jae .sld
     movzx esi,byte[rbx+8+rdx]
-    test sil,0x80;jz .s1;cmp sil,0xE0;jb .s2;add edx,3;inc eax;jmp .slp
+    test sil,0x80;jz .s1;cmp sil,0xE0;jb .s2;cmp sil,0xF0;jb .sl3;add edx,4;inc eax;jmp .slp
+.sl3: add edx,3;inc eax;jmp .slp
 .s2:add edx,2;inc eax;jmp .slp
 .s1:inc edx;inc eax;jmp .slp
+.sl_bad:inc r8;jmp dispatch
+.sl_bad:inc r8;jmp dispatch
 .sld:lea rax,[rax*2+1];mov[r13+r8*8],rax;inc r8;jmp dispatch
 
 STREQ:
@@ -343,14 +346,16 @@ STRSUB:
     pop rcx;push rcx            ; rcx=start
 .p1:test ecx,ecx;jz .p1d;cmp edi,edx;jae .sse2
     movzx eax,byte[rsi+rdi];test al,0x80;jz .p1s1
-    cmp al,0xE0;jb .p1s2;add edi,3;dec ecx;jmp .p1
+    cmp al,0xE0;jb .p1s2;cmp al,0xF0;jb .p1s3;add edi,4;dec ecx;jmp .p1
+.p1s3:add edi,3;dec ecx;jmp .p1
 .p1s2:add edi,2;dec ecx;jmp .p1
 .p1s1:inc edi;dec ecx;jmp .p1
 .p1d:mov ebx,edi               ; ebx = byte_start
     pop rcx;push rcx            ; rcx=count
 .p2:test ecx,ecx;jz .p2d;cmp edi,edx;jae .p2d
     movzx eax,byte[rsi+rdi];test al,0x80;jz .p2s1
-    cmp al,0xE0;jb .p2s2;add edi,3;dec ecx;jmp .p2
+    cmp al,0xE0;jb .p2s2;cmp al,0xF0;jb .p2s3;add edi,4;dec ecx;jmp .p2
+.p2s3:add edi,3;dec ecx;jmp .p2
 .p2s2:add edi,2;dec ecx;jmp .p2
 .p2s1:inc edi;dec ecx;jmp .p2
 .p2d:sub edi,ebx               ; byte_len
@@ -401,6 +406,7 @@ ORD:
 WRBIN:
     dec r8;mov rbx,[r13+r8*8]   ; byte_list (List*)
     dec r8;mov rdi,[r13+r8*8]   ; path (Str*)
+    push r8  ; save VM sp
     ; open(path->data, O_CREAT|O_WRONLY, 0666)
     lea rdi,[rdi+8]             ; 完整 64 位地址
     mov esi,66;mov edx,438
@@ -474,87 +480,87 @@ jmp_tbl:
 %assign i 0
 %rep 256
     %if i == 0x01
-        dw PUSH_I - jmp_tbl
+        dd PUSH_I - jmp_tbl
     %elif i == 0x2D
-        dw PUSH_STR - jmp_tbl
+        dd PUSH_STR - jmp_tbl
     %elif i == 0x07
-        dw LOAD - jmp_tbl
+        dd LOAD - jmp_tbl
     %elif i == 0x08
-        dw STORE - jmp_tbl
+        dd STORE - jmp_tbl
     %elif i == 0x02
-        dw ADD - jmp_tbl
+        dd ADD - jmp_tbl
     %elif i == 0x03
-        dw SUB - jmp_tbl
+        dd SUB - jmp_tbl
     %elif i == 0x04
-        dw MUL - jmp_tbl
+        dd MUL - jmp_tbl
     %elif i == 0x05
-        dw DIV - jmp_tbl
+        dd DIV - jmp_tbl
     %elif i == 0x06
-        dw MOD - jmp_tbl
+        dd MOD - jmp_tbl
     %elif i == 0x13
-        dw GT - jmp_tbl
+        dd GT - jmp_tbl
     %elif i == 0x14
-        dw LT - jmp_tbl
+        dd LT - jmp_tbl
     %elif i == 0x15
-        dw EQ - jmp_tbl
+        dd EQ - jmp_tbl
     %elif i == 0x17
-        dw GTE - jmp_tbl
+        dd GTE - jmp_tbl
     %elif i == 0x19
-        dw CONCAT - jmp_tbl
+        dd CONCAT - jmp_tbl
     %elif i == 0x1A
-        dw STRLEN - jmp_tbl
+        dd STRLEN - jmp_tbl
     %elif i == 0x1B
-        dw STRSUB - jmp_tbl
+        dd STRSUB - jmp_tbl
     %elif i == 0x1C
-        dw STREQ - jmp_tbl
+        dd STREQ - jmp_tbl
     %elif i == 0x31
-        dw ORD - jmp_tbl
+        dd ORD - jmp_tbl
     %elif i == 0x27
-        dw LIST_NEW - jmp_tbl
+        dd LIST_NEW - jmp_tbl
     %elif i == 0x25
-        dw LIST_GET - jmp_tbl
+        dd LIST_GET - jmp_tbl
     %elif i == 0x2A
-        dw LIST_LEN - jmp_tbl
+        dd LIST_LEN - jmp_tbl
     %elif i == 0x26
-        dw SET_ELEM - jmp_tbl
+        dd SET_ELEM - jmp_tbl
     %elif i == 0x28
-        dw LIST_CAT - jmp_tbl
+        dd LIST_CAT - jmp_tbl
     %elif i == 0x29
-        dw SLICE - jmp_tbl
+        dd SLICE - jmp_tbl
     %elif i == 0x1D
-        dw DICT - jmp_tbl
+        dd DICT - jmp_tbl
     %elif i == 0x1E
-        dw DICT_GET - jmp_tbl
+        dd DICT_GET - jmp_tbl
     %elif i == 0x1F
-        dw DICT_SET - jmp_tbl
+        dd DICT_SET - jmp_tbl
     %elif i == 0x20
-        dw DICT_HAS - jmp_tbl
+        dd DICT_HAS - jmp_tbl
     %elif i == 0x32
-        dw DICT_KEYS - jmp_tbl
+        dd DICT_KEYS - jmp_tbl
     %elif i == 0x21
-        dw IS_NUM - jmp_tbl
+        dd IS_NUM - jmp_tbl
     %elif i == 0x22
-        dw IS_STR - jmp_tbl
+        dd IS_STR - jmp_tbl
     %elif i == 0x23
-        dw IS_LIST - jmp_tbl
+        dd IS_LIST - jmp_tbl
     %elif i == 0x09
-        dw JMP - jmp_tbl
+        dd JMP - jmp_tbl
     %elif i == 0x0A
-        dw JZ - jmp_tbl
+        dd JZ - jmp_tbl
     %elif i == 0x33
-        dw JMP32 - jmp_tbl
+        dd JMP32 - jmp_tbl
     %elif i == 0x0C
-        dw CALL - jmp_tbl
+        dd CALL - jmp_tbl
     %elif i == 0x0D
-        dw RET - jmp_tbl
+        dd RET - jmp_tbl
     %elif i == 0x30
-        dw WRBIN - jmp_tbl
+        dd WRBIN - jmp_tbl
     %elif i == 0xFF
-        dw .halt - jmp_tbl
+        dd .halt - jmp_tbl
     %elif i == 0x00
-        dw .nop_handler - jmp_tbl
+        dd .nop_handler - jmp_tbl
     %else
-        dw .nop_handler - jmp_tbl
+        dd .nop_handler - jmp_tbl
     %endif
 %assign i i+1
 %endrep
