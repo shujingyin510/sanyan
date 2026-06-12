@@ -148,6 +148,7 @@ typedef struct {
     double value;
 } rt_float_t;
 
+#ifndef RT_FLOAT_NEW_CUSTOM
 static inline rt_float_t *rt_float_new(double v) {
     rt_float_t *f = (rt_float_t *)calloc(1, sizeof(rt_float_t));
     if (!f) return NULL;
@@ -155,6 +156,7 @@ static inline rt_float_t *rt_float_new(double v) {
     f->value = v;
     return f;
 }
+#endif
 
 
 /* ═══════════════════════════════════════════════════════════
@@ -176,6 +178,12 @@ static inline int san_is_dict(void *p) { return p && !san_is_int(p) && ((rt_str_
 #define is_str  san_is_str
 #define is_list san_is_list
 #define is_dict san_is_dict
+
+/* 获取堆对象类型（h_type 字段），传入非整数值 */
+static inline san_obj_type_t san_obj_type(void *p) {
+    return (san_obj_type_t)((rt_str_t*)p)->h_type;
+}
+#define obj_type san_obj_type
 
 
 /* ═══════════════════════════════════════════════════════════

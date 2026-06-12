@@ -43,20 +43,55 @@ def _parse_all_sexprs(source: str) -> list | None:
     多表达式时返回 [expr1, expr2, ...]。
     """
     from lexer import tokenize
-    from parser import parse
 
     tokens = tokenize(source)
+    if not tokens:
+        return None
+
+    # 用可变位置追踪器替代 parse 的局部 pos
+    pos = [0]
+
+    def _next():
+        if pos[0] >= len(tokens):
+            return None
+        tok = tokens[pos[0]]
+        pos[0] += 1
+        return tok
+
+    def _peek():
+        if pos[0] >= len(tokens):
+            return None
+        return tokens[pos[0]]
+
+    def _parse_one():
+        tok = _next()
+        if tok is None:
+            return None
+        if tok == '(':
+            L = []
+            while _peek() is not None and _peek() != ')':
+                child = _parse_one()
+                if child is not None:
+                    L.append(child)
+            if _peek() == ')':
+                _next()  # 跳过 ')'
+            return L
+        elif tok == ')':
+            return None
+        return tok
+
     results = []
-    while tokens:
-        parsed = parse(tokens)
+    while pos[0] < len(tokens):
+        parsed = _parse_one()
         if parsed is None:
             break
         results.append(parsed)
+
     if not results:
         return None
     if len(results) == 1:
-        return results[0]  # 单表达式：不套外层列表
-    return results  # 多表达式：返回列表的列表
+        return results[0]
+    return results
 
 
 def _parse_source(source: str) -> list:

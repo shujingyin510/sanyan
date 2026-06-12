@@ -367,6 +367,8 @@ python -X utf8 tests/test_agent_v5.py -v  # Agent V5 新模块测试 158 项
 python -X utf8 tests/test_lang_core.py -v # 语言核心测试 96 项
 python -X utf8 tests/test_new_features.py -v # 新功能测试 47 项
 python -X utf8 tests/test_lang_core_ext.py -v # 语言核心扩展测试 51 项
+python -X utf8 tests/test_effect_types.py -v  # 效应类型测试 30 项（确定/不确定）
+python -X utf8 tests/test_diff_fuzz.py -v     # 差分模糊测试 12 项（四后端一致性）
 python -X utf8 tests/test_coverage_boost.py -v # 覆盖率补全测试 170 项
 python -X utf8 tests/test_coverage_boost2.py -v # 覆盖率补全第二轮 77 项
 python -X utf8 tests/test_coverage_boost3.py -v # 覆盖率补全第三轮 70 项
@@ -402,6 +404,8 @@ python -m pytest tests/test_core.py tests/test_commands.py tests/test_parser.py 
 - test_lang_core.py 96/96
 - test_new_features.py 47/47
 - test_lang_core_ext.py 51/51
+- test_effect_types.py 30/30
+- test_diff_fuzz.py 12/12（四后端一致）
 - test_coverage_boost.py 170/170
 - test_coverage_boost2.py 77/77
 - test_coverage_boost3.py 70/70
@@ -742,3 +746,85 @@ ${MSYS2_PATH:-D:/msys64}/usr/bin/bash.exe -lc "gcc /d/path/to/obj1.o /d/path/to/
 - **类型系统**: `check_type()` 支持中英双名（int/str/list/dict/num/any）
 - **项目清理**: `.gitignore` 加 `village_log.json`/`village_trust.html`/`*.log`
 - **常量折叠**: `isinstance(op, str)` 检查防止参数列表被误判为常量 op
+
+### 效应类型系统（2026-06-12）
+
+三言类型系统新增 **确定/不确定** 效应类型，在编译期表达不确定性约束：
+
+```san
+定义 高风险操作 (输入: 确定[int]) -> 确定[int] { 返回 乘 输入 2 }
+定义 数据源 () -> 不确定[int] { ... }
+
+// 编译期拒绝：不确定[int] 不能传给 确定[int]
+高风险操作(数据源())  // → SanyanTypeError: 编译期拒绝
+```
+
+**语义规则**：
+- `确定[X]`：要求 TritValue 信度 ≥ 0.99（阈值避免浮点精度问题）
+- `不确定[X]`：接受任意信度，仅检查基础类型 X
+- 子类型：`确定[X] → 不确定[X]` 允许（放宽），`不确定[X] → 确定[X]` 拒绝（收紧）
+- 不确定性传播：`加 确定 不确定 → 不确定`，`加 确定 确定 → 确定`
+
+**改动文件**：
+| 文件 | 改动 |
+|------|------|
+| `sugar/parser.py:_parse_fn` | 解析 `确定[int]` / `不确定[int]` 语法 |
+| `values.py:check_type()` | 运行期信度校验（≥0.99） |
+| `type_checker.py:_matches()` | 子类型关系（确定→不确定 允许） |
+| `evaluator.py:_apply()` | 编译期不确定性推断 `_is_uncertain_expr()` |
+| `commands.py:call()` | 用户函数调用时信度校验 |
+| `tests/test_effect_types.py` | 30 项测试（解析/校验/传播/端到端） |
+
+### 差分模糊测试（2026-06-12）
+
+四后端一致性验证：生成随机 S 表达式程序 → 同时跑 Python VM / C VM / LLVM → 比较输出。
+
+```bash
+python -X utf8 tests/test_diff_fuzz.py -v  # 12 项测试
+```
+
+**测试覆盖**（全部 12 项全通过）：
+| 测试类 | 测试数 | 覆盖范围 |
+|--------|--------|----------|
+| TestDiffFuzzBackendAvailability | 4 | 各后端是否可用 |
+| TestDiffFuzzBasic | 2 | 算术（加减乘除）/ 变量 / 条件 / 输出 |
+| TestDiffFuzzFeatures | 3 | 变量 / 自定义函数 / 循环 |
+| TestDiffFuzzMixed | 2 | 混合操作 / 深层嵌套（depth=5） |
+| TestDiffFuzzReproduce | 1 | 相同种子 → 相同程序序列 |
+
+**设计要点**：
+- 仅生成 S 表达式语法（最低公分母）
+- 避开 LLVM 不支持的关键字（`再若/遍历/跳出/继续/导出/判`）
+- 预编译所有 .bin 文件（复用字节码编译器实例，减少编译开销）
+- C VM 编译结果缓存（类级 `_cvm_exe`）
+- LLVM runtime.o 缓存（类级 `_llvm_rt_obj`）
+- 输出标准化：取最后一行、去除求值器装饰、strip空白
+- seed 可重现：相同种子生成相同程序序列
+- 规避跨后端语义差异：除/余用正数、不用与/或/比较直出
+
+**发现的 bug 及修复（2026-06-12）**：
+
+| # | 现象 | 根因 | 修复文件 |
+|---|------|------|----------|
+| 1 | `(乘 5 -2)` → VM: 0 | `全部数字` 不认负号，字节码编译器把 `-2` 当字符串 | `stdlib/bytecode_compiler.san` |
+| 2 | `(定义 f0 (p0) 27)` → VM: 空 | 非列表函数体被 `(是列表 bd)` 跳过编译 | `stdlib/bytecode_compiler.san` |
+| 3 | C VM 多打印中间值 | `--run` 参数额外打印栈顶 | `tests/diff_fuzzer.py` |
+| 4 | `llvm_compile` 超时 >300s | `_parse_all_sexprs` 死循环（`parse` 不修改 tokens） | `llvmgen/compiler.py` |
+| 5 | C VM 编译失败：`obj_type()` 未定义 | `csrc/runtime_common.h` 缺失 `san_obj_type()` | `csrc/runtime_common.h` |
+| 6 | C VM 编译失败：嵌套函数 | `trit_propagate_conf`/`trit_is_trit` 在 `vm_run` 内 | `csrc/runtime.c` |
+| 7 | C VM 编译失败：`rt_trit_confidence()` | 一元运算缺少单值信度函数 | `csrc/runtime.c` |
+| 8 | LLVM runtime 编译失败 | `rt_float_t` 重复定义 + `is_int_val()` 类型不匹配 | `llvmgen/runtime.c` + `csrc/runtime_common.h` |
+| 9 | `(或 24 13)` → VM: 24（应为 1） | Python VM OR 返回原始值而非三态值（未修，fuzzer 规避） | — |
+| 10 | `(小于 47 21)` → LLVM: 0（应为 -1） | LLVM 比较用二值 (0/1) 而非三值 (-1/1)（未修，fuzzer 规避） | — |
+
+**改动文件**：
+| 文件 | 用途 |
+|------|------|
+| `tests/diff_fuzzer.py` | 核心引擎：ProgramGenerator + BackendRunner + normalize |
+| `tests/test_diff_fuzz.py` | unittest 包装（12 项） |
+| `csrc/runtime.c` | 修复嵌套函数 + 补 `rt_trit_confidence()` |
+| `csrc/runtime_common.h` | 补 `san_obj_type()` + `RT_FLOAT_NEW_CUSTOM` 宏 |
+| `llvmgen/runtime.c` | 修复浮点重复定义 + 类型不匹配 |
+| `llvmgen/compiler.py` | 修复 `_parse_all_sexprs` 死循环 |
+| `stdlib/bytecode_compiler.san` | 负数识别 + 函数体修复 |
+| `stdlib/bytecode_compiler.bin` | 重新编译（6400→6398 字节） |

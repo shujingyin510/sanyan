@@ -506,6 +506,18 @@ static int check_bin_header(const uint8_t *hdr, const char *path) {
     return 0;
 }
 
+/* ── 三态传播辅助：如果 a 或 b 是 OBJ_TRIT，返回传播后的信度 ×100 ── */
+static int trit_propagate_conf(void *a, void *b) {
+    double ca = is_int_val(a) ? 1.0 : (((rt_trit_t*)a)->h_type == OBJ_TRIT ? ((rt_trit_t*)a)->confidence / 100.0 : 1.0);
+    double cb = is_int_val(b) ? 1.0 : (((rt_trit_t*)b)->h_type == OBJ_TRIT ? ((rt_trit_t*)b)->confidence / 100.0 : 1.0);
+    return (int)(ca * cb * 100.0);
+}
+static int trit_is_trit(void *v) { return !is_int_val(v) && ((rt_str_t*)v)->h_type == OBJ_TRIT; }
+/* 获取单个值的信度 ×100（用于一元运算） */
+static double rt_trit_confidence(void *v) {
+    return is_int_val(v) ? 1.0 : (((rt_trit_t*)v)->h_type == OBJ_TRIT ? ((rt_trit_t*)v)->confidence / 100.0 : 1.0);
+}
+
 /* ═══════════════════════════════════════════════════
  * 主解释循环
  * ═══════════════════════════════════════════════════ */
@@ -547,14 +559,6 @@ int vm_run(VM *vm) {
             free(utf8);
             break;
         }
-
-        /* ── 三态传播辅助：如果 a 或 b 是 OBJ_TRIT，返回传播后的信度 ×100 ── */
-static int trit_propagate_conf(void *a, void *b) {
-    double ca = is_int_val(a) ? 1.0 : (((rt_trit_t*)a)->h_type == OBJ_TRIT ? ((rt_trit_t*)a)->confidence / 100.0 : 1.0);
-    double cb = is_int_val(b) ? 1.0 : (((rt_trit_t*)b)->h_type == OBJ_TRIT ? ((rt_trit_t*)b)->confidence / 100.0 : 1.0);
-    return (int)(ca * cb * 100.0);
-}
-static int trit_is_trit(void *v) { return !is_int_val(v) && ((rt_str_t*)v)->h_type == OBJ_TRIT; }
 
 /* ── 算术 ── */
         case ADD: b = pop(vm); a = pop(vm);

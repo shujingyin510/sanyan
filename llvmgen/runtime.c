@@ -65,6 +65,7 @@ static void *_arena_alloc(san_arena_t *a, size_t size) {
  * 堆对象头部 + 字符串/列表/字典类型定义
  * 已统一到 csrc/runtime_common.h
  * ═══════════════════════════════════════════════════════════ */
+#define RT_FLOAT_NEW_CUSTOM  /* 使用 arena 版 rt_float_new */
 #include "../csrc/runtime_common.h"
 
 /* 从 C 字符串创建 rt_str_t（arena 分配） */
@@ -149,7 +150,7 @@ int32_t rt_str_find(const void *hs, const void *ndl) {
 /* 整数转字符串 */
 void *rt_int_to_str(uintptr_t tagged) {
     /* 检查是否为 OBJ_TRIT */
-    if (!is_int_val(tagged)) {
+    if (!is_int_val((void*)tagged)) {
         rt_str_t *hdr = (rt_str_t*)tagged;
         if (hdr->h_type == OBJ_TRIT) {
             rt_trit_t *t = (rt_trit_t*)tagged;
@@ -587,12 +588,9 @@ int32_t rt_math_nlt(int32_t a, int32_t b) { return a >= b; }
 int32_t rt_time_now(void) { return (int32_t)time(NULL); }
 
 /* ═══════════════════════════════════════════════════════════
- * 浮点类型
+ * 浮点类型（rt_float_t 已在 runtime_common.h 定义）
+ * 此处仅覆盖 rt_float_new 为 arena 分配版本
  * ═══════════════════════════════════════════════════════════ */
-typedef struct {
-    SAN_HEADER;
-    double value;
-} rt_float_t;
 
 static san_arena_t g_float_arena;
 

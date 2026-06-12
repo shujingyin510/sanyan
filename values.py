@@ -138,6 +138,26 @@ def check_type(value: Any, expected_type: str, param_name: str = '') -> None:
         if isinstance(value, TritValue) and value.to_int() == 0:
             return
 
+    # 效应类型：确定[X] / 不确定[X] — 从内层类型开始检查
+    for _eff_prefix in ('确定[', '不确定['):
+        if base_type.startswith(_eff_prefix) and base_type.endswith(']'):
+            inner_type = base_type[len(_eff_prefix) : -1]
+            # 先检查基础类型
+            if inner_type in type_checks and not type_checks[inner_type](value):
+                actual = _get_type_name(value)
+                label = f"参数 '{param_name}' " if param_name else ''
+                raise SanyanTypeError(
+                    f"{label}期望类型 '{expected_type}'（基础类型 '{inner_type}'），但得到 '{actual}'"
+                )
+            # 确定[X] 额外要求信度 >= 0.99
+            if _eff_prefix == '确定[' and isinstance(value, TritValue):
+                if value.confidence < 0.99:
+                    label = f"参数 '{param_name}' " if param_name else ''
+                    raise SanyanTypeError(
+                        f"{label}期望 '{expected_type}'（信度≥0.99），但实际信度={value.confidence:.2f}"
+                    )
+            return
+
     if base_type not in type_checks:
         return
 

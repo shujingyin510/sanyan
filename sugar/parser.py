@@ -304,7 +304,14 @@ class _Parser:
                 if self.peek() and self.peek().value == ':':
                     self.advance()
                     t = self.advance()
-                    param_types[p.value] = t.value
+                    type_str = t.value
+                    # 支持 确定[base_type] / 不确定[base_type] 效应类型语法
+                    if type_str in ('确定', '不确定') and self.peek() and self.peek().value == '[':
+                        self.advance()  # 跳过 [
+                        base = self.advance()
+                        self._expect(']')
+                        type_str = f'{type_str}[{base.value}]'
+                    param_types[p.value] = type_str
                 params.append(p.value)
                 if self.peek() and self.peek().value == ',':
                     self.advance()
@@ -312,7 +319,14 @@ class _Parser:
         return_type = None
         if self.peek() and self.peek().value == '->':
             self.advance()
-            return_type = self.advance().value
+            rt = self.advance()
+            return_type = rt.value
+            # 支持 -> 确定[int] / -> 不确定[int] 效应类型语法
+            if return_type in ('确定', '不确定') and self.peek() and self.peek().value == '[':
+                self.advance()  # 跳过 [
+                base = self.advance()
+                self._expect(']')
+                return_type = f'{return_type}[{base.value}]'
         if return_type:
             param_types['__return__'] = return_type
         body = self.parse_block()

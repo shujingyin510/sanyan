@@ -4,6 +4,7 @@
 仅对内置操作检查，用户自定义函数跳过。
 
 类型: int, float, str, list, dict, trit, num(int|float), any
+效应类型: 确定[X]（信度≥0.99）、不确定[X]（任意信度）
 格式: (预期参数类型元组, 返回类型)
 """
 
@@ -32,11 +33,23 @@ def _type_of(v: Any) -> str:
 
 
 def _matches(actual: str, expected: str) -> bool:
-    """检查实际类型是否匹配预期类型。num 可匹配 int 或 float。"""
+    """检查实际类型是否匹配预期类型。num 可匹配 int 或 float。
+    效应类型：确定[X] 严格匹配，不确定[X] 兼容确定[X]。
+    """
     if expected == 'any':
         return True
     if expected == 'num':
         return actual in ('int', 'float', 'trit')
+
+    # 效应类型子类型关系
+    # 确定[X] 只匹配 确定[X]（严格）
+    if expected.startswith('确定[') and expected.endswith(']'):
+        return actual == expected
+    # 不确定[X] 兼容 确定[X] 和 不确定[X]（确定可以流向不确定）
+    if expected.startswith('不确定[') and expected.endswith(']'):
+        inner = expected[len('不确定[') : -1]
+        return actual in (expected, f'确定[{inner}]')
+
     if expected == actual:
         return True
     return False

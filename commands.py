@@ -106,6 +106,18 @@ class Commands:
             if rest_param and len(args) > len(params):
                 params = list(params) + [rest_param]
             evaluated_args = evaluate_args(evaluator, params, args, param_types)
+            # 效应类型校验：确定[X] 参数的运行期信度检查
+            if param_types:
+                from ternary_core import TritValue
+                from values import SanyanTypeError
+
+                for i, (param, val) in enumerate(zip(params, evaluated_args)):
+                    expected = param_types.get(param, '')
+                    if expected.startswith('确定[') and isinstance(val, TritValue):
+                        if val.confidence < 0.99:
+                            raise SanyanTypeError(
+                                f"函数 '{op}' 的参数 '{param}' 期望 确定（信度≥0.99），但实际信度={val.confidence:.2f}"
+                            )
             tail_body, last_expr, is_tco = detect_tail_call(body, op, params, evaluated_args)
             if is_tco:
                 result = run_tail_call(evaluator, params, tail_body, last_expr, op, evaluated_args)

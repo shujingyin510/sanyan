@@ -400,6 +400,14 @@ class SanyanEvaluator(SanyanRuntime):
         except Exception:
             pass  # 类型检查失败不阻塞执行
 
+        # 编译期不确定性检查：拒绝将不确定值传给确定[X] 参数
+        try:
+            self._check_uncertainty(op, args)
+        except SanyanTypeError:
+            raise  # 效应类型错误向上传播
+        except Exception:
+            pass  # 检查失败不阻塞执行
+
         self._debug_before(op, op, args)
         if self._profiling:
             t0 = time.perf_counter()
@@ -413,6 +421,65 @@ class SanyanEvaluator(SanyanRuntime):
                 self._profile[op]['count'] += 1
                 self._profile[op]['time'] += dt
             self._debug_after(op, op, args)
+
+    def _check_uncertainty(self, op: str, args: list) -> None:
+        """编译期不确定性检查：拒绝将不确定值传给确定[X] 参数。
+
+        当函数标注了确定[X] 类型参数时，检查对应实参是否为不确定表达式。
+        若是，抛出 SanyanTypeError 拒绝编译。
+        """
+        from values import SanyanTypeError
+
+        if op not in self.commands:
+            return
+        cmd_data = self.commands[op]
+        param_names = cmd_data[0]
+        param_types = cmd_data[2] if len(cmd_data) > 2 else {}
+        if not param_types:
+            return
+        for i, arg in enumerate(args):
+            if i >= len(param_names):
+                break
+            pname = param_names[i]
+            expected = param_types.get(pname, '')
+            if expected.startswith('确定[') and self._is_uncertain_expr(arg):
+                raise SanyanTypeError(f"编译期拒绝：参数 '{pname}' 期望 确定，但表达式 {arg!r} 产生不确定值")
+
+    def _is_uncertain_expr(self, expr: Any) -> bool:
+        """推断表达式是否产生不确定值。
+
+        规则：
+        - 字面量 int/float/str → 确定（False）
+        - TritValue 信度 < 0.99 → 不确定（True）
+        - 函数返回类型标注 不确定[X] → 不确定（True）
+        - 函数返回类型标注 确定[X] → 确定（False）
+        - 算术运算：任一参数不确定 → 不确定
+        - 其他 → 保守返回确定（False，不阻塞）
+        """
+        from ternary_core import TritValue
+
+        # 已求值的 TritValue
+        if isinstance(expr, TritValue):
+            return expr.confidence < 0.99
+        # Python 原生数值/字符串视为确定
+        if isinstance(expr, (int, float, str)):
+            return False
+        # 列表表达式（函数调用/运算）
+        if isinstance(expr, list) and len(expr) > 0:
+            op = expr[0]
+            # 检查函数返回类型
+            if op in self.commands:
+                cmd_data = self.commands[op]
+                ret_type = cmd_data[3] if len(cmd_data) > 3 else None
+                if ret_type and isinstance(ret_type, str):
+                    if ret_type.startswith('不确定['):
+                        return True
+                    if ret_type.startswith('确定['):
+                        return False
+            # 算术运算：任一参数不确定 → 结果不确定
+            if op in ('add', '加', 'sub', '减', 'mul', '乘', 'div', '除', 'mod', '余'):
+                return any(self._is_uncertain_expr(a) for a in expr[1:])
+        return False
 
     def _debug_before(self, internal: str, op: str, args: list) -> None:
         """操作执行前的调试检查"""
