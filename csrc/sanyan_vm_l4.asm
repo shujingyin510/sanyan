@@ -104,26 +104,26 @@ PUSH_STR:
 .sld:pop rax; mov[rax+4],ebx
     mov[r13+r8*8],rax; inc r8; jmp dispatch
 
-LOAD:  movzx eax,byte[r10+r9];inc r9;mov rax,[r12+rax*8];mov[r13+r8*8],rax;inc r8;jmp dispatch
-STORE: movzx eax,byte[r10+r9];inc r9;dec r8;mov rbx,[r13+r8*8];mov[r12+rax*8],rbx;jmp dispatch
+LOAD:  movzx eax,byte[r10+r9];inc r9;cmp eax,63;ja dispatch;mov rax,[r12+rax*8];cmp r8,511;ja dispatch;mov[r13+r8*8],rax;inc r8;jmp dispatch
+STORE: movzx eax,byte[r10+r9];inc r9;cmp eax,63;ja dispatch;dec r8;mov rbx,[r13+r8*8];mov[r12+rax*8],rbx;jmp dispatch
 
-ADD: dec r8;mov rax,[r13+r8*8];dec r8;mov rbx,[r13+r8*8];sar rax,1;sar rbx,1;add rax,rbx;lea rax,[rax*2+1];mov[r13+r8*8],rax;inc r8;jmp dispatch
-SUB: dec r8;mov rax,[r13+r8*8];dec r8;mov rbx,[r13+r8*8];sar rax,1;sar rbx,1;sub rbx,rax;lea rbx,[rbx*2+1];mov[r13+r8*8],rbx;inc r8;jmp dispatch
-MUL: dec r8;mov rax,[r13+r8*8];dec r8;mov rbx,[r13+r8*8];sar rax,1;sar rbx,1;imul rbx,rax;lea rbx,[rbx*2+1];mov[r13+r8*8],rbx;inc r8;jmp dispatch
-DIV: dec r8;mov rax,[r13+r8*8];dec r8;mov rbx,[r13+r8*8];sar rax,1;test rax,rax;jz .dz;mov rcx,rax;mov rax,rbx;sar rax,1;cqo;idiv rcx;mov rbx,rax;jmp .dp
+ADD: cmp r8,2;jb dispatch;dec r8;mov rax,[r13+r8*8];dec r8;mov rbx,[r13+r8*8];sar rax,1;sar rbx,1;add rax,rbx;lea rax,[rax*2+1];mov[r13+r8*8],rax;inc r8;jmp dispatch
+SUB: cmp r8,2;jb dispatch;dec r8;mov rax,[r13+r8*8];dec r8;mov rbx,[r13+r8*8];sar rax,1;sar rbx,1;sub rbx,rax;lea rbx,[rbx*2+1];mov[r13+r8*8],rbx;inc r8;jmp dispatch
+MUL: cmp r8,2;jb dispatch;dec r8;mov rax,[r13+r8*8];dec r8;mov rbx,[r13+r8*8];sar rax,1;sar rbx,1;imul rbx,rax;lea rbx,[rbx*2+1];mov[r13+r8*8],rbx;inc r8;jmp dispatch
+DIV: cmp r8,2;jb dispatch;dec r8;mov rax,[r13+r8*8];dec r8;mov rbx,[r13+r8*8];sar rax,1;test rax,rax;jz .dz;mov rcx,rax;mov rax,rbx;sar rax,1;cqo;idiv rcx;mov rbx,rax;jmp .dp
 .dz:xor rbx,rbx
 .dp:lea rbx,[rbx*2+1];mov[r13+r8*8],rbx;inc r8;jmp dispatch
-MOD: dec r8;mov rax,[r13+r8*8];dec r8;mov rbx,[r13+r8*8];sar rax,1;test rax,rax;jz .mz;mov rcx,rax;mov rax,rbx;sar rax,1;cqo;idiv rcx;mov rbx,rdx;jmp .mp
+MOD: cmp r8,2;jb dispatch;dec r8;mov rax,[r13+r8*8];dec r8;mov rbx,[r13+r8*8];sar rax,1;test rax,rax;jz .mz;mov rcx,rax;mov rax,rbx;sar rax,1;cqo;idiv rcx;mov rbx,rdx;jmp .mp
 .mz:xor rbx,rbx
 .mp:lea rbx,[rbx*2+1];mov[r13+r8*8],rbx;inc r8;jmp dispatch
 
-GT:  dec r8;mov rax,[r13+r8*8];dec r8;mov rbx,[r13+r8*8];sar rax,1;sar rbx,1;cmp rbx,rax;setg al;movzx eax,al;lea rax,[rax*2-1];mov[r13+r8*8],rax;inc r8;jmp dispatch
-LT:  dec r8;mov rax,[r13+r8*8];dec r8;mov rbx,[r13+r8*8];sar rax,1;sar rbx,1;cmp rbx,rax;setl al;movzx eax,al;lea rax,[rax*2-1];mov[r13+r8*8],rax;inc r8;jmp dispatch
-EQ:  dec r8;mov rax,[r13+r8*8];dec r8;mov rbx,[r13+r8*8];sar rax,1;sar rbx,1;cmp rbx,rax;sete al;movzx eax,al;lea rax,[rax*2-1];mov[r13+r8*8],rax;inc r8;jmp dispatch
+GT:  cmp r8,2;jb dispatch;dec r8;mov rax,[r13+r8*8];dec r8;mov rbx,[r13+r8*8];sar rax,1;sar rbx,1;cmp rbx,rax;setg al;movzx eax,al;lea rax,[rax*2-1];mov[r13+r8*8],rax;inc r8;jmp dispatch
+LT:  cmp r8,2;jb dispatch;dec r8;mov rax,[r13+r8*8];dec r8;mov rbx,[r13+r8*8];sar rax,1;sar rbx,1;cmp rbx,rax;setl al;movzx eax,al;lea rax,[rax*2-1];mov[r13+r8*8],rax;inc r8;jmp dispatch
+EQ:  cmp r8,2;jb dispatch;dec r8;mov rax,[r13+r8*8];dec r8;mov rbx,[r13+r8*8];sar rax,1;sar rbx,1;cmp rbx,rax;sete al;movzx eax,al;lea rax,[rax*2-1];mov[r13+r8*8],rax;inc r8;jmp dispatch
 GTE: dec r8;mov rax,[r13+r8*8];dec r8;mov rbx,[r13+r8*8];sar rax,1;sar rbx,1;cmp rbx,rax;setge al;movzx eax,al;lea rax,[rax*2-1];mov[r13+r8*8],rax;inc r8;jmp dispatch
 
-IS_NUM:  dec r8;mov rax,[r13+r8*8];test al,1;setnz al;movzx eax,al;lea rax,[rax*2-1];mov[r13+r8*8],rax;inc r8;jmp dispatch
-IS_STR:  dec r8;mov rax,[r13+r8*8];test al,1;jnz .isf;cmp dword[rax],1;sete al;jmp .isp
+IS_NUM:  cmp r8,1;jb dispatch;dec r8;mov rax,[r13+r8*8];test al,1;setnz al;movzx eax,al;lea rax,[rax*2-1];mov[r13+r8*8],rax;inc r8;jmp dispatch
+IS_STR:  cmp r8,1;jb dispatch;dec r8;mov rax,[r13+r8*8];test al,1;jnz .isf;cmp dword[rax],1;sete al;jmp .isp
 .isf:    xor eax,eax
 .isp:    movzx eax,al;lea rax,[rax*2-1];mov[r13+r8*8],rax;inc r8;jmp dispatch
 IS_LIST: dec r8;mov rax,[r13+r8*8];test al,1;jnz .ilf;cmp dword[rax],2;sete al;jmp .ilp
@@ -151,7 +151,7 @@ RET:
 ; 列表
 ; ═══════════════════════════════════════════════════════════════
 LIST_NEW:
-    dec r8;mov rax,[r13+r8*8];sar rax,1;mov ecx,eax
+    cmp r8,1;jb dispatch;dec r8;mov rax,[r13+r8*8];sar rax,1;mov ecx,eax
     lea edi,[ecx*8+16];call halloc
     mov dword[rax],2;mov[rax+4],ecx;mov[rax+8],ecx
     mov edx,ecx
@@ -159,7 +159,7 @@ LIST_NEW:
 .lnd:mov[r13+r8*8],rax;inc r8;jmp dispatch
 
 LIST_GET:
-    dec r8;mov rax,[r13+r8*8];sar rax,1;dec r8;mov rbx,[r13+r8*8];test bl,1;jnz .lgz;cmp dword[rbx],2;jne .lgz;
+    cmp r8,2;jb dispatch;dec r8;mov rax,[r13+r8*8];sar rax,1;dec r8;mov rbx,[r13+r8*8];test bl,1;jnz .lgz;cmp dword[rbx],2;jne .lgz;
     cmp eax,[rbx+4];jae .lgz;mov rax,[rbx+16+rax*8];jmp .lgd
 .lgz:xor eax,eax
 .lgd:mov[r13+r8*8],rax;inc r8;jmp dispatch
@@ -168,7 +168,7 @@ LIST_LEN:
     dec r8;mov rax,[r13+r8*8];mov eax,[rax+4];lea rax,[rax*2+1];mov[r13+r8*8],rax;inc r8;jmp dispatch
 
 SET_ELEM:
-    dec r8;mov rax,[r13+r8*8];dec r8;mov rbx,[r13+r8*8];sar rbx,1;dec r8;mov rcx,[r13+r8*8];test cl,1;jnz .sed;cmp dword[rcx],2;jne .sed
+    cmp r8,3;jb dispatch;dec r8;mov rax,[r13+r8*8];dec r8;mov rbx,[r13+r8*8];sar rbx,1;dec r8;mov rcx,[r13+r8*8];test cl,1;jnz .sed;cmp dword[rcx],2;jne .sed
     cmp ebx,[rcx+4];jae .sed;mov[rcx+16+rbx*8],rax
 .sed:jmp dispatch
 
@@ -201,7 +201,7 @@ LIST_CAT:
     mov[r13+r8*8],rax;inc r8;jmp dispatch
 
 SLICE:
-    dec r8;mov rax,[r13+r8*8];sar rax,1  ; count
+    cmp r8,3;jb dispatch;dec r8;mov rax,[r13+r8*8];sar rax,1  ; count
     dec r8;mov rbx,[r13+r8*8];sar rbx,1  ; start
     dec r8;mov rcx,[r13+r8*8]            ; list*
     cmp ebx,[rcx+4];jae .slempty
@@ -239,7 +239,7 @@ DICT:
 .dd:mov[r13+r8*8],rax;inc r8;jmp dispatch
 
 DICT_GET:
-    dec r8;mov rsi,[r13+r8*8];dec r8;mov rdi,[r13+r8*8];test dil,1;jnz .dgnf;cmp dword[rdi],3;jne .dgnf
+    cmp r8,2;jb dispatch;dec r8;mov rsi,[r13+r8*8];dec r8;mov rdi,[r13+r8*8];test dil,1;jnz .dgnf;cmp dword[rdi],3;jne .dgnf
     mov edx,[rdi+8];xor eax,eax
 .dglp:cmp eax,edx;jae .dgnf
     cmp qword[rdi+16+rax*8],0;je .dgemp
@@ -272,7 +272,7 @@ DICT_SET:
 .dsnn:inc edi;jmp .dsn
 
 DICT_HAS:
-    dec r8;mov rsi,[r13+r8*8];dec r8;mov rdi,[r13+r8*8]
+    cmp r8,2;jb dispatch;dec r8;mov rsi,[r13+r8*8];dec r8;mov rdi,[r13+r8*8]
     mov edx,[rdi+8];xor eax,eax
 .dhlp:cmp eax,edx;jae .dhno
     cmp qword[rdi+16+rax*8],0;je .dhemp
@@ -284,7 +284,7 @@ DICT_HAS:
 .dhyes:mov qword[r13+r8*8],1;inc r8;jmp dispatch
 
 DICT_KEYS:
-    dec r8;mov rdi,[r13+r8*8];push rdi;mov edx,[rdi+8];xor ecx,ecx;xor eax,eax
+    cmp r8,1;jb dispatch;dec r8;mov rdi,[r13+r8*8];push rdi;mov edx,[rdi+8];xor ecx,ecx;xor eax,eax
 .dkc:cmp eax,edx;jae .dkcd;cmp qword[rdi+16+rax*8],0;je .dkcn;inc ecx
 .dkcn:inc eax;jmp .dkc
 .dkcd:lea edi,[ecx*8+16];call halloc
@@ -300,7 +300,7 @@ DICT_KEYS:
 ; 字符串操作 (安全寄存器: rsi/rdi/rcx/rdx/rax/rbx)
 ; ═══════════════════════════════════════════════════════════════
 CONCAT:
-    dec r8;mov rax,[r13+r8*8];dec r8;mov rbx,[r13+r8*8]  ; rax=Str*b, rbx=Str*a
+    cmp r8,2;jb dispatch;dec r8;mov rax,[r13+r8*8];dec r8;mov rbx,[r13+r8*8]  ; rax=Str*b, rbx=Str*a
     mov ecx,[rbx+4];add ecx,[rax+4]
     push rax;push rbx;push rcx
     lea edi,[ecx+8];call halloc
@@ -325,7 +325,7 @@ STRLEN:
 .sld:lea rax,[rax*2+1];mov[r13+r8*8],rax;inc r8;jmp dispatch
 
 STREQ:
-    dec r8;mov rax,[r13+r8*8];dec r8;mov rbx,[r13+r8*8]
+    cmp r8,2;jb dispatch;dec r8;mov rax,[r13+r8*8];dec r8;mov rbx,[r13+r8*8]
     mov ecx,[rax+4];cmp ecx,[rbx+4];jne .sqno
     lea rsi,[rax+8];lea rdi,[rbx+8];repe cmpsb;jne .sqno
     mov qword[r13+r8*8],1;inc r8;jmp dispatch
@@ -333,7 +333,7 @@ STREQ:
 
 ; STRSUB: 安全版 — 不碰 r10/r11, 用 rsi/rdi/rcx/rdx/rax/rbx
 STRSUB:
-    dec r8;mov rax,[r13+r8*8]   ; count (tagged)
+    cmp r8,3;jb dispatch;dec r8;mov rax,[r13+r8*8]   ; count (tagged)
     dec r8;mov rbx,[r13+r8*8]   ; start (tagged)
     dec r8;mov rcx,[r13+r8*8]   ; str*
     sar rax,1;sar rbx,1
@@ -372,7 +372,7 @@ STRSUB:
     mov[r13+r8*8],rax;inc r8;jmp dispatch
 
 ORD:
-    dec r8;mov rax,[r13+r8*8];sar rax,1  ; char_index
+    cmp r8,2;jb dispatch;dec r8;mov rax,[r13+r8*8];sar rax,1  ; char_index
     dec r8;mov rbx,[r13+r8*8]            ; str*
     mov ecx,[rbx+4];lea rsi,[rbx+8];xor edi,edi
     mov edx,eax
@@ -404,7 +404,7 @@ ORD:
 ; WRITE_BINARY
 ; ═══════════════════════════════════════════════════════════════
 WRBIN:
-    dec r8;mov rbx,[r13+r8*8]   ; byte_list (List*)
+    cmp r8,2;jb dispatch;dec r8;mov rbx,[r13+r8*8]   ; byte_list (List*)
     dec r8;mov rdi,[r13+r8*8]   ; path (Str*)
     push r8  ; save VM sp
     ; open(path->data, O_CREAT|O_WRONLY, 0666)
