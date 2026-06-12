@@ -271,19 +271,28 @@ static s32 load(const char* p) {
  *   栈布局: [argc(8B)] [argv[0](8B)] [argv[1](8B)] ...
  *   rsp 指向 argc */
 void _start() {
-    register u64 sp_reg asm("rsp");
-    s32 argc = *(s32*)(sp_reg);
-    char** argv = (char**)(sp_reg + 8);
+    s32 argc; char** argv;
+    __asm__ volatile("mov (%%rsp), %0; lea 8(%%rsp), %1" : "=r"(argc), "=r"(argv));
 
     sp=0; pc=0; halt=0; csp=0; SYS3(SYS_write,1,(u64)"START
 ",6);
-    /* bootstrap test: always output a marker */
-    SYS3(SYS_write, 1, (u64)"SEED_OK
-", 8);
 
     if (argc > 1) {
         if (load(argv[1]) < 0) SYS1(SYS_exit, 1);
     } else {
+        SYS3(SYS_read, 0, cod, CM); cs=CM;
+    }
+
+    vm_run(); SYS3(SYS_write,1,(u64)"RUN1
+",5);
+    halt=0;
+    vm_run(); SYS3(SYS_write,1,(u64)"RUN2
+",5);
+
+    SYS1(SYS_exit, 0);
+}
+
+ else {
         SYS3(SYS_read, 0, cod, CM); cs=CM;
     }
 

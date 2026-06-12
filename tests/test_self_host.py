@@ -197,7 +197,19 @@ class TestBootstrapLevel3(unittest.TestCase):
             # 编译 C VM
             compiled = False
             for compiler_args in [
-                ['gcc', seed_src, '-o', seed_exe, '-nostdlib', '-Os', '-fno-builtin', '-lgcc', '-Wno-main', '-s'],
+                [
+                    'gcc',
+                    seed_src,
+                    '-o',
+                    seed_exe,
+                    '-nostdlib',
+                    '-Os',
+                    '-fno-builtin',
+                    '-lgcc',
+                    '-Wno-main',
+                    '-s',
+                    '-fomit-frame-pointer',
+                ],
                 ['tcc', seed_src, '-o', seed_exe],
             ]:
                 try:
@@ -273,6 +285,7 @@ class TestBootstrapLevel3(unittest.TestCase):
                         '-lgcc',
                         '-Wno-main',
                         '-s',
+                        '-fomit-frame-pointer',
                     ]
 
                 try:
