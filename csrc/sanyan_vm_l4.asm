@@ -239,7 +239,7 @@ DICT:
 .dd:mov[r13+r8*8],rax;inc r8;jmp dispatch
 
 DICT_GET:
-    cmp r8,2;jb dispatch;dec r8;mov rsi,[r13+r8*8];dec r8;mov rdi,[r13+r8*8];test dil,1;jnz .dgnf;cmp dword[rdi],3;jne .dgnf
+    cmp r8,2;jb dispatch;dec r8;mov rsi,[r13+r8*8];dec r8;mov rdi,[r13+r8*8];test rdi,rdi;jz .dgnf;test dil,1;jnz .dgnf;cmp dword[rdi],3;jne .dgnf
     mov edx,[rdi+8];xor eax,eax
 .dglp:cmp eax,edx;jae .dgnf
     cmp qword[rdi+16+rax*8],0;je .dgemp
@@ -276,12 +276,12 @@ DICT_HAS:
     mov edx,[rdi+8];xor eax,eax
 .dhlp:cmp eax,edx;jae .dhno
     cmp qword[rdi+16+rax*8],0;je .dhemp
-    push rax;push rdi;mov rdi,[rdi+16+rax*8];call key_cmp
+    push rax;push rdi;mov rdi,[rdi+16+rax*8];mov rsi,[rsp+16];call key_cmp
     mov ecx,eax;pop rdi;pop rax
     test ecx,ecx;jnz .dhyes
 .dhemp:inc eax;jmp .dhlp
-.dhno:mov qword[r13+r8*8],-1;inc r8;jmp dispatch
-.dhyes:mov qword[r13+r8*8],1;inc r8;jmp dispatch
+.dhno:pop rsi;mov qword[r13+r8*8],-1;inc r8;jmp dispatch
+.dhyes:pop rsi;mov qword[r13+r8*8],1;inc r8;jmp dispatch
 
 DICT_KEYS:
     cmp r8,1;jb dispatch;dec r8;mov rdi,[r13+r8*8];push rdi;mov edx,[rdi+8];xor ecx,ecx;xor eax,eax
