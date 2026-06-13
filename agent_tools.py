@@ -253,6 +253,34 @@ def _git_status_direct():
 
 # Multi-agent tools
 _agent_registry = {}
+_AGENT_TIMEOUT = 120
+_AGENT_MAX_RETRY = 2
+import time as _time
+
+def _agent_force_recover(name):
+    if name in _agent_registry:
+        _agent_registry[name] = {'status': 'killed', 'task': _agent_registry[name].get('task',''), 'result': 'force killed'}
+        return 'Agent ' + name + ' killed'
+    return 'Agent ' + name + ' not found'
+
+def _agent_check_deadlock():
+    stuck = []
+    now = _time.time()
+    for name, info in list(_agent_registry.items()):
+        if info.get('status') == 'running':
+            start = info.get('start_time', now)
+            if now - start > 30:
+                info['status'] = 'stuck'
+                stuck.append(name)
+    return 'stuck: ' + ', '.join(stuck) if stuck else 'all clear'
+
+def _agent_cleanup(max_age=300):
+    now = _time.time()
+    for name, info in list(_agent_registry.items()):
+        if now - info.get('start_time',0) > max_age:
+            del _agent_registry[name]
+    return 'ok'
+
 
 
 def _spawn_sub_agent(params):
@@ -268,7 +296,7 @@ def _spawn_sub_agent(params):
         return 'missing task='
     if name in _agent_registry and _agent_registry[name].get('status') == 'running':
         return 'Agent ' + name + ' running'
-    _agent_registry[name] = {'status': 'running', 'task': task, 'result': None}
+    _agent_registry[name] = {'status': 'running', 'task': task, 'result': None, 'start_time': _time.time()}
     try:
         from evaluator import SanyanEvaluator
         from ops.file_ops import clear_cache
