@@ -38,6 +38,7 @@ class ProjectTask:
     validation: str = ''  # python -m pytest tests/xxx.py
     status: TaskStatus = TaskStatus.PENDING
     result: str = ''
+    feedback: str = ''
     retries: int = 0
     max_retries: int = 3
 
@@ -145,24 +146,22 @@ class ProjectOrchestrator:
         return True
 
     def _validate(self, task: ProjectTask) -> bool:
-        """验证任务结果"""
         cmd = task.validation
+        if not cmd:
+            return True
         try:
             r = subprocess.run(
                 cmd.split() if isinstance(cmd, str) else cmd,
-                capture_output=True,
-                text=True,
-                timeout=30,
-                cwd='.',
+                capture_output=True, text=True, timeout=30, cwd=".",
             )
             if r.returncode != 0:
-                task.result = f'验证失败: {r.stderr[:300]}'
+                task.feedback = (r.stderr or r.stdout).strip()[:300]
                 return False
+            task.feedback = "OK"
             return True
         except Exception as e:
-            task.result = f'验证异常: {e}'
+            task.feedback = str(e)[:200]
             return False
-
     def _retry_loop(self, task: ProjectTask) -> bool:
         """重试循环：失败后最多重试 max_retries 次"""
         while task.retries < task.max_retries:
@@ -181,21 +180,34 @@ class ProjectOrchestrator:
         name_to_task = {t.name: t for t in tasks}
         visited = set()
         order = []
+    def _retry_loop(self, task: ProjectTask) -> bool:
+        while task.retries < task.max_retries:
+            if self._execute_task(task):
+                return True
+            task.retries += 1
+            task.status = TaskStatus.RETRY
+            if task.feedback:
+                task.description += chr(10) + "[last error] " + task.feedback[:200]
+            print(f"  [{task.name}] retry {task.retries}/{task.max_retries}")
+            time.sleep(1)
+        task.status = TaskStatus.FAILED
+        self._escalate(task)
+        return False
 
-        def dfs(name):
-            if name in visited:
-                return
-            visited.add(name)
-            task = name_to_task.get(name)
-            if task:
-                for dep in task.depends_on:
-                    if dep in name_to_task:
-                        dfs(dep)
-                order.append(task)
-
-        for t in tasks:
-            dfs(t.name)
-        return order
+    def _escalate(self, task: ProjectTask):
+        import json
+        import os
+        dump = {"task": task.name, "description": task.description[:200],
+                "retries": task.retries, "last_error": task.feedback[:300]}
+        os.makedirs("build", exist_ok=True)
+        fname = "build/escalate_" + task.name.replace(" ", "_")[:30] + ".json"
+        with open(fname, "w", encoding="utf-8") as f:
+            json.dump(dump, f, ensure_ascii=False, indent=2)
+        print()
+        print("  >>> ESCALATE: " + task.name + " failed " + str(task.retries) + "x")
+        print("  >>> error: " + task.feedback[:150])
+        print("  >>> saved: " + fname)
+        print()
 
     def run(self, spec: str, workspace: str = '.') -> ProjectResult:
         """运行完整项目"""
