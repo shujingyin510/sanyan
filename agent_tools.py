@@ -3,6 +3,7 @@
 import os
 import glob as _glob
 import subprocess as _sp
+import time as _time
 
 # ====== Tool 包装函数 ======
 
@@ -255,8 +256,6 @@ def _git_status_direct():
 _agent_registry = {}
 _AGENT_TIMEOUT = 120
 _AGENT_MAX_RETRY = 2
-import time as _time
-
 def _agent_force_recover(name):
     if name in _agent_registry:
         _agent_registry[name] = {'status': 'killed', 'task': _agent_registry[name].get('task',''), 'result': 'force killed'}
