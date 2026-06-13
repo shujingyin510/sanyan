@@ -489,6 +489,7 @@ sanyan/
 ├── AGENTS.md                  # AI 协作约定（自举状态、测试、代码规范）
 ├── CHANGELOG.md               # 变更日志
 ├── CONTRIBUTING.md            # 贡献指南
+├── 愿景故事.md                 # 项目愿景故事（从Setun到三言）
 ├── README.md                  # 项目说明（中文）
 ├── README_EN.md               # 项目说明（英文）
 ├── build_combined.py          # 构建脚本：展开 #include 生成合并 .san
@@ -812,7 +813,7 @@ sanyan/
 
 本项目由 1 位工程师 + AI 协作完成。架构设计、核心算法、调试方向均由人主导，AI 负责具体代码实现。
 
-> 📖 [三言 —— 一个人的编程语言](docs/vision.md) — 项目愿景故事
+> 📖 [三言 —— 一个人的编程语言](愿景故事.md) — 项目愿景故事
 
 ## License
 
