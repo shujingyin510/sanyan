@@ -345,7 +345,7 @@ class BackendRunner:
     def run_llvm(source: str, timeout: float = 10.0) -> tuple[str, str]:
         """LLVM：优先用 llvmlite 内置 codegen，回退 llc"""
         try:
-            from llvmgen.compiler import compile_source as llvm_compile, compile_to_object
+            from llvmgen.compiler import compile_source as llvm_compile
             from utils.compiler_tools import find_cc, find_llc, run_in_shell, win_to_posix
 
             # 缓存 llc/gcc 路径查找

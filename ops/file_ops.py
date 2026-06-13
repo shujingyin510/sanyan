@@ -389,6 +389,8 @@ class FileOps:
         for b in data:
             if isinstance(b, TritValue):
                 b = b.to_int()
+            if isinstance(b, str):
+                b = int(b) if b.isdigit() or (b.startswith('-') and b[1:].isdigit()) else ord(b[0])
             raw_bytes.append(b & 0xFF)
         try:
             with open(str(path), 'wb') as f:

@@ -325,7 +325,6 @@ def compile_to_executable(
 
     优先使用 llvmlite 内置 codegen，回退到 llc + gcc。
     """
-    import subprocess
     import tempfile
 
     obj_data = compile_to_object(source, module_name)

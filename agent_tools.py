@@ -202,25 +202,40 @@ def _git_diff_direct():
 
 def _run_assembly(params):
     """写汇编代码并执行"""
-    import tempfile, os
-    source = ''; output = 'build/agent_asm.bin'; run_flag = True
+    import os
+
+    source = ''
+    output = 'build/agent_asm.bin'
+    run_flag = True
     for line in (params or '').splitlines():
         line = line.strip()
-        if line.startswith('source='): source = line[7:]
-        elif line.startswith('path='): output = line[5:].strip()
-        elif line == '--no-run': run_flag = False
-    if not source: return '缺少 source= 参数'
+        if line.startswith('source='):
+            source = line[7:]
+        elif line.startswith('path='):
+            output = line[5:].strip()
+        elif line == '--no-run':
+            run_flag = False
+    if not source:
+        return '缺少 source= 参数'
     os.makedirs(os.path.dirname(output) or '.', exist_ok=True)
     try:
         from asm import Assembler
-        a = Assembler(); data = a.build(source)
-        with open(output, 'wb') as f: f.write(data)
+
+        a = Assembler()
+        data = a.build(source)
+        with open(output, 'wb') as f:
+            f.write(data)
         result = f'汇编成功: {len(data)}字节'
         if run_flag:
-            from vm import VM; import io, sys
-            old = sys.stdout; sys.stdout = io.StringIO()
+            from vm import VM
+            import io
+            import sys
+
+            old = sys.stdout
+            sys.stdout = io.StringIO()
             VM.from_bin(output).run()
-            out = sys.stdout.getvalue(); sys.stdout = old
+            out = sys.stdout.getvalue()
+            sys.stdout = old
             result += f' 输出: {out.strip() or "(空)"}'
     except Exception as e:
         result = f'汇编失败: {e}'
@@ -238,25 +253,40 @@ def _git_status_direct():
 
 def _run_assembly(params):
     """写汇编代码并执行"""
-    import tempfile, os
-    source = ''; output = 'build/agent_asm.bin'; run_flag = True
+    import os
+
+    source = ''
+    output = 'build/agent_asm.bin'
+    run_flag = True
     for line in (params or '').splitlines():
         line = line.strip()
-        if line.startswith('source='): source = line[7:]
-        elif line.startswith('path='): output = line[5:].strip()
-        elif line == '--no-run': run_flag = False
-    if not source: return '缺少 source= 参数'
+        if line.startswith('source='):
+            source = line[7:]
+        elif line.startswith('path='):
+            output = line[5:].strip()
+        elif line == '--no-run':
+            run_flag = False
+    if not source:
+        return '缺少 source= 参数'
     os.makedirs(os.path.dirname(output) or '.', exist_ok=True)
     try:
         from asm import Assembler
-        a = Assembler(); data = a.build(source)
-        with open(output, 'wb') as f: f.write(data)
+
+        a = Assembler()
+        data = a.build(source)
+        with open(output, 'wb') as f:
+            f.write(data)
         result = f'汇编成功: {len(data)}字节'
         if run_flag:
-            from vm import VM; import io, sys
-            old = sys.stdout; sys.stdout = io.StringIO()
+            from vm import VM
+            import io
+            import sys
+
+            old = sys.stdout
+            sys.stdout = io.StringIO()
             VM.from_bin(output).run()
-            out = sys.stdout.getvalue(); sys.stdout = old
+            out = sys.stdout.getvalue()
+            sys.stdout = old
             result += f' 输出: {out.strip() or "(空)"}'
     except Exception as e:
         result = f'汇编失败: {e}'

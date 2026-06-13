@@ -218,18 +218,18 @@ def _pkg_cmd(cmd: str, args: list):
 
     elif cmd == 'search':
         term = args[0] if args else ''
-        results = PackageOps.search(ev, [term]) if term else PackageOps.index_list(ev, [])
+        PackageOps.search(ev, [term]) if term else PackageOps.index_list(ev, [])
         pass  # PackageOps already prints
 
     elif cmd == 'list':
-        installed = PackageOps.list_packages(ev, [])
+        PackageOps.list_packages(ev, [])
         pass  # PackageOps already prints
 
     elif cmd == 'info':
         if not args:
             print('用法: python sanyanc.py info <包名>')
             sys.exit(1)
-        info = PackageOps.info(ev, [args[0]])
+        PackageOps.info(ev, [args[0]])
         pass  # PackageOps already prints
 
 
