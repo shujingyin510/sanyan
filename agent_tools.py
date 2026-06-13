@@ -254,9 +254,9 @@ def _git_status_direct():
 
 # Multi-agent tools
 _agent_registry = {}
-_AGENT_TIMEOUT = 30     # 可被 agent_policy.san 中 Agent超时秒数 覆盖
+_AGENT_TIMEOUT = 30  # 可被 agent_policy.san 中 Agent超时秒数 覆盖
 _AGENT_MAX_RETRY = 2
-_AGENT_CONF_WINDOW = 4   # 置信度衰减检测窗口
+_AGENT_CONF_WINDOW = 4  # 置信度衰减检测窗口
 _AGENT_CONF_FLOOR = 0.35  # 置信度底线
 
 
@@ -305,11 +305,12 @@ def _load_agent_config(evaluator=None):
         except Exception:
             pass
 
+
 def _classify_failure(out, rounds, confs):
     """分类重启原因: info_gap / wrong_approach / unsolvable / escalation"""
     if not confs:
         return 'unknown'
-    if any('UNCERT' in out[o:o+200] for o in range(0, len(out), 500)):
+    if any('UNCERT' in out[o : o + 200] for o in range(0, len(out), 500)):
         return 'info_gap'
     floor = min(confs) if confs else 1.0
     if floor < 0.2:
@@ -317,6 +318,7 @@ def _classify_failure(out, rounds, confs):
     if len(rounds) >= 4:
         return 'wrong_approach'
     return 'escalation'
+
 
 def _spawn_sub_agent(params):
 

@@ -332,18 +332,23 @@ def init_evaluator(api_key):
             # 置信度衰减检测 (严格单调递减 + 窗口检测)
             import re
             from agent_tools import _AGENT_CONF_WINDOW, _AGENT_CONF_FLOOR, _classify_failure
+
             confs = [float(m) for m in re.findall(r'信度[=:\uff1a]\s*([0-9.]+)', out)]
             rounds = re.findall(r'第\s*(\d+)\s*轮', out)
             win = _AGENT_CONF_WINDOW
             if len(confs) >= max(win, 2):
                 recent = confs[-win:]
                 # 严格单调递减: 每一项 >= 后一项
-                drop = all(recent[i] > recent[i+1] for i in range(len(recent)-1))
+                drop = all(recent[i] > recent[i + 1] for i in range(len(recent) - 1))
                 if drop and recent[-1] < _AGENT_CONF_FLOOR:
                     reason = _classify_failure(out, rounds, confs)
-                    _agent_registry[name] = {'status': 'capped', 'task': task,
+                    _agent_registry[name] = {
+                        'status': 'capped',
+                        'task': task,
                         'result': 'confidence drop ' + str(recent) + ' reason:' + reason,
-                        'failure_reason': reason, 'start_time': _time.time()}
+                        'failure_reason': reason,
+                        'start_time': _time.time(),
+                    }
                     return '[Agent ' + name + '] degraded ' + reason + ', restart'
 
             # 兜底: 轮次过多 (用配置值)
