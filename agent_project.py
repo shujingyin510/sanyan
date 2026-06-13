@@ -136,11 +136,10 @@ class ProjectOrchestrator:
                     task.status = TaskStatus.FAILED
                     return False
 
-        # 2. 验证
-        if task.validation:
-            if not self._validate(task):
-                task.status = TaskStatus.FAILED
-                return False
+        # 2. 验证 (独立调用,不走子Agent)
+        if not self._validate(task):
+            task.status = TaskStatus.FAILED
+            return False
 
         task.status = TaskStatus.DONE
         return True
@@ -154,10 +153,29 @@ class ProjectOrchestrator:
                 cmd.split() if isinstance(cmd, str) else cmd,
                 capture_output=True, text=True, timeout=30, cwd=".",
             )
+            combined = (r.stdout + r.stderr).strip()
             if r.returncode != 0:
-                task.feedback = (r.stderr or r.stdout).strip()[:300]
+                # 解析 pytest 输出: 提取测试名/期望值/文件行号
+                import re
+                parts = []
+                # 测试名: test_file.py::test_name
+                test = re.search(r'(\w+\.py::\w+)', combined)
+                if test: parts.append('test: ' + test.group(1))
+                # 期望vs实际: expected=55, got=0
+                ev = re.search(r'expected[= ]+(\S+).*?got[= ]+(\S+)', combined, re.I)
+                if ev: parts.append('expected=' + ev.group(1) + ' got=' + ev.group(2))
+                # AssertionError 消息
+                ae = re.search(r'AssertionError:?\s*(.+)', combined)
+                if ae: parts.append('assert: ' + ae.group(1)[:200])
+                # 文件+行号
+                fl = re.search(r'File "(.+?)", line (\d+)', combined)
+                if fl: parts.append('file: ' + fl.group(1) + ':' + fl.group(2))
+                # 报错摘要
+                if not parts:
+                    parts.append('error: ' + combined[:300])
+                task.feedback = ' | '.join(parts)[:500]
                 return False
-            task.feedback = "OK"
+            task.feedback = OK
             return True
         except Exception as e:
             task.feedback = str(e)[:200]
@@ -181,18 +199,33 @@ class ProjectOrchestrator:
         visited = set()
         order = []
     def _retry_loop(self, task: ProjectTask) -> bool:
+        prev_result = ""
         while task.retries < task.max_retries:
+            if task.retries > 0:
+                ctx = ["retry " + str(task.retries) + "/" + str(task.max_retries)]
+                if task.feedback:
+                    ctx.append("error: " + task.feedback[:200])
+                if prev_result and prev_result != task.result:
+                    ctx.append("last_diff: " + self._diff_str(prev_result, task.result)[:300])
+                base = task.description.split("[retry]")[0]
+                task.description = base + "[retry] " + " | ".join(ctx)
             if self._execute_task(task):
                 return True
+            prev_result = task.result[:500] if task.result else ""
             task.retries += 1
             task.status = TaskStatus.RETRY
-            if task.feedback:
-                task.description += chr(10) + "[last error] " + task.feedback[:200]
             print(f"  [{task.name}] retry {task.retries}/{task.max_retries}")
             time.sleep(1)
         task.status = TaskStatus.FAILED
         self._escalate(task)
         return False
+
+    def _diff_str(self, a: str, b: str) -> str:
+        if a == b:
+            return "unchanged"
+        import difflib
+        d = list(difflib.unified_diff(a.splitlines(), b.splitlines(), lineterm=""))
+        return "\n".join(d[:20]) if d else "no diff"
 
     def _escalate(self, task: ProjectTask):
         import json
