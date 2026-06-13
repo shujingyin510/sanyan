@@ -250,11 +250,6 @@ def _git_status_direct():
     except Exception:
         return 'git错误'
 
-
-def _run_assembly(params):
-    """写汇编代码并执行"""
-    import os
-
     source = ''
     output = 'build/agent_asm.bin'
     run_flag = True

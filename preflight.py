@@ -127,6 +127,14 @@ def pytest_core():
         'tests/test_lang_core_ext.py',
         'tests/test_effect_types.py',
         'tests/test_disasm.py',
+        'tests/test_coverage_boost.py',
+        'tests/test_coverage_boost2.py',
+        'tests/test_coverage_boost3.py',
+        'tests/test_coverage_boost4.py',
+        'tests/test_coverage_boost5.py',
+        'tests/test_coverage_boost6.py',
+        'tests/test_coverage_boost7.py',
+        'tests/test_math_coverage.py',
     ]
     r = subprocess.run(
         [sys.executable, '-X', 'utf8', '-m', 'pytest'] + test_files + ['-q'],
@@ -267,6 +275,42 @@ def bin_consistency():
 # ═══════════════════════════════════════════════════════════════
 
 
+def run_all_tests():
+    """集成测试 (.san 文件)"""
+    r = subprocess.run(
+        [sys.executable, '-X', 'utf8', 'tests/run_all.py'],
+        capture_output=True,
+        text=True,
+        cwd=str(ROOT),
+        timeout=300,
+    )
+    # run_all.py prints 37/46 通过 style output
+    lines = r.stdout.strip().splitlines()
+    last = lines[-1] if lines else ''
+    import re
+
+    m = re.search(r'(\d+)/(\d+)', last)
+    if m:
+        passed, total = int(m.group(1)), int(m.group(2))
+        assert passed == total, f'{passed}/{total} 通过 (差 {total - passed} 项)'
+        return f'{passed}/{total}'
+    assert r.returncode == 0, f'run_all exit={r.returncode}'
+    return 'OK'
+
+
+def doc_sync_check():
+    """文档一致性检查"""
+    r = subprocess.run(
+        [sys.executable, '-X', 'utf8', 'doc_sync.py'],
+        capture_output=True,
+        text=True,
+        cwd=str(ROOT),
+        timeout=10,
+    )
+    assert r.returncode == 0, f'doc_sync exit={r.returncode}'
+    return 'OK'
+
+
 def bootstrap_level2():
     """Level 2: A → B → C 不动点"""
     import sys
@@ -330,6 +374,10 @@ def main():
         print()
 
         print('─ Bootstrap ─')
+        check('run_all.py (integration)', run_all_tests, quick_skip=quick)
+        print()
+        check('doc_sync (version)', doc_sync_check)
+        print()
         check('Level 2 fixpoint (A→B→C)', bootstrap_level2, quick_skip=quick)
         print()
 

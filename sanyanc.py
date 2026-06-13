@@ -50,7 +50,7 @@ def _call_vm_export(bin_path, export_name, *args):
         vm.stack.append(a)
     vm.code.append(0xFF)
     halt_addr = len(vm.code) - 1
-    vm.code_len = len(vm.code)
+
     caller_base = max(0, len(vm.stack) - len(args))
     vm.call_stack.append((halt_addr, list(vm.vars), caller_base))
     vm.pc = addr
@@ -117,7 +117,6 @@ def compile_san(source: str, output_path: str, use_sugar: bool = True) -> bytes:
     # 在字节码末尾加 HALT 返回点
     vm.code.append(0xFF)
     halt_addr = len(vm.code) - 1
-    vm.code_len = len(vm.code)
 
     # 构造调用帧
     arg_count = 3
