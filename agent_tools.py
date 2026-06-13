@@ -253,7 +253,7 @@ def _git_status_direct():
 
 
 # Multi-agent tools
-_agent_registry = {}
+_agent_registry: dict[str, dict] = {}
 _AGENT_TIMEOUT = 30  # 可被 agent_policy.san 中 Agent超时秒数 覆盖
 _AGENT_MAX_RETRY = 2
 _AGENT_CONF_WINDOW = 4  # 置信度衰减检测窗口

@@ -186,7 +186,7 @@ class Hypothesis:
         'last_updated',
     )
 
-    def __init__(self, hid: int, description: str, estimated_cost: float = 0, tools_used: List[str] = None):
+    def __init__(self, hid: int, description: str, estimated_cost: float = 0, tools_used: Optional[List[str]] = None):
         self.id = hid
         self.description = description
         self.confidence = 0.5
