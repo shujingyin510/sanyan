@@ -22,6 +22,52 @@ SUGAR_BIN = STDLIB / 'sugar.bin'
 COMPILER_BIN = STDLIB / 'bytecode_compiler.bin'
 
 
+def _vm_to_python(val):
+    if val is None:
+        return None
+    if isinstance(val, (int, float)):
+        return val
+    if hasattr(val, 'to_int'):
+        return val.to_int() if not val.is_string() else val.to_payload()
+    if isinstance(val, str):
+        return val
+    if isinstance(val, list):
+        return [_vm_to_python(v) for v in val]
+    if isinstance(val, dict):
+        return {_vm_to_python(k): _vm_to_python(v) for k, v in val.items()}
+    return str(val)
+
+
+def _call_vm_export(bin_path, export_name, *args):
+    from vm import VM
+
+    vm = VM.from_bin(str(bin_path))
+    addr = vm.exports.get(export_name)
+    if addr is None:
+        raise RuntimeError(f'{bin_path} no export {export_name}')
+    for a in args:
+        vm.stack.append(a)
+    vm.code.append(0xFF)
+    halt_addr = len(vm.code) - 1
+    vm.code_len = len(vm.code)
+    caller_base = max(0, len(vm.stack) - len(args))
+    vm.call_stack.append((halt_addr, list(vm.vars), caller_base))
+    vm.pc = addr
+    vm.halted = False
+    vm._run_inner()
+    return _vm_to_python(vm.stack[-1]) if vm.stack else None
+
+
+def parse_sugar(source):
+    """解析 sugar 语法源码为 AST（Python sugar parser）"""
+    from sugar.parser import parse_code
+
+    ast, errors = parse_code(source)
+    if not ast:
+        raise SyntaxError(f'sugar 解析失败: {errors[:3]}')
+    return ast
+
+
 def compile_san(source: str, output_path: str, use_sugar: bool = True) -> bytes:
     """编译 Sanyan 源码为 .bin 字节码。
 
@@ -46,7 +92,13 @@ def compile_san(source: str, output_path: str, use_sugar: bool = True) -> bytes:
             ast = ['do', ast]
     else:
         # sugar 语法：加载 sugar.bin 解析
-        raise NotImplementedError('Sugar 语法需要 sugar.bin VM 加载——先写成 S-表达式，或等 VM 多模块加载支持')
+        ast = parse_sugar(source)
+        if isinstance(ast, list) and len(ast) > 0 and ast[0] == 'do':
+            pass
+        elif isinstance(ast, list):
+            ast = ['do', ast]
+        else:
+            ast = ['do', ast]
 
     if not COMPILER_BIN.exists():
         raise FileNotFoundError(f'编译器不存在: {COMPILER_BIN}')
