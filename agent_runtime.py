@@ -566,8 +566,9 @@ class AgentRuntime:
             body = _json.dumps(
                 {
                     'model': model,
-                    'max_tokens': 256,
+                    'max_tokens': 4096,
                     'temperature': 0.7,
+                    'thinking': {'type': 'enabled', 'budget_tokens': 2048},
                     'messages': [{'role': 'system', 'content': sys_msg}, {'role': 'user', 'content': prompt}],
                 },
                 ensure_ascii=False,
@@ -575,7 +576,8 @@ class AgentRuntime:
             headers = {'Content-Type': 'application/json', 'Authorization': f'Bearer {key}'}
 
             def _parse_openai(d):
-                return d['choices'][0]['message']['content']
+                msg = d['choices'][0]['message']
+                return (msg.get('content') or msg.get('reasoning_content') or '')
 
             parser = _parse_openai
 
