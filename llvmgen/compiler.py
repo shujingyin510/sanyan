@@ -293,6 +293,94 @@ def compile_file(input_path: str, output_path: str | None = None) -> str:
 
     return ir_text
 
+    return ir_text if isinstance(ir_text, str) else ''
+
+
+def compile_to_object(source: str, module_name: str = 'main') -> bytes:
+    """编译三言源码到目标文件 (.o)，不依赖外部 llc。
+
+    使用 llvmlite 内置 TargetMachine.emit_object()，
+    Windows 上若 targets 未注册则回退为 None。
+    """
+    from llvmlite import binding
+
+    ir_text, cg = compile_source(source, module_name)
+    if not ir_text:
+        raise RuntimeError('IR 生成失败')
+
+    try:
+        tm = binding.Target.from_default_triple().create_target_machine()
+        obj = tm.emit_object(cg.module)
+        return bytes(obj)
+    except RuntimeError:
+        return None  # Windows 上无 target，回退 llc
+
+
+def compile_to_executable(
+    source: str,
+    output_path: str,
+    module_name: str = 'main',
+) -> bool:
+    """一步编译三言源码到可执行文件。
+
+    优先使用 llvmlite 内置 codegen，回退到 llc + gcc。
+    """
+    import subprocess
+    import tempfile
+
+    obj_data = compile_to_object(source, module_name)
+    rt_src = os.path.join(os.path.dirname(__file__), 'runtime.c')
+    if not os.path.exists(rt_src):
+        return False
+
+    with tempfile.TemporaryDirectory() as tmpdir:
+        obj_path = os.path.join(tmpdir, f'{module_name}.o')
+        rt_obj = os.path.join(tmpdir, 'runtime.o')
+
+        if obj_data:
+            # 直接写入 llvmlite 编译的目标文件
+            with open(obj_path, 'wb') as f:
+                f.write(obj_data)
+        else:
+            # 回退到 llc
+            from utils.compiler_tools import find_llc, run_in_shell, win_to_posix
+
+            llc = find_llc()
+            if llc is None:
+                return False
+            ir_text, _ = compile_source(source, module_name)
+            ir_path = os.path.join(tmpdir, f'{module_name}.ll')
+            with open(ir_path, 'w', encoding='utf-8') as f:
+                f.write(ir_text)
+            r = run_in_shell(
+                f'{win_to_posix(llc)} {win_to_posix(ir_path)} -filetype=obj -o {win_to_posix(obj_path)}',
+                check=False,
+                timeout=30,
+            )
+            if r.returncode != 0:
+                return False
+
+        # 编译 runtime + 链接
+        from utils.compiler_tools import find_cc, run_in_shell, win_to_posix
+
+        cc = find_cc()
+        if cc is None:
+            return False
+
+        rt = win_to_posix(rt_src)
+        rt_obj_posix = win_to_posix(rt_obj)
+        r = run_in_shell(f'gcc -c {rt} -o {rt_obj_posix} -std=c99 -O2', check=False, timeout=30)
+        if r.returncode != 0:
+            return False
+
+        obj_p = win_to_posix(obj_path)
+        out_p = win_to_posix(output_path)
+        libs = '-lm'
+        if sys.platform == 'win32':
+            libs += ' -lwinhttp'
+        r = run_in_shell(f'gcc {obj_p} {rt_obj_posix} -o {out_p} {libs}', check=False, timeout=30)
+        return r.returncode == 0
+
 
 def main():
     if len(sys.argv) < 2:
