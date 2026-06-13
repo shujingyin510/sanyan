@@ -218,10 +218,121 @@ def init_evaluator(api_key):
             return f'列文件错误: {ex}'
 
     def _spawn_sub_agent_hook(e, args):
-        """调度子Agent"""
-        from agent_tools import _spawn_sub_agent
+        """调度子Agent: LLM模式(有key) 或 代码模式"""
+        params = str(e.eval(args[0])) if args else ''
+        task = ''
+        name = 'sub'
+        for line in params.splitlines():
+            line = line.strip()
+            if line.startswith('task='):
+                task = line[5:]
+            elif line.startswith('name='):
+                name = line[5:]
+        if not task:
+            return 'missing task='
 
-        return _spawn_sub_agent(str(e.eval(args[0])) if args else '')
+        # 代码模式: 以 ( 开头
+        if task.strip().startswith('('):
+            from agent_tools import _spawn_sub_agent
+
+            return _spawn_sub_agent(params)
+
+        # LLM 模式: 需要 API key
+        if not api_key or '你的key' in api_key:
+            return 'LLM mode needs valid API key'
+
+        from agent_tools import _agent_registry
+
+        _agent_registry[name] = {'status': 'running', 'task': task, 'result': None}
+
+        import io
+        import sys
+
+        sys.path.insert(0, '.')
+        from evaluator import SanyanEvaluator
+        from ops.file_ops import clear_cache
+        from preprocess import preprocess_includes
+        from sugar.parser import parse_code
+        import os as _os
+
+        try:
+            clear_cache()
+            sub_ev = SanyanEvaluator(max_loop_steps=300000)
+            _os.environ['SANYAN_API_KEY'] = api_key
+            sub_api_key = api_key
+
+            # 加载 agent.san + 最小工具集到子求值器
+            # 注册子Agent基础工具
+            from ops.registry import register as _reg_op
+
+            def _sub_read_file(ev, a):
+                path = str(ev.eval(a[0])) if a else ''
+                try:
+                    with open(path, encoding='utf-8') as fh:
+                        content = fh.read()
+                    return content[:3000]
+                except Exception as ex:
+                    return 'read error: ' + str(ex)
+
+            def _sub_write_file(ev, a):
+                params = str(ev.eval(a[0])) if a else ''
+                parts = params.split('|', 1)
+                if len(parts) < 2:
+                    return 'need path|content'
+                try:
+                    with open(parts[0], 'w', encoding='utf-8') as fh:
+                        fh.write(parts[1])
+                    return 'written ' + str(len(parts[1])) + ' bytes'
+                except Exception as ex:
+                    return 'write error: ' + str(ex)
+
+            def _sub_search(ev, a):
+                pattern = str(ev.eval(a[0])) if a else ''
+                import glob
+
+                files = glob.glob('**/*' + pattern + '*', recursive=True)[:20]
+                return chr(10).join(files) if files else 'no match'
+
+            def _sub_analyze(ev, a):
+                path = str(ev.eval(a[0])) if a else ''
+                try:
+                    with open(path, encoding='utf-8') as fh:
+                        content = fh.read()
+                    lines = len(content.splitlines())
+                    return path + ': ' + str(lines) + ' lines'
+                except Exception as ex:
+                    return 'analyze error: ' + str(ex)
+
+            _reg_op('读文件钩子', _sub_read_file)
+            _reg_op('写文件钩子', _sub_write_file)
+            _reg_op('搜代码钩子', _sub_search)
+            _reg_op('分析文件', _sub_analyze)
+            _reg_op('列出Agent', lambda ev, a: 'sub-agent tools: read, write, search, analyze')
+
+            agent_path = _os.path.join('ternary_agent', 'agent.san')
+            src = open(agent_path, encoding='utf-8').read()
+            src = preprocess_includes(src)
+            if sub_api_key:
+                src = src.replace('sk-你的key', sub_api_key)
+            ast, _ = parse_code(src)
+            fixed = [s for s in ast[1:] if not (isinstance(s, list) and s[0] == 'export')]
+            sub_ev.eval(['do'] + fixed)
+
+            # 捕获子 Agent 输出
+            old = sys.stdout
+            sys.stdout = io.StringIO()
+            try:
+                sub_ev.eval(['Agent运行', task])
+            finally:
+                out = sys.stdout.getvalue()
+                sys.stdout = old
+
+            result = out.strip()[:1000] if out.strip() else 'no output'
+            _agent_registry[name] = {'status': 'done', 'task': task, 'result': result}
+            return '[Agent ' + name + '] ' + result
+        except Exception as ex:
+            _agent_registry[name] = {'status': 'error', 'task': task, 'result': str(ex)}
+            return '[Agent ' + name + '] error: ' + str(ex)[:300]
 
     def _agent_message_hook(e, args):
         from agent_tools import _agent_message

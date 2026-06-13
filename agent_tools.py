@@ -251,28 +251,41 @@ def _git_status_direct():
         return 'git错误'
 
 
-
 # Multi-agent tools
 _agent_registry = {}
 
+
 def _spawn_sub_agent(params):
-    task = ''; name = 'sub'
+    task = ''
+    name = 'sub'
     for line in (params or '').splitlines():
         line = line.strip()
-        if line.startswith('task='): task = line[5:]
-        elif line.startswith('name='): name = line[5:]
-    if not task: return 'missing task='
+        if line.startswith('task='):
+            task = line[5:]
+        elif line.startswith('name='):
+            name = line[5:]
+    if not task:
+        return 'missing task='
     if name in _agent_registry and _agent_registry[name].get('status') == 'running':
         return 'Agent ' + name + ' running'
     _agent_registry[name] = {'status': 'running', 'task': task, 'result': None}
     try:
-        from evaluator import SanyanEvaluator; from ops.file_ops import clear_cache
-        from lexer import tokenize; from parser import parse; import io; import sys
-        clear_cache(); sub_ev = SanyanEvaluator(max_loop_steps=200000)
-        old = sys.stdout; sys.stdout = io.StringIO()
-        tokens = tokenize(task); ast = parse(tokens)
+        from evaluator import SanyanEvaluator
+        from ops.file_ops import clear_cache
+        from lexer import tokenize
+        from parser import parse
+        import io
+        import sys
+
+        clear_cache()
+        sub_ev = SanyanEvaluator(max_loop_steps=200000)
+        old = sys.stdout
+        sys.stdout = io.StringIO()
+        tokens = tokenize(task)
+        ast = parse(tokens)
         result = sub_ev.eval(ast) if ast else 'parse failed'
-        out = sys.stdout.getvalue(); sys.stdout = old
+        out = sys.stdout.getvalue()
+        sys.stdout = old
         out = out.strip() if out.strip() else str(result)
         _agent_registry[name] = {'status': 'done', 'task': task, 'result': str(result)}
         return '[Agent ' + name + '] ' + out[:500]
@@ -280,14 +293,63 @@ def _spawn_sub_agent(params):
         _agent_registry[name] = {'status': 'error', 'task': task, 'result': str(e)}
         return '[Agent ' + name + '] error: ' + str(e)[:200]
 
+
 def _agent_message(params):
-    to = ''; msg = ''
+    to = ''
+    msg = ''
     for line in (params or '').splitlines():
         line = line.strip()
-        if line.startswith('to='): to = line[3:]
-        elif line.startswith('msg='): msg = line[4:]
+        if line.startswith('to='):
+            to = line[3:]
+        elif line.startswith('msg='):
+            msg = line[4:]
     return f'msg sent to {to}: {msg[:100]}' if to else 'missing to='
 
+
 def _agent_list(params):
-    if not _agent_registry: return 'no agents'
+    if not _agent_registry:
+        return 'no agents'
     return chr(10).join(f'{n}: {i["status"]}' for n, i in _agent_registry.items())
+
+
+def _spawn_parallel(params):
+    """并行调度多个子Agent: tasks=任务1|任务2|任务3
+    每个任务在独立线程中执行，返回所有结果。
+    """
+    import threading
+
+    tasks = []
+    for line in (params or '').splitlines():
+        line = line.strip()
+        if line.startswith('tasks='):
+            tasks = [t.strip() for t in line[6:].split('|') if t.strip()]
+    if not tasks:
+        return 'missing tasks='
+
+    results = {}
+    errors = {}
+    lock = threading.Lock()
+
+    def run_one(idx, task):
+        try:
+            r = _spawn_sub_agent('task=' + task + ' name=worker' + str(idx))
+            with lock:
+                results[idx] = r
+        except Exception as e:
+            with lock:
+                errors[idx] = str(e)
+
+    threads = []
+    for i, task in enumerate(tasks):
+        t = threading.Thread(target=run_one, args=(i, task))
+        t.start()
+        threads.append(t)
+    for t in threads:
+        t.join(timeout=60)
+
+    lines = []
+    for i in sorted(results.keys()):
+        lines.append('worker' + str(i) + ': ' + results[i][:200])
+    for i in sorted(errors.keys()):
+        lines.append('worker' + str(i) + ' error: ' + errors[i][:100])
+    return chr(10).join(lines) if lines else 'all timed out'
