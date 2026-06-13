@@ -290,19 +290,24 @@ class AgentRuntime:
         return self._run_legacy(task, max_rounds, dry_run)
 
     def _execute_hypothesis(self, hypothesis, task, ctx, max_rounds, dry_run):
-        """执行假设的工具链"""
+        """执行假设的工具链 — 每步调 LLM 获取参数"""
         run_id = self.resource.replay_engine.create_run(task)
-        for step, tool_name in enumerate(hypothesis.tools_used):
+        ctx_str = ctx.build()
+        for step in range(len(hypothesis.tools_used)):
             if not self.resource.check_tokens(500):
                 print('  [预算耗尽]')
                 break
-            if tool_name not in self.tools:
+            # 调 LLM 获取工具+参数（如 _run_legacy 中的做法）
+            raw = self._llm_call(ctx_str)
+            tool_name, params = self._parse_tool(raw)
+            if not tool_name or tool_name not in self.tools:
+                print(f'  [解析失败] raw={str(raw)[:60]}')
                 continue
             try:
-                result = self.tools[tool_name](ctx.build(), dry_run)
+                result = self.tools[tool_name](params, dry_run)
             except Exception as e:
                 result = f'工具执行异常: {e}'
-            mode = self.failure_classifier.classify(tool_name, {}, result)
+            mode = self.failure_classifier.classify(tool_name, params, result)
             trit = (
                 1
                 if mode == FailureMode.SUCCESS
@@ -312,18 +317,19 @@ class AgentRuntime:
             )
             conf = 0.9 if mode == FailureMode.SUCCESS else 0.8 if mode in (FailureMode.LOGIC_ERROR,) else 0.4
             # P11: 记录每一步
-            self.resource.replay_engine.record_action(run_id, step, tool_name, '', result, hypothesis.confidence)
+            self.resource.replay_engine.record_action(run_id, step, tool_name, str(params)[:80], result, hypothesis.confidence)
             # P3: 失败归因
-            module = self._extract_module(tool_name)
+            module = self._extract_module(params)
             self.resource.record_tool_use(tool_name, trit == 1, module, mode.value)
             # 三态决策
             _, _, gate, cog = self.ternary.step(tool_name, result)
             print(f'  [{cog}]→{self.ternary.trit_display(trit, conf)} {tool_name}')
             ctx.add_tool_result(str(result)[:500])
+            ctx_str = ctx.build()
             self.memory['history'].append(
                 {
                     'tool': tool_name,
-                    'params': '',
+                    'params': str(params)[:200],
                     'result': str(result)[:300],
                     'round': step + 1,
                     'trit': trit,
@@ -334,13 +340,13 @@ class AgentRuntime:
                 print(f'  [门控] {gate["reason"]}')
                 break
             if tool_name in ('write_file', 'replace_in_file', 'replace_all'):
-                self.memory['modified'].append(tool_name)
-        # P5: 存入缓存
+                self.memory['modified'].append(params.split('|')[0] if '|' in str(params) else str(params))
+            if tool_name == 'done':
+                return {'answer': params if params else '完成', 'memory': self.memory, 'hypothesis': hypothesis.to_dict()}
         answer = self._extract_key(self.memory['history'][-1]['result']) if self.memory['history'] else '完成'
         self.resource.semantic_cache.store(task, answer)
         # P7: 指标
         self.resource.metrics.record_cost(hypothesis.estimated_cost, len(hypothesis.evidence))
-        # 持久化
         self.resource.save()
         return {'answer': answer, 'memory': self.memory, 'hypothesis': hypothesis.to_dict()}
 
