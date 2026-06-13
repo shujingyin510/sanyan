@@ -77,7 +77,7 @@ class TestAgentRuntime(unittest.TestCase):
         # Mock evaluator
         class MockEval:
             def get_var(self, name):
-                return {'模型名': 'deepseek-chat', '模型URL': 'https://api.example.com', 'API密钥': 'sk-test'}.get(
+                return {'模型名': 'deepseek-v4-pro', '模型URL': 'https://api.example.com', 'API密钥': 'sk-test'}.get(
                     name, ''
                 )
 

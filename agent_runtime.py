@@ -519,7 +519,7 @@ class AgentRuntime:
         import json as _json
         import time as _t
 
-        model = (getattr(self.ev, 'get_var', lambda x: '')('模型名') or 'deepseek-chat').strip()
+        model = (getattr(self.ev, 'get_var', lambda x: '')('模型名') or 'deepseek-v4-pro').strip()
         url = (getattr(self.ev, 'get_var', lambda x: '')('模型URL') or '').strip()
         key = (getattr(self.ev, 'get_var', lambda x: '')('API密钥') or '').strip()
         provider = (getattr(self.ev, 'get_var', lambda x: 'deepseek')('模型提供商') or 'deepseek').strip()

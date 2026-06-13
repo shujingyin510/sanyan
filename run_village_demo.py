@@ -145,7 +145,7 @@ def run_manual():
     print('  ══════════════════════════════════════')
     if has_llm:
         print('  桃花村 手动 LLM 对话模式')
-        print(f'  模型: {os.environ.get("LLM_MODEL", "deepseek-chat")}')
+        print(f'  模型: {os.environ.get("LLM_MODEL", "deepseek-v4-pro")}')
     else:
         print('  桃花村 手动规则模式')
         print('  设置 LLM_KEY 环境变量启用大模型')

@@ -15,7 +15,8 @@
 设 模型URL = "https://api.deepseek.com/v1/chat/completions"
 设 API密钥 = 环境变量("SANYAN_API_KEY")
 若 (等于(API密钥, 假) 或 等于(API密钥, "")) { 设 API密钥 = "sk-你的key" }
-设 模型名 = "deepseek-reasoner"
+// 可选: "deepseek-v4-pro"(推荐) "deepseek-v4-flash"(更快) "deepseek-v3"(最新v3)
+设 模型名 = "deepseek-v4-pro"
 设 超时秒数 = 60
 
 // === 决策阈值 ===
