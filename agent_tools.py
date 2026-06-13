@@ -434,7 +434,7 @@ def _vote_spawn(params):
         if line.startswith('task='): task = line[5:]
         elif line.startswith('n='):
             try: n = int(line[2:])
-            except: pass
+            except Exception: pass
     if not task: return 'missing task='
 
     results = []
