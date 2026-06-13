@@ -279,9 +279,18 @@ class HypothesisGenerator:
         return hyps[:3]
 
     _KNOWN_TOOLS = {
-        'analyze', 'find_symbol', 'read_file', 'search_code',
-        'replace_in_file', 'replace_all', 'write_file', 'list_files',
-        'run_test', 'git_diff', 'git_status', 'done',
+        'analyze',
+        'find_symbol',
+        'read_file',
+        'search_code',
+        'replace_in_file',
+        'replace_all',
+        'write_file',
+        'list_files',
+        'run_test',
+        'git_diff',
+        'git_status',
+        'done',
     }
 
     def _llm_generate(self, llm_fn, task, context, count) -> List[Dict]:

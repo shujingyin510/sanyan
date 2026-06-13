@@ -424,18 +424,24 @@ def _spawn_parallel(params):
         lines.append('worker' + str(i) + ' error: ' + errors[i][:100])
     return chr(10).join(lines) if lines else 'all timed out'
 
+
 def _vote_spawn(params):
     """投票表决: task=任务 n=Agent数(默认3)
     开 n 个子Agent独立决策, 融合结果返回 (值, 信度)
     """
-    task = ''; n = 3
+    task = ''
+    n = 3
     for line in (params or '').splitlines():
         line = line.strip()
-        if line.startswith('task='): task = line[5:]
+        if line.startswith('task='):
+            task = line[5:]
         elif line.startswith('n='):
-            try: n = int(line[2:])
-            except Exception: pass
-    if not task: return 'missing task='
+            try:
+                n = int(line[2:])
+            except Exception:
+                pass
+    if not task:
+        return 'missing task='
 
     results = []
     for i in range(n):
@@ -445,6 +451,7 @@ def _vote_spawn(params):
 
     # 提取 (值, 信度) 从每个结果
     import re
+
     values = []
     confs = []
     for r in results:
@@ -465,9 +472,12 @@ def _vote_spawn(params):
     # 归一化: >0→真(1), <0→假(-1), =0→可能(0)
     trit_values = []
     for v in values:
-        if v > 0: trit_values.append(1)
-        elif v < 0: trit_values.append(-1)
-        else: trit_values.append(0)
+        if v > 0:
+            trit_values.append(1)
+        elif v < 0:
+            trit_values.append(-1)
+        else:
+            trit_values.append(0)
 
     has_pos = any(v == 1 for v in trit_values)
     has_neg = any(v == -1 for v in trit_values)
@@ -485,4 +495,15 @@ def _vote_spawn(params):
 
     trues = sum(1 for v in trit_values if v == 1)
     falses = sum(1 for v in trit_values if v == -1)
-    return 'vote(' + str(n) + ' agents): ' + str(trues) + ' true, ' + str(falses) + ' false -> fused=' + str(fused) + ' conf=' + str(round(conf, 2))
+    return (
+        'vote('
+        + str(n)
+        + ' agents): '
+        + str(trues)
+        + ' true, '
+        + str(falses)
+        + ' false -> fused='
+        + str(fused)
+        + ' conf='
+        + str(round(conf, 2))
+    )

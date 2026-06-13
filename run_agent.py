@@ -126,6 +126,7 @@ def load_api_key():
 
 _agent_hooks_registered = False
 
+
 def init_evaluator(api_key):
     """幂等初始化: 第二次调用只重建evaluator,跳过重复注册"""
     global _agent_hooks_registered

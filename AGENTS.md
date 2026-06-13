@@ -44,13 +44,23 @@ python -X utf8 sanyanc.py program.bin --run   # 运行
                            UNCERT/CONFLICTED   +置信度    +置信度     /增益不足    /HUMAN
 ```
 
-**V5 AgentRuntime**（`--auto` 模式，Python 原生引擎）：
+**V5 AgentRuntime**（Python 原生引擎）：
 ```
 用户提问 → SymbolTable预加载 → SemanticCache缓存检查 → DecompositionEngine任务分解
          → HypothesisGenerator多假设生成 → Tournament锦标赛选优
-         → HypothesisExecutor执行最优假设 → TernaryEngine三态决策
-         → ResourceManager经验/Token/可观测 → 完成
+         → 每步调 LLM 获取 tool+args（JSON 格式）→ TernaryEngine三态决策
+         → 经验库跨任务模式匹配 → 完成
 ```
+
+**LLM 连接**：DeepSeek v4（`deepseek-v4-pro`），thinking 显式启用 `{budget_tokens: 2048}`，`max_tokens: 4096`。
+API 密钥通过环境变量 `SANYAN_API_KEY` 注入，`agent_policy.san` 中配置。
+
+**工具调用格式（JSON）**：
+```
+{"tool":"analyze","args":{"path":"run_agent.py"}}
+{"tool":"done","args":{"answer":"我是三言编程助手。"}}
+```
+解析器用括号计数提取 `{...}` + `json.loads`，pipe 格式 `tool|params` 作为回退。
 
 ### 安全机制
 
@@ -61,6 +71,17 @@ python -X utf8 sanyanc.py program.bin --run   # 运行
 | 超时硬杀 | 执行超过30秒 | killed |
 | 死锁检测 | running >30秒 | stuck标记 |
 | 失败分类 | info_gap / wrong_approach / unsolvable / escalation | 日志记录 |
+| LLM 失败防死循环 | 连续3次返回 error\\\\|LLM调用失败 | break 退出 |
+| 约束超限 | 同一工具连续5次 | break 退出 |
+
+### 反馈闭环（agent_project.py）
+
+| 机制 | 触发条件 | 行为 |
+|------|------|------|
+| 结构化重试历史 | 每轮记录 diff + 失败原因 | 注入 task.description |
+| 同位置连错检测 | 连续两轮同文件同错误 | 自动 escalate |
+| Toggle 检测 | 文件内容回到 baseline | 自动 escalate |
+| 经验库 | 跨任务关键词匹配 | 失败2次生成 AVOID 提示 |
 
 可配置项（`agent_policy.san`）：`Agent超时秒数`、`Agent最大轮次`、`Agent置信度衰减窗`、`Agent置信度底线`
 
@@ -77,8 +98,10 @@ python -X utf8 sanyanc.py program.bin --run   # 运行
 | `agent_hypothesis.py` | Phase 1: 多假设 + 锦标赛 + 失败分类 |
 | `agent_resource.py` | Phase 2: 资源统一管控 |
 | `agent_runtime.py` | V5 引擎: SymbolTable、MemoryStore、ProjectGraph |
-| `agent_project.py` | 项目引擎: 分解→执行→验证→重试→报告 |
-| `run_agent.py` | 启动器（`--auto` 走 V5，默认走旧引擎） |
+| `agent_project.py` | 项目引擎: 分解→执行→验证→重试→报告+经验库 |
+| `agent_context.py` | 上下文管理: LLM 安全调用 + 解析 |
+| `agent_experience.py` | 经验库: 跨任务 pattern 匹配 + AVOID 提示 |
+| `run_agent.py` | 启动器（默认走 V5 引擎） |
 
 ### 运行方式
 
@@ -94,7 +117,7 @@ python -X utf8 run_agent.py              # 交互模式（/解释 N、/原因 N�
 - **概率三态**: `TritValue.confidence` 字段，贝叶斯置信度传播（`传播置信度 = 上游 × 当前`）
 - **`#include` 预处理**: `agent.san` 通过 `#include "ternary_agent/agent_policy.san"` 内联策略
 
-### Agent 已知修复（2026-06-02）
+### Agent 已知修复（2026-06-13）
 
 - **`保护()` 返回字典**: `decision.san` 中 `保护()` 原返回列表，改为返回字典
 - **`规则降级()` 调用方式**: `query_weather()` 未定义 → 改为 `调度工具("query_weather", 城市)`

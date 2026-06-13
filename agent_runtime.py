@@ -272,8 +272,8 @@ class AgentRuntime:
 
         # Phase 1: 生成假设 + 锦标赛
         hypotheses = self.hypothesis_generator.generate(
-            lambda p: self._llm_call(p, override_system_prompt=''),
-            task, ctx, self.resource)
+            lambda p: self._llm_call(p, override_system_prompt=''), task, ctx, self.resource
+        )
         self.resource.metrics.total_hypotheses = len(hypotheses)
         best_hypothesis = None
         if len(hypotheses) > 1:
@@ -325,7 +325,9 @@ class AgentRuntime:
             )
             conf = 0.9 if mode == FailureMode.SUCCESS else 0.8 if mode in (FailureMode.LOGIC_ERROR,) else 0.4
             # P11: 记录每一步
-            self.resource.replay_engine.record_action(run_id, step, tool_name, str(params)[:80], result, hypothesis.confidence)
+            self.resource.replay_engine.record_action(
+                run_id, step, tool_name, str(params)[:80], result, hypothesis.confidence
+            )
             # P3: 失败归因
             module = self._extract_module(params)
             self.resource.record_tool_use(tool_name, trit == 1, module, mode.value)
@@ -350,7 +352,11 @@ class AgentRuntime:
             if tool_name in ('write_file', 'replace_in_file', 'replace_all'):
                 self.memory['modified'].append(params.split('|')[0] if '|' in str(params) else str(params))
             if tool_name == 'done':
-                return {'answer': params if params else '完成', 'memory': self.memory, 'hypothesis': hypothesis.to_dict()}
+                return {
+                    'answer': params if params else '完成',
+                    'memory': self.memory,
+                    'hypothesis': hypothesis.to_dict(),
+                }
         answer = self._extract_key(self.memory['history'][-1]['result']) if self.memory['history'] else '完成'
         self.resource.semantic_cache.store(task, answer)
         # P7: 指标
@@ -616,7 +622,7 @@ class AgentRuntime:
 
             def _parse_openai(d):
                 msg = d['choices'][0]['message']
-                return (msg.get('content') or msg.get('reasoning_content') or '')
+                return msg.get('content') or msg.get('reasoning_content') or ''
 
             parser = _parse_openai
 
@@ -636,17 +642,19 @@ class AgentRuntime:
 
     def _parse_tool(self, raw):
         import json as _json
+
         raw = raw.strip().replace('---END---', '').strip()
         # 1: bracket-counting JSON extraction
         start = raw.find('{')
         if start >= 0:
             depth = 0
             for i in range(start, len(raw)):
-                if raw[i] == '{': depth += 1
+                if raw[i] == '{':
+                    depth += 1
                 elif raw[i] == '}':
                     depth -= 1
                     if depth == 0:
-                        candidate = raw[start:i + 1]
+                        candidate = raw[start : i + 1]
                         try:
                             data = _json.loads(candidate)
                             tool = data.get('tool', '')
@@ -656,7 +664,19 @@ class AgentRuntime:
                                     return tool, args
                                 if isinstance(args, dict):
                                     ordered = []
-                                    for key in ('path', 'name', 'keyword', 'content', 'answer', 'old', 'new', 'pattern', 'start', 'count', 'test_file'):
+                                    for key in (
+                                        'path',
+                                        'name',
+                                        'keyword',
+                                        'content',
+                                        'answer',
+                                        'old',
+                                        'new',
+                                        'pattern',
+                                        'start',
+                                        'count',
+                                        'test_file',
+                                    ):
                                         if key in args:
                                             ordered.append(str(args[key]))
                                     if ordered:
@@ -676,6 +696,7 @@ class AgentRuntime:
         if 'def' in raw or '\u51fd\u6570' in raw or '\u7ed3\u6784' in raw:
             return 'analyze', 'run_agent.py'
         return raw, ''
+
     def _extract_key(self, result):
         result_str = str(result)
         for marker in ['⚠', '符号 ']:

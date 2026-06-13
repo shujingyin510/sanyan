@@ -161,12 +161,12 @@ def pytest_self_host():
         cwd=str(ROOT),
         timeout=120,
     )
-    last_line = r.stdout.strip().splitlines()[-1] if r.stdout.strip() else ''
-    assert 'OK' in last_line or 'passed' in last_line, f'self_host: {last_line[:150]}'
+    combined = (r.stdout + r.stderr).strip()
     import re
 
-    m = re.search(r'(\d+) passed', last_line)
+    m = re.search(r'(\d+) passed', combined)
     count = m.group(1) if m else '?'
+    assert r.returncode == 0, f'self_host exit={r.returncode}: {combined[:150]}'
     return f'{count} passed'
 
 
@@ -178,9 +178,13 @@ def pytest_sugar_self_host():
         cwd=str(ROOT),
         timeout=120,
     )
-    last_line = r.stdout.strip().splitlines()[-1] if r.stdout.strip() else ''
-    assert 'OK' in last_line or 'passed' in last_line, f'sugar_self_host: {last_line[:150]}'
-    return 'OK'
+    combined = (r.stdout + r.stderr).strip()
+    import re
+
+    m = re.search(r'(\d+) passed', combined)
+    count = m.group(1) if m else '?'
+    assert r.returncode == 0, f'sugar_self_host exit={r.returncode}: {combined[:150]}'
+    return f'{count} passed'
 
 
 # ═══════════════════════════════════════════════════════════════
@@ -193,16 +197,17 @@ def path_case_check():
     issues = []
     for f in ROOT.rglob('*.py'):
         path_str = str(f)
-        # 反斜杠
-        if '\\' in path_str:
+        # 反斜杠 (Windows 上 native 是 \\，跳过)
+        if os.name != 'nt' and '\\' in path_str:
             issues.append(f'反斜杠: {f.relative_to(ROOT)}')
         # 大写文件名 (Linux 大小写敏感)
         name = f.name
         if name != name.lower() and name.endswith('.py') and not name.startswith('test_'):
             pass  # CamelCase is fine for class files
-    for f in ROOT.rglob('*.san'):
-        if '\\' in str(f):
-            issues.append(f'反斜杠: {f.relative_to(ROOT)}')
+    if os.name != 'nt':
+        for f in ROOT.rglob('*.san'):
+            if '\\' in str(f):
+                issues.append(f'反斜杠: {f.relative_to(ROOT)}')
     assert not issues, f'{len(issues)} 个问题: {"; ".join(issues[:3])}'
     return f'OK ({sum(1 for _ in ROOT.rglob("*.py"))} .py + {sum(1 for _ in ROOT.rglob("*.san"))} .san)'
 
