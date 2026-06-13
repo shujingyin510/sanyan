@@ -12,6 +12,10 @@
 - **自举 Level 4**：617行x86_64 NASM汇编VM（`csrc/sanyan_vm_l4.asm`），35 opcode全实现
 - **ISA v2**：LOAD16/STORE16/CALL32/PUSH_STR16/CLOSURE 5个新opcode
 - **哈希字典**：FNV-1a哈希 + 开放寻址，O(1)替代O(n)
+- **多 Agent 协作（v0.4）**：调度子Agent/Agent消息/列出Agent，子Agent独立决策+继承置信
+- **sanyanc 编译器**：sugar语法直连 + 包管理CLI (install/search/list/info/uninstall)
+- **汇编器 CLI**：`python asm.py program.sasm -o program.bin`，CALL/JMP 修复
+- **preflight 预检**：`python preflight.py` 一键全量检查，推送前必须通过
 - **反汇编器**：`disasm.py`，支持--hex/--brief/--export，6项测试
 - **字节码验证器**：`verify.py`，JMP/LOAD/STORE边界检查
 

@@ -15,6 +15,27 @@ python -X utf8 sanyanc.py program.bin --run   # 运行
 
 三言 Agent 是**可读决策 DSL**——决策过程对非程序员透明可读。
 
+### 多 Agent 协作（v0.4，2026-06）
+
+父 Agent 可调度子 Agent 并行工作，每个子 Agent 独立运行决策引擎：
+
+```
+父Agent ──┬── 子Agent1 (规则分析) ──→ 返回结果
+          ├── 子Agent2 (代码编写) ──→ 返回结果
+          └── 子Agent3 (测试验证) ──→ 返回结果
+```
+
+| 工具 | 功能 |
+|------|------|
+| `调度子Agent` | task=任务 name=名称 → 子Agent独立决策 |
+| `Agent消息` | to=目标 msg=消息 → Agent间通信 |
+| `列出Agent` | 查看所有Agent状态 (running/done/error) |
+
+子Agent 继承父Agent的：置信逻辑 + 传播逻辑 + 三态决策引擎 + 工具集。
+
+**LLM 模式**：task 不以 `(` 开头时走 `Agent运行`，调用 LLM 推理。
+**代码模式**：task 以 `(` 开头时直接执行 Sanyan 表达式。
+
 ### 架构
 
 ```
