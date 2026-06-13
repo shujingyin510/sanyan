@@ -555,35 +555,32 @@ class AgentRuntime:
                 '你是三言(Sanyan)编程助手，一个中文DSL语言的工具型Agent。\n'
                 '你的任务：根据用户输入选一个工具执行。\n'
                 '\n'
-                '工具列表:\n'
-                '  analyze(文件路径)         — 分析文件结构\n'
-                '  find_symbol(符号名)       — 查找符号定义/引用\n'
-                '  read_file(文件|起始行|行数) — 读取文件内容\n'
-                '  search_code(关键词)       — 搜索代码\n'
-                '  replace_in_file(路径|旧文本|新文本) — 单次替换\n'
-                '  replace_all(模式|旧文本|新文本)     — 批量替换\n'
-                '  write_file(路径|内容)     — 写入文件\n'
-                '  list_files               — 列出项目文件\n'
-                '  run_test(测试文件)        — 运行测试\n'
-                '  git_diff                 — 查看git差异\n'
-                '  git_status               — 查看git状态\n'
-                '  done(回答)               — 任务完成，输出最终答案\n'
+                '工具与参数:\n'
+                '  analyze(path)          — 分析文件结构\n'
+                '  find_symbol(name)      — 查找符号定义/引用\n'
+                '  read_file(path,start,count) — 读文件(行号可选)\n'
+                '  search_code(keyword)   — 搜索代码\n'
+                '  replace_in_file(path,old,new) — 单次替换\n'
+                '  replace_all(pattern,old,new)  — 批量替换\n'
+                '  write_file(path,content)— 写入文件\n'
+                '  list_files(pattern)     — 列出文件(可选模式)\n'
+                '  run_test(test_file)     — 运行测试\n'
+                '  git_diff                — 查看git差异\n'
+                '  git_status              — 查看git状态\n'
+                '  done(answer)            — 任务完成，输出最终答案\n'
                 '\n'
-                '输出格式（严格，独占一行，不要任何其他文字）:\n'
-                '  工具名|参数\n'
+                '输出格式（严格，只输出一个JSON对象，独占一行，不要任何其他文字）:\n'
+                '  {"tool":"工具名", "args":{"参数名":"值"}}\n'
                 '\n'
                 '示例:\n'
                 '  用户: 看看run_agent.py结构\n'
-                '  analyze|run_agent.py\n'
+                '  {"tool":"analyze","args":{"path":"run_agent.py"}}\n'
                 '\n'
-                '  用户: main函数在哪里定义的\n'
-                '  find_symbol|main\n'
-                '\n'
-                '  用户: 帮我看看有哪些文件\n'
-                '  list_files\n'
+                '  用户: 读fib.san前20行\n'
+                '  {"tool":"read_file","args":{"path":"fib.san","start":1,"count":20}}\n'
                 '\n'
                 '  用户: 介绍一下你自己\n'
-                '  done|我是三言编程助手，基于DeepSeek v4，帮你分析和修改三言代码。'
+                '  {"tool":"done","args":{"answer":"我是三言编程助手，基于DeepSeek v4。"}}'
             )
         sys_msg = override_system_prompt if override_system_prompt is not None else self._system_prompt
 
@@ -638,13 +635,41 @@ class AgentRuntime:
         return 'error|LLM调用失败(3次重试)'
 
     def _parse_tool(self, raw):
+        import re as _re
+        import json as _json
         raw = raw.strip().replace('---END---', '').strip('{}"\' ')
+        # 1. 优先 JSON: {"tool":"xxx","args":{...}}
+        m = _re.search(r'\{[^{}]*"tool"\s*:\s*"[^"]+"\s*[,}].*?\}', raw, _re.DOTALL)
+        if m:
+            try:
+                data = _json.loads(m.group())
+                tool = data.get('tool', '')
+                args = data.get('args', {})
+                # args 转回 pipe-separated string 兼容现有工具处理器
+                if isinstance(args, str):
+                    return tool, args
+                if isinstance(args, dict):
+                    # 按约定顺序取值: path/name/keyword > 其余
+                    ordered = []
+                    for key in ('path', 'name', 'keyword', 'content', 'answer', 'old', 'new', 'pattern', 'start', 'count', 'test_file'):
+                        if key in args:
+                            val = str(args[key])
+                            if key in ('old', 'new', 'content', 'answer'):
+                                ordered.append(val)
+                            else:
+                                ordered.append(val)
+                    if ordered:
+                        return tool, '|'.join(ordered)
+                    return tool, _json.dumps(args, ensure_ascii=False)
+            except (_json.JSONDecodeError, KeyError):
+                pass
+        # 2. 回退: pipe格式 tool|params
         if '|' in raw:
             parts = raw.split('|', 1)
             return parts[0].strip(), parts[1].strip() if len(parts) > 1 else ''
         if raw.startswith('done'):
             return 'done', raw.split('|', 1)[1] if '|' in raw else ''
-        # 智能首轮: 检测任务类型
+        # 3. 兜底: 关键词试探
         if 'def' in raw or '函数' in raw or '结构' in raw:
             return 'analyze', 'run_agent.py'
         return raw, ''
