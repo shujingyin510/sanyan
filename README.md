@@ -512,8 +512,17 @@ sanyan/
 ├── pyproject.toml             # 项目配置
 ├── repl.py                    # REPL 交互环境
 ├── ternary_engine.py           # 三态认知引擎（Kleene×贝叶斯×门控）
-├── agent_runtime.py            # Agent V3 引擎
-├── agent_tools.py              # Agent V3 工具层
+├── agent_runtime.py            # Agent V5 引擎
+├── agent_tools.py              # Agent V5 工具层
+├── agent_tool_graph.py         # 工具依赖图 + 能力注册
+├── agent_decompose.py          # Phase 0: 任务分解
+├── agent_hypothesis.py         # Phase 1: 多假设 + 锦标赛
+├── agent_resource.py           # Phase 2: 资源管控
+├── agent_project.py            # 项目引擎: 分解→执行→验证→重试
+├── asm.py                      # 字节码汇编器
+├── disasm.py                   # 字节码反汇编器
+├── verify.py                   # 字节码验证器
+├── preflight.py                # 发版前预检（lint+test+自举）
 ├── run_agent.py               # Agent 启动器
 ├── run_v2.py                  # v2 演示启动器
 ├── run_v2_demo.py             # v2 演示脚本
@@ -522,7 +531,7 @@ sanyan/
 ├── runtime.py                 # 运行环境（作用域/IoT/调试/性能）
 ├── sandbox.py                 # 沙箱安全机制
 ├── sanfmt.py                  # 源码格式化器
-├── sanyancc.py                # STM32 交叉编译器
+├── sanyanc.py                # 编译器（S表达式 + sugar） + 包管理器
 ├── setup.py                   # 安装脚本
 ├── skin.py                    # 皮肤管理器
 ├── tail_call.py               # 尾递归优化
