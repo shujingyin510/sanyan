@@ -136,10 +136,25 @@ class ProjectOrchestrator:
                     break
         return diffs
 
+    def _detect_toggle(self, before, after, files):
+        """检测来回改动: 同一文件从A→B→A 或 +3行后-3行"""
+        for f in (set(before) | set(after)) & set(files):
+            a = before.get(f, ""); b = after.get(f, "")
+            if a == b and a != "":
+                return True
+            if a and b:
+                diff = list(difflib.unified_diff(a.splitlines(), b.splitlines(), lineterm=""))
+                adds = sum(1 for l in diff if l.startswith("+"))
+                dels = sum(1 for l in diff if l.startswith("-"))
+                if adds + dels == 0:
+                    return True
+        return False
+
     def _retry_loop(self, task):
         baseline = self._snapshot_files()
         prev_files = baseline
         retry_log = []
+        modified_files = []
 
         while task.retries < task.max_retries:
             if task.retries > 0:
@@ -160,6 +175,13 @@ class ProjectOrchestrator:
                     if pf and pf[:60] == cf[:60]:
                         task.feedback = "same_error_twice: " + pf[:100]
                         return self._escalate(task)
+
+                # toggle detection: 被改文件内容回到了前一轮的状态
+                curr_modified = set(d.split(":")[0] for d in diffs if ": " in d)
+                if len(modified_files) >= 1 and self._detect_toggle(prev_files, curr_files, set(modified_files[-1]) & curr_modified):
+                    task.feedback = "toggle_detected: " + str([f[:40] for f in curr_modified])[:200]
+                    return self._escalate(task)
+                modified_files.append(list(curr_modified))
 
                 prev_files = curr_files
 
