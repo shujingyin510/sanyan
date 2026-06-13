@@ -286,3 +286,82 @@ def _git_status_direct():
     except Exception as e:
         result = f'汇编失败: {e}'
     return result
+
+
+# ═══════════════════════════════════════
+# 多 Agent 协作工具
+# ═══════════════════════════════════════
+
+_agent_registry = {}  # {name: {status, task, result, parent}}
+
+
+def _spawn_sub_agent(params):
+    """调度子Agent：task=任务描述 name=Agent名
+    子Agent 在独立沙箱中执行任务，返回结构化结果。
+    """
+    task = ''
+    name = 'sub'
+    for line in (params or '').splitlines():
+        line = line.strip()
+        if line.startswith('task='):
+            task = line[5:]
+        elif line.startswith('name='):
+            name = line[5:]
+
+    if not task:
+        return '缺少 task= 参数'
+    if name in _agent_registry and _agent_registry[name].get('status') == 'running':
+        return f'Agent {name} 正在执行中'
+
+    _agent_registry[name] = {'status': 'running', 'task': task, 'result': None}
+    try:
+        import os
+
+        api_key = os.environ.get('SANYAN_API_KEY', '')
+        from evaluator import SanyanEvaluator
+        from ops.file_ops import clear_cache
+
+        clear_cache()
+        sub_ev = SanyanEvaluator(max_loop_steps=300000)
+        os.environ['SANYAN_API_KEY'] = api_key
+
+        agent_src = open('ternary_agent/agent.san', encoding='utf-8').read()
+        from preprocess import preprocess_includes
+
+        agent_src = preprocess_includes(agent_src)
+        if api_key and '你的key' not in api_key:
+            agent_src = agent_src.replace('sk-你的key', api_key)
+        sub_ev.set_var('_干跑模式', True)
+        sub_ev.eval(agent_src)
+
+        result = sub_ev.eval(['ask', task])
+        _agent_registry[name] = {'status': 'done', 'task': task, 'result': str(result)}
+        return f'[Agent {name}] {result}'
+    except Exception as e:
+        _agent_registry[name] = {'status': 'error', 'task': task, 'result': str(e)}
+        return f'[Agent {name}] 错误: {e}'
+
+
+def _agent_message(params):
+    """Agent 间消息: to=目标Agent msg=消息内容"""
+    to = ''
+    msg = ''
+    for line in (params or '').splitlines():
+        line = line.strip()
+        if line.startswith('to='):
+            to = line[3:]
+        elif line.startswith('msg='):
+            msg = line[4:]
+    if not to or not msg:
+        return '缺少 to= 或 msg='
+    return f'消息已发送给 {to}: {msg[:200]}'
+
+
+def _agent_list(params):
+    """列出所有Agent状态"""
+    if not _agent_registry:
+        return '无活跃Agent'
+    lines = []
+    for name, info in _agent_registry.items():
+        lines.append(f'{name}: {info["status"]} — {info["task"][:60]}')
+    return chr(10).join(lines)

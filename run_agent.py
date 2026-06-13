@@ -217,6 +217,22 @@ def init_evaluator(api_key):
         except Exception as ex:
             return f'列文件错误: {ex}'
 
+    def _spawn_sub_agent_hook(e, args):
+        """调度子Agent"""
+        from agent_tools import _spawn_sub_agent
+
+        return _spawn_sub_agent(str(e.eval(args[0])) if args else '')
+
+    def _agent_message_hook(e, args):
+        from agent_tools import _agent_message
+
+        return _agent_message(str(e.eval(args[0])) if args else '')
+
+    def _agent_list_hook(e, args):
+        from agent_tools import _agent_list
+
+        return _agent_list(str(e.eval(args[0])) if args else '')
+
     def _read_file_direct(e, args):
         """直接读取文件（用于 agent 工具调用），支持 路径 或 路径|起始行|结束行"""
         raw = str(e.eval(args[0])) if args else ''
