@@ -1,5 +1,16 @@
 # AGENTS.md — 三言项目维护约定
 
+## 汇编器（Agent 写字节码用）
+
+> **重要**：汇编器允许 Agent 直接写 Sanyan 字节码程序。语法和陷阱见 → [`docs/asm_guide.md`](docs/asm_guide.md)
+
+```bash
+python asm.py program.sasm -o program.bin     # 汇编
+python -X utf8 sanyanc.py program.bin --run   # 运行
+```
+
+关键陷阱：比较指令返回 TritValue(-1/1) 而非 int(0/1)，JZ/JNZ 需要加 1 归一化。
+
 ## Agent 系统（v0.3，2026-05）
 
 三言 Agent 是**可读决策 DSL**——决策过程对非程序员透明可读。
