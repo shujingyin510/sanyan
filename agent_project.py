@@ -1,32 +1,22 @@
-"""Agent 项目引擎 — 任务分解 → 执行 → 验证 → 重试 → 完成
-
-用法:
-    from agent_project import ProjectRunner
-    runner = ProjectRunner(rt)  # rt = AgentRuntime
-    result = runner.run(\"写一个水仙花数计算器\")
-
-流程:
-    1. 接收项目规格
-    2. 拆成子任务 (TaskDecomposer)
-    3. 按依赖顺序执行 (ProjectExecutor)
-    4. 每步验证 + 失败重试 (Validator + RetryLoop)
-    5. 输出完成报告
-"""
+"""Agent 项目引擎 — 分解 → 执行 → 验证 → 反馈 → 上报"""
 
 import os
+import re
 import time
+import json
 import subprocess
+import difflib
+import glob
 from dataclasses import dataclass, field
 from enum import Enum
 
 
 class TaskStatus(Enum):
-    PENDING = 'pending'
-    RUNNING = 'running'
-    DONE = 'done'
-    FAILED = 'failed'
-    RETRY = 'retry'
-    SKIPPED = 'skipped'
+    PENDING = "pending"
+    RUNNING = "running"
+    DONE = "done"
+    FAILED = "failed"
+    RETRY = "retry"
 
 
 @dataclass
@@ -35,10 +25,10 @@ class ProjectTask:
     description: str
     tools: list[str] = field(default_factory=list)
     depends_on: list[str] = field(default_factory=list)
-    validation: str = ''  # python -m pytest tests/xxx.py
+    validation: str = ""
     status: TaskStatus = TaskStatus.PENDING
-    result: str = ''
-    feedback: str = ''
+    result: str = ""
+    feedback: str = ""
     retries: int = 0
     max_retries: int = 3
 
@@ -51,185 +41,139 @@ class ProjectResult:
 
 
 class ProjectOrchestrator:
-    """项目编排引擎 — 分解、执行、验证、重试的完整循环"""
 
-    def __init__(self, rt=None, tools: dict = None):
-        """rt: AgentRuntime (V5引擎), tools: 可用工具字典"""
+    def __init__(self, rt=None, tools=None):
         self.rt = rt
         self.tools = tools or {}
-        self.memory = {}  # 跨任务记忆
-        self.errors = []  # 错误日志
+        self.memory = {}
+        self.errors = []
 
-    def _llm_decompose(self, spec: str) -> list[ProjectTask]:
-        """任务分解：用 LLM 拆项目为子任务"""
-        # 如果 AgentRuntime 可用，用它的分解引擎
+    def _llm_decompose(self, spec):
         if self.rt and self.rt.decomposition_engine:
             try:
                 result = self.rt.decomposition_engine.decompose(spec)
                 if result:
-                    tasks = []
-                    for item in result if isinstance(result, list) else [result]:
-                        tasks.append(
-                            ProjectTask(
-                                name=item.get('name', 'task'),
-                                description=item.get('desc', spec),
-                                tools=item.get('tools', []),
-                                depends_on=item.get('depends', []),
-                                validation=item.get('test', ''),
-                            )
-                        )
-                    return tasks
+                    items = result if isinstance(result, list) else [result]
+                    return [ProjectTask(name=it.get("name", "task"), description=it.get("desc", spec)) for it in items]
             except Exception as e:
-                self.errors.append(f'LLM decompose failed: {e}')
-
-        # 回退：基于模式的分词法分解
+                self.errors.append(f"decompose failed: {e}")
         return self._rule_decompose(spec)
 
-    def _rule_decompose(self, spec: str) -> list[ProjectTask]:
-        """规则分解：按关键词拆解任务"""
+    def _rule_decompose(self, spec):
         tasks = []
-        keywords = {
-            '写': ('实现代码', ['write_file', 'read_file']),
-            '定义': ('定义函数', ['write_file']),
-            '编译': ('编译验证', ['run_test']),
-            '测试': ('运行测试', ['run_test']),
-            '检查': ('代码检查', ['analyze', 'search']),
-            '优化': ('性能优化', ['write_file', 'run_test']),
-            '文档': ('写文档', ['write_file']),
-        }
-        for kw, (desc, tools) in keywords.items():
+        for kw, (desc, tools) in {
+            "写": ("实现代码", ["write_file"]), "定义": ("定义函数", ["write_file"]),
+            "编译": ("编译验证", ["run_test"]), "测试": ("运行测试", ["run_test"]),
+        }.items():
             if kw in spec:
-                tasks.append(
-                    ProjectTask(
-                        name=desc,
-                        description=f'{spec}',
-                        tools=tools,
-                        depends_on=[t.name for t in tasks[-1:]] if tasks else [],
-                    )
-                )
-        if not tasks:
-            tasks.append(ProjectTask(name='实现', description=spec, tools=['write_file', 'run_test']))
-        return tasks
+                tasks.append(ProjectTask(name=desc, description=spec, tools=tools,
+                    depends_on=[t.name for t in tasks[-1:]] if tasks else []))
+        return tasks or [ProjectTask(name="实现", description=spec, tools=["write_file", "run_test"])]
 
-    def _execute_task(self, task: ProjectTask, workspace: str = '.') -> bool:
-        """执行单个任务"""
+    def _execute_task(self, task):
         task.status = TaskStatus.RUNNING
-        print(f'  [{task.name}] 执行中...')
-
-        # 1. 通过子Agent执行
         try:
             from agent_tools import _spawn_sub_agent
-            agent_name = "proj_" + task.name.replace(" ", "_")[:20]
-            r = _spawn_sub_agent("name=" + agent_name + chr(10) + "task=" + task.description)
+            name = "proj_" + task.name.replace(" ", "_")[:20]
+            r = _spawn_sub_agent("name=" + name + "\ntask=" + task.description)
             task.result = str(r)[:500]
         except Exception as e:
             task.result = "agent error: " + str(e)[:200]
-
-        # 2. 附加工具
-        for tool in task.tools:
-            if tool in self.tools:
-                try:
-                    result = self.tools[tool](task.description)
-                    task.result += str(result)[:500]
-                except Exception as e:
-                    self.errors.append(f'{task.name}: {tool} failed: {e}')
-                    task.status = TaskStatus.FAILED
-                    return False
-
-        # 2. 验证 (独立调用,不走子Agent)
         if not self._validate(task):
             task.status = TaskStatus.FAILED
             return False
-
         task.status = TaskStatus.DONE
         return True
 
-    def _validate(self, task: ProjectTask) -> bool:
-        cmd = task.validation
-        if not cmd:
+    def _validate(self, task):
+        if not task.validation:
             return True
         try:
-            r = subprocess.run(
-                cmd.split() if isinstance(cmd, str) else cmd,
-                capture_output=True, text=True, timeout=30, cwd=".",
-            )
+            r = subprocess.run(task.validation.split() if isinstance(task.validation, str) else task.validation,
+                capture_output=True, text=True, timeout=30, cwd=".")
             combined = (r.stdout + r.stderr).strip()
             if r.returncode != 0:
-                # 解析 pytest 输出: 提取测试名/期望值/文件行号
-                import re
                 parts = []
-                # 测试名: test_file.py::test_name
                 test = re.search(r'(\w+\.py::\w+)', combined)
-                if test: parts.append('test: ' + test.group(1))
-                # 期望vs实际: expected=55, got=0
+                if test: parts.append("test=" + test.group(1))
                 ev = re.search(r'expected[= ]+(\S+).*?got[= ]+(\S+)', combined, re.I)
-                if ev: parts.append('expected=' + ev.group(1) + ' got=' + ev.group(2))
-                # AssertionError 消息
+                if ev: parts.append("expected=" + ev.group(1) + " got=" + ev.group(2))
                 ae = re.search(r'AssertionError:?\s*(.+)', combined)
-                if ae: parts.append('assert: ' + ae.group(1)[:200])
-                # 文件+行号
+                if ae: parts.append("assert=" + ae.group(1)[:200])
                 fl = re.search(r'File "(.+?)", line (\d+)', combined)
-                if fl: parts.append('file: ' + fl.group(1) + ':' + fl.group(2))
-                # 报错摘要
-                if not parts:
-                    parts.append('error: ' + combined[:300])
-                task.feedback = ' | '.join(parts)[:500]
+                if fl: parts.append("file=" + fl.group(1) + ":" + fl.group(2))
+                task.feedback = " | ".join(parts)[:400] if parts else combined[:400]
                 return False
-            task.feedback = OK
+            task.feedback = "OK"
             return True
         except Exception as e:
             task.feedback = str(e)[:200]
             return False
-    def _retry_loop(self, task: ProjectTask) -> bool:
-        """重试循环：失败后最多重试 max_retries 次"""
-        while task.retries < task.max_retries:
-            if self._execute_task(task):
-                return True
-            task.retries += 1
-            task.status = TaskStatus.RETRY
-            print(f'  [{task.name}] 重试 {task.retries}/{task.max_retries}')
-            time.sleep(1)
 
-        task.status = TaskStatus.FAILED
-        return False
+    def _snapshot_files(self, patterns=None):
+        if patterns is None:
+            patterns = ("*.san", "*.py", "*.sasm")
+        snap = {}
+        for pat in patterns:
+            for f in glob.glob(pat):
+                try:
+                    with open(f, "r", encoding="utf-8") as fh:
+                        snap[f] = fh.read()
+                except Exception:
+                    pass
+        return snap
 
-    def _topological_order(self, tasks: list[ProjectTask]) -> list[ProjectTask]:
-        """拓扑排序：按依赖关系排序"""
-        name_to_task = {t.name: t for t in tasks}
-        visited = set()
-        order = []
-    def _retry_loop(self, task: ProjectTask) -> bool:
-        prev_result = ""
+    def _diff_files(self, before, after):
+        diffs = []
+        for f in set(before) | set(after):
+            a = before.get(f, "")
+            b = after.get(f, "")
+            if a != b:
+                d = list(difflib.unified_diff(a.splitlines(), b.splitlines(), fromfile="a/" + f, tofile="b/" + f, lineterm=""))
+                lines2 = [x[:80] for x in d[:8]]
+                diffs.append(f + ": " + "; ".join(lines2))
+                if len(diffs) >= 2:
+                    break
+        return diffs
+
+    def _retry_loop(self, task):
+        baseline = self._snapshot_files()
+        prev_files = baseline
+        retry_log = []
+
         while task.retries < task.max_retries:
             if task.retries > 0:
-                ctx = ["retry " + str(task.retries) + "/" + str(task.max_retries)]
-                if task.feedback:
-                    ctx.append("error: " + task.feedback[:200])
-                if prev_result and prev_result != task.result:
-                    ctx.append("last_diff: " + self._diff_str(prev_result, task.result)[:300])
-                base = task.description.split("[retry]")[0]
-                task.description = base + "[retry] " + " | ".join(ctx)
+                curr_files = self._snapshot_files()
+                diffs = self._diff_files(prev_files, curr_files)
+                diff_str = "; ".join([d[:80] for d in diffs]) if diffs else "no change"
+                failure = task.feedback[:200] if task.feedback else "unknown"
+
+                entry = "[retry " + str(task.retries) + "] changed: " + diff_str[:120] + "\n  failure: " + failure[:120]
+                retry_log.append(entry)
+
+                task.description += "\n[history]\n" + "\n".join(retry_log[-4:])
+
+                # same error twice on same location -> escalate
+                if len(retry_log) >= 2:
+                    pf = retry_log[-2].split("failure:")[1].strip() if "failure:" in retry_log[-2] else ""
+                    cf = failure
+                    if pf and pf[:60] == cf[:60]:
+                        task.feedback = "same_error_twice: " + pf[:100]
+                        return self._escalate(task)
+
+                prev_files = curr_files
+
             if self._execute_task(task):
                 return True
-            prev_result = task.result[:500] if task.result else ""
             task.retries += 1
             task.status = TaskStatus.RETRY
-            print(f"  [{task.name}] retry {task.retries}/{task.max_retries}")
             time.sleep(1)
+
         task.status = TaskStatus.FAILED
         self._escalate(task)
         return False
 
-    def _diff_str(self, a: str, b: str) -> str:
-        if a == b:
-            return "unchanged"
-        import difflib
-        d = list(difflib.unified_diff(a.splitlines(), b.splitlines(), lineterm=""))
-        return "\n".join(d[:20]) if d else "no diff"
-
-    def _escalate(self, task: ProjectTask):
-        import json
-        import os
+    def _escalate(self, task):
         dump = {"task": task.name, "description": task.description[:200],
                 "retries": task.retries, "last_error": task.feedback[:300]}
         os.makedirs("build", exist_ok=True)
@@ -242,71 +186,41 @@ class ProjectOrchestrator:
         print("  >>> saved: " + fname)
         print()
 
-    def run(self, spec: str, workspace: str = '.') -> ProjectResult:
-        """运行完整项目"""
-        print(f'\n{"=" * 50}')
-        print(f'  项目: {spec[:60]}')
-        print(f'{"=" * 50}\n')
+    def _topological_order(self, tasks):
+        name_to_task = {t.name: t for t in tasks}
+        visited = set()
+        order = []
+        def dfs(name):
+            if name in visited: return
+            visited.add(name)
+            t = name_to_task.get(name)
+            if t:
+                for dep in t.depends_on:
+                    if dep in name_to_task: dfs(dep)
+                order.append(t)
+        for t in tasks:
+            dfs(t.name)
+        return order
 
-        # Step 1: 分解
-        print('[1/4] 任务分解...')
+    def run(self, spec, workspace="."):
+        print("\n" + "=" * 50 + "\n  Project: " + spec[:60] + "\n" + "=" * 50 + "\n")
+        print("[1/4] Decompose...")
         tasks = self._llm_decompose(spec)
         ordered = self._topological_order(tasks)
-        print(f'      拆为 {len(ordered)} 个子任务\n')
-
-        # Step 2: 执行
-        print('[2/4] 执行任务...')
-        failed_count = 0
+        print("      " + str(len(ordered)) + " sub-tasks\n")
+        print("[2/4] Execute...")
+        failed = 0
         for task in ordered:
             ok = self._retry_loop(task)
-            status = 'OK' if ok else 'FAIL'
-            print(f'  {status} {task.name} ({task.status.value})')
+            print("  " + ("OK" if ok else "FAIL") + " " + task.name)
             if not ok:
-                failed_count += 1
-                if failed_count >= 3:
-                    print(f'\n  ⚠ 连续 {failed_count} 个任务失败，暂停')
+                failed += 1
+                if failed >= 3:
+                    print("\n  Too many failures, stopping")
                     break
-
-        # Step 3: 验证
-        print('\n[3/4] 验证...')
-        all_pass = all(t.status == TaskStatus.DONE for t in tasks)
-        skipped = [t for t in tasks if t.status in (TaskStatus.FAILED, TaskStatus.SKIPPED)]
-
-        # Step 4: 报告
-        print('[4/4] 生成报告...')
-        summary_lines = [
-            f'项目: {spec}',
-            f'任务: {len(tasks)} 个 ({len([t for t in tasks if t.status == TaskStatus.DONE])} 完成, {len(skipped)} 跳过/失败)',
-            f'重试: {sum(t.retries for t in tasks)} 次',
-        ]
-        if self.errors:
-            summary_lines.append(f'错误: {len(self.errors)} 个')
-            for e in self.errors[:3]:
-                summary_lines.append(f'  - {e[:200]}')
-
-        summary = '\n'.join(summary_lines)
-        print(f'\n{summary}\n')
-
-        return ProjectResult(success=all_pass, tasks=tasks, summary=summary)
-
-
-# ═══════════════════════════════════════════════
-# 便捷入口
-# ═══════════════════════════════════════════════
-
-
-def run_project(spec: str) -> ProjectResult:
-    """一行命令运行项目"""
-    orch = ProjectOrchestrator(
-        tools={
-            'run_test': lambda _: subprocess.run(
-                ['python', '-X', 'utf8', '-m', 'pytest', 'tests/', '-q'],
-                capture_output=True,
-                text=True,
-                timeout=60,
-            ).stdout[:500],
-            'write_file': lambda desc: f'任务描述: {desc} (需 LLM 生成代码)',
-            'read_file': lambda path: open(path).read()[:2000] if os.path.exists(path) else '',
-        }
-    )
-    return orch.run(spec)
+        print("\n[3/4] Verify...")
+        all_ok = all(t.status == TaskStatus.DONE for t in tasks)
+        print("[4/4] Report...")
+        summary = "Project: " + spec + "\nTasks: " + str(len(tasks)) + " (" + str(sum(1 for t in tasks if t.status == TaskStatus.DONE)) + " done)"
+        print(summary + "\n")
+        return ProjectResult(success=all_ok, tasks=tasks, summary=summary)
