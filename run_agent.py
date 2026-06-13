@@ -124,7 +124,11 @@ def load_api_key():
     return ''
 
 
+_agent_hooks_registered = False
+
 def init_evaluator(api_key):
+    """幂等初始化: 第二次调用只重建evaluator,跳过重复注册"""
+    global _agent_hooks_registered
     if not api_key or '你的key' in api_key:
         print('错误: 请设置环境变量 SANYAN_API_KEY 或在 agent_policy.san 中填入有效 API 密钥', file=sys.stderr)
         print('      当前值包含占位符 "sk-你的key"，请替换为实际密钥', file=sys.stderr)
@@ -140,7 +144,9 @@ def init_evaluator(api_key):
     _sandbox = SanyanEvaluator(max_loop_steps=100000)
     evaluator.set_var('_sandbox', _sandbox)
 
-    # 注册 write_code 工具所需的 Python 函数
+    # 注册 write_code 工具所需的 Python 函数（仅首次）
+    if _agent_hooks_registered:
+        return evaluator
     from ops.registry import register as reg_op
 
     def _new_evaluator(e, args):
@@ -912,6 +918,7 @@ def init_evaluator(api_key):
     ast, _ = parse_code(src)
     fixed = [s for s in ast[1:] if not (isinstance(s, list) and s[0] == 'export')]
     evaluator.eval(['do'] + fixed)
+    _agent_hooks_registered = True
     return evaluator
 
 
