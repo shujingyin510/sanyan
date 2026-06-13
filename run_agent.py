@@ -262,6 +262,8 @@ def init_evaluator(api_key):
             sub_api_key = api_key
 
             # 加载 agent.san + 最小工具集到子求值器
+            # 注册中文别名（Agent需要）
+            _register_aliases()
             # 注册子Agent基础工具
             from ops.registry import register as _reg_op
 
