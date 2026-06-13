@@ -198,12 +198,12 @@ def disasm(data: bytes, show_hex: bool = False) -> str:
             target = addr + 3 + val
             hex_bytes = ' '.join(f'{b:02X}' for b in code[i : i + 3])
             if show_hex:
-                if op in (JMP, JZ, JNZ):
+                if op in (JMP, JZ, JNZ, CALL):
                     lines.append(f'  {addr:04X}: {hex_bytes}     {mnemonic} {val:+d} → {target:04X}')
                 else:
                     lines.append(f'  {addr:04X}: {hex_bytes}     {mnemonic} {val} (→ {target:04X})')
             else:
-                if op in (JMP, JZ, JNZ):
+                if op in (JMP, JZ, JNZ, CALL):
                     lines.append(f'  {addr:04X}: {mnemonic} {val:+d} → {target:04X}')
                 else:
                     lines.append(f'  {addr:04X}: {mnemonic} {val} → {target:04X}')

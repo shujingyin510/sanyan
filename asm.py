@@ -241,7 +241,11 @@ class Assembler:
                 # 暂填 0，回填
                 pos = self.addr
                 self.emit32(0)
-                self.refs.append(LabelRef(pos, operand, lambda a, t: self._fixup32(a, t)))
+                self.refs.append(LabelRef(pos, operand, lambda a, t: self._fixup_abs32(a, t)))
+            elif mnemonic in ('CALL',):
+                pos = self.addr
+                self.emit16(0)
+                self.refs.append(LabelRef(pos, operand, lambda a, t: self._fixup_abs16(a, t)))
             else:
                 pos = self.addr
                 self.emit16(0)
@@ -271,6 +275,22 @@ class Assembler:
         offset = target - (addr + 2)
         self.code[addr] = offset & 0xFF
         self.code[addr + 1] = (offset >> 8) & 0xFF
+
+    def _fixup_abs16(self, addr: int, label: str):
+        if label not in self.labels:
+            raise AssemblerError(f'未定义标签: {label}')
+        val = self.labels[label]
+        self.code[addr] = val & 0xFF
+        self.code[addr + 1] = (val >> 8) & 0xFF
+
+    def _fixup_abs32(self, addr: int, label: str):
+        if label not in self.labels:
+            raise AssemblerError(f'未定义标签: {label}')
+        val = self.labels[label]
+        self.code[addr] = val & 0xFF
+        self.code[addr + 1] = (val >> 8) & 0xFF
+        self.code[addr + 2] = (val >> 16) & 0xFF
+        self.code[addr + 3] = (val >> 24) & 0xFF
 
     def _fixup32(self, addr: int, label: str):
         if label not in self.labels:
