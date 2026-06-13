@@ -263,29 +263,22 @@ def _spawn_sub_agent(params):
         elif line.startswith('name='): name = line[5:]
     if not task: return 'missing task='
     if name in _agent_registry and _agent_registry[name].get('status') == 'running':
-        return f'Agent {name} running'
+        return 'Agent ' + name + ' running'
     _agent_registry[name] = {'status': 'running', 'task': task, 'result': None}
     try:
-        import os
-        api_key = os.environ.get('SANYAN_API_KEY', '')
-        from evaluator import SanyanEvaluator
-        from ops.file_ops import clear_cache
-        clear_cache()
-        sub_ev = SanyanEvaluator(max_loop_steps=300000)
-        os.environ['SANYAN_API_KEY'] = api_key
-        agent_src = open('ternary_agent/agent.san', encoding='utf-8').read()
-        from preprocess import preprocess_includes
-        agent_src = preprocess_includes(agent_src)
-        if api_key and '你的key' not in api_key:
-            agent_src = agent_src.replace('sk-你的key', api_key)
-        sub_ev.set_var('_干跑模式', True)
-        sub_ev.eval(agent_src)
-        result = sub_ev.eval(['ask', task])
+        from evaluator import SanyanEvaluator; from ops.file_ops import clear_cache
+        from lexer import tokenize; from parser import parse; import io; import sys
+        clear_cache(); sub_ev = SanyanEvaluator(max_loop_steps=200000)
+        old = sys.stdout; sys.stdout = io.StringIO()
+        tokens = tokenize(task); ast = parse(tokens)
+        result = sub_ev.eval(ast) if ast else 'parse failed'
+        out = sys.stdout.getvalue(); sys.stdout = old
+        out = out.strip() if out.strip() else str(result)
         _agent_registry[name] = {'status': 'done', 'task': task, 'result': str(result)}
-        return f'[Agent {name}] {result}'
+        return '[Agent ' + name + '] ' + out[:500]
     except Exception as e:
         _agent_registry[name] = {'status': 'error', 'task': task, 'result': str(e)}
-        return f'[Agent {name}] error: {e}'
+        return '[Agent ' + name + '] error: ' + str(e)[:200]
 
 def _agent_message(params):
     to = ''; msg = ''
