@@ -293,6 +293,7 @@ class AgentRuntime:
         """执行假设的工具链 — 每步调 LLM 获取参数"""
         run_id = self.resource.replay_engine.create_run(task)
         ctx_str = ctx.build()
+        llm_fail_count = 0
         for step in range(len(hypothesis.tools_used)):
             if not self.resource.check_tokens(500):
                 print('  [预算耗尽]')
@@ -300,6 +301,13 @@ class AgentRuntime:
             # 调 LLM 获取工具+参数（如 _run_legacy 中的做法）
             raw = self._llm_call(ctx_str)
             tool_name, params = self._parse_tool(raw)
+            # LLM 调用失败 → 计数，连续3次退出
+            if raw.startswith('error|') and 'LLM调用失败' in raw:
+                llm_fail_count += 1
+                print(f'  [LLM失败 {llm_fail_count}/3]')
+                if llm_fail_count >= 3:
+                    break
+                continue
             if not tool_name or tool_name not in self.tools:
                 print(f'  [解析失败] raw={str(raw)[:60]}')
                 continue
@@ -674,7 +682,7 @@ class AgentRuntime:
             if self._fail_closed(tool, params, dry_run):
                 continue
             if self._constraint_violation(tool):
-                continue
+                break
             result = ''
             if tool in self.tools:
                 try:
