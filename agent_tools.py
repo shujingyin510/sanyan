@@ -283,19 +283,24 @@ def _agent_cleanup(max_age=300):
 
 
 def _spawn_sub_agent(params):
-    task = ''
-    name = 'sub'
+    task = ''; name = 'sub'
     for line in (params or '').splitlines():
         line = line.strip()
-        if line.startswith('task='):
-            task = line[5:]
-        elif line.startswith('name='):
-            name = line[5:]
-    if not task:
-        return 'missing task='
-    if name in _agent_registry and _agent_registry[name].get('status') == 'running':
-        return 'Agent ' + name + ' running'
-    _agent_registry[name] = {'status': 'running', 'task': task, 'result': None, 'start_time': _time.time()}
+        if line.startswith('task='): task = line[5:]
+        elif line.startswith('name='): name = line[5:]
+    if not task: return 'missing task='
+    if name in _agent_registry:
+        prev = _agent_registry[name]
+        if prev.get('llm_rounds', 0) >= prev.get('max_rounds', 4):
+            prev['llm_rounds'] = 0; prev['status'] = 'restarting'
+            return '[Agent ' + name + '] LLM repeat>4, restart'
+        if prev.get('status') == 'running':
+            elapsed = _time.time() - prev.get('start_time', _time.time())
+            if elapsed > _AGENT_TIMEOUT:
+                prev['status'] = 'killed'
+                return '[Agent ' + name + '] timeout ' + str(int(elapsed)) + 's'
+            return 'Agent ' + name + ' running'
+    _agent_registry[name] = {'status': 'running', 'task': task, 'result': None, 'start_time': _time.time(), 'llm_rounds': 0, 'max_rounds': 4}
     try:
         from evaluator import SanyanEvaluator
         from ops.file_ops import clear_cache
@@ -303,24 +308,17 @@ def _spawn_sub_agent(params):
         from parser import parse
         import io
         import sys
-
-        clear_cache()
-        sub_ev = SanyanEvaluator(max_loop_steps=200000)
-        old = sys.stdout
-        sys.stdout = io.StringIO()
-        tokens = tokenize(task)
-        ast = parse(tokens)
+        clear_cache(); sub_ev = SanyanEvaluator(max_loop_steps=200000)
+        old = sys.stdout; sys.stdout = io.StringIO()
+        tokens = tokenize(task); ast = parse(tokens)
         result = sub_ev.eval(ast) if ast else 'parse failed'
-        out = sys.stdout.getvalue()
-        sys.stdout = old
+        out = sys.stdout.getvalue(); sys.stdout = old
         out = out.strip() if out.strip() else str(result)
-        _agent_registry[name] = {'status': 'done', 'task': task, 'result': str(result)}
+        _agent_registry[name] = {'status': 'done', 'task': task, 'result': str(result), 'llm_rounds': _agent_registry[name].get('llm_rounds', 0) + 1}
         return '[Agent ' + name + '] ' + out[:500]
     except Exception as e:
         _agent_registry[name] = {'status': 'error', 'task': task, 'result': str(e)}
         return '[Agent ' + name + '] error: ' + str(e)[:200]
-
-
 def _agent_message(params):
     to = ''
     msg = ''
