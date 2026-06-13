@@ -1,14 +1,15 @@
-"""sanyanc — 三言编译器驱动程序
+"""sanyanc — 三言编译器 + 包管理器
 
 用法:
-    python sanyanc.py input.san -o output.bin
-    python sanyanc.py input.san               # → input.bin
-    python sanyanc.py -x "输出(加(1,2))"      # 直接执行
+    python sanyanc.py input.san -o output.bin      # 编译
+    python sanyanc.py -x "输出(加(1,2))"             # 直接执行
+    python sanyanc.py input.san --run               # 编译+执行
 
-原理:
-    sugar.bin (解析器) + bytecode_compiler.bin (编译器) → .bin → VM 执行
-
-    agent 可以直接修改本文件——只有 50 行的胶水代码
+    python sanyanc.py install <包名>                 # 安装包
+    python sanyanc.py search <关键词>                # 搜索包
+    python sanyanc.py list                           # 列出已安装
+    python sanyanc.py info <包名>                    # 包详情
+    python sanyanc.py uninstall <包名>               # 卸载包
 """
 
 import os
@@ -146,8 +147,10 @@ def main():
         print(__doc__)
         sys.exit(1)
 
+    cmd = sys.argv[1]
+
     # -x 直接执行
-    if sys.argv[1] == '-x':
+    if cmd == '-x':
         source = sys.argv[2]
         with tempfile.TemporaryDirectory() as td:
             out = os.path.join(td, 'out.bin')
@@ -155,8 +158,13 @@ def main():
             run_bin(out)
         return
 
+    # 包管理命令
+    if cmd in ('install', 'search', 'list', 'info', 'uninstall'):
+        _pkg_cmd(cmd, sys.argv[2:])
+        return
+
     # 编译文件
-    input_path = sys.argv[1]
+    input_path = cmd
     output_path = None
     for i, arg in enumerate(sys.argv):
         if arg == '-o' and i + 1 < len(sys.argv):
@@ -166,7 +174,6 @@ def main():
         output_path = os.path.splitext(input_path)[0] + '.bin'
 
     if not os.path.exists(input_path):
-        # 可能是内联表达式
         compile_san(input_path, output_path)
     else:
         with open(input_path, 'r', encoding='utf-8') as f:
@@ -175,9 +182,55 @@ def main():
 
     print(f'[OK] {input_path} → {output_path}: {os.path.getsize(output_path)} 字节')
 
-    # --run 标志
     if '--run' in sys.argv:
         run_bin(output_path)
+
+
+def _pkg_cmd(cmd: str, args: list):
+    """包管理 CLI"""
+    from ops.package_ops import PackageOps
+    from evaluator import SanyanEvaluator
+
+    ev = SanyanEvaluator()
+
+    if cmd == 'install':
+        if not args:
+            print('用法: python sanyanc.py install <包名>')
+            sys.exit(1)
+        for name in args:
+            print(f'安装 {name}...')
+            try:
+                PackageOps.install(ev, [name])
+                print(f'  ✓ {name} 安装完成')
+            except Exception as e:
+                print(f'  ✗ {name}: {e}')
+
+    elif cmd == 'uninstall':
+        if not args:
+            print('用法: python sanyanc.py uninstall <包名>')
+            sys.exit(1)
+        for name in args:
+            try:
+                PackageOps.uninstall(ev, [name])
+                print(f'  ✓ {name} 已卸载')
+            except Exception as e:
+                print(f'  ✗ {name}: {e}')
+
+    elif cmd == 'search':
+        term = args[0] if args else ''
+        results = PackageOps.search(ev, [term]) if term else PackageOps.index_list(ev, [])
+        pass  # PackageOps already prints
+
+    elif cmd == 'list':
+        installed = PackageOps.list_packages(ev, [])
+        pass  # PackageOps already prints
+
+    elif cmd == 'info':
+        if not args:
+            print('用法: python sanyanc.py info <包名>')
+            sys.exit(1)
+        info = PackageOps.info(ev, [args[0]])
+        pass  # PackageOps already prints
 
 
 if __name__ == '__main__':
