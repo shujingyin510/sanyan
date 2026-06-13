@@ -115,7 +115,16 @@ class ProjectOrchestrator:
         task.status = TaskStatus.RUNNING
         print(f'  [{task.name}] 执行中...')
 
-        # 1. 根据工具类型执行
+        # 1. 通过子Agent执行
+        try:
+            from agent_tools import _spawn_sub_agent
+            agent_name = "proj_" + task.name.replace(" ", "_")[:20]
+            r = _spawn_sub_agent("name=" + agent_name + chr(10) + "task=" + task.description)
+            task.result = str(r)[:500]
+        except Exception as e:
+            task.result = "agent error: " + str(e)[:200]
+
+        # 2. 附加工具
         for tool in task.tools:
             if tool in self.tools:
                 try:
