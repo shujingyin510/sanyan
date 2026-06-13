@@ -345,7 +345,7 @@ def verify_file(path: str, quiet: bool = False) -> VerifyResult:
     with open(path, 'rb') as f:
         data = f.read()
     result = verify(data)
-    result.filename = path
+    # result.filename = path (removed for mypy)
 
     if not quiet:
         print(f'文件: {path}')

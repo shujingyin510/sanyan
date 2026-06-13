@@ -283,7 +283,7 @@ def disasm_file(path: str, show_hex: bool = False, brief: bool = False) -> str:
         # 统计 opcode 分布
         from collections import Counter
 
-        counter = Counter()
+        counter: 'Counter[str]' = Counter()
         code = data[10 : 10 + sz]
         i = 0
         while i < len(code):
