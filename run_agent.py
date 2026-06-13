@@ -693,6 +693,29 @@ def init_evaluator(api_key):
     reg_op('列文件', _list_files)
     reg_op('搜内容', _search_content)
     reg_op('列文件钩子', _list_files_direct)
+    def _run_assembly_hook(e, args):
+        "write assembly and run"
+        source = str(e.eval(args[0])) if args else ''
+        if not source:
+            return 'provide assembly source'
+        import os, io, sys
+        os.makedirs('build', exist_ok=True)
+        try:
+            from asm import Assembler
+            a = Assembler()
+            data = a.build(source)
+            out_path = 'build/agent_asm.bin'
+            with open(out_path, 'wb') as f: f.write(data)
+            result = f'asm OK: {len(data)}B, {a.var_count} vars'
+            from vm import VM
+            old = sys.stdout; sys.stdout = io.StringIO()
+            VM.from_bin(out_path).run()
+            out = sys.stdout.getvalue(); sys.stdout = old
+            if out.strip():
+                result += ' output: ' + out.strip()
+        except Exception as ex:
+            result = f'asm FAIL: {ex}'
+        return result
     reg_op('读文件钩子', _read_file_direct)
     reg_op('写文件钩子', _write_file_direct)
     reg_op('替换写回', _replace_in_file)
@@ -707,6 +730,7 @@ def init_evaluator(api_key):
     reg_op('清理JSON', _clean_json)
     reg_op('分析文件', _analyze_file)
     reg_op('查找符号', _find_symbol)
+    reg_op('运行汇编', _run_assembly_hook)
 
     agent_path = os.path.join('ternary_agent', 'agent.san')
     src = open(agent_path, encoding='utf-8').read()
