@@ -186,12 +186,12 @@ class Hypothesis:
         'last_updated',
     )
 
-    def __init__(self, hid: int, description: str, estimated_cost: float = 0):
+    def __init__(self, hid: int, description: str, estimated_cost: float = 0, tools_used: List[str] = None):
         self.id = hid
         self.description = description
         self.confidence = 0.5
         self.trit = 0
-        self.tools_used: List[str] = []
+        self.tools_used: List[str] = tools_used if tools_used is not None else []
         self.evidence: List[Dict[str, Any]] = []
         self.status = 'pending'
         self.estimated_cost = estimated_cost
@@ -345,7 +345,8 @@ class HypothesisGenerator:
         return valid or plans
 
     def _build_hypothesis(self, plan: Dict) -> Hypothesis:
-        h = Hypothesis(self._next_id, plan['description'], estimated_cost=len(plan.get('tools', [])))
+        tools = plan.get('tools', [])
+        h = Hypothesis(self._next_id, plan['description'], estimated_cost=len(tools), tools_used=tools)
         self._next_id += 1
         return h
 

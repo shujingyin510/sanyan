@@ -1,5 +1,16 @@
 {
-  "tool_stats": {},
-  "module_stats": {},
+  "tool_stats": {
+    "analyze": {
+      "success": 0,
+      "fail": 1,
+      "last_used": 1781351260.798754
+    }
+  },
+  "module_stats": {
+    "analyze": {
+      "error_count": 1,
+      "total_count": 1
+    }
+  },
   "lambda": 0.1
 }
