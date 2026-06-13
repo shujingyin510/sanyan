@@ -271,7 +271,9 @@ class AgentRuntime:
                 }
 
         # Phase 1: 生成假设 + 锦标赛
-        hypotheses = self.hypothesis_generator.generate(self._llm_call, task, ctx, self.resource)
+        hypotheses = self.hypothesis_generator.generate(
+            lambda p: self._llm_call(p, override_system_prompt=''),
+            task, ctx, self.resource)
         self.resource.metrics.total_hypotheses = len(hypotheses)
         best_hypothesis = None
         if len(hypotheses) > 1:
@@ -512,7 +514,7 @@ class AgentRuntime:
                 return True
         return False
 
-    def _llm_call(self, prompt):
+    def _llm_call(self, prompt, override_system_prompt=None):
         """LLM 调用：多提供商 + 重试 + 超时 + P6 Prompt 缓存"""
         import urllib.request as _req
         import urllib.error as _err
@@ -533,7 +535,7 @@ class AgentRuntime:
         except Exception:
             pass
 
-        # P6: 稳定化 system_prompt — 不含时间戳等可变内容
+        # P6: 稳定化 system_prompt — 不含时间戳等可变内容; 支持覆盖
         if self._system_prompt is None:
             self._system_prompt = (
                 '你是三言(Sanyan)编程助手，一个中文DSL语言的工具型Agent。\n'
@@ -569,7 +571,7 @@ class AgentRuntime:
                 '  用户: 介绍一下你自己\n'
                 '  done|我是三言编程助手，基于DeepSeek v4，帮你分析和修改三言代码。'
             )
-        sys_msg = self._system_prompt
+        sys_msg = override_system_prompt if override_system_prompt is not None else self._system_prompt
 
         # Gemini 专用格式
         if provider and 'gemini' in str(provider).lower():

@@ -278,13 +278,37 @@ class HypothesisGenerator:
         hyps = self.diversity.filter(hyps)
         return hyps[:3]
 
+    _KNOWN_TOOLS = {
+        'analyze', 'find_symbol', 'read_file', 'search_code',
+        'replace_in_file', 'replace_all', 'write_file', 'list_files',
+        'run_test', 'git_diff', 'git_status', 'done',
+    }
+
     def _llm_generate(self, llm_fn, task, context, count) -> List[Dict]:
         """用 LLM 生成多个方案"""
         prompt = (
-            f'为以下任务生成{count}个不同的解决方案，每个方案一行，格式：方案描述 | 工具链(逗号分隔)\n'
+            f'你是三言编程助手，需要为以下任务设计{count}个不同的解法方案。\n'
+            f'每个方案一行，格式严格为：方案简述 | 工具1,工具2(逗号分隔)\n'
+            f'\n'
             f'任务: {task}\n'
-            f'可用工具: analyze, find_symbol, read_file, search_code, replace_in_file, write_file, run_test\n'
-            f'方案:'
+            f'\n'
+            f'可用工具(择需取用):\n'
+            f'  analyze(分析文件) find_symbol(查符号) read_file(读文件)\n'
+            f'  search_code(搜索) replace_in_file(替换) write_file(写入)\n'
+            f'  list_files(列文件) run_test(跑测试) git_diff(git差异)\n'
+            f'  done(直接回答)\n'
+            f'\n'
+            f'示例:\n'
+            f'  任务: 看看项目结构\n'
+            f'  浏览项目文件 | list_files\n'
+            f'\n'
+            f'  任务: 修复fib函数bug\n'
+            f'  定位并修复fib | read_file,replace_in_file,run_test\n'
+            f'\n'
+            f'  任务: 介绍一下自己\n'
+            f'  直接回答 | done\n'
+            f'\n'
+            f'现在请为任务"{task}"生成方案:'
         )
         try:
             raw = llm_fn(prompt)
@@ -295,7 +319,8 @@ class HypothesisGenerator:
                     continue
                 parts = line.split('|', 1)
                 desc = parts[0].strip()
-                tools = [t.strip() for t in parts[1].split(',') if t.strip()] if len(parts) > 1 else []
+                tool_strs = [t.strip() for t in parts[1].split(',') if t.strip()] if len(parts) > 1 else []
+                tools = [t for t in tool_strs if t in self._KNOWN_TOOLS]
                 if desc and tools:
                     plans.append({'description': desc, 'tools': tools})
             return plans[:count]
