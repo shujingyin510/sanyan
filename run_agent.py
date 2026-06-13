@@ -329,6 +329,23 @@ def init_evaluator(api_key):
                 out = sys.stdout.getvalue()
                 sys.stdout = old
 
+            # 置信度衰减检测
+            import re
+            confs = [float(m) for m in re.findall(r'信度[=:\uff1a]\s*([0-9.]+)', out)]
+            if len(confs) >= 2:
+                recent = confs[-3:]
+                drop = all(recent[i] >= recent[i+1] for i in range(len(recent)-1))
+                if drop and min(recent) < 0.35:
+                    _agent_registry[name] = {'status': 'capped', 'task': task,
+                        'result': 'confidence degraded: ' + str(recent), 'start_time': _time.time()}
+                    return '[Agent ' + name + '] confidence degraded ' + str(recent) + ', restart'
+
+            # 兜底: 轮次过多
+            rounds = re.findall(r'第\s*(\d+)\s*轮', out)
+            max_r = max([int(r) for r in rounds]) if rounds else 0
+            if max_r >= 6:
+                return '[Agent ' + name + '] round ' + str(max_r) + ', capped'
+
             result = out.strip()[:1000] if out.strip() else 'no output'
             _agent_registry[name] = {'status': 'done', 'task': task, 'result': result}
             return '[Agent ' + name + '] ' + result
