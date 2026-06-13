@@ -635,45 +635,47 @@ class AgentRuntime:
         return 'error|LLM调用失败(3次重试)'
 
     def _parse_tool(self, raw):
-        import re as _re
         import json as _json
-        raw = raw.strip().replace('---END---', '').strip('{}"\' ')
-        # 1. 优先 JSON: {"tool":"xxx","args":{...}}
-        m = _re.search(r'\{[^{}]*"tool"\s*:\s*"[^"]+"\s*[,}].*?\}', raw, _re.DOTALL)
-        if m:
-            try:
-                data = _json.loads(m.group())
-                tool = data.get('tool', '')
-                args = data.get('args', {})
-                # args 转回 pipe-separated string 兼容现有工具处理器
-                if isinstance(args, str):
-                    return tool, args
-                if isinstance(args, dict):
-                    # 按约定顺序取值: path/name/keyword > 其余
-                    ordered = []
-                    for key in ('path', 'name', 'keyword', 'content', 'answer', 'old', 'new', 'pattern', 'start', 'count', 'test_file'):
-                        if key in args:
-                            val = str(args[key])
-                            if key in ('old', 'new', 'content', 'answer'):
-                                ordered.append(val)
-                            else:
-                                ordered.append(val)
-                    if ordered:
-                        return tool, '|'.join(ordered)
-                    return tool, _json.dumps(args, ensure_ascii=False)
-            except (_json.JSONDecodeError, KeyError):
-                pass
-        # 2. 回退: pipe格式 tool|params
+        raw = raw.strip().replace('---END---', '').strip()
+        # 1: bracket-counting JSON extraction
+        start = raw.find('{')
+        if start >= 0:
+            depth = 0
+            for i in range(start, len(raw)):
+                if raw[i] == '{': depth += 1
+                elif raw[i] == '}':
+                    depth -= 1
+                    if depth == 0:
+                        candidate = raw[start:i + 1]
+                        try:
+                            data = _json.loads(candidate)
+                            tool = data.get('tool', '')
+                            args = data.get('args', {})
+                            if tool:
+                                if isinstance(args, str):
+                                    return tool, args
+                                if isinstance(args, dict):
+                                    ordered = []
+                                    for key in ('path', 'name', 'keyword', 'content', 'answer', 'old', 'new', 'pattern', 'start', 'count', 'test_file'):
+                                        if key in args:
+                                            ordered.append(str(args[key]))
+                                    if ordered:
+                                        return tool, '|'.join(ordered)
+                                    return tool, _json.dumps(args, ensure_ascii=False)
+                                return tool, ''
+                        except (_json.JSONDecodeError, KeyError):
+                            pass
+                        break
+        # 2: fallback pipe format tool|params
         if '|' in raw:
             parts = raw.split('|', 1)
             return parts[0].strip(), parts[1].strip() if len(parts) > 1 else ''
         if raw.startswith('done'):
             return 'done', raw.split('|', 1)[1] if '|' in raw else ''
-        # 3. 兜底: 关键词试探
-        if 'def' in raw or '函数' in raw or '结构' in raw:
+        # 3: keyword heuristic
+        if 'def' in raw or '\u51fd\u6570' in raw or '\u7ed3\u6784' in raw:
             return 'analyze', 'run_agent.py'
         return raw, ''
-
     def _extract_key(self, result):
         result_str = str(result)
         for marker in ['⚠', '符号 ']:
