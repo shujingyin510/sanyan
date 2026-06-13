@@ -256,11 +256,18 @@ def _git_status_direct():
 _agent_registry = {}
 _AGENT_TIMEOUT = 120
 _AGENT_MAX_RETRY = 2
+
+
 def _agent_force_recover(name):
     if name in _agent_registry:
-        _agent_registry[name] = {'status': 'killed', 'task': _agent_registry[name].get('task',''), 'result': 'force killed'}
+        _agent_registry[name] = {
+            'status': 'killed',
+            'task': _agent_registry[name].get('task', ''),
+            'result': 'force killed',
+        }
         return 'Agent ' + name + ' killed'
     return 'Agent ' + name + ' not found'
+
 
 def _agent_check_deadlock():
     stuck = []
@@ -273,34 +280,33 @@ def _agent_check_deadlock():
                 stuck.append(name)
     return 'stuck: ' + ', '.join(stuck) if stuck else 'all clear'
 
+
 def _agent_cleanup(max_age=300):
     now = _time.time()
     for name, info in list(_agent_registry.items()):
-        if now - info.get('start_time',0) > max_age:
+        if now - info.get('start_time', 0) > max_age:
             del _agent_registry[name]
     return 'ok'
 
 
-
 def _spawn_sub_agent(params):
-    task = ''; name = 'sub'
+    task = ''
+    name = 'sub'
     for line in (params or '').splitlines():
         line = line.strip()
-        if line.startswith('task='): task = line[5:]
-        elif line.startswith('name='): name = line[5:]
-    if not task: return 'missing task='
-    if name in _agent_registry:
-        prev = _agent_registry[name]
-        if prev.get('llm_rounds', 0) >= prev.get('max_rounds', 4):
-            prev['llm_rounds'] = 0; prev['status'] = 'restarting'
-            return '[Agent ' + name + '] LLM repeat>4, restart'
-        if prev.get('status') == 'running':
-            elapsed = _time.time() - prev.get('start_time', _time.time())
-            if elapsed > _AGENT_TIMEOUT:
-                prev['status'] = 'killed'
-                return '[Agent ' + name + '] timeout ' + str(int(elapsed)) + 's'
-            return 'Agent ' + name + ' running'
-    _agent_registry[name] = {'status': 'running', 'task': task, 'result': None, 'start_time': _time.time(), 'llm_rounds': 0, 'max_rounds': 4}
+        if line.startswith('task='):
+            task = line[5:]
+        elif line.startswith('name='):
+            name = line[5:]
+    if not task:
+        return 'missing task='
+    if name in _agent_registry and _agent_registry[name].get('status') == 'running':
+        elapsed = _time.time() - _agent_registry[name].get('start_time', _time.time())
+        if elapsed > _AGENT_TIMEOUT:
+            _agent_registry[name]['status'] = 'killed'
+            return '[Agent ' + name + '] timeout ' + str(int(elapsed)) + 's'
+        return 'Agent ' + name + ' running'
+    _agent_registry[name] = {'status': 'running', 'task': task, 'result': None, 'start_time': _time.time()}
     try:
         from evaluator import SanyanEvaluator
         from ops.file_ops import clear_cache
@@ -308,17 +314,24 @@ def _spawn_sub_agent(params):
         from parser import parse
         import io
         import sys
-        clear_cache(); sub_ev = SanyanEvaluator(max_loop_steps=200000)
-        old = sys.stdout; sys.stdout = io.StringIO()
-        tokens = tokenize(task); ast = parse(tokens)
+
+        clear_cache()
+        sub_ev = SanyanEvaluator(max_loop_steps=200000)
+        old = sys.stdout
+        sys.stdout = io.StringIO()
+        tokens = tokenize(task)
+        ast = parse(tokens)
         result = sub_ev.eval(ast) if ast else 'parse failed'
-        out = sys.stdout.getvalue(); sys.stdout = old
+        out = sys.stdout.getvalue()
+        sys.stdout = old
         out = out.strip() if out.strip() else str(result)
-        _agent_registry[name] = {'status': 'done', 'task': task, 'result': str(result), 'llm_rounds': _agent_registry[name].get('llm_rounds', 0) + 1}
+        _agent_registry[name] = {'status': 'done', 'task': task, 'result': str(result)}
         return '[Agent ' + name + '] ' + out[:500]
     except Exception as e:
         _agent_registry[name] = {'status': 'error', 'task': task, 'result': str(e)}
         return '[Agent ' + name + '] error: ' + str(e)[:200]
+
+
 def _agent_message(params):
     to = ''
     msg = ''
