@@ -176,10 +176,12 @@ class ProjectOrchestrator:
                         task.feedback = "same_error_twice: " + pf[:100]
                         return self._escalate(task)
 
-                # toggle detection: 被改文件内容回到了前一轮的状态
+                # toggle detection: 被改文件内容回到了原始状态 (相对于baseline)
                 curr_modified = set(d.split(":")[0] for d in diffs if ": " in d)
-                if len(modified_files) >= 1 and self._detect_toggle(prev_files, curr_files, set(modified_files[-1]) & curr_modified):
-                    task.feedback = "toggle_detected: " + str([f[:40] for f in curr_modified])[:200]
+                prev_modified = set(modified_files[-1]) if modified_files else set()
+                overlap = prev_modified & curr_modified
+                if overlap and self._detect_toggle(baseline, curr_files, overlap):
+                    task.feedback = "toggle_detected: " + str([f[:40] for f in overlap])[:200]
                     return self._escalate(task)
                 modified_files.append(list(curr_modified))
 
