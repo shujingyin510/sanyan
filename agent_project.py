@@ -47,6 +47,7 @@ class ProjectOrchestrator:
         self.tools = tools or {}
         self.memory = {}
         self.errors = []
+        self._experience = {}
 
     def _llm_decompose(self, spec):
         if self.rt and self.rt.decomposition_engine:
@@ -150,7 +151,53 @@ class ProjectOrchestrator:
                     return True
         return False
 
+    def _extract_key(self, task):
+        """从任务描述中提取经验索引关键词: 函数名/文件名/核心概念"""
+        desc = task.description + " " + task.name
+        words = re.findall(r'[a-zA-Z_]\w{2,}|[\u4e00-\u9fff]{2,}', desc)
+        return "_".join(words[:4]) if words else task.name[:40]
+
+    def _query_experience(self, task):
+        key = self._extract_key(task)
+        best = None
+        for k, v in self._experience.items():
+            if key in k or k in key or (len(set(key.split("_")) & set(k.split("_"))) >= 2):
+                if best is None or (v.get("done", 0) + v.get("failed", 0)) > (
+                    self._experience[best].get("done", 0) + self._experience[best].get("failed", 0)):
+                    best = k
+        if not best:
+            return ""
+        ex = self._experience[best]
+        hint = "[experience] similar task '" + best[:40] + "' "
+        if ex.get("done"):
+            hint += "succeeded " + str(ex["done"]) + "x (last: " + str(ex.get("last_ok", ""))[:60] + "). "
+        if ex.get("failed"):
+            hint += "FAILED " + str(ex["failed"]) + "x. "
+        if ex.get("last_err"):
+            hint += "Last error: " + str(ex["last_err"])[:80] + ". "
+        if ex.get("avoid"):
+            hint += "AVOID: " + ex["avoid"] + ". "
+        return hint
+
+    def _record_experience(self, task, ok):
+        key = self._extract_key(task)
+        if key not in self._experience:
+            self._experience[key] = {"done": 0, "failed": 0}
+        ex = self._experience[key]
+        if ok:
+            ex["done"] += 1
+            ex["last_ok"] = task.name
+        else:
+            ex["failed"] += 1
+            ex["last_err"] = task.feedback[:200]
+            if ex["failed"] >= 2:
+                ex["avoid"] = task.feedback[:100]
+
     def _retry_loop(self, task):
+        hint = self._query_experience(task)
+        if hint:
+            task.description = hint + "\n" + task.description
+
         baseline = self._snapshot_files()
         prev_files = baseline
         retry_log = []
@@ -174,7 +221,9 @@ class ProjectOrchestrator:
                     cf = failure
                     if pf and pf[:60] == cf[:60]:
                         task.feedback = "same_error_twice: " + pf[:100]
-                        return self._escalate(task)
+                        self._escalate(task)
+                        self._record_experience(task, False)
+                        return False
 
                 # toggle detection: 被改文件内容回到了原始状态 (相对于baseline)
                 curr_modified = set(d.split(":")[0] for d in diffs if ": " in d)
@@ -182,12 +231,15 @@ class ProjectOrchestrator:
                 overlap = prev_modified & curr_modified
                 if overlap and self._detect_toggle(baseline, curr_files, overlap):
                     task.feedback = "toggle_detected: " + str([f[:40] for f in overlap])[:200]
-                    return self._escalate(task)
+                    self._escalate(task)
+                    self._record_experience(task, False)
+                    return False
                 modified_files.append(list(curr_modified))
 
                 prev_files = curr_files
 
             if self._execute_task(task):
+                self._record_experience(task, True)
                 return True
             task.retries += 1
             task.status = TaskStatus.RETRY
@@ -195,6 +247,7 @@ class ProjectOrchestrator:
 
         task.status = TaskStatus.FAILED
         self._escalate(task)
+        self._record_experience(task, False)
         return False
 
     def _escalate(self, task):
