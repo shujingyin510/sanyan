@@ -6,23 +6,22 @@
 # 安装开发依赖
 pip install -e .[dev]
 
-# 运行全部测试（16 套）
+# 运行全部测试
+python -X utf8 preflight.py --quick     # 一键全量检查
+# 或单独运行：
 python tests/test_core.py          # 138 项
 python tests/test_commands.py      # 18 项
 python tests/test_parser.py        # 28 项
 python tests/test_ops.py           # 92 项
 python tests/test_ops_ext.py       # 64 项
-python tests/test_lsp.py           # 6 项
-python tests/test_package.py       # 6 项
-python tests/test_iot.py           # 25 项
-python tests/test_sugar_san.py     # 45 项
-python tests/test_llvmgen.py       # 53 项
-python tests/test_dp_python.py     # 10 项
-python tests/test_self_host.py     # 5 项
-python tests/test_sugar_self_host.py # 3 项
 python tests/test_vm.py            # 91 项
-python tests/test_c_vm.py          # 14 项（需 C 编译器）
+python tests/test_self_host.py     # 8 项（含 Level 2+3）
+python tests/test_sugar_self_host.py # 3 项
+python tests/test_sugar_san.py     # 45 项
 python tests/test_agent.py         # 31 项
+python tests/test_diff_fuzz.py     # 12 项
+python tests/test_effect_types.py  # 30 项
+python tests/test_disasm.py        # 6 项
 
 # 集成测试
 python tests/run_all.py
