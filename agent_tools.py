@@ -423,3 +423,66 @@ def _spawn_parallel(params):
     for i in sorted(errors.keys()):
         lines.append('worker' + str(i) + ' error: ' + errors[i][:100])
     return chr(10).join(lines) if lines else 'all timed out'
+
+def _vote_spawn(params):
+    """投票表决: task=任务 n=Agent数(默认3)
+    开 n 个子Agent独立决策, 融合结果返回 (值, 信度)
+    """
+    task = ''; n = 3
+    for line in (params or '').splitlines():
+        line = line.strip()
+        if line.startswith('task='): task = line[5:]
+        elif line.startswith('n='):
+            try: n = int(line[2:])
+            except: pass
+    if not task: return 'missing task='
+
+    results = []
+    for i in range(n):
+        name = 'voter_' + str(i)
+        r = _spawn_sub_agent('name=' + name + chr(10) + 'task=' + task)
+        results.append(r)
+
+    # 提取 (值, 信度) 从每个结果
+    import re
+    values = []
+    confs = []
+    for r in results:
+        # 解析 TritValue 输出: '=> 1（三进制: +）' or '=> -1（三进制: -）'
+        m = re.search(r'=>\s*(-?\d+)', str(r))
+        c = re.search(r'信度[=:：]\s*([0-9.]+)', str(r))
+        if m:
+            values.append(int(m.group(1)))
+            confs.append(float(c.group(1)) if c else 0.5)
+    if not values:
+        return 'vote failed: no valid results from ' + str(n) + ' agents'
+
+    # 融合: Kleene logic
+    has_pos = any(v == 1 for v in values)
+    has_neg = any(v == -1 for v in values)
+    has_maybe = any(v == 0 for v in values)
+
+    # 归一化: >0→真(1), <0→假(-1), =0→可能(0)
+    trit_values = []
+    for v in values:
+        if v > 0: trit_values.append(1)
+        elif v < 0: trit_values.append(-1)
+        else: trit_values.append(0)
+
+    has_pos = any(v == 1 for v in trit_values)
+    has_neg = any(v == -1 for v in trit_values)
+    has_maybe = any(v == 0 for v in trit_values)
+
+    if has_pos and not has_neg and not has_maybe:
+        fused = 1  # all agree true
+        conf = min(confs)
+    elif has_neg and not has_pos and not has_maybe:
+        fused = -1  # all agree false
+        conf = min(confs)
+    else:
+        fused = 0  # mixed or has maybe
+        conf = sum(confs) / len(confs) if confs else 0.5
+
+    trues = sum(1 for v in trit_values if v == 1)
+    falses = sum(1 for v in trit_values if v == -1)
+    return 'vote(' + str(n) + ' agents): ' + str(trues) + ' true, ' + str(falses) + ' false -> fused=' + str(fused) + ' conf=' + str(round(conf, 2))
