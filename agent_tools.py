@@ -332,7 +332,7 @@ def _spawn_parallel(params):
 
     def run_one(idx, task):
         try:
-            r = _spawn_sub_agent('task=' + task + ' name=worker' + str(idx))
+            r = _spawn_sub_agent('name=worker' + str(idx) + chr(10) + 'task=' + task)
             with lock:
                 results[idx] = r
         except Exception as e:
