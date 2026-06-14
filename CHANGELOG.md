@@ -2,6 +2,34 @@
 
 ---
 
+## [v3.31.0] — 2026-06-13
+
+### 新增
+- **LLM 模型升级**：`deepseek-chat`/`deepseek-reasoner` → `deepseek-v4-pro`，显式 `thinking` 模式 (`budget_tokens: 2048`)，`max_tokens`: 256 → 4096
+- **工具调用 JSON 化**：系统提示词输出 `{"tool":"...","args":{...}}`，解析器用括号计数 + `json.loads`，pipe 格式 `tool|params` 作为回退
+- **任务级经验库**：跨任务关键词匹配，失败 ≥2 次自动生成 AVOID 提示，下次同类任务注入警告
+- **结构化重试历史**：每轮记录 `[retry N] diff + 失败原因`，注入 task.description
+- **Toggle 检测**：连续两轮同一文件内容回到 baseline → 自动 escalate
+- **同位置连错检测**：连续两轮同文件同错误 → 自动 escalate
+- **愿景故事**：`愿景故事.md` 讲述项目由来（从 Setun 到三言）
+
+### 修复
+- **`Hypothesis` 构造函数**：`tools_used` 未传入计划工具，导致所有假设无工具执行
+- **`_execute_hypothesis`**：每步调 LLM 获取参数（对齐 `_run_legacy`），不再用 `ctx.build()` 当参数
+- **hypothesis 生成器**：独立系统提示词（不与工具格式冲突），`done` 加入已知工具白名单
+- **LLM 失败防死循环**：`_run_legacy` 约束超限 `continue` → `break`；`_execute_hypothesis` 连续 3 次失败退出
+- **系统提示词**：身份锚定 + 详细工具说明 + JSON 示例，解决身份幻觉
+- **mypy**：`tools_used` 类型 `Optional[List[str]]`，`_agent_registry` 类型注解
+- **preflight**：`self_host`/`sugar_self_host` 改查 stderr + returncode；路径检测 Windows 适配
+- **硬编码 API 密钥**：`village_config.san` 改用 `环境变量(SANYAN_API_KEY)`
+
+### 变更
+- **AGENTS.md 更新**：LLM 模型/JSON 格式/经验库/反馈闭环/文件结构
+- **全量 CRLF→LF**：所有 .py/.san/.c 文件换行符统一为 LF
+- **愿景故事移至根目录**：`docs/vision.md` → `愿景故事.md`
+
+---
+
 ## [v3.30.0] — 2026-06-12
 
 ### 新增
