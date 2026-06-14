@@ -1130,6 +1130,9 @@ from agent_tools import (
     _run_test_direct,
     _git_diff_direct,
     _git_status_direct,
+    _git_stash_direct,
+    _git_reset_hard_direct,
+    _git_commit_auto_direct,
 )
 # ======  End AgentRuntime imports ======
 
@@ -1208,6 +1211,9 @@ def main():
         ('run_test', lambda p, d: _run_test_direct(p)),
         ('git_diff', lambda p, d: _git_diff_direct()),
         ('git_status', lambda p, d: _git_status_direct()),
+        ('git_stash', lambda p, d: _git_stash_direct()),
+        ('git_reset_hard', lambda p, d: _git_reset_hard_direct()),
+        ('git_commit_auto', lambda p, d: _git_commit_auto_direct(p)),
         ('done', lambda p, d: p if p else '完成'),
     ]:
         rt.register(name, func)

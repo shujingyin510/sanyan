@@ -290,6 +290,9 @@ class HypothesisGenerator:
         'run_test',
         'git_diff',
         'git_status',
+        'git_stash',
+        'git_reset_hard',
+        'git_commit_auto',
         'done',
     }
 
@@ -304,8 +307,9 @@ class HypothesisGenerator:
             f'可用工具(择需取用):\n'
             f'  analyze(分析文件) find_symbol(查符号) read_file(读文件)\n'
             f'  search_code(搜索) replace_in_file(替换) write_file(写入)\n'
-            f'  list_files(列文件) run_test(跑测试) git_diff(git差异)\n'
-            f'  done(直接回答)\n'
+            f'  list_files(列文件) run_test(跑测试)\n'
+            f'  git_diff(git差异) git_status(git状态) git_stash(保存现场)\n'
+            f'  git_reset_hard(回退) git_commit_auto(自动提交) done(直接回答)\n'
             f'\n'
             f'示例:\n'
             f'  任务: 看看项目结构\n'

@@ -252,6 +252,31 @@ def _git_status_direct():
         return 'git错误'
 
 
+def _git_stash_direct():
+    try:
+        r = _sp.run(['git', 'stash', '-m', 'agent自动保存现场'], capture_output=True, text=True, timeout=10)
+        return r.stdout.strip() or r.stderr.strip() or '已stash'
+    except Exception:
+        return 'git stash错误'
+
+
+def _git_reset_hard_direct():
+    try:
+        r = _sp.run(['git', 'reset', '--hard', 'HEAD~1'], capture_output=True, text=True, timeout=10)
+        return r.stdout.strip() or r.stderr.strip() or '已reset'
+    except Exception:
+        return 'git reset错误'
+
+
+def _git_commit_auto_direct(params):
+    msg = (params or '').strip() or 'agent自动提交'
+    try:
+        r = _sp.run(['git', 'commit', '-am', msg], capture_output=True, text=True, timeout=15)
+        return r.stdout.strip() or r.stderr.strip() or f'已提交: {msg}'
+    except Exception:
+        return 'git commit错误'
+
+
 # Multi-agent tools
 _agent_registry: dict[str, dict] = {}
 _AGENT_TIMEOUT = 30  # 可被 agent_policy.san 中 Agent超时秒数 覆盖
