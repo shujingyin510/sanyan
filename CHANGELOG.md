@@ -2,6 +2,22 @@
 
 ---
 
+## [v3.32.0] — 2026-06-14
+
+### 新增
+- **Agent 自主闭环**：`auto_verify.py` 自主循环脚本（提交→全量测试→通过自动commit/失败回退），三条路径实测通过
+- **git 工具扩展**：`git_stash`（保存现场）、`git_reset_hard`（回退提交）、`git_commit_auto`（自动提交）注册到 Agent 工具集
+- **post-commit hook**：`.git/hooks/post-commit` + `post-commit.bat`，检测代码变更自动触发验证
+
+### 修复
+- **md 文件全面审阅**：33 个 .md 文件逐行检查，修复 8 处过时内容（版本号 v3.29→v3.31、模型名 deepseek-chat→v4-pro、roadmap 已实现项标 ✅、API 密钥路径、README 目录树）
+- **mypy 类型**：`tools_used` `Optional[List[str]]`、`_agent_registry` 类型注解
+
+### 变更
+- **CHANGELOG**：补全 v3.31.0（28 项）和 v3.32.0
+
+---
+
 ## [v3.31.0] — 2026-06-13
 
 ### 新增
@@ -12,7 +28,6 @@
 - **Toggle 检测**：连续两轮同一文件内容回到 baseline → 自动 escalate
 - **同位置连错检测**：连续两轮同文件同错误 → 自动 escalate
 - **愿景故事**：`愿景故事.md` 讲述项目由来（从 Setun 到三言）
-- **Agent 自主闭环 v1**：`auto_verify.py` 提交→全量测试→通过自动commit/失败回退；新增 `git_stash`/`git_reset_hard`/`git_commit_auto` 工具；`.git/hooks/post-commit` 自动触发
 
 ### 修复
 - **`Hypothesis` 构造函数**：`tools_used` 未传入计划工具，导致所有假设无工具执行
