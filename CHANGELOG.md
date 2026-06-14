@@ -12,6 +12,7 @@
 - **Toggle 检测**：连续两轮同一文件内容回到 baseline → 自动 escalate
 - **同位置连错检测**：连续两轮同文件同错误 → 自动 escalate
 - **愿景故事**：`愿景故事.md` 讲述项目由来（从 Setun 到三言）
+- **Agent 自主闭环 v1**：`auto_verify.py` 提交→全量测试→通过自动commit/失败回退；新增 `git_stash`/`git_reset_hard`/`git_commit_auto` 工具；`.git/hooks/post-commit` 自动触发
 
 ### 修复
 - **`Hypothesis` 构造函数**：`tools_used` 未传入计划工具，导致所有假设无工具执行
