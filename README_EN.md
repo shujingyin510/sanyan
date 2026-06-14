@@ -1,18 +1,11 @@
-# Tri-State Cognitive Framework Sanyan v3.31.0
+# Tri-State Cognitive Framework Sanyan v3.32.0
 
 [![VS Code Extension](https://img.shields.io/badge/VS%20Code-Syntax%20Highlight-%23007ACC?logo=visualstudiocode)](sanyan-vscode/README.md)
 [![CI](https://github.com/shujingyin510/sanyan/actions/workflows/test.yml/badge.svg)](https://github.com/shujingyin510/sanyan/actions)
 
-> **A cognitive computing framework for uncertainty-oriented decision making.** The real world isn't binary — sensors glitch, users hesitate, code breaks. The Sanyan framework uses Kleene logic × Bayesian confidence × safety gating to let programs naturally express, propagate, and accumulate "not sure yet" — deferring decision until evidence is sufficient.
+> **One person. Six weeks. A compiler, a VM, a cognitive runtime, and an agent framework — built from scratch.** A cognitive computing framework for uncertainty-oriented decision making. The real world isn't binary — sensors glitch, users hesitate, code breaks. The Sanyan framework uses Kleene logic × Bayesian confidence × safety gating to let programs naturally express, propagate, and accumulate "not sure yet" — deferring decision until evidence is sufficient.
 
 [中文版](README.md)
-
----
-
-## What is Sanyan?
-
-Sanyan = **Ternary Language (DSL)** + **Ternary Engine (TernaryEngine)** + **Ternary Applications (Agent / IoT / Village)**.
-The language is the interface — the core is the Kleene three-value logic propagation + Bayesian confidence decay + protection gating decision engine.
 
 ---
 
@@ -24,7 +17,14 @@ In 2024, while building a smart home system on STM32, I noticed every sensor was
 
 **What if a programming language natively supported a third state?**
 
-That's how Sanyan was born.
+That's how Sanyan was born. From May 2026 to now — six weeks, one person — a full compiler, VM, cognitive runtime, and agent framework. What once required a team months now took one person weeks. AI helped write a lot of code, but the direction, the architecture, the judgment calls — the things AI can't figure out on its own — those were human.
+
+---
+
+## What is Sanyan?
+
+Sanyan = **Ternary Language (DSL)** + **Ternary Engine (TernaryEngine)** + **Ternary Applications (Agent / IoT / Village)**.
+The language is the interface — the core is the Kleene three-value logic propagation + Bayesian confidence decay + protection gating decision engine.
 
 ---
 
