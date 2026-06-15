@@ -1,4 +1,3 @@
-import sys
 
 """进化系统 v2 — Patch DSL + Mutation Budget + 三态评分 + Tournament + Memory
 
@@ -16,13 +15,13 @@ import sys
     P48: CandidateTournament — 候选锦标赛
     P49: EvolutionMemory — 进化历史库
 """
+import sys
 
 import os
 import json
 import sqlite3
 import time
 import urllib.request as _urllib
-import urllib.error as _urlerr
 from enum import Enum
 from typing import Dict, List, Tuple, Optional
 
@@ -976,8 +975,8 @@ class AgentCodeModifier:
             s = start + offset
             if s < 0 or s + len(before_lines) > len(lines):
                 continue
-            actual_lines = [l.strip() for l in lines[s : s + len(before_lines)]]
-            expected_lines_stripped = [l.strip() for l in before_lines]
+            actual_lines = [ln.strip() for ln in lines[s : s + len(before_lines)]]
+            expected_lines_stripped = [ln.strip() for ln in before_lines]
             score = sum(1 for a, e in zip(actual_lines, expected_lines_stripped) if a == e)
             if score > best_score and score == len(before_lines):
                 best_score = score

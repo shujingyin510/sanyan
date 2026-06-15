@@ -1,4 +1,3 @@
-import sys
 
 """约束进化系统 — 第3层：系统级自我进化（受限）
 
@@ -14,6 +13,7 @@ import sys
     P43: MultiObjectiveEvaluator — 多目标评估器（综合得分）
     P44: SelfHostVerifier — 自举验证器（不动点验证）
 """
+import sys
 
 import os
 import subprocess as sp
