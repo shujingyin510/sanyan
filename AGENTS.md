@@ -18,15 +18,21 @@ ruff check . && ruff format --check . && mypy . && python -X utf8 preflight.py -
 | 等级 | 触发条件 | 行为 |
 |------|------|------|
 | 🚨 P0 | 用户直接指令 | 立即执行，其他事暂停 |
+| 🚨 P0 | git commit / push | **必须用户明确要求**，禁止自行决定 |
 | 🚨 P0 | CI 红灯 / bug 报错 | 立即修，修完跑 preflight 绿了再继续 |
+| 🚨 P0 | 不确定需求 | 先问，不要猜 |
+| 🚨 P0 | 不确定文件用途 | 先搜索引用关系 |
+| 🚨 P0 | 不确定修改影响 | 先分析再修改 |
 | 🔴 P1 | 写完任何代码 | 先跑 `ruff check . && ruff format --check . && mypy .` |
 | 🔴 P1 | 推送到 GitHub 前 | 必跑 `python -X utf8 preflight.py --quick`，绿了才能 push |
 | 🔴 P1 | 推送前 | 检查 CHANGELOG 是否更新、版本号是否一致（README/manual/llvm 等） |
-| 🔴 P1 | CHANGELOG | 功能写完就写条目，不要攒到一天结束；同一天的多次改动合并为一个版本号 |
+| 🔴 P1 | CHANGELOG | 记录原因，不只记录结果；功能写完就写，同日合并为一个版本号 |
+| 🔴 P1 | 修改代码 | 优先最小变更 |
+| 🔴 P1 | 新增函数/模块前 | 先搜索项目是否已有实现 |
 | 🟡 P2 | 多文件替换 / 中文内容编辑 | 用外置 `.py` 脚本操作，不要 bash 内联（避免 GBK/UTF-8 编码错误） |
 | 🟡 P2 | 修改 `agent_system/` 下文件 | 改完必须验证 `import run_agent` 不崩 |
 | 🟡 P2 | 新增/删除/重命名文件 | 同步更新 README 目录树 + 文件结构表格 |
-| 🟡 P2 | Agent 相关文件的归属 | `agent_system/` 是 Agent 专属目录，Agent 文件**绝对不能**放到项目根目录。根目录是编程语言本身（编译器/VM/求值器等）。日志、DB、缓存也放 `agent_system/` 内 |
+| 🟡 P2 | Agent 相关新文件 | 统一放 `agent_system/`，**不要放根目录**。根目录是编程语言本身（编译器/VM/求值器等） |
 | 🟡 P2 | 新增 CLI 标志 | `run_agent.py` 加了新 flag 必须同步更新 AGENTS.md 运行方式列表 + CHANGELOG |
 | 🟢 P3 | 日常小改动、调试、提示词调优 | 只本地 commit，不 push，等用户确认 |
 
