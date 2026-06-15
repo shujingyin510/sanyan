@@ -2,9 +2,12 @@
 Phase 0: 任务分解 + 有界上下文 + 工具依赖图(P1) + 能力注册(P9)
 Phase 1: 多假设 + 多样性(P8) + 锦标赛(P2) + 失败分类(P3) + 自适应阈值(P4)
 Phase 2: 经验 + Token预算 + 压缩 + 缓存(P5) + 可观测(P7) + 成本(P10) + 回放(P11)
+Phase 3: 并行执行(P14) + 智能压缩(P22) + 跨会话学习(P19) + 可观测增强(P25)
 """
 
 import glob as _glob
+import time as _time
+from typing import Dict
 
 
 from ternary_engine import TernaryEngine
@@ -16,8 +19,23 @@ from agent_hypothesis import (
     FailureMode,
 )
 from agent_resource import ResourceManager
-from agent_tool_graph import ToolDependencyGraph, ToolCapabilityRegistry, TaskCapabilityExtractor
+from agent_tool_graph import (
+    ToolDependencyGraph,
+    ToolCapabilityRegistry,
+    TaskCapabilityExtractor,
+    DEFAULT_TOOL_META,
+)
 from agent_decompose import DecompositionEngine, BoundedContext
+from agent_parallel import ParallelExecutor, HypothesisParaller
+from agent_context import SmartContextCompressor
+from agent_learning import ExperienceStore, AdaptiveToolSelector
+from agent_sandbox import AgentSandbox
+from agent_obs import AgentDashboard
+from agent_streaming import ProgressiveDisplay
+from agent_composition import ToolPipeline, ToolComposer, ConditionalChain
+from agent_shared import SharedContext, SharedSymbolTable, AgentCoordinator
+from agent_strategy import PromptEvolver, ToolSelectionLearner, StrategySwitcher, ABRollout
+from agent_evolution import ConstrainedEvolutionSystem
 
 
 class SymbolTable:
@@ -191,7 +209,7 @@ class ProjectGraph:
 
 
 class AgentRuntime:
-    """Agent V5: 全栈决策引擎 — Phase 0/1/2 完整集成"""
+    """Agent V5: 全栈决策引擎 — Phase 0/1/2/3 完整集成"""
 
     def __init__(self, evaluator, sandbox):
         self.ev = evaluator
@@ -216,6 +234,32 @@ class AgentRuntime:
         self.executor = None  # 延迟初始化
         # Phase 2: 资源统一管控
         self.resource = ResourceManager()
+        # Phase 3: 新增模块
+        self.parallel_executor = ParallelExecutor(self.tools, DEFAULT_TOOL_META)
+        self.hypothesis_paraller = HypothesisParaller(self.tools)
+        self.context_compressor = SmartContextCompressor(max_tokens=7000)
+        self.experience_store = ExperienceStore()
+        self.tool_selector = AdaptiveToolSelector(self.experience_store)
+        self.security_sandbox = AgentSandbox()
+        self.dashboard = AgentDashboard()
+        self.tracer = self.dashboard.tracer
+        self.profiler = self.dashboard.profiler
+        # Phase 4: 流式/组合/共享
+        self.streaming = None  # 延迟初始化（需要API key）
+        self.pipeline = ToolPipeline(self.tools)
+        self.composer = ToolComposer(self.tools)
+        self.conditional = ConditionalChain(self.tools)
+        self.shared_context = SharedContext()
+        self.shared_symbols = SharedSymbolTable()
+        self.coordinator = AgentCoordinator()
+        self.progress_display = ProgressiveDisplay()
+        # Layer 1: 策略自优化
+        self.prompt_evolver = PromptEvolver()
+        self.tool_learner = ToolSelectionLearner()
+        self.strategy_switcher = StrategySwitcher()
+        self.ab_rollout = ABRollout()
+        # Layer 3: 约束进化
+        self.evolution = ConstrainedEvolutionSystem()
         # P6: Prompt 缓存 — 稳定化 system_prompt
         self._system_prompt = None
         self._system_prompt_hash = None
@@ -224,6 +268,7 @@ class AgentRuntime:
         self.tools[name] = handler
 
     def run(self, task, max_rounds=15, dry_run=False):
+        """主运行入口：集成Phase 0/1/2/3/4 + Layer 1策略自优化"""
         self.memory = {
             'task': task,
             'history': [],
@@ -233,42 +278,106 @@ class AgentRuntime:
             'same_tool_count': {},
             'retry_count': 0,
         }
+        # Phase 3: 启动追踪和性能分析
+        trace_id = self.tracer.start_trace(task)
+        self.profiler.start(task)
+        start_time = _time.time()
+
+        # Layer 1: 策略选择
+        strategy = self.strategy_switcher.select_strategy(task)
+        print(f'  [策略] {strategy["name"]} ({strategy["complexity"]})')
+
+        result = None
+        try:
+            result = self._run_core(task, max_rounds, dry_run, trace_id, start_time, strategy)
+            return result
+        finally:
+            # 结束追踪
+            status = 'completed' if self.memory.get('modified') else 'completed'
+            answer = self.memory.get('history', [{}])[-1].get('result', '') if self.memory.get('history') else ''
+            self.tracer.end_trace(status, str(answer)[:200])
+            perf_report = self.profiler.end()
+
+            # Layer 1: 记录策略效果
+            duration = _time.time() - start_time
+            success = bool(self.memory.get('modified')) or (result and 'answer' in result)
+            self.strategy_switcher.record_outcome(task, strategy['name'], success, duration)
+
+            # 保存经验
+            self._save_experience(task, perf_report)
+
+    def _run_core(self, task, max_rounds, dry_run, trace_id, start_time, strategy=None):
+        """核心运行逻辑"""
+        if strategy is None:
+            strategy = {'name': 'single', 'complexity': 'medium', 'use_llm': True, 'max_rounds': 5}
+
         # 验证闭环检测
         vloop = self._detect_verify_loop(task)
         if vloop:
             result = self._run_verify_loop(vloop['file'], vloop['test'], dry_run)
             if result:
                 return result
+
         # P5: 语义缓存快速通道
         cached = self.resource.semantic_cache.lookup(task)
         if cached:
             self.resource.metrics.record_cache_hit()
             print('  [缓存命中]')
             return {'answer': cached, 'memory': self.memory}
+
+        # Phase 3: 跨会话经验检索
+        similar_tasks = self.experience_store.get_similar_tasks(task, limit=3)
+        if similar_tasks:
+            best_similar = similar_tasks[0]
+            if best_similar['success'] and best_similar['similarity'] > 0.6:
+                print(f'  [经验复用] 相似任务成功率高，尝试工具链: {best_similar["tool_chain"][:3]}')
+
         # 预加载
         self.symbols.build_all()
         self.graph.build()
+
         # 初始化执行器
         self.executor = HypothesisExecutor(self.tools, self.failure_classifier, self.resource)
+
         # 构建上下文
         ctx = BoundedContext(budget=4000)
         ctx.set_task(task)
+
         # 智能首轮
         forced = self._force_tool(task)
         if forced:
             tool, params = forced
-            result = self.tools[tool](params, dry_run)
-            trit, conf, gate, cog = self.ternary.step(tool, result)
-            print(f'  [{cog}]→{self.ternary.trit_display(trit, conf)}')
-            module = self._extract_module(params)
-            self.resource.record_tool_use(tool, trit == 1, module, cog)
-            if '未找到' not in str(result):
-                self.resource.semantic_cache.store(task, self._extract_key(result))
-                return {
-                    'answer': self._extract_key(result),
-                    'memory': self.memory,
-                    'ternary': f'{cog}→{self.ternary.summary()}',
-                }
+            # Phase 3: 安全检查
+            safe, reason = self.security_sandbox.check_tool(tool, params, dry_run)
+            if not safe:
+                print(f'  [安全拦截] {reason}')
+                self.dashboard.alert(f'安全拦截: {tool} - {reason}')
+            else:
+                step_start = _time.time()
+                result = self.tools[tool](params, dry_run)
+                step_duration = _time.time() - step_start
+                self.profiler.record_step(1, tool, step_duration)
+
+                trit, conf, gate, cog = self.ternary.step(tool, result)
+                print(f'  [{cog}]→{self.ternary.trit_display(trit, conf)}')
+                module = self._extract_module(params)
+                self.resource.record_tool_use(tool, trit == 1, module, cog)
+                self.tracer.add_step(1, tool, params, str(result)[:200], cog, conf)
+                self.context_compressor.add_entry(tool, params, result, 1)
+
+                # Layer 1: 记录工具学习
+                self.tool_learner.record_outcome(tool, task, trit == 1, step_duration)
+
+                # 记录经验
+                self.tool_selector.record_outcome(task, tool, trit == 1, step_duration)
+
+                if '未找到' not in str(result):
+                    self.resource.semantic_cache.store(task, self._extract_key(result))
+                    return {
+                        'answer': self._extract_key(result),
+                        'memory': self.memory,
+                        'ternary': f'{cog}→{self.ternary.summary()}',
+                    }
 
         # Phase 1: 生成假设 + 锦标赛
         hypotheses = self.hypothesis_generator.generate(
@@ -277,7 +386,11 @@ class AgentRuntime:
         self.resource.metrics.total_hypotheses = len(hypotheses)
         best_hypothesis = None
         if len(hypotheses) > 1:
-            best_hypothesis = self.tournament.run(hypotheses, task, ctx, self.executor)
+            # Phase 3: 并行验证假设
+            print(f'  [并行验证] {len(hypotheses)}个假设同时验证...')
+            validated = self.hypothesis_paraller.parallel_validate(hypotheses, ctx, steps=2)
+            validated.sort(key=lambda x: -x[1])
+            best_hypothesis = validated[0][0] if validated else hypotheses[0]
             print(f'  [锦标赛] 最优: H{best_hypothesis.id} conf={best_hypothesis.confidence:.2f}')
         elif hypotheses:
             best_hypothesis = hypotheses[0]
@@ -290,31 +403,66 @@ class AgentRuntime:
         return self._run_legacy(task, max_rounds, dry_run)
 
     def _execute_hypothesis(self, hypothesis, task, ctx, max_rounds, dry_run):
-        """执行假设的工具链 — 每步调 LLM 获取参数"""
+        """执行假设的工具链 — 集成并行执行 + 安全检查 + 可观测"""
         run_id = self.resource.replay_engine.create_run(task)
         ctx_str = ctx.build()
         llm_fail_count = 0
+        step_num = 0
+
+        # Phase 3: 分析工具链并行度
+        analysis = self.parallel_executor.analyze_parallelism(hypothesis.tools_used)
+        if analysis['max_parallelism'] > 1:
+            print(
+                f'  [并行分析] {analysis["total_tools"]}工具, {analysis["parallel_steps"]}步可并行, 预计加速{analysis["estimated_speedup"]:.1f}x'
+            )
+
         for step in range(len(hypothesis.tools_used)):
             if not self.resource.check_tokens(500):
                 print('  [预算耗尽]')
                 break
-            # 调 LLM 获取工具+参数（如 _run_legacy 中的做法）
+
+            step_num += 1
+            step_start = _time.time()
+
+            # 调 LLM 获取工具+参数
             raw = self._llm_call(ctx_str)
             tool_name, params = self._parse_tool(raw)
-            # LLM 调用失败 → 计数，连续3次退出
+
+            # LLM 调用失败处理
             if raw.startswith('error|') and 'LLM调用失败' in raw:
                 llm_fail_count += 1
                 print(f'  [LLM失败 {llm_fail_count}/3]')
                 if llm_fail_count >= 3:
                     break
                 continue
+
             if not tool_name or tool_name not in self.tools:
                 print(f'  [解析失败] raw={str(raw)[:60]}')
                 continue
+
+            # Phase 3: 安全沙箱检查
+            safe, reason = self.security_sandbox.check_tool(tool_name, params, dry_run)
+            if not safe:
+                print(f'  [安全拦截] {tool_name}: {reason}')
+                self.dashboard.alert(f'安全拦截: {tool_name}')
+                self.tracer.add_step(step_num, tool_name, params, f'拦截: {reason}', '安全拦截', 0.0)
+                continue
+
+            # Phase 3: 工具可靠性检查
+            should_avoid, avoid_reason = self.tool_selector.should_avoid(tool_name)
+            if should_avoid:
+                print(f'  [经验规避] {tool_name}: {avoid_reason}')
+
+            # 执行工具
             try:
                 result = self.tools[tool_name](params, dry_run)
             except Exception as e:
                 result = f'工具执行异常: {e}'
+
+            step_duration = _time.time() - step_start
+            self.profiler.record_step(step_num, tool_name, step_duration)
+
+            # 失败分类
             mode = self.failure_classifier.classify(tool_name, params, result)
             trit = (
                 1
@@ -324,18 +472,30 @@ class AgentRuntime:
                 else 0
             )
             conf = 0.9 if mode == FailureMode.SUCCESS else 0.8 if mode in (FailureMode.LOGIC_ERROR,) else 0.4
+
             # P11: 记录每一步
             self.resource.replay_engine.record_action(
                 run_id, step, tool_name, str(params)[:80], result, hypothesis.confidence
             )
+
             # P3: 失败归因
             module = self._extract_module(params)
             self.resource.record_tool_use(tool_name, trit == 1, module, mode.value)
+
+            # Phase 3: 记录经验
+            self.tool_selector.record_outcome(task, tool_name, mode == FailureMode.SUCCESS, step_duration)
+
             # 三态决策
             _, _, gate, cog = self.ternary.step(tool_name, result)
             print(f'  [{cog}]→{self.ternary.trit_display(trit, conf)} {tool_name}')
+
+            # Phase 3: 追踪和上下文压缩
+            self.tracer.add_step(step_num, tool_name, params, str(result)[:200], cog, conf)
+            self.context_compressor.add_entry(tool_name, params, result, step_num)
+
             ctx.add_tool_result(str(result)[:500])
             ctx_str = ctx.build()
+
             self.memory['history'].append(
                 {
                     'tool': tool_name,
@@ -344,24 +504,32 @@ class AgentRuntime:
                     'round': step + 1,
                     'trit': trit,
                     'conf': conf,
+                    'duration': step_duration,
                 }
             )
+
             if gate['action'] == 'block':
                 print(f'  [门控] {gate["reason"]}')
                 break
+
             if tool_name in ('write_file', 'replace_in_file', 'replace_all'):
                 self.memory['modified'].append(params.split('|')[0] if '|' in str(params) else str(params))
+                self.security_sandbox.fs_guard.record_modified(params.split('|')[0] if '|' in str(params) else '')
+
             if tool_name == 'done':
                 return {
                     'answer': params if params else '完成',
                     'memory': self.memory,
                     'hypothesis': hypothesis.to_dict(),
                 }
+
         answer = self._extract_key(self.memory['history'][-1]['result']) if self.memory['history'] else '完成'
         self.resource.semantic_cache.store(task, answer)
+
         # P7: 指标
         self.resource.metrics.record_cost(hypothesis.estimated_cost, len(hypothesis.evidence))
         self.resource.save()
+
         return {'answer': answer, 'memory': self.memory, 'hypothesis': hypothesis.to_dict()}
 
     def _force_tool(self, task):
@@ -607,7 +775,11 @@ class AgentRuntime:
             headers = {'Content-Type': 'application/json'}
 
             def _parse_gemini(d):
-                return d['candidates'][0]['content']['parts'][0]['text']
+                text = d['candidates'][0]['content']['parts'][0]['text']
+                # 提取token用量（Gemini在usageMetadata中）
+                usage = d.get('usageMetadata', {})
+                tokens = usage.get('totalTokenCount', 0)
+                return text, tokens
 
             parser = _parse_gemini
         else:
@@ -625,7 +797,11 @@ class AgentRuntime:
 
             def _parse_openai(d):
                 msg = d['choices'][0]['message']
-                return msg.get('content') or msg.get('reasoning_content') or ''
+                text = msg.get('content') or msg.get('reasoning_content') or ''
+                # 提取token用量（OpenAI在usage中）
+                usage = d.get('usage', {})
+                tokens = usage.get('total_tokens', 0)
+                return text, tokens
 
             parser = _parse_openai
 
@@ -634,7 +810,11 @@ class AgentRuntime:
             try:
                 req = _req.Request(url, data=body, headers=headers, method='POST')
                 resp = _json.loads(_req.urlopen(req, timeout=timeout).read().decode('utf-8'))
-                return parser(resp).strip()
+                text, tokens = parser(resp)
+                # 记录token用量到profiler
+                if tokens > 0:
+                    self.profiler.record_llm_call(0, tokens)
+                return text.strip()
             except (_err.HTTPError, _err.URLError, OSError):
                 if attempt < 2:
                     _t.sleep(1.0 * (attempt + 1))
@@ -736,10 +916,14 @@ class AgentRuntime:
                 break
             result = ''
             if tool in self.tools:
+                step_start = _time.time()
                 try:
                     result = self.tools[tool](params, dry_run)
                 except Exception as e:
                     result = f'工具执行异常: {e}'
+                step_duration = _time.time() - step_start
+                self.profiler.record_step(rnd, tool, step_duration)
+
                 trit, conf, gate, cog = self.ternary.step(tool, result)
                 print(f'  [{cog}]→{self.ternary.trit_display(trit, conf)}')
                 self.memory['history'].append(
@@ -750,9 +934,16 @@ class AgentRuntime:
                         'round': rnd,
                         'trit': trit,
                         'conf': conf,
+                        'duration': step_duration,
                     }
                 )
                 self.mem.add(tool, params, result)
+                self.tracer.add_step(rnd, tool, params, str(result)[:200], cog, conf)
+                self.context_compressor.add_entry(tool, params, result, rnd)
+                self.tool_selector.record_outcome(task, tool, trit == 1, step_duration)
+                # Layer 1: 工具学习
+                self.tool_learner.record_outcome(tool, task, trit == 1, step_duration)
+
                 if gate['action'] == 'block':
                     break
                 if tool in ('write_file', 'replace_in_file', 'replace_all'):
@@ -801,3 +992,43 @@ class AgentRuntime:
         ):
             return True
         return False
+
+    def _save_experience(self, task: str, perf_report: Dict = None):
+        """保存本次运行经验到跨会话存储"""
+        try:
+            # 记录工具使用
+            for entry in self.memory.get('history', []):
+                tool = entry.get('tool', '')
+                success = entry.get('trit', 0) == 1
+                duration = entry.get('duration', 0)
+                self.experience_store.record_tool_use(tool, success, duration)
+
+            # 记录任务
+            tool_chain = [e.get('tool', '') for e in self.memory.get('history', [])]
+            success = bool(self.memory.get('modified'))
+            duration = perf_report.get('total_duration', 0) if perf_report else 0
+            self.experience_store.record_task(task, tool_chain, success, duration)
+
+            # 记录失败模式
+            for entry in self.memory.get('history', []):
+                if entry.get('trit', 0) == -1:
+                    self.experience_store.record_failure_pattern(
+                        entry.get('tool', ''), entry.get('result', '')[:100], 'logic_error'
+                    )
+        except Exception:
+            pass
+
+    def get_dashboard(self) -> str:
+        """获取实时仪表盘"""
+        return self.dashboard.get_status(self)
+
+    def visualize_trace(self, trace_id: str = None) -> str:
+        """可视化决策链"""
+        return self.tracer.visualize(trace_id)
+
+    def get_performance_report(self) -> str:
+        """获取性能报告"""
+        if self.profiler._records:
+            report = self.profiler._generate_report(self.profiler._records[-1])
+            return self.profiler.format_report(report)
+        return '(无性能数据)'

@@ -1,11 +1,25 @@
 {
   "tool_stats": {
+    "analyze": {
+      "success": 1,
+      "fail": 0,
+      "last_used": 1781507167.3491912
+    },
     "list_files": {
       "success": 1,
       "fail": 0,
-      "last_used": 1781351395.4367585
+      "last_used": 1781507180.4798286
     }
   },
-  "module_stats": {},
+  "module_stats": {
+    "agent_runtime": {
+      "error_count": 0,
+      "total_count": 1
+    },
+    "test*": {
+      "error_count": 0,
+      "total_count": 1
+    }
+  },
   "lambda": 0.1
 }

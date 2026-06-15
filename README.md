@@ -1,4 +1,4 @@
-# 三态认知框架 Sanyan v3.32.0
+# 三态认知框架 Sanyan v3.29.0
 
 [![VS Code Extension](https://img.shields.io/badge/VS%20Code-%E8%AF%AD%E6%B3%95%E9%AB%98%E4%BA%AE-%23007ACC?logo=visualstudiocode)](sanyan-vscode/README.md)
 [![CI](https://github.com/shujingyin510/sanyan/actions/workflows/test.yml/badge.svg)](https://github.com/shujingyin510/sanyan/actions)
@@ -18,6 +18,16 @@
 **如果编程语言原生支持第三种状态呢？**
 
 于是就有了三言。从 2026 年 5 月到现在，一个半月，一个人，做出了一整套编译器、虚拟机、认知运行时、智能体框架。如果放到以前，这需要一个团队干好几个月。AI 帮了很大忙，但方向、判断、架构——那些 AI 不知道要往哪走的选择——都是人做的。
+
+---
+
+## v3.32 更新摘要
+
+- **Agent 自主闭环**：`auto_verify.py` 提交→全量测试→通过自动提交/失败回退，三条路径实测通过
+- **LLM 深度集成**：模型升级 `deepseek-v4-pro`，thinking 显式启控，工具调用 JSON 化，经验库跨任务学习
+- **认知运行时**：Toggle 检测、同位置连错检测、结构化重试历史、任务级经验库，Agent 能从失败中学习
+- **自举 Level 2-4**：三言编译器自编译（不动点验证）→ C 种子 VM（318行）→ x86_64 NASM 汇编 VM（617行）
+- **全量 CI 绿**：1650+ 项测试，preflight 一键检查，多后端一致性验证
 
 ---
 
@@ -419,7 +429,7 @@ tests/
 
 ### Agent 可读决策 DSL
 
-> 详见 [ternary_agent/README.md](ternary_agent/README.md) — v5 架构、三阶段设计、补丁目录。
+> 详见 [ternary_agent/README.md](ternary_agent/README.md) — v5 架构、四阶段设计、补丁目录。
 
 | 特性 | 说明 |
 |---|---|
@@ -438,6 +448,18 @@ tests/
 | **经验学习** | 工具成功率统计 + 遗忘衰减 + 模块风险评估 |
 | **多提供商** | DeepSeek / OpenAI / 千问 / Gemini / 小米MIMO / Token Plan / Ollama 七家 |
 | **声明式策略** | `agent_policy.san` 纯数据 + 场景规则，热重载 |
+| **并行执行** | P14: 独立工具并行执行，工具链自动并行化，预计加速 2-4x |
+| **智能压缩** | P22: 多策略上下文压缩（分层摘要+滑动窗口+重要性评分） |
+| **跨会话学习** | P19: SQLite 持久化工具成功率、失败模式库、任务类型映射 |
+| **安全沙箱** | P16: 命令黑名单/白名单、文件系统守卫、只读模式、审计日志 |
+| **流式响应** | P28: LLM 边生成边显示，支持可中断、渐进式输出 |
+| **高阶工具组合** | P31: Unix 风格管道、复合工具、条件工具链 |
+| **工具自发现** | P13: 自动扫描 ops/*.py 注册工具，提取元数据（参数/副作用/成本） |
+| **多Agent共享** | P34: 共享上下文空间、共享符号表、Agent协调器（任务分发+结果聚合） |
+| **Token追踪** | 实时统计 LLM Token 用量，支持 DeepSeek/Gemini API |
+| **策略自优化** | Layer 1: Prompt自进化 + Tool Selection学习 + 策略切换 + A/B Rollout |
+| **自主循环** | Layer 2: 文件监控 + 自动验证 + Agent修复 + 日志持久化 + 健康监控 |
+| **约束进化** | Layer 3: 接口不变只改内部 + 多后端差分验证 + 多目标评估 + 自举验证（框架完成，闭环开发中） |
 
 使用方式：
 
@@ -453,6 +475,66 @@ python -X utf8 run_agent.py "(设 x 10)(输出(加 x 5))"
 
 # 文件操作
 python -X utf8 run_agent.py "把AGENTS.md里的v0.3改成v0.4"
+
+# 安全沙箱（只读模式，禁止文件修改）
+python -X utf8 run_agent.py "分析代码结构" --sandbox
+
+# 性能报告（显示Token用量、工具耗时）
+python -X utf8 run_agent.py "任务" --report
+
+# 实时仪表盘
+python -X utf8 run_agent.py "任务" --dashboard
+
+# 决策追踪
+python -X utf8 run_agent.py "任务" --trace
+
+# 流式输出
+python -X utf8 run_agent.py "任务" --stream
+
+# 执行工具管道
+python -X utf8 run_agent.py "任务" --pipeline read_and_analyze
+
+# 自举验证（第3层）
+python -X utf8 run_agent.py --self-host
+
+# 约束进化验证（第3层）
+python -X utf8 run_agent.py --evolve
+
+# 自动化进化闭环（第3层）
+python -X utf8 run_agent.py --auto-evolve --max-cycles 3
+
+# Agent自主改代码闭环（第3层）
+python -X utf8 run_agent.py --code-evolve --max-cycles 3
+
+# 带审查的进化闭环（第3层）
+python -X utf8 run_agent.py --review-evolve
+```
+
+自主循环（第2层）：
+
+```bash
+# 文件监控模式
+python -X utf8 agent_loop.py --watch
+
+# 连续循环模式
+python -X utf8 agent_loop.py --continuous
+
+# 查看统计和健康状态
+python -X utf8 agent_loop.py --status
+```
+
+交互模式命令：
+
+```
+/状态    — 三态决策摘要
+/记忆    — 任务记忆
+/仪表盘  — 实时仪表盘
+/追踪    — 决策链可视化
+/性能    — 性能报告（Token用量、工具耗时）
+/经验    — 跨会话经验（工具可靠性、失败模式）
+/安全    — 安全沙箱状态（审计日志）
+/共享    — 共享上下文空间
+/管道    — 工具管道列表
 ```
 
 ## 三进制算术（模拟实现）
@@ -516,12 +598,41 @@ sanyan/
 ├── ternary_engine.py           # 三态认知引擎（Kleene×贝叶斯×门控）
 ├── agent_runtime.py            # Agent V5 引擎
 ├── agent_tools.py              # Agent V5 工具层
-├── agent_tool_graph.py         # 工具依赖图 + 能力注册
+├── agent_tool_graph.py         # 工具依赖图 + 能力注册 + 工具元数据 + 自发现
 ├── agent_decompose.py          # Phase 0: 任务分解
 ├── agent_hypothesis.py         # Phase 1: 多假设 + 锦标赛
 ├── agent_resource.py           # Phase 2: 资源管控
 ├── agent_project.py            # 项目引擎: 分解→执行→验证→重试
-├── asm.py                      # 字节码汇编器
+├── agent_context.py            # 智能上下文压缩（分层摘要+滑动窗口+重要性评分）
+├── agent_experience.py         # 经验库: 跨任务 pattern 匹配 + AVOID 提示
+├── agent_parallel.py           # 并行执行引擎（工具链并行+假设并行验证）
+├── agent_sandbox.py            # 安全沙箱（命令过滤+文件系统守卫+审计日志）
+├── agent_learning.py           # 跨会话学习（SQLite持久化+失败模式库+自适应选择）
+├── agent_obs.py                # 可观测性（决策追踪+性能分析+仪表盘）
+├── agent_streaming.py          # 流式响应（LLM边生成边显示+可中断）
+├── agent_composition.py        # 高阶工具组合（管道+复合工具+条件链）
+├── agent_shared.py             # 多Agent共享上下文（共享空间+符号表+协调器）
+├── agent_strategy.py           # Layer 1: 策略自优化（Prompt进化+Tool学习+策略切换+A/B）
+├── agent_loop.py               # Layer 2: 自主循环（文件监控+连续循环+健康监控）
+├── agent_loop_monitor.py       # Layer 2: 循环监控（日志+统计+健康+回滚验证）
+├── agent_evolution.py          # Layer 3: 约束进化（接口不变+差分验证+多目标评估）
+├── agent_evolution_v2.py       # Layer 3: Patch DSL + Mutation Budget + 三态评分 + Tournament
+├── agent_review.py             # Layer 4: Reviewer Agent（独立代码审查+对抗补丁检测）
+├── agent_benchmark.py          # Layer 4: Real Benchmark（真实基准测试）
+├── agent_dashboard.py          # Layer 4: Evolution Dashboard（进化仪表盘）
+├── agent_test_gen.py           # Layer 4: Test Generator（测试用例生成）
+├── agent_history.py            # Layer 4: PatchHistory（Patch历史数据库+可信度权重）
+├── agent_validation.py         # Layer 4: Evolution Validation（100次随机+收敛+Reviewer）
+├── agent_stress.py             # Layer 4: Evolution Stress Test（长期稳定性+退化测试）
+├── agent_knowledge.py          # Layer 5: Knowledge Layer（TaskClassifier+TaskEmbedding+ClusterLearning）
+├── agent_knowledge_confidence.py # Layer 5: Knowledge Confidence（知识置信度计算）
+├── agent_generalization.py     # Layer 5: Knowledge Generalization（知识泛化验证）
+├── agent_causal_chain.py       # Layer 5: Causal Chain（因果链闭环验证）
+├── agent_meta_knowledge.py     # Layer 5: Meta-Knowledge Transfer（元知识迁移）
+├── agent_param_importance.py   # Layer 5: Parameter Importance Ranking + StrategySchema
+├── agent_cost_aware.py         # Layer 5: Cost-Aware Evolution（收益/成本感知+UCB）
+├── agent_task_taxonomy.py      # Layer 5: Task Taxonomy（任务分类+MetaLearningDB）
+├── agent_knowledge_validation.py # Layer 5: Knowledge Validation（知识分化验证）
 ├── disasm.py                   # 字节码反汇编器
 ├── verify.py                   # 字节码验证器
 ├── preflight.py                # 发版前预检（lint+test+自举）
@@ -769,6 +880,32 @@ sanyan/
 - [ ] Web IDE
 - [ ] 社区生态建设
 
+## 三态逻辑贯穿整个系统
+
+三态逻辑不是语言特色，是整个系统的认知哲学：
+
+| 层 | 三态表现 | 说明 |
+|---|---|---|
+| 语言层 | TRUE / FALSE / UNKNOWN | Kleene三值逻辑 |
+| Agent层 | 高置信度 / 低置信度 / 未知 | 决策门控 |
+| Knowledge Layer | 可信知识 / 弱知识 / 未知知识 | 知识可靠性评估 |
+| Evolution Layer | 接受 / 拒绝 / 收集更多数据 | 三态裁决 |
+
+```
+语言时代：TRUE / FALSE / UNKNOWN
+    ↓
+Agent时代：高置信度 / 低置信度 / 未知
+    ↓
+Knowledge Layer：可信知识 / 弱知识 / 未知知识
+    ↓
+进化系统：接受 / 拒绝 / 收集更多数据
+```
+
+**核心洞察：**
+- 没有Confidence时：经验 = 真理
+- 有Confidence时：经验 = 待验证知识
+- 这是科学方法：观察→假设→置信度→实验→更新置信度
+
 ## 为什么是中文
 
 中文天然适合表达三进制。
@@ -809,6 +946,47 @@ sanyan/
 这不是硬件三进制。真正的三进制计算机（如 Setun）在硬件层每个比特就是三态。本项目的三进制逻辑语义是正确的（Kleene 强逻辑），但底层存储和运算是二进制的。
 
 未来方向：如果出现三进制硬件（如三态忆阻器或量子三态），三言的语义层可以直接映射到真实三进制硬件，无需修改语言规范。
+
+## 四层进化架构
+
+```
+Layer 3: Knowledge Layer（知识层）
+  - MetaLearningDB（项目经验数据库）
+  - TaskEmbedding（任务向量化）
+  - ClusterLearning（自动聚类）
+  - 目标：不同任务→不同策略（条件最优）
+        ↓
+Layer 2: Evolution Layer（进化层）
+  - ParameterRanker（参数影响力排名）
+  - CostAwareRanker（收益/成本排名）
+  - ExplorationBudget（探索预算）
+  - UCBExploration（UCB探索策略）
+        ↓
+Layer 1: Policy Layer（策略层）
+  - ConfigSchema（可进化配置参数）
+  - StrategySchema（策略参数化）
+  - HypothesisSchema（候选参数）
+        ↓
+Layer 0: Frozen Core（冰冻核心，不可修改）
+  - Reviewer（代码审查）
+  - TernaryEngine（三态决策）
+  - PatchHistory（历史记录）
+  - TaskReplay（任务回放）
+```
+
+### 三层知识体系
+
+| 层 | 内容 | 共享策略 |
+|---|---|---|
+| Global Knowledge | 任务模式→策略模式（元知识） | 共享统计规律 |
+| Project Memory | 项目专属经验（最优参数/Patch模式） | 项目内共享 |
+| Personal Memory | 用户偏好/习惯 | 不共享 |
+
+**LLM知识 vs Agent知识：**
+- LLM知识 = Prior（推测）：世界知识，已预训练
+- Agent知识 = Evidence（证据）：项目级因果知识，经过验证
+
+> LLM解决"我知道什么"；Agent知识库解决"在这个项目里什么真的有效"
 
 ## AI 声明
 

@@ -1,11 +1,14 @@
-"""工具依赖图 + 能力注册表
+"""工具依赖图 + 能力注册表 + 工具元数据 + 自发现
 P1: ToolDependencyGraph — 工具链合法性预校验
 P9: ToolCapabilityRegistry + TaskCapabilityExtractor — 能力匹配
+P12: ToolMetadata — 工具元数据（参数类型、副作用、成本）
+P13: ToolAutoDiscovery — 自动扫描 ops/*.py 注册工具
 """
 
-from typing import Optional
-
-from typing import List, Set, Tuple
+import os
+import glob as _glob
+import re as _re
+from typing import Any, Dict, List, Optional, Set, Tuple
 
 
 class ToolDependencyGraph:
@@ -125,3 +128,247 @@ class TaskCapabilityExtractor:
         """为任务推荐工具"""
         caps = self.extract(task)
         return self.registry.find_tools_for_caps(caps)
+
+
+# ── P12: 工具元数据 ──
+
+
+class ToolMetadata:
+    """工具元数据：参数类型、副作用、成本、并行安全性"""
+
+    def __init__(self):
+        self._meta: Dict[str, Dict[str, Any]] = {}
+
+    def register(
+        self,
+        name: str,
+        params: List[str] = None,
+        side_effects: List[str] = None,
+        cost: float = 1.0,
+        parallel_safe: bool = True,
+        category: str = 'general',
+    ):
+        """注册工具元数据"""
+        self._meta[name] = {
+            'params': params or [],
+            'side_effects': side_effects or [],
+            'cost': cost,
+            'parallel_safe': parallel_safe,
+            'category': category,
+        }
+
+    def get(self, name: str) -> Dict[str, Any]:
+        """获取工具元数据"""
+        return self._meta.get(
+            name,
+            {
+                'params': [],
+                'side_effects': [],
+                'cost': 1.0,
+                'parallel_safe': True,
+                'category': 'general',
+            },
+        )
+
+    def is_parallel_safe(self, name: str) -> bool:
+        """工具是否可以并行执行"""
+        return self._meta.get(name, {}).get('parallel_safe', True)
+
+    def get_parallel_group(self, tools: List[str]) -> List[List[str]]:
+        """将工具分组：可并行的放一组"""
+        groups: List[List[str]] = []
+        current_group: List[str] = []
+        for t in tools:
+            meta = self.get(t)
+            if meta.get('parallel_safe', True) and not meta.get('side_effects'):
+                current_group.append(t)
+            else:
+                if current_group:
+                    groups.append(current_group)
+                    current_group = []
+                groups.append([t])
+        if current_group:
+            groups.append(current_group)
+        return groups
+
+    def estimate_cost(self, tools: List[str]) -> float:
+        """估算工具链总成本"""
+        return sum(self.get(t).get('cost', 1.0) for t in tools)
+
+
+# 预注册内置工具元数据
+_BUILTIN_META = {
+    'analyze': {'params': ['path'], 'side_effects': [], 'cost': 0.5, 'parallel_safe': True, 'category': 'read'},
+    'find_symbol': {'params': ['name'], 'side_effects': [], 'cost': 0.5, 'parallel_safe': True, 'category': 'read'},
+    'read_file': {
+        'params': ['path', 'start', 'count'],
+        'side_effects': [],
+        'cost': 0.3,
+        'parallel_safe': True,
+        'category': 'read',
+    },
+    'search_code': {'params': ['keyword'], 'side_effects': [], 'cost': 0.5, 'parallel_safe': True, 'category': 'read'},
+    'list_files': {'params': ['pattern'], 'side_effects': [], 'cost': 0.2, 'parallel_safe': True, 'category': 'read'},
+    'replace_in_file': {
+        'params': ['path', 'old', 'new'],
+        'side_effects': ['file_write'],
+        'cost': 1.0,
+        'parallel_safe': False,
+        'category': 'write',
+    },
+    'replace_all': {
+        'params': ['pattern', 'old', 'new'],
+        'side_effects': ['file_write'],
+        'cost': 2.0,
+        'parallel_safe': False,
+        'category': 'write',
+    },
+    'write_file': {
+        'params': ['path', 'content'],
+        'side_effects': ['file_write'],
+        'cost': 1.0,
+        'parallel_safe': False,
+        'category': 'write',
+    },
+    'run_test': {
+        'params': ['test_file'],
+        'side_effects': ['subprocess'],
+        'cost': 2.0,
+        'parallel_safe': True,
+        'category': 'test',
+    },
+    'git_diff': {'params': [], 'side_effects': ['subprocess'], 'cost': 0.3, 'parallel_safe': True, 'category': 'vcs'},
+    'git_status': {'params': [], 'side_effects': ['subprocess'], 'cost': 0.2, 'parallel_safe': True, 'category': 'vcs'},
+    'git_stash': {
+        'params': [],
+        'side_effects': ['subprocess', 'file_write'],
+        'cost': 0.5,
+        'parallel_safe': False,
+        'category': 'vcs',
+    },
+    'git_reset_hard': {
+        'params': [],
+        'side_effects': ['subprocess', 'file_write'],
+        'cost': 1.0,
+        'parallel_safe': False,
+        'category': 'vcs',
+    },
+    'git_commit_auto': {
+        'params': ['msg'],
+        'side_effects': ['subprocess', 'file_write'],
+        'cost': 0.5,
+        'parallel_safe': False,
+        'category': 'vcs',
+    },
+    'done': {'params': ['answer'], 'side_effects': [], 'cost': 0.1, 'parallel_safe': True, 'category': 'control'},
+}
+
+DEFAULT_TOOL_META = ToolMetadata()
+for _name, _info in _BUILTIN_META.items():
+    DEFAULT_TOOL_META.register(_name, **_info)
+
+
+# ── P13: 工具自发现 ──
+
+
+class ToolAutoDiscovery:
+    """自动扫描 ops/*.py 注册工具，提取函数签名"""
+
+    IGNORE_PATTERNS = {'__pycache__', '.pyc', '__init__'}
+
+    def __init__(self, ops_dir: str = 'ops'):
+        self.ops_dir = ops_dir
+        self._discovered: Dict[str, Dict[str, Any]] = {}
+
+    def scan(self) -> Dict[str, Dict[str, Any]]:
+        """扫描 ops/*.py，提取 def 函数和 register 调用"""
+        if self._discovered:
+            return self._discovered
+
+        ops_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), self.ops_dir)
+        if not os.path.isdir(ops_path):
+            return self._discovered
+
+        for fp in _glob.glob(os.path.join(ops_path, '*.py')):
+            basename = os.path.basename(fp)
+            if any(p in basename for p in self.IGNORE_PATTERNS):
+                continue
+            try:
+                with open(fp, encoding='utf-8', errors='ignore') as f:
+                    content = f.read()
+                self._extract_from_file(fp, content)
+            except Exception:
+                pass
+        return self._discovered
+
+    def _extract_from_file(self, fp: str, content: str):
+        """从单个文件提取工具注册信息"""
+        module = os.path.basename(fp).replace('.py', '')
+
+        # 匹配 register('name', func) 或 _ra('name', 'target')
+        register_pattern = _re.compile(r"""register\(\s*['"]([^'"]+)['"]|_ra\(\s*['"]([^'"]+)['"]""")
+        for m in register_pattern.finditer(content):
+            name = m.group(1) or m.group(2)
+            if name and name not in self._discovered:
+                self._discovered[name] = {
+                    'source': fp,
+                    'module': module,
+                    'category': self._infer_category(module),
+                }
+
+        # 匹配 def 函数定义
+        func_pattern = _re.compile(r'def\s+(_?\w+)\s*\(')
+        for m in func_pattern.finditer(content):
+            fname = m.group(1)
+            if fname.startswith('_') and not fname.startswith('__'):
+                # 内部函数，跳过
+                continue
+            if fname not in self._discovered:
+                self._discovered[fname] = {
+                    'source': fp,
+                    'module': module,
+                    'category': self._infer_category(module),
+                }
+
+    def _infer_category(self, module_name: str) -> str:
+        """从模块名推断类别"""
+        category_map = {
+            'arithmetic': 'math',
+            'math_funcs': 'math',
+            'math_extra': 'math',
+            'comparison': 'logic',
+            'logic': 'logic',
+            'string': 'string',
+            'unicode': 'string',
+            'list': 'container',
+            'dict': 'container',
+            'file': 'io',
+            'io': 'io',
+            'net': 'network',
+            'http': 'network',
+            'json': 'data',
+            'csv': 'data',
+            'regex': 'data',
+            'time': 'system',
+            'random': 'system',
+            'crypto': 'security',
+            'sandbox': 'security',
+            'concurrent': 'concurrency',
+            'iot': 'iot',
+            'device': 'iot',
+            'type': 'type',
+            'control': 'control',
+            'package': 'package',
+        }
+        for key, cat in category_map.items():
+            if key in module_name:
+                return cat
+        return 'general'
+
+    def get_tools(self) -> Dict[str, Dict[str, Any]]:
+        """获取发现的工具"""
+        return self.scan()
+
+    def get_tools_by_category(self, category: str) -> List[str]:
+        """按类别获取工具"""
+        return [name for name, info in self._discovered.items() if info.get('category') == category]

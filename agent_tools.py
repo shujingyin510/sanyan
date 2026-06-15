@@ -174,7 +174,10 @@ def _list_files_direct_simple(pattern):
     return '\n'.join(files[:20]) + (f'\n...共{len(files)}个' if len(files) > 20 else '')
 
 
-def _run_test_direct(test_path):
+def _run_test_direct(test_path, dry_run=False):
+
+    if dry_run:
+        return f'[干跑] 将运行测试: {test_path}'
 
     try:
         r = _sp.run(

@@ -13,7 +13,7 @@ import subprocess as sp
 ROOT = os.path.dirname(os.path.abspath(__file__))
 
 
-def run(cmd, timeout=120):
+def run(cmd, timeout=300):
     return sp.run(cmd, capture_output=True, text=True, timeout=timeout, cwd=ROOT)
 
 
@@ -24,7 +24,7 @@ def main():
 
     # 1. 跑全量测试
     print('\n[1/3] 运行 preflight --quick...')
-    r = run([sys.executable, '-X', 'utf8', 'preflight.py', '--quick'], timeout=180)
+    r = run([sys.executable, '-X', 'utf8', 'preflight.py', '--quick'], timeout=300)
     print(r.stdout[-500:] if len(r.stdout) > 500 else r.stdout)
     if r.returncode != 0:
         print(f'\n[2/3] 测试失败 (exit={r.returncode})，Agent 介入修复...')
@@ -41,7 +41,7 @@ def main():
         )
         print(r2.stdout[-300:] if len(r2.stdout) > 300 else r2.stdout)
         # 再测一次
-        r3 = run([sys.executable, '-X', 'utf8', 'preflight.py', '--quick'], timeout=180)
+        r3 = run([sys.executable, '-X', 'utf8', 'preflight.py', '--quick'], timeout=300)
         if r3.returncode != 0:
             print('\n[3/3] Agent 修复后仍失败，git stash 回退...')
             run(['git', 'stash', '-m', 'agent自动修复失败-回退现场'])

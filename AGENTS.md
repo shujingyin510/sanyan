@@ -44,12 +44,13 @@ python -X utf8 sanyanc.py program.bin --run   # 运行
                            UNCERT/CONFLICTED   +置信度    +置信度     /增益不足    /HUMAN
 ```
 
-**V5 AgentRuntime**（Python 原生引擎）：
+**V5 AgentRuntime**（Python 原生引擎，四阶段）：
 ```
-用户提问 → SymbolTable预加载 → SemanticCache缓存检查 → DecompositionEngine任务分解
-         → HypothesisGenerator多假设生成 → Tournament锦标赛选优
-         → 每步调 LLM 获取 tool+args（JSON 格式）→ TernaryEngine三态决策
-         → 经验库跨任务模式匹配 → 完成
+Phase 0: 任务分解 + 工具图 + 能力注册
+Phase 1: 多假设生成 + 锦标赛选优 + 并行验证
+Phase 2: 经验 + Token预算 + 压缩 + 缓存 + 可观测 + 成本 + 回放
+Phase 3: 并行执行 + 智能压缩 + 跨会话学习 + 安全沙箱
+Phase 4: 流式响应 + 高阶工具组合 + 多Agent共享上下文
 ```
 
 **LLM 连接**：DeepSeek v4（`deepseek-v4-pro`），thinking 显式启用 `{budget_tokens: 2048}`，`max_tokens: 4096`。
@@ -73,6 +74,7 @@ API 密钥通过环境变量 `SANYAN_API_KEY` 注入，`agent_policy.san` 中配
 | 失败分类 | info_gap / wrong_approach / unsolvable / escalation | 日志记录 |
 | LLM 失败防死循环 | 连续3次返回 error\\\\|LLM调用失败 | break 退出 |
 | 约束超限 | 同一工具连续5次 | break 退出 |
+| **安全沙箱** | `--sandbox` 模式 | 命令黑名单 + 文件系统守卫 + 只读模式 + 审计日志 |
 
 ### 反馈闭环（agent_project.py）
 
@@ -93,21 +95,47 @@ API 密钥通过环境变量 `SANYAN_API_KEY` 注入，`agent_policy.san` 中配
 | `ternary_agent/agent_policy.san` | 纯数据策略（配置、阈值、规则） |
 | `ternary_agent/decision.san` | 决策核心（信任感知规则匹配） |
 | `agent_tools.py` | 工具层：analyze、find_symbol、spawn_sub_agent 等 |
-| `agent_tool_graph.py` | 工具依赖图 + 能力注册表 |
+| `agent_tool_graph.py` | 工具依赖图 + 能力注册表 + 工具元数据 + 自发现 |
 | `agent_decompose.py` | Phase 0: 任务分解引擎 |
 | `agent_hypothesis.py` | Phase 1: 多假设 + 锦标赛 + 失败分类 |
 | `agent_resource.py` | Phase 2: 资源统一管控 |
 | `agent_runtime.py` | V5 引擎: SymbolTable、MemoryStore、ProjectGraph |
 | `agent_project.py` | 项目引擎: 分解→执行→验证→重试→报告+经验库 |
-| `agent_context.py` | 上下文管理: LLM 安全调用 + 解析 |
+| `agent_context.py` | 智能上下文压缩（分层摘要+滑动窗口+重要性评分） |
 | `agent_experience.py` | 经验库: 跨任务 pattern 匹配 + AVOID 提示 |
+| `agent_parallel.py` | 并行执行引擎（工具链并行+假设并行验证） |
+| `agent_sandbox.py` | 安全沙箱（命令过滤+文件系统守卫+审计日志） |
+| `agent_learning.py` | 跨会话学习（SQLite持久化+失败模式库+自适应选择） |
+| `agent_obs.py` | 可观测性（决策追踪+性能分析+仪表盘） |
+| `agent_streaming.py` | 流式响应（LLM边生成边显示+可中断） |
+| `agent_composition.py` | 高阶工具组合（管道+复合工具+条件链） |
+| `agent_shared.py` | 多Agent共享上下文（共享空间+符号表+协调器） |
+| `agent_strategy.py` | Layer 1: 策略自优化（Prompt进化+Tool学习+策略切换+A/B） |
+| `agent_loop.py` | Layer 2: 自主循环（文件监控+连续循环+健康监控） |
+| `agent_loop_monitor.py` | Layer 2: 循环监控（日志+统计+健康+回滚验证） |
+| `agent_evolution.py` | Layer 3: 约束进化（接口不变+差分验证+多目标评估） |
+| `auto_verify.py` | Layer 2: 自动验证脚本（测试→修复→提交/回退） |
 | `run_agent.py` | 启动器（默认走 V5 引擎） |
 
 ### 运行方式
 
 ```bash
-python -X utf8 run_agent.py "问题"      # 单次提问
-python -X utf8 run_agent.py              # 交互模式（/解释 N、/原因 N、/策略）
+python -X utf8 run_agent.py "问题"                    # 单次提问
+python -X utf8 run_agent.py                            # 交互模式
+python -X utf8 run_agent.py "任务" --sandbox           # 安全沙箱（只读）
+python -X utf8 run_agent.py "任务" --report            # 性能报告
+python -X utf8 run_agent.py "任务" --stream            # 流式输出
+python -X utf8 run_agent.py "任务" --pipeline NAME     # 执行管道
+python -X utf8 run_agent.py "任务" --dashboard         # 仪表盘
+python -X utf8 run_agent.py "任务" --trace             # 决策追踪
+python -X utf8 run_agent.py --self-host                # 自举验证（第3层）
+python -X utf8 run_agent.py --evolve                   # 约束进化验证（第3层）
+python -X utf8 run_agent.py --auto-evolve              # 自动化进化闭环（第3层）
+python -X utf8 run_agent.py --code-evolve              # Agent自主改代码闭环（第3层）
+python -X utf8 run_agent.py --review-evolve             # 带审查的进化闭环（第3层）
+python -X utf8 agent_loop.py --watch                   # 文件监控（第2层）
+python -X utf8 agent_loop.py --continuous              # 连续循环（第2层）
+python -X utf8 agent_loop.py --status                  # 查看统计（第2层）
 ```
 
 ### 关键设计
@@ -116,6 +144,66 @@ python -X utf8 run_agent.py              # 交互模式（/解释 N、/原因 N�
 - **决策记录**: `_决策记录` 字典存储每轮完整推理链
 - **概率三态**: `TritValue.confidence` 字段，贝叶斯置信度传播（`传播置信度 = 上游 × 当前`）
 - **`#include` 预处理**: `agent.san` 通过 `#include "ternary_agent/agent_policy.san"` 内联策略
+
+### 四层进化架构
+
+```
+Layer 3: Knowledge Layer
+  - MetaLearningDB（项目经验数据库）
+  - TaskEmbedding（任务向量化）
+  - ClusterLearning（自动聚类）
+  - 目标：不同任务→不同策略（条件最优）
+        ↓
+Layer 2: Evolution Layer
+  - ParameterRanker（参数影响力排名）
+  - CostAwareRanker（收益/成本排名）
+  - ExplorationBudget（探索预算）
+  - UCBExploration（UCB探索策略）
+        ↓
+Layer 1: Policy Layer
+  - ConfigSchema（7个可进化配置参数）
+  - StrategySchema（策略参数化）
+  - HypothesisSchema（候选参数）
+        ↓
+Layer 0: Frozen Core（不可修改）
+  - Reviewer（代码审查）
+  - TernaryEngine（三态决策）
+  - PatchHistory（历史记录）
+  - TaskReplay（任务回放）
+```
+
+### 三层知识体系
+
+```
+Layer 3: Global Knowledge（云端）
+  - 不共享具体Patch历史（项目差异大）
+  - 共享元知识：任务模式→策略模式
+  - 新用户开箱即用
+
+Layer 2: Project Memory（项目）
+  - sanyan.db = 项目大脑
+  - 最有价值的一层
+
+Layer 1: Personal Memory（个人）
+  - 用户偏好/习惯
+  - 绝不共享
+```
+
+### LLM知识 vs Agent知识
+
+| 类型 | LLM有 | Agent需要 | 价值 |
+|------|-------|-----------|------|
+| 世界知识 | ✓ | ✗ | 低（已预训练） |
+| 项目知识 | ✗ | ✓ | 高（MetaLearningDB） |
+| 验证后知识 | ✗ | ✓ | 最高（有证据） |
+
+```
+LLM知识 = Prior（推测）
+Agent知识 = Evidence（证据）
+
+LLM解决"我知道什么"
+Agent知识库解决"在这个项目里什么真的有效"
+```
 
 ### Agent 已知修复（2026-06-13）
 

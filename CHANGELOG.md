@@ -2,6 +2,92 @@
 
 ---
 
+## [v3.35.0] — 2026-06-15 (Agent进化系统 + Knowledge Layer + Meta-Knowledge Transfer)
+
+### 新增
+- **策略自优化系统**（Layer 1）：`agent_strategy.py`
+  - PromptEvolver: Prompt自进化（变体库+成功率追踪+自动选择）
+  - ToolSelectionLearner: 工具选择学习（任务类型分类+贝叶斯平滑）
+  - StrategySwitcher: 策略切换（简单→direct / 中等→single / 复杂→tournament）
+  - ABRollout: A/B测试（多策略并行+赢家选择）
+- **自主循环系统**（Layer 2）：`agent_loop.py` + `agent_loop_monitor.py`
+  - 文件监控模式：检测到变化自动触发验证
+  - 连续循环模式：持续运行验证
+  - 日志持久化：.agent_loop.log 记录每次循环
+  - 统计：成功率、修复率、平均耗时
+  - 健康监控：卡住检测、连续失败告警
+  - 回滚验证：stash 状态检查
+- **约束进化系统**（Layer 3）：`agent_evolution.py` + `agent_evolution_v2.py`
+  - ConstraintEvolver: 约束进化器（定义可改变/不可改变区域）
+  - DifferentialVerifier: 差分验证器（多后端一致性+性能）
+  - MultiObjectiveEvaluator: 多目标评估器（综合得分）
+  - SelfHostVerifier: 自举验证器（不动点验证）
+  - PatchDSL: 结构化补丁格式（before/after/rationale/expected）
+  - MutationBudget: 进化预算控制（MAX_FILES=1, MAX_LINES=20, MAX_PATCHES=1）
+  - TernaryPatchEvaluator: 三态Patch评分（TRUE/FALSE/UNKNOWN）
+  - CandidateTournament: 候选锦标赛（多候选竞争，赢家存活）
+  - EvolutionMemory: 进化历史库（SQLite持久化，成功率追踪）
+  - AgentCodeModifier: Agent自主改代码（读代码→生成补丁→应用→测试→回滚/接受）
+- **Knowledge Layer**（Layer 4）：`agent_knowledge.py` + `agent_knowledge_confidence.py` + `agent_generalization.py` + `agent_causal_chain.py` + `agent_meta_knowledge.py`
+  - TaskClassifier: 任务分类器（7种任务类型）
+  - TaskEmbedding: 任务向量化（12维特征）
+  - ClusterLearning: 自动聚类学习任务距离
+  - KnowledgeConfidence: 知识置信度计算（样本数×成功率×一致性）
+  - ConfidenceAwareKnowledge: 带置信度的知识库
+  - GeneralizationValidator: 知识泛化验证（训练集→测试集）
+  - CausalChainExperiment: 因果链闭环验证
+  - TaskPatternTransfer: 任务规律迁移（不迁移参数）
+  - ConfidenceModelTransfer: 置信度模型迁移
+- **Reviewer Agent**：独立代码审查（11条规则，含4条对抗补丁检测）
+- **PatchHistory**：Patch历史数据库（成功率/回滚率/收益/可信度权重）
+- **RealBenchmark**：真实基准测试（before/after耗时对比）
+- **EvolutionDashboard**：进化仪表盘（可视化进化状态）
+- **Cost-Aware Evolution**：收益/成本感知（效率=改进/成本）
+- **Parameter Importance Ranking**：参数影响力排名（自动计算Tier）
+- **MetaConfig Evolution**：配置参数进化（ConfigSchema+ConfigPatch+TernaryVerdict）
+- **Strategy Schema**：策略参数化（StrategySchema+StrategyReplay）
+- **Task Taxonomy**：任务分类体系（MetaLearningDB+ConditionalOptimizer）
+- **CLI 选项**：`--evolve`、`--self-host`、`--auto-evolve`、`--code-evolve`、`--review-evolve`、`--evo-dashboard`、`--validate`、`--metaconfig`
+- **post-commit hook 增强**：防递归（AGENT_HOOK_RUNNING 环境变量）
+- **研究文档**：`docs/research/` 目录（4篇研究文档+架构文档）
+
+### 变更
+- **README.md**：更新四层架构图、三层知识体系、三态逻辑贯穿说明
+- **AGENTS.md**：更新四层架构、三层知识体系、LLM vs Agent知识对比
+- **agent_runtime.py**：集成所有新模块
+- **CHANGELOG.md**：合并同一天条目
+
+### 关键实验结果
+- **因果链闭环**：Knowledge → Calibration → Selection → Success ✓ (+43.6%)
+- **知识迁移**：配置不可迁移（-4.6%），但任务规律可迁移（+27.9%）
+- **Meta-Knowledge Transfer**：迁移策略类型而非具体配置，证明战略比战术更容易迁移
+
+---
+
+## [v3.33.0] — 2026-06-15 (Phase 3/4 功能)
+
+### 新增
+- **并行执行引擎**（P14/P15）：`agent_parallel.py` — 独立工具并行执行，假设并行验证，预计加速 2-4x
+- **智能上下文压缩**（P22-P24）：`agent_context.py` — 分层摘要+滑动窗口+重要性评分，Token 节省 ~40%
+- **跨会话学习**（P19-P21）：`agent_learning.py` — SQLite 持久化工具成功率、失败模式库、任务类型映射
+- **安全沙箱**（P16-P18）：`agent_sandbox.py` — 命令黑名单/白名单、文件系统守卫、只读模式、审计日志
+- **可观测性增强**（P25-P27）：`agent_obs.py` — 决策链追踪、性能分析、实时仪表盘
+- **流式响应**（P28-P30）：`agent_streaming.py` — LLM 边生成边显示，支持可中断、渐进式输出
+- **高阶工具组合**（P31-P33）：`agent_composition.py` — Unix 风格管道、复合工具、条件工具链
+- **工具自发现**（P13）：`agent_tool_graph.py` — 自动扫描 ops/*.py 注册工具，提取元数据
+- **多Agent共享上下文**（P34-P36）：`agent_shared.py` — 共享上下文空间、共享符号表、Agent协调器
+- **Token 追踪**：LLM 调用实时统计 Token 用量，支持 DeepSeek/Gemini API
+- **CLI 选项**：`--sandbox`（安全沙箱）、`--report`（性能报告）、`--stream`（流式）、`--pipeline`（管道）、`--dashboard`（仪表盘）、`--trace`（追踪）、`--perf`（性能）
+- **交互命令**：`/仪表盘`、`/追踪`、`/性能`、`/经验`、`/安全`、`/共享`、`/管道`
+
+### 变更
+- **README.md**：更新 Agent 特性表（+10项）、CLI 用法、交互命令
+- **AGENTS.md**：更新架构图（四阶段）、文件结构（+10文件）、运行方式
+- **agent_runtime.py**：集成 Phase 3/4 所有模块，优化性能记录
+- **run_agent.py**：新增 CLI 选项和交互命令
+
+---
+
 ## [v3.32.0] — 2026-06-14
 
 ### 新增
@@ -991,5 +1077,5 @@
 
 ---
 
-## [v3.3] — 2025-05
+## [v3.3] — 2026-05-04
 - 初始发布：平衡三进制核心、糖语法、S 表达式、高阶函数、IoT 抽象、温室示例

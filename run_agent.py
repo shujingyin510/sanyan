@@ -987,10 +987,17 @@ def _watch_files():
 
 
 def run_interactive(evaluator, api_key, rt=None):
-    """交互模式 — V3 AgentRuntime 驱动"""
-    print('三言 Agent V3 - 多轮对话（输入 exit 退出）')
+    """交互模式 — V5 AgentRuntime 驱动"""
+    print('三言 Agent V5 - 多轮对话（输入 exit 退出）')
     print('  /状态 → 三态决策摘要')
     print('  /记忆 → 任务记忆')
+    print('  /仪表盘 → 实时仪表盘')
+    print('  /追踪 → 决策链可视化')
+    print('  /性能 → 性能报告')
+    print('  /经验 → 跨会话经验')
+    print('  /安全 → 安全沙箱状态')
+    print('  /共享 → 共享上下文')
+    print('  /管道 → 工具管道列表')
     print()
     round_num = 0
     while True:
@@ -1011,6 +1018,41 @@ def run_interactive(evaluator, api_key, rt=None):
         if q.startswith('/记忆'):
             print(f'  阶段: {rt.memory.get("stage", "?")}' if rt else '')
             print(f'  修改: {rt.memory.get("modified", [])}' if rt else '')
+            continue
+        if q.startswith('/仪表盘') or q.startswith('/dashboard'):
+            print(rt.get_dashboard() if rt else '  无引擎')
+            continue
+        if q.startswith('/追踪') or q.startswith('/trace'):
+            print(rt.visualize_trace() if rt else '  无引擎')
+            continue
+        if q.startswith('/性能') or q.startswith('/perf'):
+            print(rt.get_performance_report() if rt else '  无性能数据')
+            continue
+        if q.startswith('/经验') or q.startswith('/exp'):
+            if rt and rt.experience_store:
+                top_tools = rt.experience_store.get_top_tools(limit=5)
+                print('  最可靠工具:')
+                for tool, score in top_tools:
+                    print(f'    {tool}: {score:.2f}')
+                patterns = rt.experience_store.get_failure_patterns(limit=3)
+                if patterns:
+                    print('  常见失败:')
+                    for p in patterns:
+                        print(f'    {p["tool"]}: {p["error"][:40]} (x{p["count"]})')
+            continue
+        if q.startswith('/安全') or q.startswith('/sandbox'):
+            print(rt.security_sandbox.summary() if rt else '  无沙箱')
+            continue
+        if q.startswith('/共享') or q.startswith('/shared'):
+            if rt and rt.shared_context:
+                print(rt.shared_context.summary())
+            continue
+        if q.startswith('/管道') or q.startswith('/pipeline'):
+            if rt and rt.pipeline:
+                pipelines = rt.pipeline.list_pipelines()
+                print('  已定义管道:' if pipelines else '  (无管道)')
+                for p in pipelines:
+                    print(f'    - {p}')
             continue
         try:
             result = rt.run(q, max_rounds=15)
@@ -1134,6 +1176,13 @@ from agent_tools import (
     _git_reset_hard_direct,
     _git_commit_auto_direct,
 )
+from agent_evolution import ConstrainedEvolutionSystem
+from agent_review import (
+    ReviewedEvolutionLoop,
+    EvolutionDashboard,
+)
+from agent_validation import EvolutionValidation
+from agent_metaconfig import MetaConfigSystem
 # ======  End AgentRuntime imports ======
 
 
@@ -1147,6 +1196,22 @@ def main():
     parser.add_argument('--report', action='store_true', help='完成后输出修改报告')
     parser.add_argument('--resume', action='store_true', help='续接上次未完成任务')
     parser.add_argument('--list-tasks', action='store_true', help='查看任务历史')
+    parser.add_argument('--dashboard', action='store_true', help='显示实时仪表盘')
+    parser.add_argument('--trace', action='store_true', help='显示决策追踪')
+    parser.add_argument('--perf', action='store_true', help='显示性能报告')
+    parser.add_argument('--sandbox', action='store_true', help='启用安全沙箱（只读模式）')
+    parser.add_argument('--parallel', action='store_true', help='启用并行执行')
+    parser.add_argument('--stream', action='store_true', help='启用流式输出')
+    parser.add_argument('--pipeline', type=str, default='', help='执行工具管道')
+    parser.add_argument('--evolve', action='store_true', help='运行约束进化验证')
+    parser.add_argument('--self-host', action='store_true', help='运行自举验证')
+    parser.add_argument('--auto-evolve', action='store_true', help='运行自动化进化闭环')
+    parser.add_argument('--code-evolve', action='store_true', help='Agent自主改代码闭环')
+    parser.add_argument('--review-evolve', action='store_true', help='带审查的进化闭环')
+    parser.add_argument('--evo-dashboard', action='store_true', help='进化仪表盘')
+    parser.add_argument('--validate', action='store_true', help='运行进化验证（100次随机+收敛+Reviewer）')
+    parser.add_argument('--metaconfig', action='store_true', help='MetaConfig进化（配置参数验证）')
+    parser.add_argument('--max-cycles', type=int, default=3, help='最大进化轮次')
     args = parser.parse_args()
 
     # 三言代码：直接执行，跳过 Agent 和 LLM
@@ -1196,9 +1261,16 @@ def main():
 
     evaluator = init_evaluator(api_key)
 
-    # 统一引擎：AgentRuntime V3（--auto 和非 auto 都走这里）
+    # 统一引擎：AgentRuntime V5（--auto 和非 auto 都走这里）
     sandbox = evaluator.get_var('_sandbox') if evaluator.has_var('_sandbox') else None
     rt = AgentRuntime(evaluator, sandbox)
+
+    # Phase 3: 配置安全沙箱
+    if args.sandbox:
+        rt.security_sandbox.read_only = True
+        print('  [沙箱模式] 只读，禁止文件修改')
+
+    # 注册工具
     for name, func in [
         ('analyze', lambda p, d: _analyze_file_direct(p)),
         ('find_symbol', lambda p, d: _find_symbol_direct(p)),
@@ -1208,7 +1280,7 @@ def main():
         ('replace_all', lambda p, d: _replace_all_direct(p, d)),
         ('write_file', lambda p, d: _write_file_direct_simple(p, d)),
         ('list_files', lambda p, d: _list_files_direct_simple(p)),
-        ('run_test', lambda p, d: _run_test_direct(p)),
+        ('run_test', lambda p, d: _run_test_direct(p, d)),
         ('git_diff', lambda p, d: _git_diff_direct()),
         ('git_status', lambda p, d: _git_status_direct()),
         ('git_stash', lambda p, d: _git_stash_direct()),
@@ -1217,7 +1289,133 @@ def main():
         ('done', lambda p, d: p if p else '完成'),
     ]:
         rt.register(name, func)
+
+    # Phase 3: 同步工具到并行执行器
+    rt.parallel_executor.tools = rt.tools
+
     max_r = args.rounds or 15
+
+    # Phase 3: 显示仪表盘
+    if args.dashboard:
+        print(rt.get_dashboard())
+        return
+
+    # Phase 3: 显示追踪
+    if args.trace:
+        print(rt.visualize_trace())
+        return
+
+    # Phase 3: 显示性能报告
+    if args.perf:
+        print(rt.get_performance_report())
+        return
+
+    # Layer 3: 约束进化验证
+    if args.evolve:
+        evo = ConstrainedEvolutionSystem()
+        print('运行约束进化验证...')
+        result = evo.propose_and_verify('vm.py', 'VM._dispatch', '优化分派逻辑')
+        print(f'\n状态: {result["status"]}')
+        if result['status'] == 'accepted':
+            print(f'一致性: {result["verification"]["consistency_rate"]:.1%}')
+            print(f'综合得分: {result["evaluation"]["total_score"]:.2f}')
+        else:
+            print(f'原因: {result.get("reason", "未通过验证")}')
+        print(evo.summary())
+        return
+
+    # Layer 3: 自举验证
+    if args.self_host:
+        evo = ConstrainedEvolutionSystem()
+        print('运行自举验证...')
+        result = evo.run_self_host_check()
+        print(f'\n结果: {"通过" if result["success"] else "失败"}')
+        print(f'字节码编译器: {"通过" if result["bytecode_compiler"]["success"] else "失败"}')
+        print(f'VM一致性: {result["vm_consistency"]["consistent"]}/{result["vm_consistency"]["total"]}')
+        return
+
+    # Layer 3: 自动化进化闭环
+    if args.auto_evolve:
+        evo = ConstrainedEvolutionSystem()
+        result = evo.run_evolution(max_cycles=args.max_cycles or 3)
+        print(evo.summary())
+        return
+
+    # Layer 3: Agent自主改代码闭环
+    if args.code_evolve:
+        from agent_evolution_v2 import AgentCodeModifier
+
+        modifier = AgentCodeModifier()
+        result = modifier.run_evolution_loop(max_cycles=args.max_cycles or 3)
+        print(modifier.summary())
+        return
+
+    # Layer 3: 带审查的进化闭环
+    if args.review_evolve:
+        loop = ReviewedEvolutionLoop()
+        # 测试补丁
+        test_patches = [
+            {
+                'target': 'vm.py',
+                'action': 'replace',
+                'before': 'old code',
+                'after': 'new code',
+                'rationale': '缓存优化：减少重复计算',
+                'expected': '提升5-10%',
+            },
+            {
+                'target': 'ternary_core.py',
+                'action': 'replace',
+                'before': 'old code',
+                'after': 'new code',
+                'rationale': '循环优化：减少迭代次数',
+                'expected': '减少10-20%耗时',
+            },
+        ]
+        result = loop.run(test_patches)
+        print(f'\n结果: 接受{result["accepted"]} 拒绝{result["rejected"]} 回滚{result["rolled_back"]}')
+        print(loop.summary())
+        return
+
+    # 进化仪表盘
+    if args.evo_dashboard:
+        dashboard = EvolutionDashboard()
+        print(dashboard.render())
+        return
+
+    # 进化验证
+    if args.validate:
+        validator = EvolutionValidation()
+        report = validator.run_all(
+            n_random=100,
+            n_convergence=20,
+            n_reviewer=100,
+            n_meta=5,
+        )
+        validator.print_report(report)
+        return
+
+    # MetaConfig进化
+    if args.metaconfig:
+        from agent_metaconfig import TaskReplay
+
+        system = MetaConfigSystem()
+
+        # 先记录一些历史任务
+        replay = TaskReplay()
+        for i in range(30):
+            replay.record_task(f'task_{i}', ['analyze', 'read_file'], success=True, duration=1.0, tokens=100)
+
+        # 运行多个配置变更
+        proposals = [
+            {'parameter': 'cooldown_seconds', 'new_value': 15, 'reason': '减少等待时间'},
+            {'parameter': 'tournament_candidates', 'new_value': 4, 'reason': '增加候选数量'},
+            {'parameter': 'max_lines_changed', 'new_value': 25, 'reason': '允许更大变更'},
+        ]
+        result = system.run(proposals)
+        print(f'\n结果: 接受{result["accepted"]} 拒绝{result["rejected"]} 未知{result["unknown"]}')
+        print(system.summary())
+        return
 
     if args.question:
         result = rt.run(args.question, max_rounds=max_r, dry_run=args.dry_run)
@@ -1225,8 +1423,14 @@ def main():
         if args.report:
             m = result['memory']
             print(f'\n=== 报告 ===\n阶段: {m["stage"]}\n工具: {len(m["history"])}次\n修改: {m["modified"]}')
+            # Phase 3: 显示性能摘要
+            print('\n=== 性能摘要 ===')
+            print(rt.get_performance_report())
+            # Phase 3: 显示安全摘要
+            print('\n=== 安全摘要 ===')
+            print(rt.security_sandbox.summary())
     else:
-        run_interactive(evaluator, api_key, rt)  # V3 引擎
+        run_interactive(evaluator, api_key, rt)  # V5 引擎
 
 
 def _print_report(evaluator):
