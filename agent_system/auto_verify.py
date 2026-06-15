@@ -10,7 +10,7 @@ import os
 import sys
 import subprocess as sp
 
-ROOT = os.path.dirname(os.path.abspath(__file__))
+ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 
 def run(cmd, timeout=300):

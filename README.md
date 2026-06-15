@@ -1,4 +1,4 @@
-# 三态认知框架 Sanyan v3.36.0
+# 三态认知框架 Sanyan v3.29.0
 
 [![VS Code Extension](https://img.shields.io/badge/VS%20Code-%E8%AF%AD%E6%B3%95%E9%AB%98%E4%BA%AE-%23007ACC?logo=visualstudiocode)](sanyan-vscode/README.md)
 [![CI](https://github.com/shujingyin510/sanyan/actions/workflows/test.yml/badge.svg)](https://github.com/shujingyin510/sanyan/actions)
@@ -9,17 +9,14 @@
 
 ---
 
-## Research Results
+## v3.36 更新摘要
 
-```
-✓ 因果链闭环: Knowledge → Calibration → Selection → Success (+43.6%)
-✓ 知识迁移: 任务规律可迁移 (+27.9%), 配置不可迁移 (-4.6%)
-✓ 知识置信度: 防止把偶然当规律 (Confidence 0.69-0.92)
-✓ Task Taxonomy: 不同任务需要不同策略
-✓ 三态逻辑贯穿: 语言→Agent→Knowledge→Evolution
-```
+- **Agent 自主改代码闭环**：LLM 生成补丁 → 行号校准 → 多后端一致性 + 自举验证 → 接受/回滚，坏补丁自动拦截
+- **四层进化架构**：策略自优化（Layer 1）→ 自主循环（Layer 2）→ 约束进化（Layer 3）→ 知识层（Layer 4）
+- **全量 CI 绿**：1650+ 测试，mypy 零错误，ruff 零错误，preflight 一键检查
+- **自举 Level 2–4**：编译器自编译（不动点验证）→ C 种子 VM（318行）→ x86_64 NASM 汇编 VM（617行）
 
-详见 [实验报告](docs/research/05-experiment-report.md)
+详见 [CHANGELOG](CHANGELOG.md)
 
 ---
 

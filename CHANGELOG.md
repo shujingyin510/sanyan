@@ -126,7 +126,7 @@
 ## [v3.32.0] — 2026-06-14
 
 ### 新增
-- **Agent 自主闭环**：`auto_verify.py` 自主循环脚本（提交→全量测试→通过自动commit/失败回退），三条路径实测通过
+- **Agent 自主闭环**：`agent_system/auto_verify.py` 自主循环脚本（提交→全量测试→通过自动commit/失败回退），三条路径实测通过
 - **git 工具扩展**：`git_stash`（保存现场）、`git_reset_hard`（回退提交）、`git_commit_auto`（自动提交）注册到 Agent 工具集
 - **post-commit hook**：`.git/hooks/post-commit` + `post-commit.bat`，检测代码变更自动触发验证
 

@@ -1,4 +1,4 @@
-# Tri-State Cognitive Framework Sanyan v3.36.0
+# Tri-State Cognitive Framework Sanyan v3.29.0
 
 [![VS Code Extension](https://img.shields.io/badge/VS%20Code-Syntax%20Highlight-%23007ACC?logo=visualstudiocode)](sanyan-vscode/README.md)
 [![CI](https://github.com/shujingyin510/sanyan/actions/workflows/test.yml/badge.svg)](https://github.com/shujingyin510/sanyan/actions)
@@ -30,7 +30,7 @@ The language is the interface — the core is the Kleene three-value logic propa
 
 ## What's New in v3.36
 
-- **Agent Autonomous Loop**: `auto_verify.py` — commit triggers full test suite → auto-commit on pass / auto-rollback on fail. Three paths tested and verified.
+- **Agent Autonomous Loop**: `agent_system/auto_verify.py` — commit triggers full test suite → auto-commit on pass / auto-rollback on fail. Three paths tested and verified.
 - **Deep LLM Integration**: Upgraded to `deepseek-v4-pro` with explicit thinking control (`budget_tokens: 2048`). JSON tool call format. Cross-task experience library for learning from failures.
 - **Cognitive Runtime**: Toggle detection, same-error-twice escalation, structured retry history — the Agent knows when it's going in circles.
 - **Bootstrap Level 2–4**: Self-compiling compiler (fixpoint verified) → 318-line C seed VM → 617-line x86_64 NASM assembly VM. Zero external dependencies.
