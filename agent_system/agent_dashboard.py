@@ -5,7 +5,7 @@ class EvolutionDashboard:
     """进化仪表盘：可视化进化状态"""
 
     def __init__(self, patch_history=None, benchmark=None, reviewer=None):
-        from agent_review import PatchHistory, ReviewerAgent
+        from agent_system.agent_review import PatchHistory, ReviewerAgent
 
         self.patch_history = patch_history or PatchHistory()
         self.benchmark = benchmark

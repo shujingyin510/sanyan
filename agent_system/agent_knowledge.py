@@ -362,7 +362,7 @@ class KnowledgeValidator:
     def validate_classification(self, tasks: List[Dict], true_labels: List[str]) -> Dict:
         """验证分类质量"""
         # 用规则分类
-        from agent_task_taxonomy import TaskClassifier
+        from agent_system.agent_task_taxonomy import TaskClassifier
 
         classifier = TaskClassifier()
 
@@ -391,7 +391,7 @@ class KnowledgeValidator:
 
     def find_misclassifications(self, tasks: List[Dict], true_labels: List[str], threshold: float = 0.5) -> List[Dict]:
         """找到可能的误分类"""
-        from agent_task_taxonomy import TaskClassifier
+        from agent_system.agent_task_taxonomy import TaskClassifier
 
         classifier = TaskClassifier()
 

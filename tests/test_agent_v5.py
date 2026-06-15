@@ -17,7 +17,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 class TestToolDependencyGraph(unittest.TestCase):
     def setUp(self):
-        from agent_tool_graph import ToolDependencyGraph
+        from agent_system.agent_tool_graph import ToolDependencyGraph
 
         self.g = ToolDependencyGraph()
 
@@ -66,7 +66,7 @@ class TestToolDependencyGraph(unittest.TestCase):
 
 class TestToolCapabilityRegistry(unittest.TestCase):
     def setUp(self):
-        from agent_tool_graph import ToolCapabilityRegistry
+        from agent_system.agent_tool_graph import ToolCapabilityRegistry
 
         self.r = ToolCapabilityRegistry()
 
@@ -93,7 +93,7 @@ class TestToolCapabilityRegistry(unittest.TestCase):
 
 class TestTaskCapabilityExtractor(unittest.TestCase):
     def setUp(self):
-        from agent_tool_graph import TaskCapabilityExtractor
+        from agent_system.agent_tool_graph import TaskCapabilityExtractor
 
         self.e = TaskCapabilityExtractor()
 
@@ -136,7 +136,7 @@ class TestTaskCapabilityExtractor(unittest.TestCase):
 
 class TestComplexityClassifier(unittest.TestCase):
     def setUp(self):
-        from agent_decompose import ComplexityClassifier
+        from agent_system.agent_decompose import ComplexityClassifier
 
         self.c = ComplexityClassifier()
 
@@ -163,12 +163,12 @@ class TestComplexityClassifier(unittest.TestCase):
 
 class TestTaskNode(unittest.TestCase):
     def setUp(self):
-        from agent_decompose import TaskNode
+        from agent_system.agent_decompose import TaskNode
 
         self.root = TaskNode('root', '根任务')
 
     def test_add_child(self):
-        from agent_decompose import TaskNode
+        from agent_system.agent_decompose import TaskNode
 
         child = TaskNode('root.0', '子任务')
         self.root.add_child(child)
@@ -177,7 +177,7 @@ class TestTaskNode(unittest.TestCase):
 
     def test_is_leaf(self):
         self.assertTrue(self.root.is_leaf())
-        from agent_decompose import TaskNode
+        from agent_system.agent_decompose import TaskNode
 
         self.root.add_child(TaskNode('root.0', '子'))
         self.assertFalse(self.root.is_leaf())
@@ -190,7 +190,7 @@ class TestTaskNode(unittest.TestCase):
         self.assertEqual(d['children'], [])
 
     def test_to_dict_with_children(self):
-        from agent_decompose import TaskNode
+        from agent_system.agent_decompose import TaskNode
 
         child = TaskNode('root.0', '子任务')
         child.result_summary = '子结果'
@@ -208,7 +208,7 @@ class TestTaskNode(unittest.TestCase):
 
 class TestBoundedContext(unittest.TestCase):
     def setUp(self):
-        from agent_decompose import BoundedContext
+        from agent_system.agent_decompose import BoundedContext
 
         self.ctx = BoundedContext(budget=100)
 
@@ -253,21 +253,21 @@ class TestBoundedContext(unittest.TestCase):
 
 class TestDecompositionEngine(unittest.TestCase):
     def setUp(self):
-        from agent_decompose import DecompositionEngine
+        from agent_system.agent_decompose import DecompositionEngine
 
         self.mock_agent = MagicMock()
         self.mock_agent._run_single_task.return_value = '执行结果'
         self.de = DecompositionEngine(MagicMock(return_value='子任务1\n子任务2'), self.mock_agent)
 
     def test_run_simple_task(self):
-        from agent_decompose import DecompositionEngine
+        from agent_system.agent_decompose import DecompositionEngine
 
         de = DecompositionEngine(MagicMock(return_value=''), self.mock_agent)
         de.run('读取 config.py')
         self.mock_agent._run_single_task.assert_called()
 
     def test_run_complex_task(self):
-        from agent_decompose import DecompositionEngine
+        from agent_system.agent_decompose import DecompositionEngine
 
         mock_agent = MagicMock()
         mock_agent._run_single_task.return_value = '执行结果'
@@ -278,14 +278,14 @@ class TestDecompositionEngine(unittest.TestCase):
         self.assertIn('[', result)
 
     def test_decompose(self):
-        from agent_decompose import TaskNode
+        from agent_system.agent_decompose import TaskNode
 
         node = TaskNode('root', '重构认证模块的多个文件，包括修改和测试')
         subtasks = self.de._decompose(node)
         self.assertEqual(len(subtasks), 2)
 
     def test_decompose_error(self):
-        from agent_decompose import DecompositionEngine, TaskNode
+        from agent_system.agent_decompose import DecompositionEngine, TaskNode
 
         de = DecompositionEngine(MagicMock(side_effect=Exception('LLM错误')), self.mock_agent)
         node = TaskNode('root', '重构认证模块的多个文件')
@@ -293,14 +293,14 @@ class TestDecompositionEngine(unittest.TestCase):
         self.assertEqual(subtasks, [])
 
     def test_execute_leaf_success(self):
-        from agent_decompose import TaskNode
+        from agent_system.agent_decompose import TaskNode
 
         node = TaskNode('root', '读取配置')
         self.de._execute_leaf(node)
         self.assertEqual(node.status, 'done')
 
     def test_execute_leaf_failure(self):
-        from agent_decompose import DecompositionEngine, TaskNode
+        from agent_system.agent_decompose import DecompositionEngine, TaskNode
 
         mock_agent = MagicMock()
         mock_agent._run_single_task.side_effect = Exception('执行错误')
@@ -311,7 +311,7 @@ class TestDecompositionEngine(unittest.TestCase):
         self.assertIn('执行失败', node.result_summary)
 
     def test_merge_children(self):
-        from agent_decompose import TaskNode
+        from agent_system.agent_decompose import TaskNode
 
         root = TaskNode('root', '任务')
         c1 = TaskNode('root.0', '子1')
@@ -326,14 +326,14 @@ class TestDecompositionEngine(unittest.TestCase):
         self.assertEqual(root.status, 'done')
 
     def test_merge_children_empty(self):
-        from agent_decompose import TaskNode
+        from agent_system.agent_decompose import TaskNode
 
         root = TaskNode('root', '任务')
         self.de._merge_children(root)
         self.assertEqual(root.result_summary, '')
 
     def test_max_depth(self):
-        from agent_decompose import DecompositionEngine, TaskNode
+        from agent_system.agent_decompose import DecompositionEngine, TaskNode
 
         de = DecompositionEngine(MagicMock(return_value='子任务\n子任务2'), self.mock_agent)
         node = TaskNode('root', 'x' * 300)
@@ -348,7 +348,7 @@ class TestDecompositionEngine(unittest.TestCase):
 
 class TestFailureMode(unittest.TestCase):
     def test_enum_values(self):
-        from agent_hypothesis import FailureMode
+        from agent_system.agent_hypothesis import FailureMode
 
         self.assertEqual(FailureMode.SUCCESS.value, 'ok')
         self.assertEqual(FailureMode.EMPTY_RESULT.value, 'empty')
@@ -360,7 +360,7 @@ class TestFailureMode(unittest.TestCase):
         self.assertEqual(FailureMode.UNKNOWN.value, 'unknown')
 
     def test_retry_strategy_keys(self):
-        from agent_hypothesis import RETRY_STRATEGY, FailureMode
+        from agent_system.agent_hypothesis import RETRY_STRATEGY, FailureMode
 
         for mode in FailureMode:
             if mode != FailureMode.SUCCESS:
@@ -369,80 +369,80 @@ class TestFailureMode(unittest.TestCase):
 
 class TestFailureClassifier(unittest.TestCase):
     def setUp(self):
-        from agent_hypothesis import FailureClassifier
+        from agent_system.agent_hypothesis import FailureClassifier
 
         self.fc = FailureClassifier()
 
     def test_success(self):
-        from agent_hypothesis import FailureMode
+        from agent_system.agent_hypothesis import FailureMode
 
         self.assertEqual(self.fc.classify('analyze', {}, '函数列表...'), FailureMode.SUCCESS)
 
     def test_empty_none(self):
-        from agent_hypothesis import FailureMode
+        from agent_system.agent_hypothesis import FailureMode
 
         self.assertEqual(self.fc.classify('x', {}, None), FailureMode.EMPTY_RESULT)
 
     def test_empty_string(self):
-        from agent_hypothesis import FailureMode
+        from agent_system.agent_hypothesis import FailureMode
 
         self.assertEqual(self.fc.classify('x', {}, ''), FailureMode.EMPTY_RESULT)
 
     def test_not_found_en(self):
-        from agent_hypothesis import FailureMode
+        from agent_system.agent_hypothesis import FailureMode
 
         self.assertEqual(self.fc.classify('x', {}, 'not found'), FailureMode.TOOL_MISSING)
 
     def test_not_found_cn(self):
-        from agent_hypothesis import FailureMode
+        from agent_system.agent_hypothesis import FailureMode
 
         self.assertEqual(self.fc.classify('x', {}, '未找到目标'), FailureMode.TOOL_MISSING)
 
     def test_schema_error(self):
-        from agent_hypothesis import FailureMode
+        from agent_system.agent_hypothesis import FailureMode
 
         self.assertEqual(self.fc.classify('x', {}, 'missing argument'), FailureMode.SCHEMA_ERROR)
         self.assertEqual(self.fc.classify('x', {}, '格式错误'), FailureMode.SCHEMA_ERROR)
         self.assertEqual(self.fc.classify('x', {}, '参数不对'), FailureMode.SCHEMA_ERROR)
 
     def test_timeout(self):
-        from agent_hypothesis import FailureMode
+        from agent_system.agent_hypothesis import FailureMode
 
         self.assertEqual(self.fc.classify('x', {}, 'timeout'), FailureMode.TIMEOUT)
         self.assertEqual(self.fc.classify('x', {}, '请求超时'), FailureMode.TIMEOUT)
 
     def test_logic_error_test_fail(self):
-        from agent_hypothesis import FailureMode
+        from agent_system.agent_hypothesis import FailureMode
 
         self.assertEqual(self.fc.classify('run_test', {}, 'FAIL test_foo'), FailureMode.LOGIC_ERROR)
 
     def test_logic_error_replace_not_found(self):
-        from agent_hypothesis import FailureMode
+        from agent_system.agent_hypothesis import FailureMode
 
         # replace_in_file with '未找到' is TOOL_MISSING (checked first)
         self.assertEqual(self.fc.classify('replace_in_file', {}, '未找到'), FailureMode.TOOL_MISSING)
 
     def test_logic_error_analyze(self):
-        from agent_hypothesis import FailureMode
+        from agent_system.agent_hypothesis import FailureMode
 
         self.assertEqual(self.fc.classify('analyze', {}, '分析错误'), FailureMode.LOGIC_ERROR)
 
     def test_logic_error_keyword(self):
-        from agent_hypothesis import FailureMode
+        from agent_system.agent_hypothesis import FailureMode
 
         self.assertEqual(self.fc.classify('x', {}, 'error occurred'), FailureMode.LOGIC_ERROR)
         self.assertEqual(self.fc.classify('x', {}, '执行错误'), FailureMode.LOGIC_ERROR)
         self.assertEqual(self.fc.classify('x', {}, '操作失败'), FailureMode.LOGIC_ERROR)
 
     def test_loop_detection(self):
-        from agent_hypothesis import FailureMode
+        from agent_system.agent_hypothesis import FailureMode
 
         for _ in range(3):
             mode = self.fc.classify('foo', {}, 'same result')
         self.assertEqual(mode, FailureMode.LOGIC_LOOP)
 
     def test_no_loop_different_results(self):
-        from agent_hypothesis import FailureMode
+        from agent_system.agent_hypothesis import FailureMode
 
         self.fc.classify('foo', {}, 'result1')
         self.fc.classify('foo', {}, 'result2')
@@ -457,7 +457,7 @@ class TestFailureClassifier(unittest.TestCase):
 
 class TestDiversityController(unittest.TestCase):
     def setUp(self):
-        from agent_hypothesis import DiversityController, Hypothesis
+        from agent_system.agent_hypothesis import DiversityController, Hypothesis
 
         self.dc = DiversityController()
         self.H = Hypothesis
@@ -495,7 +495,7 @@ class TestDiversityController(unittest.TestCase):
 
 class TestThresholdTuner(unittest.TestCase):
     def setUp(self):
-        from agent_hypothesis import ThresholdTuner
+        from agent_system.agent_hypothesis import ThresholdTuner
 
         self.tt = ThresholdTuner()
 
@@ -525,7 +525,7 @@ class TestThresholdTuner(unittest.TestCase):
 
 class TestHypothesis(unittest.TestCase):
     def setUp(self):
-        from agent_hypothesis import Hypothesis, FailureMode
+        from agent_system.agent_hypothesis import Hypothesis, FailureMode
 
         self.h = Hypothesis(0, '方案A', estimated_cost=3)
         self.FM = FailureMode
@@ -592,7 +592,7 @@ class TestHypothesis(unittest.TestCase):
 
 class TestHypothesisGenerator(unittest.TestCase):
     def setUp(self):
-        from agent_hypothesis import HypothesisGenerator
+        from agent_system.agent_hypothesis import HypothesisGenerator
 
         self.hg = HypothesisGenerator()
 
@@ -634,7 +634,7 @@ class TestHypothesisGenerator(unittest.TestCase):
 
 class TestTournament(unittest.TestCase):
     def setUp(self):
-        from agent_hypothesis import Tournament, Hypothesis
+        from agent_system.agent_hypothesis import Tournament, Hypothesis
 
         self.T = Tournament
         self.H = Hypothesis
@@ -709,7 +709,7 @@ class TestTournament(unittest.TestCase):
         self.assertEqual(result.id, 0)
 
     def test_with_metrics(self):
-        from agent_resource import MetricsCollector
+        from agent_system.agent_resource import MetricsCollector
 
         m = MetricsCollector()
         h1 = self.H(0, 'A')
@@ -736,7 +736,7 @@ class TestTournament(unittest.TestCase):
         h = self.H(0, 'A')
         h.confidence = 0.05
         mock_exec.advance.return_value = h
-        from agent_resource import MetricsCollector
+        from agent_system.agent_resource import MetricsCollector
 
         m = MetricsCollector()
         t = self.T(metrics=m)
@@ -749,16 +749,16 @@ class TestTournament(unittest.TestCase):
 
 class TestHypothesisExecutor(unittest.TestCase):
     def setUp(self):
-        from agent_hypothesis import HypothesisExecutor, FailureClassifier
+        from agent_system.agent_hypothesis import HypothesisExecutor, FailureClassifier
 
         self.tools = {'read_file': MagicMock(return_value='内容'), 'analyze': MagicMock(return_value='分析')}
         self.exec = HypothesisExecutor(self.tools, FailureClassifier())
 
     def test_advance_success(self):
-        from agent_hypothesis import Hypothesis
+        from agent_system.agent_hypothesis import Hypothesis
 
         h = Hypothesis(0, 'read_file,analyze')
-        from agent_decompose import BoundedContext
+        from agent_system.agent_decompose import BoundedContext
 
         ctx = BoundedContext()
         ctx.set_task('test')
@@ -766,10 +766,10 @@ class TestHypothesisExecutor(unittest.TestCase):
         self.assertEqual(len(h.tools_used), 1)
 
     def test_advance_no_tool(self):
-        from agent_hypothesis import Hypothesis
+        from agent_system.agent_hypothesis import Hypothesis
 
         h = Hypothesis(0, 'unknown_tool')
-        from agent_decompose import BoundedContext
+        from agent_system.agent_decompose import BoundedContext
 
         ctx = BoundedContext()
         ctx.set_task('test')
@@ -777,12 +777,12 @@ class TestHypothesisExecutor(unittest.TestCase):
         self.assertLess(h.confidence, 0.5)
 
     def test_advance_error(self):
-        from agent_hypothesis import Hypothesis, HypothesisExecutor, FailureClassifier
+        from agent_system.agent_hypothesis import Hypothesis, HypothesisExecutor, FailureClassifier
 
         bad_tools = {'fail': MagicMock(side_effect=Exception('错误'))}
         exec = HypothesisExecutor(bad_tools, FailureClassifier())
         h = Hypothesis(0, 'fail')
-        from agent_decompose import BoundedContext
+        from agent_system.agent_decompose import BoundedContext
 
         ctx = BoundedContext()
         ctx.set_task('test')
@@ -802,7 +802,7 @@ class TestHypothesisExecutor(unittest.TestCase):
 
 class TestMetricsCollector(unittest.TestCase):
     def setUp(self):
-        from agent_resource import MetricsCollector
+        from agent_system.agent_resource import MetricsCollector
 
         self.m = MetricsCollector()
 
@@ -865,7 +865,7 @@ class TestMetricsCollector(unittest.TestCase):
 
 class TestSemanticCache(unittest.TestCase):
     def setUp(self):
-        from agent_resource import SemanticCache
+        from agent_system.agent_resource import SemanticCache
 
         self.sc = SemanticCache()
 
@@ -886,7 +886,7 @@ class TestSemanticCache(unittest.TestCase):
         self.assertAlmostEqual(self.sc._keyword_overlap('', 'a'), 0.0)
 
     def test_store_overflow(self):
-        from agent_resource import SemanticCache
+        from agent_system.agent_resource import SemanticCache
 
         sc = SemanticCache()
         sc.MAX_SIZE = 3
@@ -897,7 +897,7 @@ class TestSemanticCache(unittest.TestCase):
 
 class TestCostPredictor(unittest.TestCase):
     def setUp(self):
-        from agent_resource import CostPredictor
+        from agent_system.agent_resource import CostPredictor
 
         self.cp = CostPredictor()
 
@@ -922,7 +922,7 @@ class TestCostPredictor(unittest.TestCase):
 
 class TestActionLog(unittest.TestCase):
     def test_add_action(self):
-        from agent_resource import ActionLog
+        from agent_system.agent_resource import ActionLog
 
         log = ActionLog('run1', '任务')
         log.add_action(0, 'read_file', 'foo.py', '内容', 0.9)
@@ -930,7 +930,7 @@ class TestActionLog(unittest.TestCase):
         self.assertEqual(log.actions[0]['tool'], 'read_file')
 
     def test_to_dict(self):
-        from agent_resource import ActionLog
+        from agent_system.agent_resource import ActionLog
 
         log = ActionLog('run1', '任务')
         d = log.to_dict()
@@ -941,7 +941,7 @@ class TestActionLog(unittest.TestCase):
 
 class TestReplayEngine(unittest.TestCase):
     def setUp(self):
-        from agent_resource import ReplayEngine
+        from agent_system.agent_resource import ReplayEngine
 
         self.re = ReplayEngine()
 
@@ -992,7 +992,7 @@ class TestReplayEngine(unittest.TestCase):
 
 class TestResourceManager(unittest.TestCase):
     def setUp(self):
-        from agent_resource import ResourceManager
+        from agent_system.agent_resource import ResourceManager
 
         self.rm = ResourceManager()
 
@@ -1068,7 +1068,7 @@ class TestResourceManager(unittest.TestCase):
 
 class TestAgentRuntimeV5Integration(unittest.TestCase):
     def setUp(self):
-        from agent_runtime import AgentRuntime
+        from agent_system.agent_runtime import AgentRuntime
         from evaluator import SanyanEvaluator
 
         ev = SanyanEvaluator()

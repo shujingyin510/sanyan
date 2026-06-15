@@ -85,7 +85,7 @@ _register_aliases()
 
 # ── 配置 ──
 cfg = {'url': '', 'model': '', 'key': ''}
-cp = 'ternary_agent/runtime_v2/village_config.san'
+cp = 'agent_system/sanyan/runtime_v2/village_config.san'
 if os.path.exists(cp):
     with open(cp, encoding='utf-8') as f:
         for line in f:
@@ -733,7 +733,7 @@ register('夜间冲突事件', _night_events)
 register('夜间事件', _night_events)  # 别名，兼容旧代码
 
 # ── 加载游戏 ──
-src = open('ternary_agent/runtime_v2/village_game.san', encoding='utf-8').read()
+src = open('agent_system/sanyan/runtime_v2/village_game.san', encoding='utf-8').read()
 ast, _ = parse_code(src)
 fixed = [
     s
@@ -746,7 +746,7 @@ try:
 except ReturnException:
     pass
 
-src2 = open('ternary_agent/runtime_v2/village_observe.san', encoding='utf-8').read()
+src2 = open('agent_system/sanyan/runtime_v2/village_observe.san', encoding='utf-8').read()
 ast2, _ = parse_code(src2)
 fixed2 = [s for s in ast2[1:] if not (isinstance(s, list) and s[0] == 'export')]
 try:

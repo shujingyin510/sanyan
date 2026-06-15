@@ -81,7 +81,7 @@ class ProjectOrchestrator:
     def _execute_task(self, task):
         task.status = TaskStatus.RUNNING
         try:
-            from agent_tools import _spawn_sub_agent
+            from agent_system.agent_tools import _spawn_sub_agent
 
             name = 'proj_' + task.name.replace(' ', '_')[:20]
             r = _spawn_sub_agent('name=' + name + '\ntask=' + task.description)

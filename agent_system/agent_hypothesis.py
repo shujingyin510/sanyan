@@ -254,7 +254,7 @@ class HypothesisGenerator:
     DEFAULT_COUNT = 5
 
     def __init__(self, tool_graph=None, cap_registry=None):
-        from agent_tool_graph import ToolDependencyGraph, ToolCapabilityRegistry, TaskCapabilityExtractor
+        from agent_system.agent_tool_graph import ToolDependencyGraph, ToolCapabilityRegistry, TaskCapabilityExtractor
 
         self.tool_graph = tool_graph or ToolDependencyGraph()
         self.cap_registry = cap_registry or ToolCapabilityRegistry()
@@ -518,7 +518,7 @@ class HypothesisExecutor:
 
     def _infer_tools(self, description: str) -> List[str]:
         """从描述推断工具链"""
-        from agent_tool_graph import TaskCapabilityExtractor
+        from agent_system.agent_tool_graph import TaskCapabilityExtractor
 
         extractor = TaskCapabilityExtractor()
         return extractor.suggest_tools(description)

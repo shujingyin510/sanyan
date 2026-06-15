@@ -209,7 +209,7 @@ class ReviewerDegradationTest:
                     }
 
             # 审查
-            from agent_review import ReviewerAgent
+            from agent_system.agent_review import ReviewerAgent
 
             reviewer = ReviewerAgent()
             original_rules = reviewer.RULES.copy()

@@ -10,7 +10,7 @@
 
     设置 API 密钥:
     set SANYAN_API_KEY=sk-xxx
-    或修改 ternary_agent/agent_policy.san 中的 API密钥
+    或修改 agent_system/sanyan/agent_policy.san 中的 API密钥
 """
 
 import sys
@@ -103,7 +103,7 @@ def load_api_key():
         if key and '你的' not in key:
             return key
     # 在 agent.san（含 #include 展开）中查找 API密钥
-    agent_path = os.path.join('ternary_agent', 'agent.san')
+    agent_path = os.path.join('agent_system', 'sanyan', 'agent.san')
     with open(agent_path, encoding='utf-8') as f:
         src = f.read()
     src = preprocess_includes(src)
@@ -113,7 +113,7 @@ def load_api_key():
             if key and '你的' not in key:
                 return key
     # 尝试从 village_config.san 读取（游戏用的密钥文件）
-    village_cfg = os.path.join('ternary_agent', 'runtime_v2', 'village_config.san')
+    village_cfg = os.path.join('agent_system', 'sanyan', 'runtime_v2', 'village_config.san')
     if os.path.exists(village_cfg):
         with open(village_cfg, encoding='utf-8') as f:
             for line in f:
@@ -240,7 +240,7 @@ def init_evaluator(api_key):
 
         # 代码模式: 以 ( 开头
         if task.strip().startswith('('):
-            from agent_tools import _spawn_sub_agent
+            from agent_system.agent_tools import _spawn_sub_agent
 
             return _spawn_sub_agent(params)
 
@@ -248,7 +248,7 @@ def init_evaluator(api_key):
         if not api_key or '你的key' in api_key:
             return 'LLM mode needs valid API key'
 
-        from agent_tools import _agent_registry
+        from agent_system.agent_tools import _agent_registry
 
         _agent_registry[name] = {'status': 'running', 'task': task, 'result': None}
 
@@ -318,7 +318,7 @@ def init_evaluator(api_key):
             _reg_op('分析文件', _sub_analyze)
             _reg_op('列出Agent', lambda ev, a: 'sub-agent tools: read, write, search, analyze')
 
-            agent_path = _os.path.join('ternary_agent', 'agent.san')
+            agent_path = _os.path.join('agent_system', 'sanyan', 'agent.san')
             src = open(agent_path, encoding='utf-8').read()
             src = preprocess_includes(src)
             if sub_api_key:
@@ -338,7 +338,7 @@ def init_evaluator(api_key):
 
             # 置信度衰减检测 (严格单调递减 + 窗口检测)
             import re
-            from agent_tools import _AGENT_CONF_WINDOW, _AGENT_CONF_FLOOR, _classify_failure
+            from agent_system.agent_tools import _AGENT_CONF_WINDOW, _AGENT_CONF_FLOOR, _classify_failure
 
             confs = [float(m) for m in re.findall(r'信度[=:\uff1a]\s*([0-9.]+)', out)]
             rounds = re.findall(r'第\s*(\d+)\s*轮', out)
@@ -372,12 +372,12 @@ def init_evaluator(api_key):
             return '[Agent ' + name + '] error: ' + str(ex)[:300]
 
     def _agent_message_hook(e, args):
-        from agent_tools import _agent_message
+        from agent_system.agent_tools import _agent_message
 
         return _agent_message(str(e.eval(args[0])) if args else '')
 
     def _agent_list_hook(e, args):
-        from agent_tools import _agent_list
+        from agent_system.agent_tools import _agent_list
 
         return _agent_list(str(e.eval(args[0])) if args else '')
 
@@ -663,7 +663,7 @@ def init_evaluator(api_key):
         matches = _glob.glob('**/' + path, recursive=True)
         if matches:
             return matches[0]
-        prefixed = os.path.join('ternary_agent', path)
+        prefixed = os.path.join('agent_system', 'sanyan', path)
         if os.path.exists(prefixed):
             return prefixed
         matches = _glob.glob('**/' + prefixed, recursive=True)
@@ -906,7 +906,7 @@ def init_evaluator(api_key):
     reg_op('查找符号', _find_symbol)
     reg_op('运行汇编', _run_assembly_hook)
 
-    agent_path = os.path.join('ternary_agent', 'agent.san')
+    agent_path = os.path.join('agent_system', 'sanyan', 'agent.san')
     src = open(agent_path, encoding='utf-8').read()
     # 预处理 #include 展开
     src = preprocess_includes(src)
@@ -978,7 +978,7 @@ def run_once(evaluator, question):
 
 def _watch_files():
     """返回当前所有 Agent 文件的修改时间戳字典。"""
-    agent_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'ternary_agent')
+    agent_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'agent_system', 'sanyan')
     return {
         'agent.san': os.path.getmtime(os.path.join(agent_dir, 'agent.san')),
         'agent_policy.san': os.path.getmtime(os.path.join(agent_dir, 'agent_policy.san')),
@@ -1159,8 +1159,8 @@ def _list_tasks():
 
 
 # ====== AgentRuntime V3 导入 ======
-from agent_runtime import AgentRuntime
-from agent_tools import (
+from agent_system.agent_runtime import AgentRuntime
+from agent_system.agent_tools import (
     _analyze_file_direct,
     _find_symbol_direct,
     _read_file_direct_simple,
@@ -1176,13 +1176,13 @@ from agent_tools import (
     _git_reset_hard_direct,
     _git_commit_auto_direct,
 )
-from agent_evolution import ConstrainedEvolutionSystem
-from agent_review import (
+from agent_system.agent_evolution import ConstrainedEvolutionSystem
+from agent_system.agent_review import (
     ReviewedEvolutionLoop,
     EvolutionDashboard,
 )
-from agent_validation import EvolutionValidation
-from agent_metaconfig import MetaConfigSystem
+from agent_system.agent_validation import EvolutionValidation
+from agent_system.agent_metaconfig import MetaConfigSystem
 # ======  End AgentRuntime imports ======
 
 
@@ -1343,7 +1343,7 @@ def main():
 
     # Layer 3: Agent自主改代码闭环
     if args.code_evolve:
-        from agent_evolution_v2 import AgentCodeModifier
+        from agent_system.agent_evolution_v2 import AgentCodeModifier
 
         modifier = AgentCodeModifier()
         result = modifier.run_evolution_loop(max_cycles=args.max_cycles or 3)
@@ -1397,7 +1397,7 @@ def main():
 
     # MetaConfig进化
     if args.metaconfig:
-        from agent_metaconfig import TaskReplay
+        from agent_system.agent_metaconfig import TaskReplay
 
         system = MetaConfigSystem()
 

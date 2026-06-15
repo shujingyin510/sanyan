@@ -80,7 +80,7 @@ class SubClusterDiscovery:
     def _create_embedder(self):
         """创建嵌入器"""
         try:
-            from agent_knowledge import TaskEmbedding
+            from agent_system.agent_knowledge import TaskEmbedding
 
             return TaskEmbedding()
         except Exception:

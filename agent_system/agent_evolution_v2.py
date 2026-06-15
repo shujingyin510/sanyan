@@ -573,7 +573,7 @@ class EvolutionSystemV2:
 
     def propose_candidates(self, target_files: List[str] = None) -> List[Patch]:
         """提议候选补丁（从可改变区域生成，带差异化描述）"""
-        from agent_evolution import ConstraintEvolver
+        from agent_system.agent_evolution import ConstraintEvolver
 
         evolver = ConstraintEvolver()
         candidates = []

@@ -58,9 +58,9 @@ def _register_aliases():
 
 cmd = sys.argv[1] if len(sys.argv) > 1 else 'test'
 file_map = {
-    'test': 'ternary_agent/runtime_v2/tests_v2.san',
-    'npc': 'ternary_agent/runtime_v2/npc_demo.san',
-    'game': 'ternary_agent/runtime_v2/npc_game.san',
+    'test': 'agent_system/sanyan/runtime_v2/tests_v2.san',
+    'npc': 'agent_system/sanyan/runtime_v2/npc_demo.san',
+    'game': 'agent_system/sanyan/runtime_v2/npc_game.san',
 }
 
 if cmd not in file_map:

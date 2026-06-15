@@ -43,7 +43,7 @@
 )
 
 // === 文件路径 ===
-设 记忆文件 = "ternary_agent/memory.json"
+设 记忆文件 = "agent_system/memory.json"
 
 // === 系统提示词（多段拼接，方便维护） ===
 // _P角色: 角色定义

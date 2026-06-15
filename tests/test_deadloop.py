@@ -28,7 +28,7 @@ QUICK = '--quick' in sys.argv
 if QUICK:
     # 简单任务: 不触发 LLM，只测框架
     print('Quick mode: 框架测试')
-    from agent_tools import _agent_registry, _spawn_sub_agent
+    from agent_system.agent_tools import _agent_registry, _spawn_sub_agent
 
     _agent_registry.clear()
     r = _spawn_sub_agent('name=test\ntask=(输出 (加 1 2))')
@@ -57,7 +57,7 @@ sub = SanyanEvaluator(max_loop_steps=200000)
 os.environ['SANYAN_API_KEY'] = api_key
 _register_aliases()
 
-src = open('ternary_agent/agent.san', encoding='utf-8').read()
+src = open('agent_system/sanyan/agent.san', encoding='utf-8').read()
 src = preprocess_includes(src)
 src = src.replace('sk-你的key', api_key)
 ast, _ = parse_code(src)

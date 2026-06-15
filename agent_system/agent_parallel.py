@@ -7,7 +7,7 @@ import threading
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import Any, Callable, Dict, List, Tuple
 
-from agent_tool_graph import ToolMetadata, DEFAULT_TOOL_META
+from agent_system.agent_tool_graph import ToolMetadata, DEFAULT_TOOL_META
 
 
 class ParallelExecutor:

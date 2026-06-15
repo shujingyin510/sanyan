@@ -357,7 +357,7 @@ class ReviewerReliabilityTest:
         """运行Reviewer可靠性测试"""
         print(f'\n═══ 实验3: Reviewer可靠性测试 ({n}个用例) ═══')
 
-        from agent_review import ReviewerAgent
+        from agent_system.agent_review import ReviewerAgent
 
         reviewer = ReviewerAgent()
 

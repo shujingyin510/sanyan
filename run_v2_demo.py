@@ -148,7 +148,7 @@ builtins.input = echo_input()
 # 运行
 e = SanyanEvaluator(max_loop_steps=999999)
 _register_aliases()  # 注册中文别名（必须在 evaluator 实例化之后）
-src = open('ternary_agent/runtime_v2/npc_game.san', encoding='utf-8').read()
+src = open('agent_system/sanyan/runtime_v2/npc_game.san', encoding='utf-8').read()
 ast, _ = parse_code(src)
 fixed = [s for s in ast[1:] if not (isinstance(s, list) and s[0] == 'export')]
 e.eval(['do'] + fixed)

@@ -130,7 +130,7 @@ def _load_agent():
     reg.register('新求值器', _test_new_eval)
     reg.register('求值', _test_sandbox_eval)
 
-    with open('ternary_agent/agent.san', 'r', encoding='utf-8') as f:
+    with open('agent_system/sanyan/agent.san', 'r', encoding='utf-8') as f:
         source = f.read()
     source = preprocess_includes(source)
     ast, _ = parse_code(source)
@@ -323,7 +323,7 @@ def _load_village():
             reg.register_alias(a, t)
         except Exception:
             pass
-    with open('ternary_agent/runtime_v2/village_game.san', encoding='utf-8') as f:
+    with open('agent_system/sanyan/runtime_v2/village_game.san', encoding='utf-8') as f:
         src = f.read()
     ast, _ = parse_code(src)
     for stmt in ast[1:]:
@@ -442,7 +442,7 @@ def _load_npc():
             reg.register_alias(a, t)
         except Exception:
             pass
-    with open('ternary_agent/runtime_v2/npc_game.san', encoding='utf-8') as f:
+    with open('agent_system/sanyan/runtime_v2/npc_game.san', encoding='utf-8') as f:
         src = f.read()
     ast, _ = parse_code(src)
     for stmt in ast[1:]:
@@ -499,7 +499,7 @@ class TestVillageE2E(unittest.TestCase):
 
         e = SanyanEvaluator(max_loop_steps=100000)
         # Phase 1: 村庄世界
-        with open('ternary_agent/runtime_v2/village_game.san', encoding='utf-8') as f:
+        with open('agent_system/sanyan/runtime_v2/village_game.san', encoding='utf-8') as f:
             src = f.read()
         ast, _ = parse_code(src)
         fixed = [
@@ -515,7 +515,7 @@ class TestVillageE2E(unittest.TestCase):
         self.assertIn('NPC数据', e.scope_vars)
 
         # Phase 2: 观察模式
-        with open('ternary_agent/runtime_v2/village_observe.san', encoding='utf-8') as f:
+        with open('agent_system/sanyan/runtime_v2/village_observe.san', encoding='utf-8') as f:
             src2 = f.read()
         ast2, _ = parse_code(src2)
         fixed2 = [s for s in ast2[1:] if not (isinstance(s, list) and s[0] == 'export')]
@@ -593,7 +593,10 @@ class TestVillageE2E(unittest.TestCase):
             except Exception:
                 pass
 
-        for fname in ['ternary_agent/runtime_v2/village_game.san', 'ternary_agent/runtime_v2/village_observe.san']:
+        for fname in [
+            'agent_system/sanyan/runtime_v2/village_game.san',
+            'agent_system/sanyan/runtime_v2/village_observe.san',
+        ]:
             src = open(fname, encoding='utf-8').read()
             ast, _ = parse_code(src)
             fixed = [

@@ -15,7 +15,7 @@ import subprocess as sp
 import argparse
 from pathlib import Path
 
-from agent_loop_monitor import LoopLogger, LoopStats, HealthMonitor, RollbackVerifier
+from agent_system.agent_loop_monitor import LoopLogger, LoopStats, HealthMonitor, RollbackVerifier
 
 ROOT = os.path.dirname(os.path.abspath(__file__))
 WATCH_EXTS = {'.py', '.san', '.sasm'}

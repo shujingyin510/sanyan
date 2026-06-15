@@ -102,7 +102,7 @@ def run_auto():
 
     e = SanyanEvaluator(max_loop_steps=999999)
     _register_aliases()
-    src = open('ternary_agent/runtime_v2/village_game.san', encoding='utf-8').read()
+    src = open('agent_system/sanyan/runtime_v2/village_game.san', encoding='utf-8').read()
     ast, _ = parse_code(src)
     fixed = [s for s in ast[1:] if not (isinstance(s, list) and s[0] == 'export')]
     from values import ReturnException
@@ -119,7 +119,7 @@ def run_manual():
     _register_aliases()
 
     # 直接读取配置（village_config.san 已包含 key）
-    src = open('ternary_agent/runtime_v2/village_game.san', encoding='utf-8').read()
+    src = open('agent_system/sanyan/runtime_v2/village_game.san', encoding='utf-8').read()
     # 手动模式自动启用 LLM
     src = src.replace('设 LLM启用 = 假', '设 LLM启用 = 真')
     # 检查环境变量覆盖

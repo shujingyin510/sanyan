@@ -9,8 +9,8 @@
 //   - API密钥通过源码替换注入(非冗余)
 //   - 保护门控接入主循环，元认知反思高信度时自动触发
 //
-#include "ternary_agent/agent_policy.san"
-#include "ternary_agent/decision.san"
+#include "agent_system/sanyan/agent_policy.san"
+#include "agent_system/sanyan/decision.san"
 
 // === LLM 调用（带重试+降级+多提供商）===
 定义 调用LLM (系统提示, 用户消息)

@@ -1,4 +1,4 @@
-# 三态认知框架 Sanyan v3.35.0
+# 三态认知框架 Sanyan v3.29.0
 
 [![VS Code Extension](https://img.shields.io/badge/VS%20Code-%E8%AF%AD%E6%B3%95%E9%AB%98%E4%BA%AE-%23007ACC?logo=visualstudiocode)](sanyan-vscode/README.md)
 [![CI](https://github.com/shujingyin510/sanyan/actions/workflows/test.yml/badge.svg)](https://github.com/shujingyin510/sanyan/actions)
@@ -665,43 +665,6 @@ sanyan/
 ├── pyproject.toml             # 项目配置
 ├── repl.py                    # REPL 交互环境
 ├── ternary_engine.py           # 三态认知引擎（Kleene×贝叶斯×门控）
-├── agent_runtime.py            # Agent V5 引擎
-├── agent_tools.py              # Agent V5 工具层
-├── agent_tool_graph.py         # 工具依赖图 + 能力注册 + 工具元数据 + 自发现
-├── agent_decompose.py          # Phase 0: 任务分解
-├── agent_hypothesis.py         # Phase 1: 多假设 + 锦标赛
-├── agent_resource.py           # Phase 2: 资源管控
-├── agent_project.py            # 项目引擎: 分解→执行→验证→重试
-├── agent_context.py            # 智能上下文压缩（分层摘要+滑动窗口+重要性评分）
-├── agent_experience.py         # 经验库: 跨任务 pattern 匹配 + AVOID 提示
-├── agent_parallel.py           # 并行执行引擎（工具链并行+假设并行验证）
-├── agent_sandbox.py            # 安全沙箱（命令过滤+文件系统守卫+审计日志）
-├── agent_learning.py           # 跨会话学习（SQLite持久化+失败模式库+自适应选择）
-├── agent_obs.py                # 可观测性（决策追踪+性能分析+仪表盘）
-├── agent_streaming.py          # 流式响应（LLM边生成边显示+可中断）
-├── agent_composition.py        # 高阶工具组合（管道+复合工具+条件链）
-├── agent_shared.py             # 多Agent共享上下文（共享空间+符号表+协调器）
-├── agent_strategy.py           # Layer 1: 策略自优化（Prompt进化+Tool学习+策略切换+A/B）
-├── agent_loop.py               # Layer 2: 自主循环（文件监控+连续循环+健康监控）
-├── agent_loop_monitor.py       # Layer 2: 循环监控（日志+统计+健康+回滚验证）
-├── agent_evolution.py          # Layer 3: 约束进化（接口不变+差分验证+多目标评估）
-├── agent_evolution_v2.py       # Layer 3: Patch DSL + Mutation Budget + 三态评分 + Tournament
-├── agent_review.py             # Layer 4: Reviewer Agent（独立代码审查+对抗补丁检测）
-├── agent_benchmark.py          # Layer 4: Real Benchmark（真实基准测试）
-├── agent_dashboard.py          # Layer 4: Evolution Dashboard（进化仪表盘）
-├── agent_test_gen.py           # Layer 4: Test Generator（测试用例生成）
-├── agent_history.py            # Layer 4: PatchHistory（Patch历史数据库+可信度权重）
-├── agent_validation.py         # Layer 4: Evolution Validation（100次随机+收敛+Reviewer）
-├── agent_stress.py             # Layer 4: Evolution Stress Test（长期稳定性+退化测试）
-├── agent_knowledge.py          # Layer 5: Knowledge Layer（TaskClassifier+TaskEmbedding+ClusterLearning）
-├── agent_knowledge_confidence.py # Layer 5: Knowledge Confidence（知识置信度计算）
-├── agent_generalization.py     # Layer 5: Knowledge Generalization（知识泛化验证）
-├── agent_causal_chain.py       # Layer 5: Causal Chain（因果链闭环验证）
-├── agent_meta_knowledge.py     # Layer 5: Meta-Knowledge Transfer（元知识迁移）
-├── agent_param_importance.py   # Layer 5: Parameter Importance Ranking + StrategySchema
-├── agent_cost_aware.py         # Layer 5: Cost-Aware Evolution（收益/成本感知+UCB）
-├── agent_task_taxonomy.py      # Layer 5: Task Taxonomy（任务分类+MetaLearningDB）
-├── agent_knowledge_validation.py # Layer 5: Knowledge Validation（知识分化验证）
 ├── disasm.py                   # 字节码反汇编器
 ├── verify.py                   # 字节码验证器
 ├── preflight.py                # 发版前预检（lint+test+自举）
@@ -720,6 +683,55 @@ sanyan/
 ├── ternary_core.py            # 平衡三进制算术（模拟）
 ├── values.py                  # 值类型 + 异常体系
 ├── vm.py                      # 字节码 VM（自举能力）
+├── agent_system/              # Agent 系统（Python 运行时 + Sanyan DSL）
+│   ├── __init__.py
+│   ├── README.md              # Agent 文档
+│   ├── agent_runtime.py       # Agent V5 引擎
+│   ├── agent_tools.py         # Agent V5 工具层
+│   ├── agent_tool_graph.py    # 工具依赖图 + 能力注册 + 工具元数据 + 自发现
+│   ├── agent_decompose.py     # Phase 0: 任务分解
+│   ├── agent_hypothesis.py    # Phase 1: 多假设 + 锦标赛
+│   ├── agent_resource.py      # Phase 2: 资源管控
+│   ├── agent_project.py       # 项目引擎: 分解→执行→验证→重试
+│   ├── agent_context.py       # 智能上下文压缩（分层摘要+滑动窗口+重要性评分）
+│   ├── agent_experience.py    # 经验库: 跨任务 pattern 匹配 + AVOID 提示
+│   ├── agent_parallel.py      # 并行执行引擎（工具链并行+假设并行验证）
+│   ├── agent_sandbox.py       # 安全沙箱（命令过滤+文件系统守卫+审计日志）
+│   ├── agent_learning.py      # 跨会话学习（SQLite持久化+失败模式库+自适应选择）
+│   ├── agent_obs.py           # 可观测性（决策追踪+性能分析+仪表盘）
+│   ├── agent_streaming.py     # 流式响应（LLM边生成边显示+可中断）
+│   ├── agent_composition.py   # 高阶工具组合（管道+复合工具+条件链）
+│   ├── agent_shared.py        # 多Agent共享上下文（共享空间+符号表+协调器）
+│   ├── agent_strategy.py      # Layer 1: 策略自优化（Prompt进化+Tool学习+策略切换+A/B）
+│   ├── agent_loop.py          # Layer 2: 自主循环（文件监控+连续循环+健康监控）
+│   ├── agent_loop_monitor.py  # Layer 2: 循环监控（日志+统计+健康+回滚验证）
+│   ├── agent_evolution.py     # Layer 3: 约束进化（接口不变+差分验证+多目标评估）
+│   ├── agent_evolution_v2.py  # Layer 3: Patch DSL + Mutation Budget + 三态评分 + Tournament
+│   ├── agent_review.py        # Layer 4: Reviewer Agent（独立代码审查+对抗补丁检测）
+│   ├── agent_benchmark.py     # Layer 4: Real Benchmark（真实基准测试）
+│   ├── agent_dashboard.py     # Layer 4: Evolution Dashboard（进化仪表盘）
+│   ├── agent_test_gen.py      # Layer 4: Test Generator（测试用例生成）
+│   ├── agent_history.py       # Layer 4: PatchHistory（Patch历史数据库+可信度权重）
+│   ├── agent_validation.py    # Layer 4: Evolution Validation（100次随机+收敛+Reviewer）
+│   ├── agent_stress.py        # Layer 4: Evolution Stress Test（长期稳定性+退化测试）
+│   ├── agent_knowledge.py     # Layer 5: Knowledge Layer（TaskClassifier+TaskEmbedding+ClusterLearning）
+│   ├── agent_knowledge_confidence.py # Layer 5: Knowledge Confidence（知识置信度计算）
+│   ├── agent_generalization.py # Layer 5: Knowledge Generalization（知识泛化验证）
+│   ├── agent_causal_chain.py  # Layer 5: Causal Chain（因果链闭环验证）
+│   ├── agent_meta_knowledge.py # Layer 5: Meta-Knowledge Transfer（元知识迁移）
+│   ├── agent_param_importance.py # Layer 5: Parameter Importance Ranking + StrategySchema
+│   ├── agent_cost_aware.py    # Layer 5: Cost-Aware Evolution（收益/成本感知+UCB）
+│   ├── agent_task_taxonomy.py # Layer 5: Task Taxonomy（任务分类+MetaLearningDB）
+│   ├── agent_knowledge_validation.py # Layer 5: Knowledge Validation（知识分化验证）
+│   └── sanyan/                 # Sanyan 语言实现（Agent DSL）
+│       ├── agent.san           # Agent 核心逻辑（决策函数、记忆、追踪）
+│       ├── agent_policy.san    # 纯数据策略（配置、阈值、映射规则）
+│       ├── decision.san        # 决策核心（信任感知规则匹配）
+│       ├── memory.json         # Agent 记忆持久化
+│       └── runtime_v2/         # V2 运行时
+│           ├── village_game.san
+│           ├── npc_game.san
+│           └── ...
 ├── sugar/                     # 糖语法转换器
 │   ├── __init__.py
 │   ├── errors.py

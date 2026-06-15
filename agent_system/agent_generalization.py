@@ -275,7 +275,7 @@ class GeneralizationValidator:
         print(f'{"=" * 60}')
 
         # 生成任务
-        from agent_task_taxonomy import TaskClassifier
+        from agent_system.agent_task_taxonomy import TaskClassifier
 
         classifier = TaskClassifier()
 

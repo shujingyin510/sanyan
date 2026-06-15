@@ -11,31 +11,31 @@ from typing import Dict
 
 
 from ternary_engine import TernaryEngine
-from agent_hypothesis import (
+from agent_system.agent_hypothesis import (
     HypothesisGenerator,
     Tournament,
     HypothesisExecutor,
     FailureClassifier,
     FailureMode,
 )
-from agent_resource import ResourceManager
-from agent_tool_graph import (
+from agent_system.agent_resource import ResourceManager
+from agent_system.agent_tool_graph import (
     ToolDependencyGraph,
     ToolCapabilityRegistry,
     TaskCapabilityExtractor,
     DEFAULT_TOOL_META,
 )
-from agent_decompose import DecompositionEngine, BoundedContext
-from agent_parallel import ParallelExecutor, HypothesisParaller
-from agent_context import SmartContextCompressor
-from agent_learning import ExperienceStore, AdaptiveToolSelector
-from agent_sandbox import AgentSandbox
-from agent_obs import AgentDashboard
-from agent_streaming import ProgressiveDisplay
-from agent_composition import ToolPipeline, ToolComposer, ConditionalChain
-from agent_shared import SharedContext, SharedSymbolTable, AgentCoordinator
-from agent_strategy import PromptEvolver, ToolSelectionLearner, StrategySwitcher, ABRollout
-from agent_evolution import ConstrainedEvolutionSystem
+from agent_system.agent_decompose import DecompositionEngine, BoundedContext
+from agent_system.agent_parallel import ParallelExecutor, HypothesisParaller
+from agent_system.agent_context import SmartContextCompressor
+from agent_system.agent_learning import ExperienceStore, AdaptiveToolSelector
+from agent_system.agent_sandbox import AgentSandbox
+from agent_system.agent_obs import AgentDashboard
+from agent_system.agent_streaming import ProgressiveDisplay
+from agent_system.agent_composition import ToolPipeline, ToolComposer, ConditionalChain
+from agent_system.agent_shared import SharedContext, SharedSymbolTable, AgentCoordinator
+from agent_system.agent_strategy import PromptEvolver, ToolSelectionLearner, StrategySwitcher, ABRollout
+from agent_system.agent_evolution import ConstrainedEvolutionSystem
 
 
 class SymbolTable:
