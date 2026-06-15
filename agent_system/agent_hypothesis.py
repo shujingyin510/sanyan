@@ -7,7 +7,7 @@ P8: DiversityController
 
 import time
 from enum import Enum
-from typing import Any, Callable, Dict, List, Optional, Tuple
+from typing import Any, Callable, Dict, List, Optional, Tuple, Optional
 
 
 # ── P3: 失败模式分类 ──

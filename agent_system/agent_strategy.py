@@ -10,7 +10,7 @@ import random
 import sqlite3
 import time
 from collections import defaultdict
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Optional
 
 
 class PromptEvolver:
@@ -85,7 +85,7 @@ class PromptEvolver:
         conn.commit()
         conn.close()
 
-    def get_stats(self, variant_name: str = None) -> Dict:
+    def get_stats(self, variant_name: Optional[str] = None) -> Dict:
         """获取变体统计"""
         conn = sqlite3.connect(self.DB_PATH)
         if variant_name:
@@ -490,7 +490,7 @@ class ABRollout:
 
         return best_variant
 
-    def get_stats(self, experiment_name: str = None) -> Dict:
+    def get_stats(self, experiment_name: Optional[str] = None) -> Dict:
         """获取实验统计"""
         results = self._results
         if experiment_name:

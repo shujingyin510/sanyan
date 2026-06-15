@@ -8,7 +8,7 @@ P13: ToolAutoDiscovery — 自动扫描 ops/*.py 注册工具
 import os
 import glob as _glob
 import re as _re
-from typing import Any, Dict, List, Optional, Set, Tuple
+from typing import Any, Dict, List, Optional, Set, Tuple, Optional
 
 
 class ToolDependencyGraph:

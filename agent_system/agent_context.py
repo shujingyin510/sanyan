@@ -6,7 +6,7 @@ P24: SlidingWindowBuffer — 滑动窗口 + 重要性缓冲
 
 import re
 from collections import deque
-from typing import Any, Dict, List, Tuple
+from typing import Any, Dict, List, Tuple, Optional
 
 
 class ImportanceScorer:
@@ -81,7 +81,7 @@ class SlidingWindowBuffer:
                 self._important.sort(key=lambda x: -x.get('_importance', 0))
                 self._important = self._important[: self.important_reserve]
 
-    def get_recent(self, n: int = None) -> List[Dict]:
+    def get_recent(self, n: Optional[int] = None) -> List[Dict]:
         """获取最近N条"""
         n = n or self.window_size
         return list(self._buffer)[-n:]

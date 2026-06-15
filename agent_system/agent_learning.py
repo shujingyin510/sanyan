@@ -9,13 +9,13 @@ import os
 import sqlite3
 import time
 from collections import defaultdict
-from typing import Dict, List, Tuple
+from typing import Dict, List, Tuple, Optional
 
 
 class ExperienceStore:
     """跨会话经验持久化：工具成功率、失败模式、任务类型映射"""
 
-    def __init__(self, db_path: str = None):
+    def __init__(self, db_path: Optional[str] = None):
         if db_path is None:
             db_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'agent_experience.db')
         self.db_path = db_path
@@ -148,7 +148,7 @@ class ExperienceStore:
         conn.close()
         return rows
 
-    def get_failure_patterns(self, tool: str = None, limit: int = 20) -> List[Dict]:
+    def get_failure_patterns(self, tool: Optional[str] = None, limit: int = 20) -> List[Dict]:
         """获取失败模式"""
         conn = sqlite3.connect(self.db_path)
         if tool:

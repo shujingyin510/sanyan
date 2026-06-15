@@ -5,7 +5,7 @@ P15: HypothesisParaller — 多假设并行验证
 
 import threading
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from typing import Any, Callable, Dict, List, Tuple
+from typing import Any, Callable, Dict, List, Tuple, Optional
 
 from agent_system.agent_tool_graph import ToolMetadata, DEFAULT_TOOL_META
 
@@ -13,7 +13,7 @@ from agent_system.agent_tool_graph import ToolMetadata, DEFAULT_TOOL_META
 class ParallelExecutor:
     """并行执行引擎：分析工具依赖，独立工具并行执行"""
 
-    def __init__(self, tools: Dict[str, Callable], meta: ToolMetadata = None):
+    def __init__(self, tools: Dict[str, Callable], meta: Optional[ToolMetadata] = None):
         self.tools = tools
         self.meta = meta or DEFAULT_TOOL_META
         self.max_workers = 4

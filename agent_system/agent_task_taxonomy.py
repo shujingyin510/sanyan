@@ -13,7 +13,7 @@ import json
 import os
 import sqlite3
 import time
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Optional
 
 ROOT = os.path.dirname(os.path.abspath(__file__))
 

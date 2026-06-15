@@ -21,7 +21,7 @@ import os
 import time
 import urllib.request
 import urllib.error
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional
 
 
 class LLMProvider:
@@ -65,7 +65,9 @@ class LLMProvider:
                 raise
 
     @classmethod
-    def create(cls, provider: str, api_key: str, model: str = None, base_url: str = None, **kwargs) -> 'LLMProvider':
+    def create(
+        cls, provider: str, api_key: str, model: Optional[str] = None, base_url: Optional[str] = None, **kwargs
+    ) -> 'LLMProvider':
         """工厂方法：根据 provider 名称创建实例"""
         providers = {
             'openai': OpenAIProvider,
@@ -89,7 +91,7 @@ class OpenAIProvider(LLMProvider):
     DEFAULT_BASE_URL = 'https://api.openai.com/v1'
     DEFAULT_MODEL = 'gpt-4o'
 
-    def __init__(self, api_key: str, model: str = None, base_url: str = None, **kwargs):
+    def __init__(self, api_key: str, model: Optional[str] = None, base_url: Optional[str] = None, **kwargs):
         super().__init__(
             api_key=api_key,
             model=model or self.DEFAULT_MODEL,
@@ -135,7 +137,7 @@ class DeepSeekProvider(LLMProvider):
     DEFAULT_BASE_URL = 'https://api.deepseek.com/v1'
     DEFAULT_MODEL = 'deepseek-v4-pro'
 
-    def __init__(self, api_key: str, model: str = None, base_url: str = None, **kwargs):
+    def __init__(self, api_key: str, model: Optional[str] = None, base_url: Optional[str] = None, **kwargs):
         super().__init__(
             api_key=api_key,
             model=model or self.DEFAULT_MODEL,
@@ -186,7 +188,7 @@ class AnthropicProvider(LLMProvider):
     DEFAULT_BASE_URL = 'https://api.anthropic.com'
     DEFAULT_MODEL = 'claude-sonnet-4-20250514'
 
-    def __init__(self, api_key: str, model: str = None, base_url: str = None, **kwargs):
+    def __init__(self, api_key: str, model: Optional[str] = None, base_url: Optional[str] = None, **kwargs):
         super().__init__(
             api_key=api_key,
             model=model or self.DEFAULT_MODEL,
@@ -245,7 +247,7 @@ class GeminiProvider(LLMProvider):
     DEFAULT_BASE_URL = 'https://generativelanguage.googleapis.com/v1beta'
     DEFAULT_MODEL = 'gemini-2.5-flash'
 
-    def __init__(self, api_key: str, model: str = None, base_url: str = None, **kwargs):
+    def __init__(self, api_key: str, model: Optional[str] = None, base_url: Optional[str] = None, **kwargs):
         super().__init__(
             api_key=api_key,
             model=model or self.DEFAULT_MODEL,
@@ -297,7 +299,7 @@ class QwenProvider(LLMProvider):
     DEFAULT_BASE_URL = 'https://dashscope.aliyuncs.com/compatible-mode/v1'
     DEFAULT_MODEL = 'qwen-max'
 
-    def __init__(self, api_key: str, model: str = None, base_url: str = None, **kwargs):
+    def __init__(self, api_key: str, model: Optional[str] = None, base_url: Optional[str] = None, **kwargs):
         super().__init__(
             api_key=api_key,
             model=model or self.DEFAULT_MODEL,
@@ -317,7 +319,7 @@ class GLMProvider(LLMProvider):
     DEFAULT_BASE_URL = 'https://open.bigmodel.cn/api/paas/v4'
     DEFAULT_MODEL = 'glm-4'
 
-    def __init__(self, api_key: str, model: str = None, base_url: str = None, **kwargs):
+    def __init__(self, api_key: str, model: Optional[str] = None, base_url: Optional[str] = None, **kwargs):
         super().__init__(
             api_key=api_key,
             model=model or self.DEFAULT_MODEL,
@@ -337,7 +339,7 @@ class MoonshotProvider(LLMProvider):
     DEFAULT_BASE_URL = 'https://api.moonshot.cn/v1'
     DEFAULT_MODEL = 'moonshot-v1-8k'
 
-    def __init__(self, api_key: str, model: str = None, base_url: str = None, **kwargs):
+    def __init__(self, api_key: str, model: Optional[str] = None, base_url: Optional[str] = None, **kwargs):
         super().__init__(
             api_key=api_key,
             model=model or self.DEFAULT_MODEL,
@@ -357,7 +359,7 @@ class SiliconFlowProvider(LLMProvider):
     DEFAULT_BASE_URL = 'https://api.siliconflow.cn/v1'
     DEFAULT_MODEL = 'deepseek-ai/DeepSeek-V3'
 
-    def __init__(self, api_key: str, model: str = None, base_url: str = None, **kwargs):
+    def __init__(self, api_key: str, model: Optional[str] = None, base_url: Optional[str] = None, **kwargs):
         super().__init__(
             api_key=api_key,
             model=model or self.DEFAULT_MODEL,
@@ -377,7 +379,7 @@ class OpenRouterProvider(LLMProvider):
     DEFAULT_BASE_URL = 'https://openrouter.ai/api/v1'
     DEFAULT_MODEL = 'anthropic/claude-sonnet-4'
 
-    def __init__(self, api_key: str, model: str = None, base_url: str = None, **kwargs):
+    def __init__(self, api_key: str, model: Optional[str] = None, base_url: Optional[str] = None, **kwargs):
         super().__init__(
             api_key=api_key,
             model=model or self.DEFAULT_MODEL,
@@ -452,10 +454,10 @@ class LLMConfig:
         },
     }
 
-    def __init__(self, config_path: str = None):
+    def __init__(self, config_path: Optional[str] = None):
         self.config = self._load_config(config_path)
 
-    def _load_config(self, config_path: str = None) -> Dict:
+    def _load_config(self, config_path: Optional[str] = None) -> Dict:
         """加载配置"""
         if config_path and os.path.exists(config_path):
             with open(config_path, encoding='utf-8') as f:

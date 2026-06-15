@@ -7,7 +7,7 @@ Phase 3: 并行执行(P14) + 智能压缩(P22) + 跨会话学习(P19) + 可观�
 
 import glob as _glob
 import time as _time
-from typing import Dict
+from typing import Dict, Optional
 
 
 from ternary_engine import TernaryEngine
@@ -1022,7 +1022,7 @@ class AgentRuntime:
         """获取实时仪表盘"""
         return self.dashboard.get_status(self)
 
-    def visualize_trace(self, trace_id: str = None) -> str:
+    def visualize_trace(self, trace_id: Optional[str] = None) -> str:
         """可视化决策链"""
         return self.tracer.visualize(trace_id)
 

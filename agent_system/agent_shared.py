@@ -6,7 +6,7 @@ P36: SharedSymbolTable — 共享符号表（子Agent可读父Agent索引）
 
 import threading
 import time
-from typing import Any, Callable, Dict, List, Tuple
+from typing import Any, Callable, Dict, List, Tuple, Optional
 
 
 class SharedContext:
@@ -169,7 +169,7 @@ class AgentCoordinator:
                 'tasks_completed': 0,
             }
 
-    def submit_task(self, task: str, required_capabilities: List[str] = None, agent_name: str = None) -> str:
+    def submit_task(self, task: str, required_capabilities: List[str] = None, agent_name: Optional[str] = None) -> str:
         """提交任务"""
         task_id = f'task_{int(time.time() * 1000)}'
 

@@ -6,7 +6,7 @@ P27: AgentDashboard — 实时仪表盘摘要
 
 import time
 from collections import defaultdict
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Optional
 
 
 class DecisionTracer:
@@ -57,7 +57,7 @@ class DecisionTracer:
         self._traces.append(self._current_trace)
         self._current_trace = None
 
-    def get_trace(self, trace_id: str = None) -> Optional[Dict]:
+    def get_trace(self, trace_id: Optional[str] = None) -> Optional[Dict]:
         """获取追踪记录"""
         if trace_id:
             for t in self._traces:
@@ -66,7 +66,7 @@ class DecisionTracer:
             return None
         return self._current_trace
 
-    def visualize(self, trace_id: str = None) -> str:
+    def visualize(self, trace_id: Optional[str] = None) -> str:
         """可视化决策链"""
         trace = self.get_trace(trace_id)
         if not trace:

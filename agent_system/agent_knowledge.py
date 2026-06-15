@@ -12,7 +12,7 @@ import math
 import os
 import sqlite3
 import time
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, List, Optional, Tuple, Optional
 
 ROOT = os.path.dirname(os.path.abspath(__file__))
 

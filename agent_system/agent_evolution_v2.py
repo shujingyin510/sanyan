@@ -19,7 +19,7 @@ import os
 import sqlite3
 import time
 from enum import Enum
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, List, Optional, Tuple, Optional
 
 ROOT = os.path.dirname(os.path.abspath(__file__))
 
@@ -176,7 +176,9 @@ class MutationBudget:
     DEFAULT_MAX_LINES = 20
     DEFAULT_MAX_PATCHES = 1
 
-    def __init__(self, max_files: int = None, max_lines: int = None, max_patches: int = None):
+    def __init__(
+        self, max_files: Optional[int] = None, max_lines: Optional[int] = None, max_patches: Optional[int] = None
+    ):
         self.max_files = max_files or self.DEFAULT_MAX_FILES
         self.max_lines = max_lines or self.DEFAULT_MAX_LINES
         self.max_patches = max_patches or self.DEFAULT_MAX_PATCHES
@@ -505,7 +507,7 @@ class EvolutionMemory:
         conn.commit()
         conn.close()
 
-    def query_success_rate(self, target: str, pattern: str = None) -> float:
+    def query_success_rate(self, target: str, pattern: Optional[str] = None) -> float:
         """查询成功率"""
         conn = sqlite3.connect(self.DB_PATH)
         if pattern:

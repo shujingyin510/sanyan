@@ -15,7 +15,7 @@ import os
 import sqlite3
 import statistics
 import time
-from typing import Dict, List
+from typing import Dict, List, Optional
 
 ROOT = os.path.dirname(os.path.abspath(__file__))
 
@@ -421,7 +421,7 @@ class PatchHistory:
                 ),
             )
 
-    def query_success_rate(self, target: str, opt_type: str = None) -> float:
+    def query_success_rate(self, target: str, opt_type: Optional[str] = None) -> float:
         """查询成功率"""
         conn = sqlite3.connect(self.DB_PATH)
         if opt_type:
@@ -439,7 +439,7 @@ class PatchHistory:
             return 0.5
         return row[0] / (row[0] + row[1])
 
-    def query_rollback_rate(self, target: str, opt_type: str = None) -> float:
+    def query_rollback_rate(self, target: str, opt_type: Optional[str] = None) -> float:
         """查询回滚率"""
         conn = sqlite3.connect(self.DB_PATH)
         if opt_type:
@@ -712,7 +712,10 @@ class EvolutionDashboard:
     """进化仪表盘：可视化进化状态"""
 
     def __init__(
-        self, patch_history: PatchHistory = None, benchmark: RealBenchmark = None, reviewer: ReviewerAgent = None
+        self,
+        patch_history: Optional[PatchHistory] = None,
+        benchmark: Optional[RealBenchmark] = None,
+        reviewer: Optional[ReviewerAgent] = None,
     ):
         self.patch_history = patch_history or PatchHistory()
         self.benchmark = benchmark or RealBenchmark()

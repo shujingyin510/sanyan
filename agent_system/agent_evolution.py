@@ -16,7 +16,7 @@
 import os
 import subprocess as sp
 import time
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, List, Optional, Tuple, Optional
 
 ROOT = os.path.dirname(os.path.abspath(__file__))
 
@@ -75,7 +75,7 @@ class ConstraintEvolver:
         self._accepted: List[Dict] = []
         self._rejected: List[Dict] = []
 
-    def can_change(self, file_path: str, element: str = None) -> Tuple[bool, str]:
+    def can_change(self, file_path: str, element: Optional[str] = None) -> Tuple[bool, str]:
         """检查是否可以修改"""
         # 检查是否在不可改变区域
         for immutable_file, elements in self.IMMUTABLE.items():
@@ -103,7 +103,7 @@ class ConstraintEvolver:
             return file_path.startswith(pattern)
         return file_path == pattern or file_path.endswith('/' + pattern)
 
-    def is_performance_critical(self, file_path: str, element: str = None) -> bool:
+    def is_performance_critical(self, file_path: str, element: Optional[str] = None) -> bool:
         """是否是性能关键路径"""
         for critical_file, elements in self.PERFORMANCE_CRITICAL.items():
             if self._match_path(file_path, critical_file):
