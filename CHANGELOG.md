@@ -51,8 +51,13 @@
 - **post-commit hook 增强**：防递归（AGENT_HOOK_RUNNING 环境变量）
 - **研究文档**：`docs/research/` 目录（4篇研究文档+架构文档）
 
+### 修复
+- **mypy 152 错误清零**：18 个文件批量 `Optional` 类型注解修复，覆盖 `str`/`int`/`list`/`dict`/`Callable`/自定义类型所有 `= None` 缺 `Optional` 的模式
+- **ruff check**：11 处自动修复
+
 ### 变更
-- **README.md**：更新四层架构图、三层知识体系、三态逻辑贯穿说明
+- **README.md**：起源挪到第一屏，简介加「一个人一个半月」，v3.32 更新摘要块，四层架构图、三层知识体系、三态逻辑贯穿说明
+- **README_EN.md**：同步重构（起源第一屏 + "One person. Six weeks." + v3.32 What's New）
 - **AGENTS.md**：更新四层架构、三层知识体系、LLM vs Agent知识对比
 - **agent_runtime.py**：集成所有新模块
 - **CHANGELOG.md**：合并同一天条目
