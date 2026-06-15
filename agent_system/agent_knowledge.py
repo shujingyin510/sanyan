@@ -14,7 +14,7 @@ import sqlite3
 import time
 from typing import Dict, List, Tuple, Optional
 
-ROOT = os.path.dirname(os.path.abspath(__file__))
+ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 
 # ── Task Embedding ──

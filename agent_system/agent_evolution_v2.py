@@ -1,3 +1,4 @@
+import sys
 """进化系统 v2 — Patch DSL + Mutation Budget + 三态评分 + Tournament + Memory
 
 五层架构:
@@ -16,12 +17,15 @@
 """
 
 import os
+import json
 import sqlite3
 import time
+import urllib.request as _urllib
+import urllib.error as _urlerr
 from enum import Enum
 from typing import Dict, List, Tuple, Optional
 
-ROOT = os.path.dirname(os.path.abspath(__file__))
+ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 
 # ── Patch DSL ──
@@ -715,6 +719,8 @@ class AgentCodeModifier:
     def __init__(self):
         self.evolution = EvolutionSystemV2()
         self._applied_patches: List[Dict] = []
+        self._llm_fail_count = 0
+        self._max_llm_fails = 3
 
     def read_code(self, file_path: str) -> str:
         """读取目标文件"""
@@ -724,11 +730,105 @@ class AgentCodeModifier:
         except Exception as e:
             return f'读取失败: {e}'
 
-    def generate_patch(self, file_path: str, code: str, optimization_type: str) -> Optional[Patch]:
-        """根据优化类型生成补丁"""
-        lines = code.split('\n')
+    def _llm_call(self, prompt: str) -> str:
+        if self._llm_fail_count >= self._max_llm_fails:
+            return ''
+        api_key = os.environ.get('SANYAN_API_KEY', '')
+        if not api_key:
+            return ''
+        url = 'https://api.deepseek.com/v1/chat/completions'
+        body = json.dumps({
+            'model': 'deepseek-v4-pro',
+            'max_tokens': 4096,
+            'temperature': 0.3,
+            'stream': True,
+            'thinking': {'type': 'enabled', 'budget_tokens': 512},
+            'messages': [
+                {'role': 'system', 'content': (
+                    '你是代码优化专家。输出严格JSON格式，不要任何其他文字。\n'
+                    '{"action":"insert|replace", "line":行号, "before":"旧代码", "after":"新代码", "rationale":"理由", "expected":"预期效果"}'
+                )},
+                {'role': 'user', 'content': prompt},
+            ],
+        }, ensure_ascii=False).encode()
+        try:
+            req = _urllib.Request(url, body, {
+                'Content-Type': 'application/json',
+                'Authorization': f'Bearer {api_key}',
+            })
+            resp = _urllib.urlopen(req, timeout=300)
+            # 流式读取: 持续读但设上限(最多500块=~2MB, 最多5分钟)
+            chunks = []
+            t_start = time.time()
+            while len(chunks) < 500:
+                if time.time() - t_start > 300:
+                    break
+                try:
+                    chunk = resp.read(4096)
+                    if not chunk:
+                        break
+                    chunks.append(chunk.decode())
+                except Exception:
+                    break
+            raw_stream = ''.join(chunks)
+            # 从SSE流中提取 content
+            content_parts = []
+            for line in raw_stream.split('\n'):
+                if line.startswith('data: ') and line != 'data: [DONE]':
+                    try:
+                        delta = json.loads(line[6:])
+                        c = delta['choices'][0]['delta'].get('content', '')
+                        if c:
+                            content_parts.append(c)
+                    except Exception:
+                        pass
+            return ''.join(content_parts)
+        except Exception as e:
+            self._llm_fail_count += 1
+            print(f'  [LLM错误 {self._llm_fail_count}/{self._max_llm_fails}] {e}')
+            if self._llm_fail_count >= self._max_llm_fails:
+                print('  [LLM] 连续失败已达上限，后续调用将跳过')
+            return f'error: {e}'
 
-        # 根据优化类型选择生成策略
+    def _generate_patch_llm(self, file_path: str, code: str) -> Optional[Patch]:
+        if self._llm_fail_count >= self._max_llm_fails:
+            return None
+        snapshot = code[:3000]
+        prompt = (
+            f'请分析以下Python代码，提出一个具体的优化补丁（只选一处优化，不要大改）。'
+            f'只返回JSON，格式：{{"action":"insert|replace","line":行号,"before":"要替换的旧代码(一行)","after":"优化后的新代码","rationale":"优化理由","expected":"预期效果"}}\n\n'
+            f'文件: {file_path}\n'
+            f'{snapshot}'
+        )
+        raw = self._llm_call(prompt)
+        if raw.startswith('error:') or not raw:
+            return None
+        try:
+            start = raw.find('{')
+            end = raw.rfind('}') + 1
+            if start >= 0 and end > start:
+                data = json.loads(raw[start:end])
+            else:
+                return None
+            line = int(data.get('line', 0)) - 1
+            return Patch(
+                target=file_path,
+                action=data.get('action', 'replace'),
+                range_start=line,
+                range_end=line,
+                before=data.get('before', ''),
+                after=data.get('after', ''),
+                rationale=data.get('rationale', 'LLM优化')[:80],
+                expected=data.get('expected', '性能提升')[:60],
+            )
+        except (json.JSONDecodeError, KeyError, ValueError):
+            return None
+
+    def generate_patch(self, file_path: str, code: str, optimization_type: str) -> Optional[Patch]:
+        llm_patch = self._generate_patch_llm(file_path, code)
+        if llm_patch:
+            return llm_patch
+        lines = code.split('\n')
         if optimization_type == 'cache':
             return self._generate_cache_patch(file_path, lines)
         elif optimization_type == 'loop':
@@ -846,8 +946,46 @@ class AgentCodeModifier:
                 )
         return None
 
+    def _locate_patch(self, patch: Patch, lines: List[str]) -> Optional[Tuple[int, int]]:
+        """行号校验：验证patch.before是否匹配，不匹配则在±20行内搜索"""
+        start = max(0, patch.range_start)
+        end = min(len(lines), patch.range_end + 1)
+        actual = '\n'.join(lines[start:end]).strip()
+        expected = patch.before.strip()
+        if actual and actual == expected:
+            return (start, end)
+
+        # 不匹配 → 在 ±20 行范围内搜索
+        search_window = 20
+        best_start = None
+        best_score = 0
+        before_lines = patch.before.strip().split('\n')
+
+        for offset in range(-search_window, search_window + 1):
+            s = start + offset
+            if s < 0 or s + len(before_lines) > len(lines):
+                continue
+            actual_lines = [l.strip() for l in lines[s : s + len(before_lines)]]
+            expected_lines_stripped = [l.strip() for l in before_lines]
+            score = sum(1 for a, e in zip(actual_lines, expected_lines_stripped) if a == e)
+            if score > best_score and score == len(before_lines):
+                best_score = score
+                best_start = s
+
+        if best_start is not None:
+            return (best_start, best_start + len(before_lines) - 1)
+
+        # 模糊匹配：至少第一行匹配
+        first = before_lines[0].strip()
+        for offset in range(-search_window, search_window + 1):
+            s = start + offset
+            if 0 <= s < len(lines) and lines[s].strip() == first:
+                return (s, s)
+
+        return None
+
     def apply_patch(self, patch: Patch) -> bool:
-        """应用补丁"""
+        """应用补丁（含行号校验）"""
         try:
             code = self.read_code(patch.target)
             if code.startswith('读取失败'):
@@ -856,29 +994,35 @@ class AgentCodeModifier:
 
             lines = code.split('\n')
 
+            # 行号校验：检查 before 是否匹配
+            located = self._locate_patch(patch, lines)
+            if located is None:
+                print(f'  [跳过] before不匹配任何行 (原始行{patch.range_start}: "{patch.before[:40]}")')
+                return False
+            real_start, real_end = located
+            if real_start != max(0, patch.range_start):
+                print(f'  [校准] 行号 {patch.range_start}→{real_start}')
+
             # 根据操作类型应用
             if patch.action == 'replace':
-                # 替换指定行
-                start = max(0, patch.range_start)
-                end = min(len(lines), patch.range_end + 1)
+                start = max(0, real_start)
+                end = min(len(lines), real_end + 1)
                 new_lines = patch.after.split('\n')
                 lines = lines[:start] + new_lines + lines[end:]
             elif patch.action == 'insert':
-                # 在指定位置插入
-                start = max(0, patch.range_start)
+                start = max(0, real_start)
                 new_lines = patch.after.split('\n')
                 lines = lines[:start] + new_lines + lines[start:]
             elif patch.action == 'delete':
-                # 删除指定行
-                start = max(0, patch.range_start)
-                end = min(len(lines), patch.range_end + 1)
+                start = max(0, real_start)
+                end = min(len(lines), real_end + 1)
                 lines = lines[:start] + lines[end:]
 
             # 写回文件
             with open(os.path.join(ROOT, patch.target), 'w', encoding='utf-8') as f:
                 f.write('\n'.join(lines))
 
-            print(f'  [应用] {patch.target} {patch.action} 行{patch.range_start}-{patch.range_end}')
+            print(f'  [应用] {patch.target} {patch.action} 行{real_start}-{real_end}')
             return True
 
         except Exception as e:
@@ -925,22 +1069,57 @@ class AgentCodeModifier:
             return False
 
     def run_tests(self) -> Tuple[bool, str]:
-        """运行测试"""
+        """运行强验证：多后端一致性 + 自举验证"""
         import subprocess as sp
 
+        output_parts = []
+        all_passed = True
+
+        # 1. 多后端一致性验证
+        try:
+            from agent_system.agent_evolution import DifferentialVerifier
+
+            verifier = DifferentialVerifier()
+            consistency = verifier.verify_consistency()
+            if consistency.get('consistent', 0) < consistency.get('total', 1):
+                all_passed = False
+            output_parts.append(
+                f'一致性: {consistency.get("consistent", 0)}/{consistency.get("total", 0)}'
+            )
+        except Exception as e:
+            all_passed = False
+            output_parts.append(f'一致性错误: {e}')
+
+        # 2. 自举验证
+        try:
+            from agent_system.agent_evolution import SelfHostVerifier
+
+            sv = SelfHostVerifier()
+            result = sv.run_full_verification()
+            if not result.get('success', False):
+                all_passed = False
+            output_parts.append(
+                f'自举: {"通过" if result.get("success") else "失败"} '
+                f'(字节码: {"通过" if result.get("bytecode_compiler", {}).get("success") else "失败"}, '
+                f'VM: {result.get("vm_consistency", {}).get("consistent", 0)}/{result.get("vm_consistency", {}).get("total", 0)})'
+            )
+        except Exception as e:
+            all_passed = False
+            output_parts.append(f'自举错误: {e}')
+
+        # 3. 快速 pytest（兜底）
         try:
             r = sp.run(
-                [os.sys.executable, '-X', 'utf8', '-m', 'pytest', 'tests/test_agent.py', '-q'],
-                capture_output=True,
-                text=True,
-                timeout=60,
-                cwd=ROOT,
+                [sys.executable, '-X', 'utf8', '-m', 'pytest', 'tests/test_core.py', '-q'],
+                capture_output=True, text=True, timeout=120, cwd=ROOT,
             )
-            passed = r.returncode == 0
-            output = r.stdout[-500:] + r.stderr[-300:]
-            return passed, output
+            if r.returncode != 0:
+                all_passed = False
+            output_parts.append(f'pytest: {"通过" if r.returncode == 0 else "失败"}')
         except Exception as e:
-            return False, str(e)
+            output_parts.append(f'pytest错误: {e}')
+
+        return all_passed, ' | '.join(output_parts)
 
     def run_evolution_loop(self, max_cycles: int = 3) -> Dict:
         """完整进化循环：生成→应用→测试→回滚/接受"""

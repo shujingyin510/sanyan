@@ -17,7 +17,7 @@ from pathlib import Path
 
 from agent_system.agent_loop_monitor import LoopLogger, LoopStats, HealthMonitor, RollbackVerifier
 
-ROOT = os.path.dirname(os.path.abspath(__file__))
+ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 WATCH_EXTS = {'.py', '.san', '.sasm'}
 COOLDOWN_SECS = 30  # 冷却时间，防止无限循环
 MAX_CYCLES = 10  # 默认最大循环次数

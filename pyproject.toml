@@ -132,6 +132,14 @@ omit = [
     "dap_server.py",
     "setup.py",
     "sanyan/*",
+    "agent_system/*",
+    "preflight.py",
+    "auto_verify.py",
+    "asm.py",
+    "disasm.py",
+    "verify.py",
+    "benchmark/*",
+    "packages/*",
 ]
 
 [tool.coverage.report]

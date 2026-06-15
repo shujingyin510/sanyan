@@ -15,7 +15,7 @@ import random
 import statistics
 from typing import Dict, List
 
-ROOT = os.path.dirname(os.path.abspath(__file__))
+ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 
 # ── 实验A: 1000轮连续进化 ──

@@ -1,3 +1,4 @@
+import sys
 """约束进化系统 — 第3层：系统级自我进化（受限）
 
 核心思路：不是自由进化，而是在围栏内优化
@@ -18,7 +19,7 @@ import subprocess as sp
 import time
 from typing import Dict, List, Tuple, Optional
 
-ROOT = os.path.dirname(os.path.abspath(__file__))
+ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 
 class ConstraintEvolver:
@@ -154,11 +155,11 @@ class DifferentialVerifier:
     BACKENDS = {
         'python': {
             'name': 'Python 求值器',
-            'cmd': [os.sys.executable, '-X', 'utf8', 'main.py'],
+            'cmd': [sys.executable, '-X', 'utf8', 'main.py'],
         },
         'vm': {
             'name': '字节码 VM',
-            'cmd': [os.sys.executable, '-X', 'utf8', 'main.py', '--vm'],
+            'cmd': [sys.executable, '-X', 'utf8', 'main.py', '--vm'],
         },
     }
 
@@ -360,7 +361,7 @@ class SelfHostVerifier:
             # 编译 bytecode_compiler.san
             r1 = sp.run(
                 [
-                    os.sys.executable,
+                    sys.executable,
                     '-X',
                     'utf8',
                     'sanyanc.py',
@@ -390,7 +391,7 @@ vm = VM.from_bin('build/test_compiler.bin')
 vm.run()
 """
             r2 = sp.run(
-                [os.sys.executable, '-X', 'utf8', '-c', test_code], capture_output=True, text=True, timeout=60, cwd=ROOT
+                [sys.executable, '-X', 'utf8', '-c', test_code], capture_output=True, text=True, timeout=60, cwd=ROOT
             )
 
             if r2.returncode != 0:
@@ -428,12 +429,12 @@ vm.run()
         for test in test_cases:
             # Python 求值器
             r_py = sp.run(
-                [os.sys.executable, '-X', 'utf8', 'main.py', test], capture_output=True, text=True, timeout=30, cwd=ROOT
+                [sys.executable, '-X', 'utf8', 'main.py', test], capture_output=True, text=True, timeout=30, cwd=ROOT
             )
 
             # 字节码 VM
             r_vm = sp.run(
-                [os.sys.executable, '-X', 'utf8', 'main.py', '--vm', test],
+                [sys.executable, '-X', 'utf8', 'main.py', '--vm', test],
                 capture_output=True,
                 text=True,
                 timeout=30,

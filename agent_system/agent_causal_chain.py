@@ -20,7 +20,7 @@ import random
 import statistics
 from typing import Dict, List
 
-ROOT = os.path.dirname(os.path.abspath(__file__))
+ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 
 # ── 修正1: 真实独立任务生成器 ──

@@ -14,7 +14,7 @@ import statistics
 import time
 from typing import Dict, List
 
-ROOT = os.path.dirname(os.path.abspath(__file__))
+ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 
 # ── 实验1: 100次随机进化 ──
