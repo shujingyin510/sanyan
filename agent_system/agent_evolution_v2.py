@@ -1,4 +1,3 @@
-
 """进化系统 v2 — Patch DSL + Mutation Budget + 三态评分 + Tournament + Memory
 
 五层架构:
@@ -15,6 +14,7 @@
     P48: CandidateTournament — 候选锦标赛
     P49: EvolutionMemory — 进化历史库
 """
+
 import sys
 
 import os

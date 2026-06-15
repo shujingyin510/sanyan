@@ -1,4 +1,3 @@
-
 """约束进化系统 — 第3层：系统级自我进化（受限）
 
 核心思路：不是自由进化，而是在围栏内优化
@@ -13,6 +12,7 @@
     P43: MultiObjectiveEvaluator — 多目标评估器（综合得分）
     P44: SelfHostVerifier — 自举验证器（不动点验证）
 """
+
 import sys
 
 import os
