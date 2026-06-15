@@ -1,6 +1,6 @@
 # Agent 可读决策 DSL
 
-[English](README_EN.md)
+[English](README_EN.md) | [操作手册](agent_operations.md) | [Operations Manual](agent_operations_en.md)
 
 > 基于 [ternary-engine](https://pypi.org/project/ternary-engine/) 的 LLM Agent ——每步决策带置信度，不确定时自动门控拦截。
 
