@@ -1,4 +1,5 @@
 import sys
+
 """进化系统 v2 — Patch DSL + Mutation Budget + 三态评分 + Tournament + Memory
 
 五层架构:
@@ -737,25 +738,35 @@ class AgentCodeModifier:
         if not api_key:
             return ''
         url = 'https://api.deepseek.com/v1/chat/completions'
-        body = json.dumps({
-            'model': 'deepseek-v4-pro',
-            'max_tokens': 4096,
-            'temperature': 0.3,
-            'stream': True,
-            'thinking': {'type': 'enabled', 'budget_tokens': 512},
-            'messages': [
-                {'role': 'system', 'content': (
-                    '你是代码优化专家。输出严格JSON格式，不要任何其他文字。\n'
-                    '{"action":"insert|replace", "line":行号, "before":"旧代码", "after":"新代码", "rationale":"理由", "expected":"预期效果"}'
-                )},
-                {'role': 'user', 'content': prompt},
-            ],
-        }, ensure_ascii=False).encode()
+        body = json.dumps(
+            {
+                'model': 'deepseek-v4-pro',
+                'max_tokens': 4096,
+                'temperature': 0.3,
+                'stream': True,
+                'thinking': {'type': 'enabled', 'budget_tokens': 512},
+                'messages': [
+                    {
+                        'role': 'system',
+                        'content': (
+                            '你是代码优化专家。输出严格JSON格式，不要任何其他文字。\n'
+                            '{"action":"insert|replace", "line":行号, "before":"旧代码", "after":"新代码", "rationale":"理由", "expected":"预期效果"}'
+                        ),
+                    },
+                    {'role': 'user', 'content': prompt},
+                ],
+            },
+            ensure_ascii=False,
+        ).encode()
         try:
-            req = _urllib.Request(url, body, {
-                'Content-Type': 'application/json',
-                'Authorization': f'Bearer {api_key}',
-            })
+            req = _urllib.Request(
+                url,
+                body,
+                {
+                    'Content-Type': 'application/json',
+                    'Authorization': f'Bearer {api_key}',
+                },
+            )
             resp = _urllib.urlopen(req, timeout=300)
             # 流式读取: 持续读但设上限(最多500块=~2MB, 最多5分钟)
             chunks = []
@@ -1083,9 +1094,7 @@ class AgentCodeModifier:
             consistency = verifier.verify_consistency()
             if consistency.get('consistent', 0) < consistency.get('total', 1):
                 all_passed = False
-            output_parts.append(
-                f'一致性: {consistency.get("consistent", 0)}/{consistency.get("total", 0)}'
-            )
+            output_parts.append(f'一致性: {consistency.get("consistent", 0)}/{consistency.get("total", 0)}')
         except Exception as e:
             all_passed = False
             output_parts.append(f'一致性错误: {e}')
@@ -1111,7 +1120,10 @@ class AgentCodeModifier:
         try:
             r = sp.run(
                 [sys.executable, '-X', 'utf8', '-m', 'pytest', 'tests/test_core.py', '-q'],
-                capture_output=True, text=True, timeout=120, cwd=ROOT,
+                capture_output=True,
+                text=True,
+                timeout=120,
+                cwd=ROOT,
             )
             if r.returncode != 0:
                 all_passed = False
