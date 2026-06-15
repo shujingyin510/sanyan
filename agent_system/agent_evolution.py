@@ -16,7 +16,7 @@
 import os
 import subprocess as sp
 import time
-from typing import Dict, List, Optional, Tuple, Optional
+from typing import Dict, List, Tuple, Optional
 
 ROOT = os.path.dirname(os.path.abspath(__file__))
 

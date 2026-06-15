@@ -4,7 +4,7 @@ Phase 0 核心：大任务自动递归分解，每层只携带摘要
 
 import time
 import re
-from typing import Any, Callable, List, Optional, Optional
+from typing import Any, Callable, List, Optional
 
 
 class ComplexityClassifier:

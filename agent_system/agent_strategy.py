@@ -10,7 +10,7 @@ import random
 import sqlite3
 import time
 from collections import defaultdict
-from typing import Dict, List, Optional, Optional
+from typing import Dict, List, Optional
 
 
 class PromptEvolver:

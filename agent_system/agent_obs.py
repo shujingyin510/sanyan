@@ -6,7 +6,7 @@ P27: AgentDashboard — 实时仪表盘摘要
 
 import time
 from collections import defaultdict
-from typing import Any, Dict, List, Optional, Optional
+from typing import Any, Dict, List, Optional
 
 
 class DecisionTracer:
