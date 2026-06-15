@@ -1,5 +1,32 @@
 # AGENTS.md — 三言项目维护约定
 
+## 🚨 最高优先级：提交前强制自查
+
+**每次 `git commit` 前，必须先跑本地测试，绿了才能提交：**
+
+```bash
+ruff check . && ruff format --check . && mypy . && python -X utf8 preflight.py --quick
+```
+
+绿了 → 提交。红灯 → 修完再提。**不允许跳过。不允许 `--no-verify`。**
+这条规则优先级高于一切——宁可慢一点，不要再把 CI 红着推上去。
+
+---
+
+## 📋 工作优先级（从上到下执行）
+
+| 等级 | 触发条件 | 行为 |
+|------|------|------|
+| 🚨 P0 | 用户直接指令 | 立即执行，其他事暂停 |
+| 🚨 P0 | CI 红灯 / bug 报错 | 立即修，修完跑 preflight 绿了再继续 |
+| 🔴 P1 | 写完任何代码 | 先跑 `ruff check . && ruff format --check . && mypy .` |
+| 🔴 P1 | 推送到 GitHub 前 | 必跑 `python -X utf8 preflight.py --quick`，绿了才能 push |
+| 🟡 P2 | 多文件替换 / 中文内容编辑 | 用外置 `.py` 脚本操作，不要 bash 内联（避免 GBK/UTF-8 编码错误） |
+| 🟡 P2 | 修改 `agent_system/` 下文件 | 改完必须验证 `import run_agent` 不崩 |
+| 🟢 P3 | 日常小改动、调试、提示词调优 | 只本地 commit，不 push，等用户确认 |
+
+---
+
 ## 汇编器（Agent 写字节码用）
 
 > **重要**：汇编器允许 Agent 直接写 Sanyan 字节码程序。语法和陷阱见 → [`docs/asm_guide.md`](docs/asm_guide.md)
