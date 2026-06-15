@@ -1,40 +1,109 @@
-# 三态认知框架 Sanyan v3.29.0
+# 三态认知框架 Sanyan v3.35.0
 
 [![VS Code Extension](https://img.shields.io/badge/VS%20Code-%E8%AF%AD%E6%B3%95%E9%AB%98%E4%BA%AE-%23007ACC?logo=visualstudiocode)](sanyan-vscode/README.md)
 [![CI](https://github.com/shujingyin510/sanyan/actions/workflows/test.yml/badge.svg)](https://github.com/shujingyin510/sanyan/actions)
 
-> **一个人，一个半月，从零写出一整套编译器、虚拟机、智能体框架。** 面向不确定性决策的认知计算框架。现实世界不是 0 和 1——传感器会失灵、用户会犹豫、代码会写错。三态框架用 Kleene 传播 × 贝叶斯置信度 × 保护门控，让程序原生表达、传播、积累"还不确定"，直到证据充足再决策。
+> **三态认知框架** — 从三进制语言到 Knowledge Runtime 的演进。核心贡献：构建了一个可验证的自改进 Agent 知识系统，证明了 Knowledge → Calibration → Selection → Success 的因果链。
 
 [English](README_EN.md)
 
 ---
 
-## 起源
+## Research Results
 
-1958 年，莫斯科国立大学造了一台三进制计算机，叫 **Setun**。每个比特不是 0 或 1，而是**正、零、负**。它稳定运行了三十年，功耗只有同期二进制计算机的三分之一。然后被停产了——不是因为技术不行，而是苏联的工业标准全面转向了二进制。
+```
+✓ 因果链闭环: Knowledge → Calibration → Selection → Success (+43.6%)
+✓ 知识迁移: 任务规律可迁移 (+27.9%), 配置不可迁移 (-4.6%)
+✓ 知识置信度: 防止把偶然当规律 (Confidence 0.69-0.92)
+✓ Task Taxonomy: 不同任务需要不同策略
+✓ 三态逻辑贯穿: 语言→Agent→Knowledge→Evolution
+```
 
-2024 年，我在用 STM32 做智能家居时，发现所有传感器都在对我说三种状态：有人、没人、信号不稳。但我的代码只能写 `if` 和 `else`。"信号不稳"被强行归类为 0 或 1，然后我加了一堆阈值、状态机和注释来弥补丢失的信息。
-
-**如果编程语言原生支持第三种状态呢？**
-
-于是就有了三言。从 2026 年 5 月到现在，一个半月，一个人，做出了一整套编译器、虚拟机、认知运行时、智能体框架。如果放到以前，这需要一个团队干好几个月。AI 帮了很大忙，但方向、判断、架构——那些 AI 不知道要往哪走的选择——都是人做的。
-
----
-
-## v3.32 更新摘要
-
-- **Agent 自主闭环**：`auto_verify.py` 提交→全量测试→通过自动提交/失败回退，三条路径实测通过
-- **LLM 深度集成**：模型升级 `deepseek-v4-pro`，thinking 显式启控，工具调用 JSON 化，经验库跨任务学习
-- **认知运行时**：Toggle 检测、同位置连错检测、结构化重试历史、任务级经验库，Agent 能从失败中学习
-- **自举 Level 2-4**：三言编译器自编译（不动点验证）→ C 种子 VM（318行）→ x86_64 NASM 汇编 VM（617行）
-- **全量 CI 绿**：1650+ 项测试，preflight 一键检查，多后端一致性验证
+详见 [实验报告](docs/research/05-experiment-report.md)
 
 ---
 
 ## 一句话定位
 
-三态认知框架 = **三态语言（DSL）** + **三态引擎（TernaryEngine）** + **三态应用（Agent / IoT / Village）**。
-语言只是接口层——真正的核心是 Kleene 三值逻辑传播 + 贝叶斯置信度衰减 + 保护门控的决策引擎。
+三态认知框架 = **三态语言（DSL）** + **三态引擎（TernaryEngine）** + **Knowledge Runtime**。
+
+语言只是接口层——真正的核心是 **Knowledge + Confidence + Selection** 的可验证自改进系统。
+
+---
+
+## 五层架构
+
+```
+Layer 5: Knowledge Validation（知识验证层）
+  Confidence / Cluster / Consistency
+        ↓
+Layer 4: Knowledge Layer（知识层）
+  MetaLearningDB / TaskEmbedding / ClusterLearning
+        ↓
+Layer 3: Evolution Layer（进化层）
+  Ranking / Cost / Budget / UCB
+        ↓
+Layer 2: Policy Layer（策略层）
+  Config / Strategy / Hypothesis
+        ↓
+Layer 1: Frozen Core（冰冻核心）
+  Reviewer / Replay / History / Ternary
+```
+
+### 三态逻辑贯穿整个系统
+
+| 层 | 三态表现 | 说明 |
+|---|---|---|
+| 语言层 | TRUE / FALSE / UNKNOWN | Kleene三值逻辑 |
+| Agent层 | 高置信度 / 低置信度 / 未知 | 决策门控 |
+| Knowledge Layer | 可信知识 / 弱知识 / 未知知识 | 知识可靠性评估 |
+| Evolution Layer | 接受 / 拒绝 / 收集更多数据 | 三态裁决 |
+
+---
+
+## 核心实验
+
+### 实验1: 因果链闭环
+
+```
+Knowledge → Better Prediction → Better Selection → Higher Success Rate
+
+Baseline:       40.9% 成功率
+Knowledge:      82.5% 成功率 (+41.6%)
+Knowledge+Conf: 84.5% 成功率 (+2.0%)
+总体提升:       +43.6%
+```
+
+### 实验2: 知识迁移
+
+```
+直接迁移配置 → 负收益 (-4.6%)  ✗
+迁移任务规律 → 正收益 (+27.9%) ✓
+
+结论: 迁移的是规律，不是配置。战略比战术更容易迁移。
+```
+
+### 实验3: 知识置信度
+
+```
+documentation:  151样本  置信度0.92 (高)
+analysis:       111样本  置信度0.87 (中)
+feature:        172样本  置信度0.84 (中)
+bug_fix:        183样本  置信度0.79 (中)
+refactor:        87样本  置信度0.69 (低，需更多数据)
+```
+
+### 实验4: Task Taxonomy
+
+```
+test:           72.2% → thorough
+feature:        66.8% → standard
+documentation:  49.5% → direct
+performance:    48.4% → multi_candidate
+bug_fix:        45.8% → multi_fix
+refactor:       45.0% → careful
+analysis:       42.5% → direct
+```
 
 ---
 
