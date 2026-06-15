@@ -224,6 +224,8 @@ ternary_agent/runtime_v2/association.json
 *.env
 agent_*.db
 agent_system/*.db
+agent_system/agent_decision.json
+agent_system/.agent_experience.json
 !stdlib/io.bin
 !stdlib/logic.bin
 !stdlib/stat.bin
