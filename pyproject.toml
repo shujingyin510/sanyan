@@ -97,6 +97,7 @@ module = [
     "sugar.*",
     "lsp.*",
     "llvmgen.*",
+    "agent_system.*",
 ]
 ignore_errors = true
 
