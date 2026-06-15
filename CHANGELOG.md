@@ -2,6 +2,36 @@
 
 ---
 
+## [v3.36.0] — 2026-06-15 (Agent自主改代码闭环 — LLM补丁+强验证+行号校准)
+
+### 新增
+- **LLM补丁生成**：`--code-evolve` 接入 DeepSeek v4，替代规则模板。LLM分析上下文生成真实优化（如移除冗余 `max()`、reduce遍历次数、删除未使用导入），质量显著优于固定规则
+- **行号校准**：补丁应用前在 ±20 行范围内搜索 `before` 匹配内容，精准定位后再应用，解决 LLM 行号偏移问题
+- **强验证管道**：`--code-evolve` 验证从 `pytest test_agent.py` 升级为多后端一致性 + 自举验证 + pytest，坏补丁在第一轮就被拦下并自动回滚
+- **流式 LLM 调用**：SSE 流式读取，持续读取不限超时，上限 500 块/300 秒，避免 thinking 模式超时
+- **LLM 死循环保护**：连续 3 次失败自动跳过后续 LLM 调用（`_llm_fail_count`），外层 `max_cycles=3`
+
+### 修复
+- **路径修复**：8 个文件 `ROOT` 从 `agent_system/` 修正为项目根目录（`dirname(dirname(...))`），7 处 `os.sys.executable` → `sys.executable`，`test_code` 字符串补 `import sys`
+- **CI 修复**：导入路径 `agent_runtime` → `agent_system.agent_runtime`，coverage 排除 `agent_system/*`，ruff 格式化
+- **mypy**：152 错误清零，18 文件 `Optional` 批量修复
+
+### 关键数据
+- **仿真验证**（`--validate`）：100 随机补丁，Reviewer F1=88%，Precision 78.6%，Recall 100%，收敛检测正常
+- **实测闭环**（`--code-evolve`）：3 轮 × LLM 生成 → 强验证 → 自动回滚/接受，最终自举验证通过，代码零污染
+- **自举验证**：字节码编译器自举 + VM 3/3 多后端一致性全部通过
+
+### 对比前版本
+| | v3.35 规则演化 | v3.36 LLM 闭环 |
+|------|------|------|
+| 补丁生成 | 固定规则（缓存/循环/死代码） | LLM 上下文分析，真实优化 |
+| 行号定位 | 直接使用，常偏几行 | ±20 行搜索校准 |
+| 验证强度 | `pytest test_agent.py` | 多后端一致性 + 自举 + pytest |
+| 补丁质量 | 缩进错误/"无法生成" | 语法正确，语义有意义 |
+| 接受率 | 0% | 有效补丁被接受 |
+
+---
+
 ## [v3.35.0] — 2026-06-15 (Agent进化系统 + Knowledge Layer + Meta-Knowledge Transfer)
 
 ### 新增

@@ -44,13 +44,14 @@ python -X utf8 sanyanc.py program.bin --run   # 运行
                            UNCERT/CONFLICTED   +置信度    +置信度     /增益不足    /HUMAN
 ```
 
-**V5 AgentRuntime**（Python 原生引擎，四阶段）：
+**V5 AgentRuntime**（Python 原生引擎，四阶段）+ **自主进化闭环**（`--code-evolve`）：
 ```
-Phase 0: 任务分解 + 工具图 + 能力注册
-Phase 1: 多假设生成 + 锦标赛选优 + 并行验证
-Phase 2: 经验 + Token预算 + 压缩 + 缓存 + 可观测 + 成本 + 回放
-Phase 3: 并行执行 + 智能压缩 + 跨会话学习 + 安全沙箱
-Phase 4: 流式响应 + 高阶工具组合 + 多Agent共享上下文
+用户提问 → SymbolTable预加载 → SemanticCache缓存检查 → DecompositionEngine任务分解
+         → HypothesisGenerator多假设生成 → Tournament锦标赛选优
+         → 每步调 LLM 获取 tool+args（JSON 格式）→ TernaryEngine三态决策
+         → 经验库跨任务模式匹配 → 完成
+
+--code-evolve: LLM生成补丁 → 行号校准 → 多后端一致性验证 → 自举验证 → 接受/回滚
 ```
 
 **LLM 连接**：DeepSeek v4（`deepseek-v4-pro`），thinking 显式启用 `{budget_tokens: 2048}`，`max_tokens: 4096`。
