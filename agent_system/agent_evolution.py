@@ -15,6 +15,7 @@
 
 import sys
 
+
 import os
 import subprocess as sp
 import time
@@ -229,6 +230,8 @@ class DifferentialVerifier:
             cmd,
             capture_output=True,
             text=True,
+            encoding='utf-8',
+            errors='replace',
             timeout=30,
             cwd=ROOT,
         )
@@ -372,6 +375,8 @@ class SelfHostVerifier:
                 ],
                 capture_output=True,
                 text=True,
+                encoding='utf-8',
+                errors='replace',
                 timeout=60,
                 cwd=ROOT,
             )
@@ -392,7 +397,13 @@ vm = VM.from_bin('build/test_compiler.bin')
 vm.run()
 """
             r2 = sp.run(
-                [sys.executable, '-X', 'utf8', '-c', test_code], capture_output=True, text=True, timeout=60, cwd=ROOT
+                [sys.executable, '-X', 'utf8', '-c', test_code],
+                capture_output=True,
+                text=True,
+                encoding='utf-8',
+                errors='replace',
+                timeout=60,
+                cwd=ROOT,
             )
 
             if r2.returncode != 0:
@@ -430,7 +441,13 @@ vm.run()
         for test in test_cases:
             # Python 求值器
             r_py = sp.run(
-                [sys.executable, '-X', 'utf8', 'main.py', test], capture_output=True, text=True, timeout=30, cwd=ROOT
+                [sys.executable, '-X', 'utf8', 'main.py', test],
+                capture_output=True,
+                text=True,
+                encoding='utf-8',
+                errors='replace',
+                timeout=30,
+                cwd=ROOT,
             )
 
             # 字节码 VM
@@ -438,6 +455,8 @@ vm.run()
                 [sys.executable, '-X', 'utf8', 'main.py', '--vm', test],
                 capture_output=True,
                 text=True,
+                encoding='utf-8',
+                errors='replace',
                 timeout=30,
                 cwd=ROOT,
             )

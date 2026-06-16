@@ -34,6 +34,7 @@ ruff check . && ruff format --check . && mypy . && python -X utf8 preflight.py -
 | 🟡 P2 | 新增/删除/重命名文件 | 同步更新 README 目录树 + 文件结构表格 |
 | 🟡 P2 | Agent 相关新文件 | 统一放 `agent_system/`，**不要放根目录**。根目录是编程语言本身（编译器/VM/求值器等） |
 | 🟡 P2 | 新增 CLI 标志 | `run_agent.py` 加了新 flag 必须同步更新 AGENTS.md 运行方式列表 + CHANGELOG |
+| 🟡 P2 | 新文件行数 | 超过 500 行提示审查；超过 1000 行必须说明为什么不拆。已有文件不回溯 |
 | 🟢 P3 | 日常小改动、调试、提示词调优 | 只本地 commit，不 push，等用户确认 |
 
 ---

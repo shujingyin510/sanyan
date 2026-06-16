@@ -49,7 +49,7 @@ dev = [
 ]
 
 [project.scripts]
-sanyan = "main:main"
+sanyan = "sanyan.cli:main"
 
 [tool.setuptools]
 packages = ["sanyan", "ops", "sugar", "lsp", "llvmgen", "utils"]

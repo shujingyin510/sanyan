@@ -17,6 +17,7 @@
 
 import sys
 
+
 import os
 import json
 import sqlite3
@@ -1121,6 +1122,8 @@ class AgentCodeModifier:
                 [sys.executable, '-X', 'utf8', '-m', 'pytest', 'tests/test_core.py', '-q'],
                 capture_output=True,
                 text=True,
+                encoding='utf-8',
+                errors='replace',
                 timeout=120,
                 cwd=ROOT,
             )

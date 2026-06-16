@@ -10,10 +10,8 @@
 """
 
 from __future__ import annotations
-from typing import Any, Callable
 import os
 import struct
-
 # removed unused import
 from ternary_core import TritValue
 

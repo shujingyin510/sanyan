@@ -1,0 +1,872 @@
+{
+  "date": "2026-06-16T12:09:10.091272",
+  "total": 49,
+  "detected": 48,
+  "skipped": 0,
+  "detection_rate": 98.0,
+  "by_category": {
+    "语法": {
+      "total": 4,
+      "detected": 3
+    },
+    "逻辑": {
+      "total": 6,
+      "detected": 6
+    },
+    "变量": {
+      "total": 8,
+      "detected": 8
+    },
+    "边界": {
+      "total": 9,
+      "detected": 9
+    },
+    "导入": {
+      "total": 4,
+      "detected": 4
+    },
+    "类型": {
+      "total": 6,
+      "detected": 6
+    },
+    "语义": {
+      "total": 12,
+      "detected": 12
+    }
+  },
+  "results": [
+    {
+      "detected": true,
+      "by_ruff": true,
+      "by_self": false,
+      "by_logic": false,
+      "by_semantic": false,
+      "by_trace": true,
+      "ruff_output": "vm.py:287:61: F821 Undefined name `Any`\nvm.py:287:69: F821 Undefined name `Any`\nvm.py:841:23: F821 Undefined name `Callable`\nFound 3 errors.",
+      "duration": 1.6,
+      "bug": {
+        "type": "syntax_missing_colon",
+        "category": "语法",
+        "desc": "缺少冒号"
+      },
+      "target": "vm.py",
+      "index": 1
+    },
+    {
+      "detected": true,
+      "by_ruff": false,
+      "by_self": false,
+      "by_logic": false,
+      "by_semantic": false,
+      "by_trace": true,
+      "ruff_output": "All checks passed!",
+      "duration": 1.6,
+      "bug": {
+        "type": "syntax_bad_indent",
+        "category": "语法",
+        "desc": "错误缩进"
+      },
+      "target": "evaluator.py",
+      "index": 2
+    },
+    {
+      "detected": true,
+      "by_ruff": true,
+      "by_self": false,
+      "by_logic": false,
+      "by_semantic": false,
+      "by_trace": true,
+      "ruff_output": "vm.py:287:61: F821 Undefined name `Any`\nvm.py:287:69: F821 Undefined name `Any`\nvm.py:841:23: F821 Undefined name `Callable`\nFound 3 errors.",
+      "duration": 1.5,
+      "bug": {
+        "type": "syntax_bad_indent",
+        "category": "语法",
+        "desc": "错误缩进(2)"
+      },
+      "target": "vm.py",
+      "index": 3
+    },
+    {
+      "detected": true,
+      "by_ruff": false,
+      "by_self": false,
+      "by_logic": false,
+      "by_semantic": false,
+      "by_trace": true,
+      "ruff_output": "All checks passed!",
+      "duration": 1.7,
+      "bug": {
+        "type": "logic_wrong_op",
+        "category": "逻辑",
+        "desc": "反向比较符"
+      },
+      "target": "evaluator.py",
+      "index": 4
+    },
+    {
+      "detected": true,
+      "by_ruff": true,
+      "by_self": false,
+      "by_logic": false,
+      "by_semantic": true,
+      "by_trace": true,
+      "ruff_output": "vm.py:287:61: F821 Undefined name `Any`\nvm.py:287:69: F821 Undefined name `Any`\nvm.py:841:23: F821 Undefined name `Callable`\nFound 3 errors.",
+      "duration": 1.6,
+      "bug": {
+        "type": "logic_wrong_op",
+        "category": "逻辑",
+        "desc": "反向比较符(2)"
+      },
+      "target": "vm.py",
+      "index": 5
+    },
+    {
+      "detected": true,
+      "by_ruff": false,
+      "by_self": false,
+      "by_logic": false,
+      "by_semantic": false,
+      "by_trace": true,
+      "ruff_output": "All checks passed!",
+      "duration": 1.4,
+      "bug": {
+        "type": "logic_off_by_one",
+        "category": "逻辑",
+        "desc": "差一错误"
+      },
+      "target": "evaluator.py",
+      "index": 6
+    },
+    {
+      "detected": true,
+      "by_ruff": true,
+      "by_self": false,
+      "by_logic": false,
+      "by_semantic": false,
+      "by_trace": true,
+      "ruff_output": "vm.py:287:61: F821 Undefined name `Any`\nvm.py:287:69: F821 Undefined name `Any`\nvm.py:841:23: F821 Undefined name `Callable`\nFound 3 errors.",
+      "duration": 1.4,
+      "bug": {
+        "type": "logic_off_by_one",
+        "category": "逻辑",
+        "desc": "差一错误(2)"
+      },
+      "target": "vm.py",
+      "index": 7
+    },
+    {
+      "detected": true,
+      "by_ruff": false,
+      "by_self": false,
+      "by_logic": false,
+      "by_semantic": true,
+      "by_trace": false,
+      "ruff_output": "All checks passed!",
+      "duration": 1.6,
+      "bug": {
+        "type": "var_undefined",
+        "category": "变量",
+        "desc": "未定义变量"
+      },
+      "target": "evaluator.py",
+      "index": 8
+    },
+    {
+      "detected": true,
+      "by_ruff": true,
+      "by_self": false,
+      "by_logic": false,
+      "by_semantic": true,
+      "by_trace": true,
+      "ruff_output": "vm.py:288:61: F821 Undefined name `Any`\nvm.py:288:69: F821 Undefined name `Any`\nvm.py:842:23: F821 Undefined name `Callable`\nFound 3 errors.",
+      "duration": 1.6,
+      "bug": {
+        "type": "var_undefined",
+        "category": "变量",
+        "desc": "未定义变量(2)"
+      },
+      "target": "vm.py",
+      "index": 9
+    },
+    {
+      "detected": true,
+      "by_ruff": false,
+      "by_self": false,
+      "by_logic": false,
+      "by_semantic": true,
+      "by_trace": true,
+      "ruff_output": "All checks passed!",
+      "duration": 1.4,
+      "bug": {
+        "type": "var_shadow",
+        "category": "变量",
+        "desc": "变量遮蔽"
+      },
+      "target": "evaluator.py",
+      "index": 10
+    },
+    {
+      "detected": true,
+      "by_ruff": true,
+      "by_self": false,
+      "by_logic": false,
+      "by_semantic": true,
+      "by_trace": true,
+      "ruff_output": "vm.py:288:61: F821 Undefined name `Any`\nvm.py:288:69: F821 Undefined name `Any`\nvm.py:842:23: F821 Undefined name `Callable`\nFound 3 errors.",
+      "duration": 1.6,
+      "bug": {
+        "type": "var_shadow",
+        "category": "变量",
+        "desc": "变量遮蔽(2)"
+      },
+      "target": "vm.py",
+      "index": 11
+    },
+    {
+      "detected": true,
+      "by_ruff": false,
+      "by_self": false,
+      "by_logic": false,
+      "by_semantic": true,
+      "by_trace": false,
+      "ruff_output": "All checks passed!",
+      "duration": 0.8,
+      "bug": {
+        "type": "var_overwrite",
+        "category": "变量",
+        "desc": "覆盖核心变量"
+      },
+      "target": "evaluator.py",
+      "index": 12
+    },
+    {
+      "detected": true,
+      "by_ruff": true,
+      "by_self": false,
+      "by_logic": false,
+      "by_semantic": true,
+      "by_trace": true,
+      "ruff_output": "vm.py:104:30: F821 Undefined name `vars_broken`\nvm.py:287:61: F821 Undefined name `Any`\nvm.py:287:69: F821 Undefined name `Any`\nvm.py:841:23: F821 Undefined name `Callable`\nFound 4 errors.",
+      "duration": 1.5,
+      "bug": {
+        "type": "var_overwrite",
+        "category": "变量",
+        "desc": "覆盖核心变量(2)"
+      },
+      "target": "vm.py",
+      "index": 13
+    },
+    {
+      "detected": true,
+      "by_ruff": false,
+      "by_self": false,
+      "by_logic": false,
+      "by_semantic": true,
+      "by_trace": true,
+      "ruff_output": "All checks passed!",
+      "duration": 1.6,
+      "bug": {
+        "type": "boundary_div_zero",
+        "category": "边界",
+        "desc": "除零"
+      },
+      "target": "evaluator.py",
+      "index": 14
+    },
+    {
+      "detected": true,
+      "by_ruff": true,
+      "by_self": false,
+      "by_logic": false,
+      "by_semantic": true,
+      "by_trace": true,
+      "ruff_output": "vm.py:288:61: F821 Undefined name `Any`\nvm.py:288:69: F821 Undefined name `Any`\nvm.py:842:23: F821 Undefined name `Callable`\nFound 3 errors.",
+      "duration": 1.6,
+      "bug": {
+        "type": "boundary_div_zero",
+        "category": "边界",
+        "desc": "除零(2)"
+      },
+      "target": "vm.py",
+      "index": 15
+    },
+    {
+      "detected": true,
+      "by_ruff": false,
+      "by_self": false,
+      "by_logic": false,
+      "by_semantic": true,
+      "by_trace": false,
+      "ruff_output": "All checks passed!",
+      "duration": 1.5,
+      "bug": {
+        "type": "boundary_index_oob",
+        "category": "边界",
+        "desc": "数组越界"
+      },
+      "target": "evaluator.py",
+      "index": 16
+    },
+    {
+      "detected": true,
+      "by_ruff": true,
+      "by_self": false,
+      "by_logic": false,
+      "by_semantic": true,
+      "by_trace": false,
+      "ruff_output": "vm.py:288:61: F821 Undefined name `Any`\nvm.py:288:69: F821 Undefined name `Any`\nvm.py:842:23: F821 Undefined name `Callable`\nFound 3 errors.",
+      "duration": 1.7,
+      "bug": {
+        "type": "boundary_index_oob",
+        "category": "边界",
+        "desc": "数组越界(2)"
+      },
+      "target": "vm.py",
+      "index": 17
+    },
+    {
+      "detected": true,
+      "by_ruff": false,
+      "by_self": false,
+      "by_logic": false,
+      "by_semantic": true,
+      "by_trace": true,
+      "ruff_output": "All checks passed!",
+      "duration": 1.4,
+      "bug": {
+        "type": "boundary_index_oob",
+        "category": "边界",
+        "desc": "数组越界(3)"
+      },
+      "target": "evaluator.py",
+      "index": 18
+    },
+    {
+      "detected": true,
+      "by_ruff": true,
+      "by_self": false,
+      "by_logic": false,
+      "by_semantic": true,
+      "by_trace": true,
+      "ruff_output": "vm.py:288:61: F821 Undefined name `Any`\nvm.py:288:69: F821 Undefined name `Any`\nvm.py:842:23: F821 Undefined name `Callable`\nFound 3 errors.",
+      "duration": 1.6,
+      "bug": {
+        "type": "type_none_attr",
+        "category": "边界",
+        "desc": "None属性"
+      },
+      "target": "vm.py",
+      "index": 19
+    },
+    {
+      "detected": true,
+      "by_ruff": false,
+      "by_self": false,
+      "by_logic": false,
+      "by_semantic": true,
+      "by_trace": true,
+      "ruff_output": "All checks passed!",
+      "duration": 1.5,
+      "bug": {
+        "type": "type_none_attr",
+        "category": "边界",
+        "desc": "None属性(2)"
+      },
+      "target": "evaluator.py",
+      "index": 20
+    },
+    {
+      "detected": true,
+      "by_ruff": true,
+      "by_self": false,
+      "by_logic": false,
+      "by_semantic": true,
+      "by_trace": true,
+      "ruff_output": "vm.py:288:61: F821 Undefined name `Any`\nvm.py:288:69: F821 Undefined name `Any`\nvm.py:842:23: F821 Undefined name `Callable`\nFound 3 errors.",
+      "duration": 1.8,
+      "bug": {
+        "type": "import_missing",
+        "category": "导入",
+        "desc": "不存在模块"
+      },
+      "target": "vm.py",
+      "index": 21
+    },
+    {
+      "detected": true,
+      "by_ruff": false,
+      "by_self": false,
+      "by_logic": false,
+      "by_semantic": true,
+      "by_trace": true,
+      "ruff_output": "All checks passed!",
+      "duration": 1.5,
+      "bug": {
+        "type": "import_missing",
+        "category": "导入",
+        "desc": "不存在模块(2)"
+      },
+      "target": "evaluator.py",
+      "index": 22
+    },
+    {
+      "detected": true,
+      "by_ruff": true,
+      "by_self": false,
+      "by_logic": false,
+      "by_semantic": false,
+      "by_trace": true,
+      "ruff_output": "vm.py:287:61: F821 Undefined name `Any`\nvm.py:287:69: F821 Undefined name `Any`\nvm.py:841:23: F821 Undefined name `Callable`\nFound 3 errors.",
+      "duration": 1.6,
+      "bug": {
+        "type": "import_wrong_name",
+        "category": "导入",
+        "desc": "导入名错误"
+      },
+      "target": "vm.py",
+      "index": 23
+    },
+    {
+      "detected": true,
+      "by_ruff": true,
+      "by_self": false,
+      "by_logic": false,
+      "by_semantic": false,
+      "by_trace": true,
+      "ruff_output": "evaluator.py:6:24: F407 Future feature `broken_annotations` is not defined\nFound 1 error.",
+      "duration": 0.6,
+      "bug": {
+        "type": "import_wrong_name",
+        "category": "导入",
+        "desc": "导入名错误(2)"
+      },
+      "target": "evaluator.py",
+      "index": 24
+    },
+    {
+      "detected": true,
+      "by_ruff": true,
+      "by_self": false,
+      "by_logic": false,
+      "by_semantic": true,
+      "by_trace": false,
+      "ruff_output": "vm.py:288:61: F821 Undefined name `Any`\nvm.py:288:69: F821 Undefined name `Any`\nvm.py:842:23: F821 Undefined name `Callable`\nFound 3 errors.",
+      "duration": 1.6,
+      "bug": {
+        "type": "type_mismatch",
+        "category": "类型",
+        "desc": "类型不匹配"
+      },
+      "target": "vm.py",
+      "index": 25
+    },
+    {
+      "detected": true,
+      "by_ruff": false,
+      "by_self": false,
+      "by_logic": false,
+      "by_semantic": true,
+      "by_trace": true,
+      "ruff_output": "All checks passed!",
+      "duration": 1.7,
+      "bug": {
+        "type": "type_mismatch",
+        "category": "类型",
+        "desc": "类型不匹配(2)"
+      },
+      "target": "evaluator.py",
+      "index": 26
+    },
+    {
+      "detected": true,
+      "by_ruff": true,
+      "by_self": false,
+      "by_logic": false,
+      "by_semantic": true,
+      "by_trace": true,
+      "ruff_output": "vm.py:288:61: F821 Undefined name `Any`\nvm.py:288:69: F821 Undefined name `Any`\nvm.py:842:23: F821 Undefined name `Callable`\nFound 3 errors.",
+      "duration": 1.8,
+      "bug": {
+        "type": "type_none_attr",
+        "category": "类型",
+        "desc": "None属性"
+      },
+      "target": "vm.py",
+      "index": 27
+    },
+    {
+      "detected": true,
+      "by_ruff": false,
+      "by_self": false,
+      "by_logic": false,
+      "by_semantic": true,
+      "by_trace": true,
+      "ruff_output": "All checks passed!",
+      "duration": 1.6,
+      "bug": {
+        "type": "type_none_attr",
+        "category": "类型",
+        "desc": "None属性(2)"
+      },
+      "target": "evaluator.py",
+      "index": 28
+    },
+    {
+      "detected": true,
+      "by_ruff": true,
+      "by_self": false,
+      "by_logic": false,
+      "by_semantic": true,
+      "by_trace": true,
+      "ruff_output": "vm.py:288:61: F821 Undefined name `Any`\nvm.py:288:69: F821 Undefined name `Any`\nvm.py:842:23: F821 Undefined name `Callable`\nFound 3 errors.",
+      "duration": 1.5,
+      "bug": {
+        "type": "recursion_infinite",
+        "category": "语义",
+        "desc": "无限递归"
+      },
+      "target": "vm.py",
+      "index": 29
+    },
+    {
+      "detected": true,
+      "by_ruff": false,
+      "by_self": false,
+      "by_logic": false,
+      "by_semantic": true,
+      "by_trace": true,
+      "ruff_output": "All checks passed!",
+      "duration": 1.6,
+      "bug": {
+        "type": "recursion_infinite",
+        "category": "语义",
+        "desc": "无限递归(2)"
+      },
+      "target": "evaluator.py",
+      "index": 30
+    },
+    {
+      "detected": true,
+      "by_ruff": true,
+      "by_self": false,
+      "by_logic": false,
+      "by_semantic": true,
+      "by_trace": true,
+      "ruff_output": "vm.py:288:61: F821 Undefined name `Any`\nvm.py:288:69: F821 Undefined name `Any`\nvm.py:842:23: F821 Undefined name `Callable`\nFound 3 errors.",
+      "duration": 1.6,
+      "bug": {
+        "type": "scope_global_leak",
+        "category": "语义",
+        "desc": "全局泄漏"
+      },
+      "target": "vm.py",
+      "index": 31
+    },
+    {
+      "detected": true,
+      "by_ruff": false,
+      "by_self": false,
+      "by_logic": false,
+      "by_semantic": true,
+      "by_trace": true,
+      "ruff_output": "All checks passed!",
+      "duration": 1.5,
+      "bug": {
+        "type": "scope_global_leak",
+        "category": "语义",
+        "desc": "全局泄漏(2)"
+      },
+      "target": "evaluator.py",
+      "index": 32
+    },
+    {
+      "detected": true,
+      "by_ruff": true,
+      "by_self": false,
+      "by_logic": false,
+      "by_semantic": true,
+      "by_trace": true,
+      "ruff_output": "vm.py:288:61: F821 Undefined name `Any`\nvm.py:288:69: F821 Undefined name `Any`\nvm.py:842:23: F821 Undefined name `Callable`\nFound 3 errors.",
+      "duration": 1.5,
+      "bug": {
+        "type": "memory_hog",
+        "category": "语义",
+        "desc": "内存炸弹"
+      },
+      "target": "vm.py",
+      "index": 33
+    },
+    {
+      "detected": true,
+      "by_ruff": false,
+      "by_self": false,
+      "by_logic": false,
+      "by_semantic": true,
+      "by_trace": true,
+      "ruff_output": "All checks passed!",
+      "duration": 1.6,
+      "bug": {
+        "type": "memory_hog",
+        "category": "语义",
+        "desc": "内存炸弹(2)"
+      },
+      "target": "evaluator.py",
+      "index": 34
+    },
+    {
+      "detected": true,
+      "by_ruff": true,
+      "by_self": false,
+      "by_logic": false,
+      "by_semantic": true,
+      "by_trace": false,
+      "ruff_output": "vm.py:130:5: invalid-syntax: Expected an indented block after function definition\nvm.py:131:1: invalid-syntax: Unexpected indentation\nvm.py:842:1: invalid-syntax: Expected a statement\nFound 3 errors.",
+      "duration": 1.3,
+      "bug": {
+        "type": "return_missing",
+        "category": "语义",
+        "desc": "缺返回值"
+      },
+      "target": "vm.py",
+      "index": 35
+    },
+    {
+      "detected": true,
+      "by_ruff": false,
+      "by_self": false,
+      "by_logic": false,
+      "by_semantic": true,
+      "by_trace": true,
+      "ruff_output": "All checks passed!",
+      "duration": 1.5,
+      "bug": {
+        "type": "return_missing",
+        "category": "语义",
+        "desc": "缺返回值(2)"
+      },
+      "target": "evaluator.py",
+      "index": 36
+    },
+    {
+      "detected": true,
+      "by_ruff": true,
+      "by_self": false,
+      "by_logic": false,
+      "by_semantic": false,
+      "by_trace": false,
+      "ruff_output": "vm.py:287:61: F821 Undefined name `Any`\nvm.py:287:69: F821 Undefined name `Any`\nvm.py:841:23: F821 Undefined name `Callable`\nFound 3 errors.",
+      "duration": 1.7,
+      "bug": {
+        "type": "return_wrong_type",
+        "category": "语义",
+        "desc": "返回类型错"
+      },
+      "target": "vm.py",
+      "index": 37
+    },
+    {
+      "detected": true,
+      "by_ruff": false,
+      "by_self": false,
+      "by_logic": false,
+      "by_semantic": false,
+      "by_trace": true,
+      "ruff_output": "All checks passed!",
+      "duration": 1.5,
+      "bug": {
+        "type": "return_wrong_type",
+        "category": "语义",
+        "desc": "返回类型错(2)"
+      },
+      "target": "evaluator.py",
+      "index": 38
+    },
+    {
+      "detected": true,
+      "by_ruff": true,
+      "by_self": false,
+      "by_logic": false,
+      "by_semantic": true,
+      "by_trace": false,
+      "ruff_output": "vm.py:288:61: F821 Undefined name `Any`\nvm.py:288:69: F821 Undefined name `Any`\nvm.py:842:23: F821 Undefined name `Callable`\nFound 3 errors.",
+      "duration": 1.6,
+      "bug": {
+        "type": "string_encoding",
+        "category": "语义",
+        "desc": "编码错误"
+      },
+      "target": "vm.py",
+      "index": 39
+    },
+    {
+      "detected": false,
+      "by_ruff": false,
+      "by_self": false,
+      "by_logic": false,
+      "by_semantic": false,
+      "by_trace": false,
+      "ruff_output": "All checks passed!",
+      "duration": 1.6,
+      "bug": {
+        "type": "syntax_unclosed_string",
+        "category": "语法",
+        "desc": "未闭合字符串"
+      },
+      "target": "evaluator.py",
+      "index": 40
+    },
+    {
+      "detected": true,
+      "by_ruff": true,
+      "by_self": false,
+      "by_logic": false,
+      "by_semantic": true,
+      "by_trace": true,
+      "ruff_output": "vm.py:287:61: F821 Undefined name `Any`\nvm.py:287:69: F821 Undefined name `Any`\nvm.py:841:23: F821 Undefined name `Callable`\nFound 3 errors.",
+      "duration": 1.6,
+      "bug": {
+        "type": "logic_wrong_op",
+        "category": "逻辑",
+        "desc": "反向比较符(3)"
+      },
+      "target": "vm.py",
+      "index": 41
+    },
+    {
+      "detected": true,
+      "by_ruff": false,
+      "by_self": false,
+      "by_logic": false,
+      "by_semantic": false,
+      "by_trace": true,
+      "ruff_output": "All checks passed!",
+      "duration": 1.6,
+      "bug": {
+        "type": "logic_wrong_op",
+        "category": "逻辑",
+        "desc": "反向比较符(4)"
+      },
+      "target": "evaluator.py",
+      "index": 42
+    },
+    {
+      "detected": true,
+      "by_ruff": true,
+      "by_self": false,
+      "by_logic": false,
+      "by_semantic": true,
+      "by_trace": false,
+      "ruff_output": "vm.py:104:30: F821 Undefined name `vars_broken`\nvm.py:287:61: F821 Undefined name `Any`\nvm.py:287:69: F821 Undefined name `Any`\nvm.py:841:23: F821 Undefined name `Callable`\nFound 4 errors.",
+      "duration": 1.4,
+      "bug": {
+        "type": "var_overwrite",
+        "category": "变量",
+        "desc": "覆盖核心变量(3)"
+      },
+      "target": "vm.py",
+      "index": 43
+    },
+    {
+      "detected": true,
+      "by_ruff": false,
+      "by_self": false,
+      "by_logic": false,
+      "by_semantic": true,
+      "by_trace": false,
+      "ruff_output": "All checks passed!",
+      "duration": 0.7,
+      "bug": {
+        "type": "var_overwrite",
+        "category": "变量",
+        "desc": "覆盖核心变量(4)"
+      },
+      "target": "evaluator.py",
+      "index": 44
+    },
+    {
+      "detected": true,
+      "by_ruff": true,
+      "by_self": false,
+      "by_logic": false,
+      "by_semantic": true,
+      "by_trace": true,
+      "ruff_output": "vm.py:288:61: F821 Undefined name `Any`\nvm.py:288:69: F821 Undefined name `Any`\nvm.py:842:23: F821 Undefined name `Callable`\nFound 3 errors.",
+      "duration": 1.6,
+      "bug": {
+        "type": "boundary_index_oob",
+        "category": "边界",
+        "desc": "数组越界(4)"
+      },
+      "target": "vm.py",
+      "index": 45
+    },
+    {
+      "detected": true,
+      "by_ruff": false,
+      "by_self": false,
+      "by_logic": false,
+      "by_semantic": true,
+      "by_trace": true,
+      "ruff_output": "All checks passed!",
+      "duration": 1.6,
+      "bug": {
+        "type": "string_encoding",
+        "category": "边界",
+        "desc": "编码错误"
+      },
+      "target": "evaluator.py",
+      "index": 46
+    },
+    {
+      "detected": true,
+      "by_ruff": true,
+      "by_self": false,
+      "by_logic": false,
+      "by_semantic": true,
+      "by_trace": true,
+      "ruff_output": "vm.py:288:61: F821 Undefined name `Any`\nvm.py:288:69: F821 Undefined name `Any`\nvm.py:842:23: F821 Undefined name `Callable`\nFound 3 errors.",
+      "duration": 1.5,
+      "bug": {
+        "type": "boundary_div_zero",
+        "category": "语义",
+        "desc": "除零(3)"
+      },
+      "target": "vm.py",
+      "index": 47
+    },
+    {
+      "detected": true,
+      "by_ruff": false,
+      "by_self": false,
+      "by_logic": false,
+      "by_semantic": true,
+      "by_trace": false,
+      "ruff_output": "All checks passed!",
+      "duration": 1.6,
+      "bug": {
+        "type": "type_none_attr",
+        "category": "类型",
+        "desc": "None属性(3)"
+      },
+      "target": "evaluator.py",
+      "index": 48
+    },
+    {
+      "detected": true,
+      "by_ruff": true,
+      "by_self": false,
+      "by_logic": false,
+      "by_semantic": true,
+      "by_trace": true,
+      "ruff_output": "vm.py:288:61: F821 Undefined name `Any`\nvm.py:288:69: F821 Undefined name `Any`\nvm.py:842:23: F821 Undefined name `Callable`\nFound 3 errors.",
+      "duration": 1.6,
+      "bug": {
+        "type": "type_none_attr",
+        "category": "类型",
+        "desc": "None属性(4)"
+      },
+      "target": "vm.py",
+      "index": 49
+    }
+  ]
+}
