@@ -1120,18 +1120,49 @@ class AgentCodeModifier:
         try:
             r = sp.run(
                 [sys.executable, '-X', 'utf8', '-m', 'pytest', 'tests/test_core.py', '-q'],
-                capture_output=True,
-                text=True,
-                encoding='utf-8',
-                errors='replace',
-                timeout=120,
-                cwd=ROOT,
+                capture_output=True, text=True, encoding='utf-8', errors='replace',
+                timeout=120, cwd=ROOT,
             )
             if r.returncode != 0:
                 all_passed = False
             output_parts.append(f'pytest: {"通过" if r.returncode == 0 else "失败"}')
         except Exception as e:
             output_parts.append(f'pytest错误: {e}')
+
+        # 4. 逻辑审计（下放到规则层）
+        try:
+            from agent_system.logic_audit import audit_code
+            with open(os.path.join(ROOT, 'vm.py'), encoding='utf-8') as f:
+                lr = audit_code(f.read())
+            if lr.get('by_severity', {}).get('high', 0) > 0:
+                all_passed = False
+            output_parts.append(f'logic: {"通过" if lr.get("by_severity", {}).get("high", 0) == 0 else "检测到逻辑问题"}')
+        except Exception:
+            pass
+
+        # 5. 语义diff（下放到规则层）
+        try:
+            import difflib
+            backup_dir = os.path.join(ROOT, 'benchmarks', 'backups')
+            for target in ['vm.py', 'ternary_core.py', 'evaluator.py']:
+                bak = os.path.join(backup_dir, os.path.basename(target) + '.bak')
+                if not os.path.exists(bak):
+                    continue
+                with open(bak, encoding='utf-8') as f:
+                    orig = f.readlines()
+                with open(os.path.join(ROOT, target), encoding='utf-8') as f:
+                    curr = f.readlines()
+                diffs = list(difflib.unified_diff(orig, curr, lineterm=''))
+                if not diffs:
+                    continue
+                for line in diffs:
+                    if line.startswith('+') and any(op in line for op in
+                        (' ==', ' !=', ' and ', ' or ', '_broken', 'broken_undefined', '/ 0', '[99999]')):
+                        output_parts.append(f'semantic: 检测到可疑变更在 {target}')
+                        all_passed = False
+                        break
+        except Exception:
+            pass
 
         return all_passed, ' | '.join(output_parts)
 

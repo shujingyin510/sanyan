@@ -517,8 +517,18 @@ class AgentRuntime:
                 self.security_sandbox.fs_guard.record_modified(params.split('|')[0] if '|' in str(params) else '')
 
             if tool_name == 'done':
+                # 规则层: Truth Calibration 校准置信度
+                calibrated_params = params
+                try:
+                    from agent_system.truth_calibration import get_calibrator
+                    tc = get_calibrator()
+                    result = tc.calibrate(str(params), self.memory.get('task', ''))
+                    if result.uncertainty in ('high',):
+                        calibrated_params = f'{params}  [校准: 置信度 {result.confidence:.2f}]'
+                except Exception:
+                    pass
                 return {
-                    'answer': params if params else '完成',
+                    'answer': calibrated_params if calibrated_params else '完成',
                     'memory': self.memory,
                     'hypothesis': hypothesis.to_dict(),
                 }
@@ -953,7 +963,15 @@ class AgentRuntime:
             if tool in ('analyze', 'find_symbol') and '未找到' not in str(result):
                 return {'answer': self._extract_key(result), 'memory': self.memory}
             if tool == 'done':
-                return {'answer': params if params else '完成', 'memory': self.memory}
+                calibrated_answer = params if params else '完成'
+                try:
+                    from agent_system.truth_calibration import get_calibrator
+                    r = get_calibrator().calibrate(str(params), self.memory.get('task', ''))
+                    if r.uncertainty in ('high',):
+                        calibrated_answer = f'{params}  [校准: 置信度 {r.confidence:.2f}]'
+                except Exception:
+                    pass
+                return {'answer': calibrated_answer, 'memory': self.memory}
             if tool == 'run_test' and ('FAIL' in str(result) or '失败' in str(result)):
                 self.memory['retry_count'] += 1
                 if self.memory['retry_count'] < 4:
