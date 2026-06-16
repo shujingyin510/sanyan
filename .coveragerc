@@ -29,6 +29,8 @@ omit =
     scripts/*
     examples/*
     csrc/*
+    # Agent 系统（独立模块，暂不纳入核心覆盖率）
+    agent_system/*
     # 网络依赖（需外网访问）
     #   package_ops.py: GitHub 包下载/索引，需外网
     #   net_ops.py: HTTP 请求，需外网

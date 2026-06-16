@@ -62,6 +62,46 @@ UR-based Degeneration Detection (UR_TH = 0.30)
 
 ---
 
+## Known Boundaries
+
+The current findings (UR ≈ 0.30 as a degeneration threshold) are empirical and should be interpreted within the following constraints:
+
+### 1. Windowed lexical measurement
+
+`unique_ratio` is computed over a fixed sliding window of tokens. All reported results use a window size of 32 tokens, stride = 1. The threshold is stable under moderate window sizes (32–64), but is not invariant across arbitrary scales.
+
+### 2. Regime definition (not quality classification)
+
+UR measures **repetition-dominated generation regimes**, not semantic correctness or overall output quality. Therefore:
+
+- Structured outputs (code, lists, enumerations)
+- Poetic or stylistically constrained text
+
+may exhibit low UR while remaining valid. These cases are not considered false positives, but a different generation regime outside the detector's target domain.
+
+### 3. Prompt-induced repetition is a separate regime
+
+Repetition explicitly present in the input prompt (e.g., "cat cat cat") is treated as input-conditioned behavior, not model-internal degeneration. The detector is designed for emergent repetition during generation, not echoing input structure.
+
+### 4. Empirical model coverage
+
+The current evaluation includes:
+- TinyStories (3.6M, 28M)
+- GPT-2 (124M)
+- Qwen2.5-0.5B
+
+Results are consistent across these models, but this should be interpreted as *empirical cross-model stability within tested regimes*, not full model-invariance across all architectures.
+
+### 5. Scale limitation
+
+No evaluation has been performed on:
+- 7B+ parameter models (e.g., LLaMA-3, Qwen2.5-7B)
+- Instruction-tuned large chat models in open-ended dialogue regimes
+
+Generalization to large-scale models remains an open question.
+
+---
+
 ## Quick Start
 
 ```bash
