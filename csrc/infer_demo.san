@@ -1,0 +1,22 @@
+;; infer_demo.san — 三态推理引擎演示
+;; 运行: python -X utf8 csrc/sanyan_run.py csrc/infer_demo.san
+;; 算子注册: csrc/sanyan_ops.py (自动导入)
+;; 链路: .san → reg_op → C DLL (LayerNorm/GELU) → NumPy → GPT-2 124M
+
+(输出 "══════════════════════════════")
+(输出 "  三言语言调度推理引擎 Demo")
+(输出 "  模型: GPT-2 124M")
+(输出 "  门控: UR < 0.30 → NEGATE")
+(输出 "══════════════════════════════")
+(输出 "")
+
+(初始化 "Once upon a time there was a")
+
+(输出 "推理开始 (max 15 steps):")
+(推理循环 15)
+
+(输出 "")
+(输出 "══════════════════════════════")
+(输出 "  完整输出:")
+(输出全部)
+(输出 "══════════════════════════════")

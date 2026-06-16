@@ -1,4 +1,3 @@
-
 // Transformer kernels: LayerNorm + GELU + FFN
 #include <math.h>
 
@@ -18,7 +17,6 @@ void layernorm(float* x, float* gamma, float* beta, float* y, int N, float eps) 
 void gelu(float* x, float* y, int N) {
     for (int i = 0; i < N; i++) {
         float v = x[i];
-        // GELU approx: 0.5 * x * (1 + tanh(sqrt(2/pi) * (x + 0.044715 * x^3)))
         float c = 0.7978845608f; // sqrt(2/pi)
         float x3 = v * v * v;
         y[i] = 0.5f * v * (1.0f + tanhf(c * (v + 0.044715f * x3)));

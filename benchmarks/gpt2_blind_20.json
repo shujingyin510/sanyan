@@ -1,0 +1,202 @@
+[
+  {
+    "id": 1,
+    "prompt": "Once upon a time girl",
+    "A": "Once upon a time girl,,,,,,,,,,,,,,",
+    "B": "Once upon a time girl,,,,,,,,,,,,,,,,,,.,,,,.,,.,.,,.,,.,.,,..,.,.,..,,.,,.:.,,.,..,.., ,.,.'.,..,,..,...,,,.,",
+    "A_label": "ternary",
+    "B_label": "eos",
+    "A_len": 64,
+    "B_len": 14
+  },
+  {
+    "id": 2,
+    "prompt": "Once upon a time boy",
+    "A": "Once upon a time boy,,,,,,,,,,,,,,,,,\n,,,, ,,,,, , , ,, ,, , and , , , , , , , , and , , , , ,, ,, and , , , . , , , and , , ,",
+    "B": "Once upon a time boy,,,,,,,,,,,,,,",
+    "A_label": "eos",
+    "B_label": "ternary",
+    "A_len": 64,
+    "B_len": 14
+  },
+  {
+    "id": 3,
+    "prompt": "Once upon a time dog",
+    "A": "Once upon a time dogfightsfightsfightsfightsfightsfightsfightsfightsfightsfightsfightsfightsfightsfightsfightsfightsfightsfightsfightsfightsfightsfightsfightsfightsfightsfightsfightsfightsfightsfightsfightsfightsfightsfightsfightsfightsfightsfightsfightsfightsfightsfightsfightsfightsfightsfightsfightsfightsfightsfightsfightsfightsfightsfightsfightsfightsfightsfightsfightsfightsfightsfightsfightsfights",
+    "B": "Once upon a time dog was was was was was was was was was was was was was was",
+    "A_label": "eos",
+    "B_label": "ternary",
+    "A_len": 64,
+    "B_len": 14
+  },
+  {
+    "id": 4,
+    "prompt": "Once upon a time cat",
+    "A": "Once upon a time cataclysmic events events events events events events events events events events events events events events events events events events events events events events events events events events events events events events events events events events events events events events events events events events events events events events events events events events events events events events events events events events events events events events",
+    "B": "Once upon a time catnipnipnipnnnnnnnn",
+    "A_label": "eos",
+    "B_label": "ternary",
+    "A_len": 64,
+    "B_len": 14
+  },
+  {
+    "id": 5,
+    "prompt": "The little girl",
+    "A": "The little girl I I I I I I I I I I I",
+    "B": "The little girl was was was was was was was was was was was was was was was was was was was was was was was was was was was was was was was was was was was was was was was was was was was was was was was was was was was was was was was was was was was was was was was was",
+    "A_label": "ternary",
+    "B_label": "eos",
+    "A_len": 64,
+    "B_len": 11
+  },
+  {
+    "id": 6,
+    "prompt": "The little boy",
+    "A": "The little boy is is is is is is is is is is is",
+    "B": "The little boy was was was was was was was was was was was was was was was was was was was was was was was was was was was was was was was was was was was was was was was was was was was was was was was was was was was was was was was was was was was was was was was was",
+    "A_label": "ternary",
+    "B_label": "eos",
+    "A_len": 64,
+    "B_len": 11
+  },
+  {
+    "id": 7,
+    "prompt": "The little dog",
+    "A": "The little dog is is is is is is is is is is is",
+    "B": "The little dog in the in in in in in in in in in in in in in in in in in in in in in in in in in in in in in in in in in in in in in in in in in in in in in in in in in in in in in in in in in in in in in in",
+    "A_label": "ternary",
+    "B_label": "eos",
+    "A_len": 64,
+    "B_len": 11
+  },
+  {
+    "id": 8,
+    "prompt": "The little cat",
+    "A": "The little cat is is is is is is is is is is is is is is is is is is is is is is is is is is is is is is is is is is is is is is is is is is is is is is is is is is is is is is is is is is is is is is is is",
+    "B": "The little cat is is is is is is is is is is is",
+    "A_label": "eos",
+    "B_label": "ternary",
+    "A_len": 64,
+    "B_len": 11
+  },
+  {
+    "id": 9,
+    "prompt": "A big girl",
+    "A": "A big girl is is is is is is is is is is is is is is is is is is is is is is is is is is is is is is is is is is is is is is is is is is is is is is is is is is is is is is is is is is is is is is is is",
+    "B": "A big girl,,,,,,,,,,,",
+    "A_label": "eos",
+    "B_label": "ternary",
+    "A_len": 64,
+    "B_len": 11
+  },
+  {
+    "id": 10,
+    "prompt": "A big boy",
+    "A": "A big boy,,,,,,,,,,,,,,,,,.,,,,.,,,,.,, ,, ,,,...,,,,...,,,,,,..,,,,,.. ,,,,,...\n\n,,,... ,",
+    "B": "A big boy ( ( ( ( ( ( ( ( ( ( - ( ( (",
+    "A_label": "eos",
+    "B_label": "ternary",
+    "A_len": 64,
+    "B_len": 14
+  },
+  {
+    "id": 11,
+    "prompt": "A big dog",
+    "A": "A big dog that that that that that that that that that that that that that that that that that that that that that that that that that that that that that that that that that that that that that that that that that that that that that that that that that that that that that that that that that that that that that that that that",
+    "B": "A big dog is is is is is is is is is is is",
+    "A_label": "eos",
+    "B_label": "ternary",
+    "A_len": 64,
+    "B_len": 11
+  },
+  {
+    "id": 12,
+    "prompt": "A big cat",
+    "A": "A big cat......... .....",
+    "B": "A big cat,,,,,,,,,,,,,,,.,,,,-,,,-,-,,-,,,,,.,,,-,,-\",,,,-,,-,,,,,,,,.,,,,,.,,,",
+    "A_label": "ternary",
+    "B_label": "eos",
+    "A_len": 64,
+    "B_len": 14
+  },
+  {
+    "id": 13,
+    "prompt": "I like to girl",
+    "A": "I like to girl scout scout scout scout scout scout scout scout scout scout scout scout scout scout scout scout scout scout scout scout scout scout scout scout scout scout scout scout scout scout scout scout scout scout scout scout scout scout scout scout scout scout scout scout scout scout scout scout scout scout scout scout scout scout scout scout scout scout scout scout scout scout scout scout",
+    "B": "I like to girl up up up up up up up up up up up up",
+    "A_label": "eos",
+    "B_label": "ternary",
+    "A_len": 64,
+    "B_len": 12
+  },
+  {
+    "id": 14,
+    "prompt": "I like to boy",
+    "A": "I like to boycotted a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a",
+    "B": "I like to boycotted the the the the the the the the the the the the the",
+    "A_label": "eos",
+    "B_label": "ternary",
+    "A_len": 64,
+    "B_len": 15
+  },
+  {
+    "id": 15,
+    "prompt": "I like to dog",
+    "A": "I like to dogfightfightfightfightfightfightfightfightfightfightfightfight",
+    "B": "I like to dog it it it it it it it it it it it it it it it it it it it it it it it it it it it it it it it it it it it it it it it it it it it it it it it it it it it it it it it it it it it it it it it it",
+    "A_label": "ternary",
+    "B_label": "eos",
+    "A_len": 64,
+    "B_len": 12
+  },
+  {
+    "id": 16,
+    "prompt": "I like to cat",
+    "A": "I like to catamaranamamamamamamamamamamam",
+    "B": "I like to cat people people people people people people people people people people people people people people people people people people people people people people people people people people people people people people people people people people people people people people people people people people people people people people people people people people people people people people people people people people people people people people people people",
+    "A_label": "ternary",
+    "B_label": "eos",
+    "A_len": 64,
+    "B_len": 13
+  },
+  {
+    "id": 17,
+    "prompt": "One day a girl",
+    "A": "One day a girl in in in in in in in in in in in in in in in in in in in in in in in in in in in in in in in in in in in in in in in in in in in in in in in in in in in in in in in in in in in in in in in in",
+    "B": "One day a girl in in in in in in in in in in",
+    "A_label": "eos",
+    "B_label": "ternary",
+    "A_len": 64,
+    "B_len": 10
+  },
+  {
+    "id": 18,
+    "prompt": "One day a boy",
+    "A": "One day a boy who who who who who who who who who who who who",
+    "B": "One day a boy was was was was was was was was was was was was was was was was was was was was was was was was was was was was was was was was was was was was was was was was was was was was was was was was was was was was was was was was was was was was was was was was",
+    "A_label": "ternary",
+    "B_label": "eos",
+    "A_len": 64,
+    "B_len": 12
+  },
+  {
+    "id": 19,
+    "prompt": "One day a dog",
+    "A": "One day a dog ate ate ate ate ate ate ate ate ate ate ate ate",
+    "B": "One day a dog named named named named named named named named named named named named named named named named named named named named named named named named named named named named named named named named named named named named named named named named named named named named named named named named named named named named named named named named named named named named named named named named",
+    "A_label": "ternary",
+    "B_label": "eos",
+    "A_len": 64,
+    "B_len": 12
+  },
+  {
+    "id": 20,
+    "prompt": "One day a cat",
+    "A": "One day a cat got got got got got got got got got got got got got got got got got got got got got got got got got got got got got got got got got got got got got got got got got got got got got got got got got got got got got got got got got got got got got got got got",
+    "B": "One day a cat came came came came came came came came came came came came",
+    "A_label": "eos",
+    "B_label": "ternary",
+    "A_len": 64,
+    "B_len": 12
+  }
+]

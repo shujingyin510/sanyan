@@ -1,0 +1,17 @@
+{
+  "ternary_wins": {
+    "completeness": 78,
+    "naturalness": 78,
+    "stop_timing": 83
+  },
+  "eos_wins": {
+    "completeness": 9,
+    "naturalness": 10,
+    "stop_timing": 6
+  },
+  "tie": {
+    "completeness": 13,
+    "naturalness": 12,
+    "stop_timing": 11
+  }
+}

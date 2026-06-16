@@ -1,0 +1,18 @@
+[
+  {
+    "model": "GPT-2 124M",
+    "strategy": "三态门控",
+    "N": 1000,
+    "avg_len": 12.235,
+    "stop_rate": 100.0,
+    "time": 478.34942339999543
+  },
+  {
+    "model": "GPT-2 124M",
+    "strategy": "EOS-only",
+    "N": 1000,
+    "avg_len": 64.0,
+    "stop_rate": 0.0,
+    "time": 1942.7930387000015
+  }
+]

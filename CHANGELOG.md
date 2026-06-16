@@ -2,6 +2,33 @@
 
 ---
 
+## [v3.38.0] — 2026-06-17 (SIMD推理引擎 + 三态门控 + Transformer全链路)
+
+### 新增
+- **AVX2 GEMM内核**：手写汇编256×256矩阵乘法, FMA指令, 与NumPy逐位一致(误差0.00)
+- **C算子库**：Softmax(C expf, 精度e-09)、LayerNorm(e-07)、GELU(e-08)
+- **Transformer全链路**：QKV投影 → 多头注意力(16头×4维) → 因果掩码 → FFN → 残差+LayerNorm → 输出logits
+- **真实模型推理**：加载TinyStories-1M(3.6M参数, 8层GPT-Neo)和TinyStories-28M(50M参数, dim=512)
+- **自回归文本生成**：GPT-2 Tokenizer + 8层推理 + 采样解码, 生成连贯语义文本
+- **KV Cache**：增量推理缓存, 32 token从1s降到0.1s(10x加速)
+- **三态门控推理**：局部置信度 + 轨迹质量 + 持续步数, 三级决策(AFFIRM/MAYBE/NEGATE)
+  - 可解释停止：每条NEGATE带原因+数据(unique_ratio/周期/持续步数)
+- **三言调度集成**：`reg_op`注册GEMM/Softmax/LayerNorm为原生函数, Sanyan脚本调用SIMD内核
+
+### 性能
+- GEMM 256×256: AVX2 0.51ms vs NumPy 0.15ms (3.4x)
+- 推理速度: 3.6M模型 4ms/token, 28M模型 34ms/token
+- KV Cache: 10x加速
+
+### 关键文件
+- `csrc/simd_demo.asm` — AVX2 GEMM汇编内核
+- `csrc/softmax_c.c` / `transformer_c.c` — C算子
+- `csrc/ternary_infer.py` — 三态门控推理引擎
+- `csrc/sanyan_gemm_demo.py` — 三言调度验证
+- `docs/research/transformer_kernels.md` — 实验报告
+
+---
+
 ## [v3.37.0] — 2026-06-16 (统一CLI + 安全基准 + 诚实度基准 + 语义逻辑层)
 
 ### 新增

@@ -1,0 +1,15 @@
+{
+  "ternary": {
+    "avg_len": 14.34,
+    "stop_rate": 0.99,
+    "loop_rate": 0.14,
+    "avg_ur": 0.4311009108822709
+  },
+  "plain": {
+    "avg_len": 64.0,
+    "stop_rate": 0.0,
+    "loop_rate": 0.38,
+    "avg_ur": 0.353125
+  },
+  "n": 100
+}

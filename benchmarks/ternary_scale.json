@@ -1,0 +1,23 @@
+[
+  {
+    "model": "3.6M",
+    "strategy": "\u4e09\u6001\u95e8\u63a7",
+    "avg_len": 18.058,
+    "stop_rate": 98.1,
+    "time": 68.39554290000524
+  },
+  {
+    "model": "3.6M",
+    "strategy": "\u91cd\u590d\u60e9\u7f5a",
+    "avg_len": 64.0,
+    "stop_rate": 0.0,
+    "time": 254.45829400000366
+  },
+  {
+    "model": "3.6M",
+    "strategy": "EOS-only",
+    "avg_len": 64.0,
+    "stop_rate": 0.0,
+    "time": 234.5625153000001
+  }
+]

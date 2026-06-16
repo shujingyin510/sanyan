@@ -1,0 +1,44 @@
+[
+  {
+    "model": "28M",
+    "strategy": "三态门控",
+    "avg_len": 20.632,
+    "stop_rate": 100.0,
+    "time": 679.237246100005,
+    "stop_reasons": 1000,
+    "top_reasons": [
+      [
+        "UR=0.29",
+        682
+      ],
+      [
+        "UR=0.30",
+        201
+      ],
+      [
+        "UR=0.28",
+        116
+      ],
+      [
+        "UR=0.27",
+        1
+      ]
+    ]
+  },
+  {
+    "model": "28M",
+    "strategy": "重复惩罚",
+    "avg_len": 64.0,
+    "stop_rate": 0.0,
+    "time": 1894.6571045999954,
+    "loops": 0
+  },
+  {
+    "model": "28M",
+    "strategy": "EOS-only",
+    "avg_len": 64.0,
+    "stop_rate": 0.0,
+    "time": 2172.1057696999997,
+    "loops": 1000
+  }
+]
