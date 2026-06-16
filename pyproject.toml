@@ -136,11 +136,11 @@ omit = [
     "sanyan/*",
     "agent_system/*",
     "preflight.py",
-    "auto_verify.py",
+    "agent_system/auto_verify.py",
     "asm.py",
     "disasm.py",
     "verify.py",
-    "benchmark/*",
+    "benchmarks/*",
     "packages/*",
 ]
 
