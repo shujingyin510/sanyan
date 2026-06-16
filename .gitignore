@@ -259,3 +259,6 @@ _test_*.bin
 agent_decision.json
 agent_state.db
 publish/ternary_engine/dist/
+coverage*.json
+coverage*.xml
+.coverage
