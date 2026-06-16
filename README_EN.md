@@ -28,7 +28,7 @@ The language is the interface — the core is the Kleene three-value logic propa
 
 ---
 
-## What's New in v3.36
+## What's New in v3.37
 
 - **Agent Autonomous Loop**: `agent_system/auto_verify.py` — commit triggers full test suite → auto-commit on pass / auto-rollback on fail. Three paths tested and verified.
 - **Deep LLM Integration**: Upgraded to `deepseek-v4-pro` with explicit thinking control (`budget_tokens: 2048`). JSON tool call format. Cross-task experience library for learning from failures.

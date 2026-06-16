@@ -2,6 +2,49 @@
 
 ---
 
+## [v3.37.0] — 2026-06-16 (统一CLI + 安全基准 + 诚实度基准 + 语义逻辑层)
+
+### 新增
+- **统一 CLI**：`sanyan` 命令入口（git/cargo 风格子命令），替换散落式 `--flag`
+  - `sanyan agent run/chat/evolve/dashboard/validate` — Agent 全操作
+  - `sanyan compile/run/repl` — 编译运行交互
+  - `sanyan bench --type safety/honesty` — 基准测试
+  - `sanyan version` — Rich 面板版版本信息
+- **TUI 进化仪表盘**：`sanyan agent dashboard`，Rich 实时面板（状态/进度条/成功率和系统状态）
+- **多轮对话**：`sanyan agent chat`，上下文记忆（5轮历史注入）+ Rich 面板渲染
+- **Agent 安全基准 v2**：49 种 bug 注入 vm.py/evaluator.py，五层检测管道
+  - 检出率 98%（48/49），零跳过
+  - 检测层：ruff(static) + self-host(runtime) + logic_audit(semantic) + semantic_diff(diff) + exec_trace(trace)
+  - 三层语义检测：运算符反转 + 比较方向反转 + 边界偏移（逻辑类 100%）
+  - 执行轨迹对比：注前/注后 `pytest test_vm + test_core` diff
+  - 操作数变更检测：数字变更 + 变量名损坏 + 未定义引用
+  - 可执行过滤：只往代码行注入，跳过注释/文档字符串
+- **Agent 诚实度基准 v2**：100 题 × 5 类（硬事实/软事实/不可知/诱导题/对抗谣言），三维评分
+  - 正确率(A) + 校准ECE(B) + 认知越界(C)
+  - 不可知类不计对错，只测过度自信率
+  - Truth Calibration 对比：认知越界率 57.7% → 46.2%（-11.5% ↓）
+- **Truth Calibration Engine**：三态门控校准层（`agent_system/truth_calibration.py`）
+  - certain(硬事实锁定0.95) / calibrate(风险加权) / uncertain(锁定0.35)
+  - 100条事实校验库 + 8种因果风险因子 + 绝对化语言检测
+  - 核心原则：永不修改答案，只调置信度
+- **Logic Audit Engine**：CFG + 状态追踪 + 逻辑矛盾检测（`agent_system/logic_audit.py`）
+  - 7种检测器：反向逻辑 / 不可达代码 / 死分支 / 状态不一致 / Return后代码 / 逻辑同义反复 / 符号化状态追踪
+- **Myth Shield**：50条误解字典 + 神话模式正则（`agent_system/myth_shield.py`）
+
+### 修复
+- **subprocess 编码统一**：全管道 `encoding="utf-8", errors="replace"`，消除 GBK 崩溃
+- **路径修复**：8个文件 ROOT 修正；`os.sys.executable` → `sys.executable`（7处）
+- **mypy 152 错误清零**：18 文件 `Optional` 批量修复
+- **CI 修复**：导入路径 + coverage 排除 `agent_system/*` + ruff 格式化
+- **pyproject.toml**：`sanyan = "sanyan.cli:main"` 入口 + `agent_system.*` 加入 mypy 宽松模式
+
+### 变更
+- **AGENTS.md**：P0-P3 工作优先级体系（18条规则），提交前强制自查
+- **README**：版本 v3.36 → v3.37，起源挪第一屏，加 CLI + 基准描述
+- **CHANGELOG**：v3.36/v3.37 条目补全
+
+---
+
 ## [v3.36.0] — 2026-06-15 (Agent自主改代码闭环 — LLM补丁+强验证+行号校准)
 
 ### 新增
