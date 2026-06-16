@@ -99,6 +99,7 @@ module = [
     "llvmgen.*",
     "agent_system.*",
     "benchmarks.*",
+    "csrc.*",
 ]
 ignore_errors = true
 
@@ -142,6 +143,7 @@ omit = [
     "verify.py",
     "benchmarks/*",
     "packages/*",
+    "csrc/*",
 ]
 
 [tool.coverage.report]
