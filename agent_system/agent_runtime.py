@@ -521,6 +521,7 @@ class AgentRuntime:
                 calibrated_params = params
                 try:
                     from agent_system.truth_calibration import get_calibrator
+
                     tc = get_calibrator()
                     result = tc.calibrate(str(params), self.memory.get('task', ''))
                     if result.uncertainty in ('high',):
@@ -966,6 +967,7 @@ class AgentRuntime:
                 calibrated_answer = params if params else '完成'
                 try:
                     from agent_system.truth_calibration import get_calibrator
+
                     r = get_calibrator().calibrate(str(params), self.memory.get('task', ''))
                     if r.uncertainty in ('high',):
                         calibrated_answer = f'{params}  [校准: 置信度 {r.confidence:.2f}]'
