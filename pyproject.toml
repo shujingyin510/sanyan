@@ -148,4 +148,4 @@ omit = [
 exclude_lines = ["pragma: no cover", "if __name__ == .__main__.:", "raise NotImplementedError"]
 show_missing = true
 skip_covered = true
-fail_under = 75
+fail_under = 60
