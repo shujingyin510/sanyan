@@ -80,48 +80,62 @@ matmul_256x256:
 ; softmax_avx2(float* input, float* output, int N)
 ; 简化实现: exp 用 3 阶多项式近似 (精度 ~0.1%)
 softmax_avx2:
-    ; rcx=input, rdx=output, r8d=N  (Windows x64)
-    ; 直接用调用约定的寄存器，避免额外保存
-    push rbx; push r12
-    mov r12, rcx               ; r12 = input
-    mov rbx, rdx               ; rbx = output
-    mov ebp, r8d               ; ebp = N
+    push rbx; push r12; push r13
+    mov r12, rcx; mov r13, rdx; mov ebx, r8d
 
     ; 1. find max
-    vbroadcastss ymm0, [r12]
-    xor ecx, ecx
-    cmp ebp, 8; jl .smax
-.mxlp:  vmovups ymm1, [r12 + rcx*4]; vmaxps ymm0, ymm0, ymm1
-    add ecx, 8; cmp ecx, ebp; jl .mxlp; jmp .mxdn
-.smax:  mov eax, 1
-.smxl:  vmaxss xmm0, xmm0, [r12 + rax*4]; inc eax; cmp eax, ebp; jl .smxl
-.mxdn:  vextractf128 xmm1, ymm0, 1; vmaxps xmm0, xmm0, xmm1
-    vpermilps xmm1, xmm0, 0x4E; vmaxps xmm0, xmm0, xmm1
-    vpermilps xmm1, xmm0, 0xB1; vmaxps xmm0, xmm0, xmm1
-    vbroadcastss ymm9, xmm0
+    movss xmm10, [r12]
+    mov eax, 1
+.mx:    movss xmm1, [r12 + rax*4]
+    maxss xmm10, xmm1
+    inc eax; cmp eax, ebx; jl .mx
 
-    ; 2. exp approx + sum
-    vxorps ymm10, ymm10, ymm10
-    xor ecx, ecx
-    mov eax, 0x3F800000; vmovd xmm12, eax; vbroadcastss ymm12, xmm12
-    mov eax, 0x3F000000; vmovd xmm13, eax; vbroadcastss ymm13, xmm13
-    mov eax, 0x3E2AAAAB; vmovd xmm14, eax; vbroadcastss ymm14, xmm14
+    ; 2. exp(x-max) + sum, with clamp for very negative values
+    xorps xmm11, xmm11
+    mov eax, 0xC1200000        ; -10.0 as float bits
+    vmovd xmm9, eax            ; threshold
+    xor eax, eax
+    ; exp constants
+    mov eax, 0x3F800000; vmovd xmm8, eax  ; 1.0
+    xor eax, eax          ; reset counter
 
-.xlp:   vmovups ymm0, [r12 + rcx*4]; vsubps ymm0, ymm0, ymm9
-    vmulps ymm1, ymm0, ymm14; vaddps ymm1, ymm1, ymm13
-    vmulps ymm1, ymm0, ymm1; vaddps ymm1, ymm1, ymm12
-    vmulps ymm1, ymm0, ymm1; vaddps ymm1, ymm1, ymm12
-    vmovups [rbx + rcx*4], ymm1; vaddps ymm10, ymm10, ymm1
-    add ecx, 8; cmp ecx, ebp; jl .xlp
+.xp:    movss xmm0, [r12 + rax*4]
+    subss xmm0, xmm10          ; x - max
+    movss xmm7, xmm0
 
-    ; 3. sum
-    vextractf128 xmm0, ymm10, 1; vaddps xmm10, xmm10, xmm0
-    vhaddps xmm10, xmm10, xmm10; vhaddps xmm10, xmm10, xmm10
-    vbroadcastss ymm11, xmm10
+    ; if x < -10, result = 0
+    comiss xmm7, xmm9
+    jb .zero_exp
 
-    ; 4. div
-    xor ecx, ecx
-.nlp:   vmovups ymm0, [rbx + rcx*4]; vdivps ymm0, ymm0, ymm11
-    vmovups [rbx + rcx*4], ymm0; add ecx, 8; cmp ecx, ebp; jl .nlp
+    ; exp approx: 1 + x*(1 + x*(0.5 + x*0.1667))
+    movss xmm2, xmm7
+    movss xmm3, [rel c3_data]
+    mulss xmm3, xmm7; movss xmm4, [rel c2_data]; addss xmm3, xmm4
+    mulss xmm3, xmm7; movss xmm4, [rel c1_data]; addss xmm3, xmm4
+    mulss xmm3, xmm7; movss xmm4, [rel c1_data]; addss xmm3, xmm4
+    jmp .store
 
-    pop r12; pop rbx; ret
+.zero_exp:
+    xorps xmm3, xmm3
+
+.store:
+    movss [r13 + rax*4], xmm3
+    addss xmm11, xmm3
+    inc eax; cmp eax, ebx; jl .xp
+
+    ; 3. divide by sum
+    movss xmm12, xmm11
+    ucomiss xmm12, xmm8
+    jbe .skip_div
+    xor eax, eax
+.dv:    movss xmm0, [r13 + rax*4]
+    divss xmm0, xmm12
+    movss [r13 + rax*4], xmm0
+    inc eax; cmp eax, ebx; jl .dv
+.skip_div:
+    pop r13; pop r12; pop rbx; ret
+
+section .rodata align 16
+c1_data: dd 1.0
+c2_data: dd 0.5
+c3_data: dd 0.16666667
