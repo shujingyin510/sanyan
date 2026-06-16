@@ -11,10 +11,11 @@
 
 ## v3.37 更新摘要
 
-- **Agent 自主改代码闭环**：LLM 生成补丁 → 行号校准 → 多后端一致性 + 自举验证 → 接受/回滚，坏补丁自动拦截
-- **四层进化架构**：策略自优化（Layer 1）→ 自主循环（Layer 2）→ 约束进化（Layer 3）→ 知识层（Layer 4）
+- **统一 CLI**：`sanyan` 命令入口，替换散落式 `--flag`（agent run/chat/evolve/dashboard/bench）
+- **Agent 安全基准**：49 种 bug 注入，五层检测管道，检出率 98%，逻辑类 100%
+- **Agent 诚实度基准**：100 题 × 5 类，三维评分（正确率+校准ECE+认知越界），Truth Calibration 越界率 -15.2%
+- **五层检测下放规则层**：语义 diff + 逻辑审计 + Truth Calibration 接入 Agent 运行时
 - **全量 CI 绿**：1650+ 测试，mypy 零错误，ruff 零错误，preflight 一键检查
-- **自举 Level 2–4**：编译器自编译（不动点验证）→ C 种子 VM（318行）→ x86_64 NASM 汇编 VM（617行）
 
 详见 [CHANGELOG](CHANGELOG.md)
 

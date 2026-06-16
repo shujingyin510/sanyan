@@ -154,8 +154,17 @@ API 密钥通过环境变量 `SANYAN_API_KEY` 注入，`agent_policy.san` 中配
 | `agent_loop.py` | Layer 2: 自主循环（文件监控+连续循环+健康监控） |
 | `agent_loop_monitor.py` | Layer 2: 循环监控（日志+统计+健康+回滚验证） |
 | `agent_evolution.py` | Layer 3: 约束进化（接口不变+差分验证+多目标评估） |
+| `agent_evolution_v2.py` | Layer 3: LLM补丁生成+行号校准+集成验证管道 |
+| `truth_calibration.py` | 规则层: Truth Calibration Engine (三态门控+事实校验) |
+| `logic_audit.py` | 规则层: 逻辑审计引擎 (CFG+状态追踪+7种检测器) |
+| `myth_shield.py` | 规则层: 误解盾 (50条误解字典+模式检测) |
 | `auto_verify.py` | Layer 2: 自动验证脚本（测试→修复→提交/回退） |
 | `run_agent.py` | 启动器（默认走 V5 引擎） |
+| `sanyan/cli.py` | 统一 CLI 入口（git/cargo 风格） |
+| `sanyan/dashboard_tui.py` | TUI 实时仪表盘 |
+| `sanyan/chat_tui.py` | 多轮对话 |
+| `benchmarks/agent_bench.py` | 安全基准（49种bug注入+五层检测） |
+| `benchmarks/honesty_bench.py` | 诚实度基准（100题×5类+三维评分） |
 
 ### 运行方式
 

@@ -29,7 +29,12 @@
   - 核心原则：永不修改答案，只调置信度
 - **Logic Audit Engine**：CFG + 状态追踪 + 逻辑矛盾检测（`agent_system/logic_audit.py`）
   - 7种检测器：反向逻辑 / 不可达代码 / 死分支 / 状态不一致 / Return后代码 / 逻辑同义反复 / 符号化状态追踪
+  - **已下放规则层**：`--code-evolve` 每轮 patch 后自动运行
 - **Myth Shield**：50条误解字典 + 神话模式正则（`agent_system/myth_shield.py`）
+- **规则层集成**：检测逻辑从 benchmark 层下放到 Agent 运行时
+  - 语义 diff 检查自动接入 `--code-evolve` 验证管道（每轮 patch 后）
+  - 逻辑审计自动接入 `--code-evolve` 验证管道（一致性→自举→pytest→logic→semantic）
+  - Truth Calibration 接入 `done` 回答（高不确定性自动标注置信度）
 
 ### 修复
 - **subprocess 编码统一**：全管道 `encoding="utf-8", errors="replace"`，消除 GBK 崩溃
