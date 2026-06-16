@@ -165,6 +165,7 @@ API 密钥通过环境变量 `SANYAN_API_KEY` 注入，`agent_policy.san` 中配
 | `sanyan/chat_tui.py` | 多轮对话 |
 | `benchmarks/agent_bench.py` | 安全基准（49种bug注入+五层检测） |
 | `benchmarks/honesty_bench.py` | 诚实度基准（100题×5类+三维评分） |
+| `docs/research/` | 实验报告和评测文档 |
 
 ### 运行方式
 
