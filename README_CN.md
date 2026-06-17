@@ -1,11 +1,11 @@
-# 三言（Sanyan）— LLM 退化检测的通用阈值
+# 三言（Sanyan）— 小语言模型的惊人稳定退化阈值
 
 [![CI](https://github.com/shujingyin510/sanyan/actions/workflows/test.yml/badge.svg)](https://github.com/shujingyin510/sanyan/actions)
 ![Tests](https://img.shields.io/badge/tests-1650%2B%20passing-brightgreen)
 ![Models](https://img.shields.io/badge/models-GPT--2%20%7C%20Qwen2.5%20%7C%20TinyStories-blue)
 ![UR](https://img.shields.io/badge/threshold-UR%E2%89%880.30-orange)
 
-> **UR ≈ 0.30 在 4 个模型、3 种架构、3 个数量级的参数跨度上，可靠区分退化生成与连贯生成。**
+> **UR ≈ 0.30 在 4 个小型模型、3 种架构、3 个数量级的参数跨度上，可靠区分退化生成与连贯生成。**
 
 [English](README.md) | [快速开始](QUICK_START.md) | [结果](RESULTS_CN.md) | [研究](docs/research/) | [路线图](ROADMAP.md)
 

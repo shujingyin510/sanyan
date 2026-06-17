@@ -1,11 +1,11 @@
-# Sanyan — A Universal Degeneration Threshold for LLMs
+# Sanyan — A Surprisingly Stable Degeneration Threshold for Small LLMs
 
 [![CI](https://github.com/shujingyin510/sanyan/actions/workflows/test.yml/badge.svg)](https://github.com/shujingyin510/sanyan/actions)
 ![Tests](https://img.shields.io/badge/tests-1650%2B%20passing-brightgreen)
 ![Models](https://img.shields.io/badge/models-GPT--2%20%7C%20Qwen2.5%20%7C%20TinyStories-blue)
 ![UR](https://img.shields.io/badge/threshold-UR%E2%89%880.30-orange)
 
-> **UR ≈ 0.30 reliably separates degenerative from coherent text generation across 4 models, 3 architectures, and 3 orders of magnitude in parameter count.**
+> **UR ≈ 0.30 reliably separates degenerative from coherent text generation across 4 small models, 3 architectures, and 3 orders of magnitude in parameter count.**
 
 [中文](README_CN.md) | [Quick Start](QUICK_START.md) | [Results](RESULTS.md) | [Research](docs/research/) | [Roadmap](ROADMAP.md)
 
