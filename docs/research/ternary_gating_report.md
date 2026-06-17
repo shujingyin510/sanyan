@@ -264,17 +264,17 @@ Qwen2.5-0.5B（494M 参数，Qwen2 架构，RMSNorm + RoPE + SwiGLU + GQA）在 
 
 
 
-## Empirical Validation of the UR Threshold
+## UR 阈值经验验证
 
-We evaluate the robustness of the unique_ratio (UR ≈ 0.30) threshold across multiple axes: window size, human vs. model text, and comparison baselines.
+从窗口大小、人类文本对比、现有方法比较三维度验证 UR ≈ 0.30 阈值的鲁棒性。
 
 ---
 
-### 1. Window Size Sensitivity
+### 1. 窗口大小消融
 
-We perform a controlled ablation over different sliding window sizes on GPT-2 124M (20 prompts):
+在 GPT-2 124M（20 prompt）上测试不同滑动窗口：
 
-| Window Size | Avg UR | UR < 0.30 Rate |
+| 窗口大小 | 平均 UR | UR < 0.30 比例 |
 |-------------|--------|-----------------|
 | 16 | 0.157 | 80.5% |
 | 24 | 0.145 | 91.2% |
@@ -285,57 +285,55 @@ We perform a controlled ablation over different sliding window sizes on GPT-2 12
 | 48 | 0.157 | 92.8% |
 | 64 | 0.171 | 92.7% |
 
-**Conclusion:** UR is stable under moderate window variations (16–64), remaining in 0.145–0.171 with 80–93% detection rate. No crossing of the 0.30 threshold boundary in degenerative regimes. Window 32 provides a good balance between detection speed and accuracy.
+> UR 在窗口 16–64 范围内保持 0.145–0.171，检测率 80–93%。始终远离 0.30 阈值边界。窗口 32 兼顾检测速度和准确性。
 
 ---
 
-### 2. Human vs. Degenerative Text Separation
+### 2. 人类文本 vs 退化文本
 
-We evaluate UR on human-written text (classic literature excerpts) vs. model degeneration samples (GPT-2 outputs), window=32:
+在 window=32 下对比经典文学摘录与 GPT-2 退化输出：
 
-| Text Type | Avg UR | Min UR | UR < 0.30 |
+| 文本类型 | 平均 UR | 最低 UR | UR < 0.30 |
 |-----------|--------|--------|------------|
-| Human (literature) | **0.704** | 0.406 | **0.0%** |
-| Degenerative (GPT-2) | **0.101** | 0.031 | **99.7%** |
+| 人类（经典文学） | **0.704** | 0.406 | **0.0%** |
+| 退化（GPT-2） | **0.101** | 0.031 | **99.7%** |
 
-**Separation margin:** 0.603
+**分离度：0.603**
 
-**Conclusion:** UR = 0.30 provides a near-perfect linear separation between human and degenerative distributions in the tested dataset. Human text UR never falls below 0.40; degenerative text UR almost always stays below 0.30. No overlap zone.
+> 人类文本 UR 从未低于 0.40；退化文本 UR 几乎全部低于 0.30。无交叉区域。阈值 0.30 完美分隔两类分布。
 
 ---
 
-### 3. Comparison with Existing Methods
+### 3. 与现有方法对比
 
-We compare UR-based detection with standard decoding strategies on degenerating models (TinyStories 3.6M):
+在退化模型（TinyStories 3.6M）上与常见策略对比：
 
-| Method | Stop Rate | Notes |
+| 方法 | 停止率 | 说明 |
 |--------|-----------|-------|
-| **UR < 0.30** | **98–100%** | This work |
-| EOS-only | 0% | Generates to max_tokens |
-| repetition_penalty=1.2 | 0% | Penalizes recent tokens |
-| contrastive search | N/A | Requires degenerate model testing |
+| **UR < 0.30** | **98–100%** | 本方法 |
+| EOS-only | 0% | 生成至 max_tokens |
+| repetition_penalty=1.2 | 0% | 降低已出现 token 概率 |
+| contrastive search | — | Qwen2.5 不退化，需退化模型测试 |
 
-On Qwen2.5-0.5B (non-degenerating), all methods correctly remain inactive — no false positives. The key difference emerges on degenerating models: UR is the only signal that reliably detects collapse.
-
-**Conclusion:** UR is not a decoding method, but a post-hoc degeneration signal complementary to existing decoding strategies.
+> Qwen2.5-0.5B 上所有方法均不误报。关键差异在退化模型上：UR 是唯一能可靠检测模型崩溃的信号。
 
 ---
 
-### 4. Why 0.30? Theoretical Justification
+### 4. 为什么是 0.30？
 
-unique_ratio = (distinct tokens in window) / (total tokens in window)
+unique_ratio = (窗口内不同 token 数) / (窗口内总 token 数)
 
-**Natural language statistics:** In English text, function words (a/the/is/of) account for 10–20% of tokens in a 32-token window, rarely exceeding 30%. Normal text UR ≈ 0.70–0.95.
+**自然语言：** 32-token 窗口中虚词（a/the/is/of）占 10–20%，极少超 30%。正常文本 UR ≈ 0.70–0.95。
 
-**Degenerative text statistics:** When a model collapses, output reduces to a small set of repeated tokens. When >70% of tokens in a window are repeats → UR < 0.30. The model has stopped producing new information.
+**退化文本：** 模型崩溃时输出坍缩为少数 token 循环。窗口内 >70% token 重复 → UR < 0.30。模型不再产生新信息。
 
-**Why 0.30 is the boundary:**
-- Human text UR > 0.70 (empirical lower bound: 0.40)
-- Degenerative text UR < 0.20 (empirical upper bound: 0.25)
-- 0.30 lies between the two distributions, approximately 3σ below natural language UR
-- Window 32 covers ~1.5–2 complete English sentences
+**0.30 的分界意义：**
+- 人类文本 UR > 0.70（经验下界 0.40）
+- 退化文本 UR < 0.20（经验上界 0.25）
+- 0.30 位于两者之间，约等于自然语言 UR 的 3σ 下限
+- 窗口 32 ≈ 1.5–2 个完整英文句子
 
-> 0.30 is not a magic number. It is the intersection point where English lexical statistics meet model collapse behavior — the mathematical threshold at which \"most positions in a window no longer produce new information.\"
+> 0.30 不是 magic number。它是英语词法统计与模型退化行为的交汇点——"窗口中大多数位置不再产生新信息"的数学临界点。
 
 ### 核心结论
 
