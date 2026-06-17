@@ -1,3 +1,5 @@
+> ⚠️ Archived — see [README.md](../README.md) for current version.
+
 # 三态认知框架 Sanyan v3.29.0
 
 [![VS Code Extension](https://img.shields.io/badge/VS%20Code-%E8%AF%AD%E6%B3%95%E9%AB%98%E4%BA%AE-%23007ACC?logo=visualstudiocode)](sanyan-vscode/README.md)

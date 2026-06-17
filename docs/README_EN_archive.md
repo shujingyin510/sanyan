@@ -1,3 +1,5 @@
+> ⚠️ Archived — see [README.md](../README.md) for current version.
+
 # Tri-State Cognitive Framework Sanyan v3.29.0
 
 [![VS Code Extension](https://img.shields.io/badge/VS%20Code-Syntax%20Highlight-%23007ACC?logo=visualstudiocode)](sanyan-vscode/README.md)
