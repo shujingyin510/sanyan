@@ -40,6 +40,34 @@ Small language models frequently collapse into repetitive loops ("was was was...
 
 Human blind evaluation across 100 prompts: **ternary gating preferred 79.7% vs. EOS-only 8.3%** (12% ties).
 
+### Empirical Validation
+
+**UR trajectories show a phase transition**, not just a statistical drop — UR declines monotonically from ~0.70 to ~0.10, crosses 0.30 at t=18–28, and **no recovery is observed within the evaluated horizon** (≤64 tokens):
+
+| Step | "Once upon a time" | "The little boy" | "A big dog" |
+|------|--------------------|-------------------|-------------|
+| t=9 | 0.62 | 0.88 | 0.50 |
+| t=18 | 0.35 | 0.41 | **0.24** |
+| t=28 | 0.26 | **0.26** | 0.19 |
+| t=48 | 0.16 | 0.03 | 0.06 |
+
+**Human vs. degenerative text separation** (window=32):
+
+| Text Type | Avg UR | UR < 0.30 |
+|-----------|--------|-----------|
+| Human (literature) | **0.704** | **0.0%** |
+| Degenerative (GPT-2) | **0.101** | **99.7%** |
+
+**Decoding strategy comparison** on GPT-2 124M:
+
+| Strategy | Degeneration Rate | Avg UR |
+|----------|-------------------|--------|
+| nucleus (top_p=0.9) | **0%** | **0.867** |
+| greedy | 25% | 0.336 |
+| rep_penalty=1.15 | **100%** | 0.117 |
+
+> **Counterintuitive**: repetition penalty *amplifies* collapse on GPT-2 by narrowing the effective sampling space. UR correctly reflects each strategy's actual degeneration level independent of the strategy's assumptions.
+
 ---
 
 ## Architecture
