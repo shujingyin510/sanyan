@@ -1,7 +1,7 @@
 # 三言（Sanyan）— LLM 退化检测的通用阈值
 
 [![CI](https://github.com/shujingyin510/sanyan/actions/workflows/test.yml/badge.svg)](https://github.com/shujingyin510/sanyan/actions)
-![Tests](https://img.shields.io/badge/tests-1634%20passing-brightgreen)
+![Tests](https://img.shields.io/badge/tests-1650%2B%20passing-brightgreen)
 ![Models](https://img.shields.io/badge/models-GPT--2%20%7C%20Qwen2.5%20%7C%20TinyStories-blue)
 ![UR](https://img.shields.io/badge/threshold-UR%E2%89%880.30-orange)
 
@@ -67,6 +67,18 @@
 | rep_penalty=1.15 | **100%** | 0.117 |
 
 > **反直觉发现**：repetition_penalty 在 GPT-2 上*加剧*了模型坍缩——缩小有效采样空间迫使模型循环。UR 作为机制无关的后验信号，正确反映每种策略的实际退化程度。
+
+**GPT-2 跨规模 UR 稳定性**（nucleus sampling, top_p=0.9）：
+
+| 模型 | 参数 | 平均 UR | UR < 0.30 |
+|------|------|--------|-----------|
+| GPT-2 | 124M | 0.711 | 0% |
+| GPT-2 Medium | 355M | 0.714 | 0% |
+| GPT-2 Large | 774M | 0.797 | 0% |
+
+> UR 跨 6× 参数规模的波动仅 ±0.043。模型越大，UR 越高（0.71→0.80），生成多样性递增。UR 不仅是退化检测器，更是稳定的生成多样性度量。
+
+**阈值敏感性**：UR 从 0.20–0.40 滑动扫描，TPR/FPR 完全相同——两类分布在 0.20–0.40 间存在宽分离带。选择 0.30（比中点 0.402 更保守），最小化假阳性风险。
 
 ---
 

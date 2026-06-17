@@ -1,7 +1,7 @@
 # Sanyan — A Universal Degeneration Threshold for LLMs
 
 [![CI](https://github.com/shujingyin510/sanyan/actions/workflows/test.yml/badge.svg)](https://github.com/shujingyin510/sanyan/actions)
-![Tests](https://img.shields.io/badge/tests-1634%20passing-brightgreen)
+![Tests](https://img.shields.io/badge/tests-1650%2B%20passing-brightgreen)
 ![Models](https://img.shields.io/badge/models-GPT--2%20%7C%20Qwen2.5%20%7C%20TinyStories-blue)
 ![UR](https://img.shields.io/badge/threshold-UR%E2%89%880.30-orange)
 
@@ -67,6 +67,18 @@ Human blind evaluation across 100 prompts: **ternary gating preferred 79.7% vs. 
 | rep_penalty=1.15 | **100%** | 0.117 |
 
 > **Counterintuitive**: repetition penalty *amplifies* collapse on GPT-2 by narrowing the effective sampling space. UR correctly reflects each strategy's actual degeneration level independent of the strategy's assumptions.
+
+**GPT-2 cross-size UR stability** (nucleus sampling, top_p=0.9):
+
+| Model | Params | Avg UR | UR < 0.30 |
+|-------|--------|--------|-----------|
+| GPT-2 | 124M | 0.711 | 0% |
+| GPT-2 Medium | 355M | 0.714 | 0% |
+| GPT-2 Large | 774M | 0.797 | 0% |
+
+> UR varies only ±0.043 across 6× scale. Larger models → higher UR → more diverse output. UR functions as a stable generation diversity metric, not just a degeneration detector.
+
+**Threshold sensitivity**: sweeping UR from 0.20–0.40 shows identical TPR/FPR — the two distributions have a wide separation band. We chose 0.30 (more conservative than the midpoint 0.402) to minimize false positive risk.
 
 ---
 
