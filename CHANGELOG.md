@@ -2,6 +2,59 @@
 
 ---
 
+## [v3.39.0] — 2026-06-17 (UR≈0.30 退化检测阈值 + 跨架构验证 + 文档重构)
+
+### 核心发现
+- **UR≈0.30 退化检测阈值**：单一 unique_ratio 阈值在 4 个模型、3 种架构、3 个数量级参数跨度上可靠区分退化与连贯生成
+  - TinyStories 3.6M (GPT-Neo): 真阳性 98%
+  - TinyStories 28M (GPT-Neo): 真阳性 100%
+  - GPT-2 124M (GPT-2): 真阳性 100%
+  - Qwen2.5-0.5B (Qwen2): 假阳性 0.4%，平均 min_UR=0.717
+- **消融实验**：UR-only = 完整轨迹检测。周期检测、功能词密度等信号完全冗余
+- **统计显著性**：二项检验 p=0.0287, 95%CI [0.01%, 0.79%]
+
+### 实验
+- **1000-prompt 基准**：三元门控 98-100% 停止率 vs EOS-only 0%
+- **人工盲评**：GPT-2 124M 三元 79.7% vs EOS 8.3%（100 prompt, 3 维度）
+- **诱导退化实验**：Qwen2.5 9 类坏 prompt, UR 正确区分退化 vs 理解
+- **窗口大小消融**：16-64 窗口 UR 始终 0.145-0.171, 检测率 80-93%
+- **人类文本 UR 基线**：经典文学 avg_UR=0.704（0% 低于 0.30）
+- **UR 下降曲线**：单调下降至 <0.30 后无恢复（评估窗口内）
+- **采样策略对比**：nucleus 防退化(UR=0.87), rep_penalty 加剧坍缩(UR=0.12)
+- **GPT-2 跨规模验证**：124M/355M/774M, UR 波动 ±0.043
+- **阈值敏感性**：0.20-0.40 全区间 TPR/FPR 一致，选 0.30 更保守
+
+### 新增模型支持
+- **GPT-2 124M**：Conv1D + pre-norm 架构, KV Cache 推理 (logit_diff=0.000046)
+- **Qwen2.5-0.5B**：RMSNorm + RoPE + SwiGLU + GQA 架构 (via transformers)
+- **GPT-Neo 125M**：支持 global/local attention
+- **GPT-2 Medium (355M)** / **GPT-2 Large (774M)**：跨规模验证
+
+### 三言语言验证
+- `csrc/infer_demo.san`：三言源码演示（S-表达式语法）
+- `csrc/sanyan_ops.py`：reg_op 注册 C 推理算子
+- `csrc/sanyan_run.py`：.san 运行器
+- 链路：.san → lexer → parser → evaluator → reg_op → ctypes → C DLL → GPT-2
+
+### 文档重构
+- **README.md**：英文首页（UR≈0.30 发现 + 徽章 + 经验验证）
+- **README_CN.md**：中文首页
+- **RESULTS.md / RESULTS_CN.md**：全部实验数据表格
+- **QUICK_START.md**：5 分钟快速开始
+- **ROADMAP.md**：已完成和计划中
+- `csrc/README.md`：C 源码文件索引
+- `docs/research/`：12→3 篇合并 + 阅读索引
+- 旧 README 归档至 `docs/`
+- Known Boundaries 章节（双语文档）
+
+### CI 修复
+- mypy: `csrc.*` ignore_errors + `csrc/__init__.py`
+- coverage: `.coveragerc` 添加 `agent_system/*` omit
+- ruff format/check 全绿
+- 测试徽章 1634 → 1650+
+
+---
+
 ## [v3.38.0] — 2026-06-17 (SIMD推理引擎 + 三态门控 + Transformer全链路)
 
 ### 新增
