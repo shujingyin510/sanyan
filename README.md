@@ -80,7 +80,7 @@ Human blind evaluation across 100 prompts: **ternary gating preferred 79.7% vs. 
 
 **Cross-language stability**: Qwen2.5-0.5B on Chinese (n=1000): FP=**0.6%**, avg min_UR=**0.714** — vs English FP=0.4%, avg=0.717. UR threshold is language-agnostic at scale.
 
-**Threshold sensitivity**: sweeping UR from 0.20–0.40 shows identical TPR/FPR — the two distributions have a wide separation band. We chose 0.30 (more conservative than the midpoint 0.402) to minimize false positive risk.
+**Threshold selection** (real-data ROC, 1214 samples): Youden's J optimum = 0.32. We chose **0.30** — the TPR "knee point" where detection jumps from 0.847→0.993. Conservative relative to the optimum, minimizing FPR.
 
 ---
 
