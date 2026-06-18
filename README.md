@@ -78,6 +78,8 @@ Human blind evaluation across 100 prompts: **ternary gating preferred 79.7% vs. 
 
 > UR varies only ±0.043 across 6× scale. Larger models → higher UR → more diverse output. UR functions as a stable generation diversity metric, not just a degeneration detector.
 
+**Cross-language stability**: Qwen2.5-0.5B on Chinese prompts (n=50): avg min_UR=**0.718** (vs English 0.692), FP=2% (identical to English). UR threshold is language-agnostic for this model.
+
 **Threshold sensitivity**: sweeping UR from 0.20–0.40 shows identical TPR/FPR — the two distributions have a wide separation band. We chose 0.30 (more conservative than the midpoint 0.402) to minimize false positive risk.
 
 ---
