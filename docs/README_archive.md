@@ -1,6 +1,6 @@
 > ⚠️ Archived — see [README.md](../README.md) for current version.
 
-# 三态认知框架 Sanyan v3.39.0
+# 三态认知框架 Sanyan v3.41.0
 
 [![VS Code Extension](https://img.shields.io/badge/VS%20Code-%E8%AF%AD%E6%B3%95%E9%AB%98%E4%BA%AE-%23007ACC?logo=visualstudiocode)](sanyan-vscode/README.md)
 [![CI](https://github.com/shujingyin510/sanyan/actions/workflows/test.yml/badge.svg)](https://github.com/shujingyin510/sanyan/actions)
@@ -12,18 +12,19 @@
 
 ---
 
-## v3.39 更新摘要
+## v3.41 更新摘要
 
-- **UR≈0.30 退化检测阈值**：单一 unique_ratio 阈值在 4 个模型、3 种架构、3 个数量级参数跨度上可靠区分退化与连贯生成
-  - TinyStories 3.6M (GPT-Neo): 真阳性 98%
-  - TinyStories 28M (GPT-Neo): 真阳性 100%
-  - GPT-2 124M: 真阳性 99.3%
-  - Qwen2.5 0.5B/3B: 真阳性 98-100%
-  - 人类基线 (WikiText-2, n=60): avg UR=0.849, <0.30仅0.2%
-- **Agent 安全基准**：49 种 bug 注入，五层检测管道，检出率 100%
-- **Agent 诚实度基准**：100 题 × 5 类，认知越界率 -16.7%
-- **LLM Provider 抽象层**：支持 9 个模型厂商（DeepSeek/OpenAI/Anthropic/Gemini/Qwen/GLM/Moonshot/SiliconFlow/OpenRouter）
-- **Agent 系统整合**：所有 agent_*.py 文件移动到 agent_system/ 文件夹
+- **规则引擎**：200+ 规则，匹配任务→执行工具链，0 LLM 调用
+- **模板库**：11 个模板（数学/数据结构/算法/工具），代码生成
+- **领域知识层**：LLM 动态生成领域知识，SQLite 缓存
+- **学习系统**：Git 批量学习 + 项目风格记录
+- **规则自动生成**：LLM 生成→用户审批→入库
+- **跨项目迁移**：规则/模板/学习记录导出导入
+- **多 Agent 协作**：任务分解→并行执行→结果汇总
+- **多模型路由**：DeepSeek/Claude/GPT-4/本地模型
+- **SQLite 内置**：10 个操作，三言直接操作数据库
+- **三言版运行时**：agent_runtime.san，本语言实现决策循环
+- **文件拆分**：agent_runtime.py 从 1659 行降到 1326 行
 
 详见 [CHANGELOG](../CHANGELOG.md)
 
@@ -504,37 +505,28 @@ tests/
 
 ### Agent 可读决策 DSL
 
-> 详见 [ternary_agent/README.md](ternary_agent/README.md) — v5 架构、四阶段设计、补丁目录。
+> 详见 [agent_system/README.md](../agent_system/README.md) — v5 架构、四阶段设计、补丁目录。
 
 | 特性 | 说明 |
 |---|---|
+| **规则引擎** | 200+ 规则，匹配任务→执行工具链，0 LLM 调用 |
+| **模板库** | 11 个模板（数学/数据结构/算法/工具），代码生成 |
+| **领域知识层** | LLM 动态生成领域知识，SQLite 缓存 |
+| **学习系统** | Git 批量学习 + 项目风格记录 + 经验库 |
+| **规则自动生成** | LLM 生成→用户审批→入库 |
+| **跨项目迁移** | 规则/模板/学习记录导出导入 |
+| **多 Agent 协作** | 任务分解→并行执行→结果汇总 |
+| **多模型路由** | DeepSeek/Claude/GPT-4/本地模型 |
+| **AST 解析** | 精准上下文加载，4K 窗口处理复杂任务 |
+| **UR 退化检测** | 防止 LLM 死循环 |
+| **SQLite 内置** | 10 个操作，三言直接操作数据库 |
+| **三言版运行时** | agent_runtime.san，本语言实现决策循环 |
 | **三态推理** | LLM 认知态 → 三态映射 → Kleene 传播 → 贝叶斯置信度 → 保护门控 |
 | **多假设并行** | Top-3 候选方案同时探索，锦标赛选优，早停淘汰死假设 |
 | **任务分解** | 大任务自动递归拆解，每层有界上下文（4000 token 硬限） |
-| **工具依赖图** | P1: 工具链合法性预校验，过滤无效组合 |
-| **能力注册表** | P9: 任务需求 vs 工具能力匹配，误选率 -50% |
-| **多样性控制** | P8: 关键词聚类去重，避免 5≈1 假多样化 |
-| **失败分类** | P3: 6 类 FailureMode（空/缺/格式/超时/逻辑/循环），精准重试 |
-| **自适应阈值** | P4: 50 轮后从历史自动调参，消除硬编码 |
-| **语义缓存** | P5: 相似任务直接复用，命中率 ~15% |
-| **可观测性** | P7: 全链路指标（早停率/缓存命中/LLM 比较次数/成本预测） |
-| **成本预测** | P10: 历史数据模型替代 LLM 猜测，准确率 +20% |
-| **执行回放** | P11: 完整运行记录 + diff 对比，Debug 效率 +300% |
-| **经验学习** | 工具成功率统计 + 遗忘衰减 + 模块风险评估 |
-| **多提供商** | DeepSeek / OpenAI / 千问 / Gemini / 小米MIMO / Token Plan / Ollama 七家 |
-| **声明式策略** | `agent_policy.san` 纯数据 + 场景规则，热重载 |
-| **并行执行** | P14: 独立工具并行执行，工具链自动并行化，预计加速 2-4x |
-| **智能压缩** | P22: 多策略上下文压缩（分层摘要+滑动窗口+重要性评分） |
-| **跨会话学习** | P19: SQLite 持久化工具成功率、失败模式库、任务类型映射 |
-| **安全沙箱** | P16: 命令黑名单/白名单、文件系统守卫、只读模式、审计日志 |
-| **流式响应** | P28: LLM 边生成边显示，支持可中断、渐进式输出 |
-| **高阶工具组合** | P31: Unix 风格管道、复合工具、条件工具链 |
-| **工具自发现** | P13: 自动扫描 ops/*.py 注册工具，提取元数据（参数/副作用/成本） |
-| **多Agent共享** | P34: 共享上下文空间、共享符号表、Agent协调器（任务分发+结果聚合） |
-| **Token追踪** | 实时统计 LLM Token 用量，支持 DeepSeek/Gemini API |
-| **策略自优化** | Layer 1: Prompt自进化 + Tool Selection学习 + 策略切换 + A/B Rollout |
-| **自主循环** | Layer 2: 文件监控 + 自动验证 + Agent修复 + 日志持久化 + 健康监控 |
-| **约束进化** | Layer 3: 接口不变只改内部 + 多后端差分验证 + 多目标评估 + 自举验证（框架完成，闭环开发中） |
+| **失败分类** | 6 类 FailureMode（空/缺/格式/超时/逻辑/循环），精准重试 |
+| **安全沙箱** | 命令黑名单/白名单、文件系统守卫、只读模式、审计日志 |
+| **多提供商** | DeepSeek / OpenAI / Anthropic / Gemini / Qwen / GLM / Moonshot / SiliconFlow / OpenRouter 九家 |
 
 使用方式：
 

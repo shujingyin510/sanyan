@@ -1,6 +1,6 @@
 > ⚠️ Archived — see [README.md](../README.md) for current version.
 
-# Tri-State Cognitive Framework Sanyan v3.39.0
+# Tri-State Cognitive Framework Sanyan v3.41.0
 
 [![VS Code Extension](https://img.shields.io/badge/VS%20Code-Syntax%20Highlight-%23007ACC?logo=visualstudiocode)](sanyan-vscode/README.md)
 [![CI](https://github.com/shujingyin510/sanyan/actions/workflows/test.yml/badge.svg)](https://github.com/shujingyin510/sanyan/actions)
@@ -12,18 +12,19 @@
 
 ---
 
-## v3.39 Update Summary
+## v3.41 Update Summary
 
-- **UR≈0.30 Degeneration Threshold**: A single unique_ratio threshold reliably distinguishes degenerate from coherent generation across 4 models, 3 architectures, and 3 orders of magnitude in parameter count
-  - TinyStories 3.6M (GPT-Neo): True positive rate 98%
-  - TinyStories 28M (GPT-Neo): True positive rate 100%
-  - GPT-2 124M: True positive rate 99.3%
-  - Qwen2.5 0.5B/3B: True positive rate 98-100%
-  - Human baseline (WikiText-2, n=60): avg UR=0.849, <0.30 only 0.2%
-- **Agent Safety Benchmark**: 49 bug injections, 5-layer detection pipeline, 100% detection rate
-- **Agent Honesty Benchmark**: 100 questions × 5 types, cognitive overreach rate -16.7%
-- **LLM Provider Abstraction**: Supports 9 model providers (DeepSeek/OpenAI/Anthropic/Gemini/Qwen/GLM/Moonshot/SiliconFlow/OpenRouter)
-- **Agent System Reorganization**: All agent_*.py files moved to agent_system/ folder
+- **Rule Engine**: 200+ rules, task→tool chain matching, 0 LLM calls
+- **Template Library**: 11 templates (math/data structures/algorithms/utils), code generation
+- **Domain Knowledge Layer**: LLM dynamic generation, SQLite caching
+- **Learning System**: Git batch learning + project style recording
+- **Auto Rule Generation**: LLM generates → user approves → saved
+- **Cross-project Migration**: Export/import rules/templates/learning records
+- **Multi-Agent Collaboration**: Task decomposition → parallel execution → result aggregation
+- **Multi-model Routing**: DeepSeek/Claude/GPT-4/local models
+- **SQLite Built-in**: 10 operations, Sanyan directly operates databases
+- **Sanyan Runtime**: agent_runtime.san, decision loop in native language
+- **File Split**: agent_runtime.py reduced from 1659 to 1326 lines
 
 See [CHANGELOG](../CHANGELOG.md)
 
@@ -187,25 +188,28 @@ See [CHANGELOG.md](CHANGELOG.md) for the full version history.
 
 ### Agent: Readable Decision DSL (v5)
 
-> See [ternary_agent/README.md](ternary_agent/README.md) — v5 architecture, three-phase design, patch catalog.
+> See [agent_system/README.md](../agent_system/README.md) — v5 architecture, three-phase design, patch catalog.
 
 | Feature | Description |
 |---|---|
+| **Rule Engine** | 200+ rules, task→tool chain matching, 0 LLM calls |
+| **Template Library** | 11 templates (math/data structures/algorithms/utils), code generation |
+| **Domain Knowledge** | LLM dynamic generation, SQLite caching |
+| **Learning System** | Git batch learning + project style recording + experience store |
+| **Auto Rule Generation** | LLM generates → user approves → saved |
+| **Cross-project Migration** | Export/import rules/templates/learning records |
+| **Multi-Agent** | Task decomposition → parallel execution → result aggregation |
+| **Multi-model** | DeepSeek/Claude/GPT-4/local models |
+| **AST Parsing** | Precise context loading, 4K window handles complex tasks |
+| **UR Detection** | Prevents LLM death loops |
+| **SQLite Built-in** | 10 operations, Sanyan directly operates databases |
+| **Sanyan Runtime** | agent_runtime.san, decision loop in native language |
 | **Ternary Reasoning** | LLM cognitive states → ternary mapping → Kleene propagation → Bayesian confidence → safety gating |
-| **Multi-Hypothesis** | Top-3 candidates explored in parallel, tournament selects best, early stop kills dead hypotheses |
-| **Task Decomposition** | Auto-recursive task splitting, bounded context per layer (4000 token hard limit) |
-| **Tool Dependency Graph** | P1: pre-validate tool chain legality, filter invalid combinations |
-| **Capability Registry** | P9: task needs vs tool capability matching, -50% misselection rate |
-| **Diversity Control** | P8: keyword clustering dedup, avoid 5≈1 pseudo-diversity |
-| **Failure Classification** | P3: 6 FailureModes (empty/missing/schema/timeout/logic/loop), precise retry |
-| **Adaptive Threshold** | P4: auto-tune from history after 50 rounds, eliminate hardcoded values |
-| **Semantic Cache** | P5: similar tasks reused directly, ~15% hit rate |
-| **Observability** | P7: full-chain metrics (early stop/cache hit/LLM compare/cost prediction) |
-| **Cost Prediction** | P10: historical data model replaces LLM guessing, +20% accuracy |
-| **Execution Replay** | P11: complete run log + diff comparison, +300% debug efficiency |
-| **Experience Learning** | Tool success rate stats + time decay + module risk assessment |
-| **Multi-Provider** | DeepSeek / OpenAI / Qwen / Gemini / Xiaomi MIMO / Token Plan / Ollama |
-| **Declarative Policy** | `agent_policy.san` pure data + scene rules, hot-reload |
+| **Multi-Hypothesis** | Top-3 candidates explored in parallel, tournament selects best |
+| **Task Decomposition** | Auto-recursive task splitting, bounded context per layer |
+| **Failure Classification** | 6 FailureModes, precise retry |
+| **Safety Sandbox** | Command blacklist/whitelist, filesystem guard, read-only mode, audit log |
+| **Multi-Provider** | DeepSeek / OpenAI / Anthropic / Gemini / Qwen / GLM / Moonshot / SiliconFlow / OpenRouter |
 
 ```bash
 # Interactive mode (multi-turn, hot reload)

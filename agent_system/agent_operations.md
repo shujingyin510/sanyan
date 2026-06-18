@@ -84,7 +84,23 @@ python -X utf8 run_agent.py
 
 | 工具 | 参数 | 说明 |
 |------|------|------|
+| `run_shell` | `cmd` | 执行 shell 命令 |
 | `done` | `answer` | 任务完成，输出最终答案 |
+
+### SQLite 操作
+
+| 工具 | 参数 | 说明 |
+|------|------|------|
+| `sqlite_open` | `path` | 打开数据库连接 |
+| `sqlite_close` | `path` | 关闭连接 |
+| `sqlite_exec` | `path\|sql` | 执行 SQL |
+| `sqlite_query` | `path\|sql` | 查询 SQL（返回列表） |
+| `sqlite_tables` | `path` | 列出所有表 |
+| `sqlite_schema` | `path\|table` | 获取表结构 |
+| `sqlite_insert` | `path\|table\|dict` | 插入数据 |
+| `sqlite_update` | `path\|table\|dict\|where` | 更新数据 |
+| `sqlite_delete` | `path\|table\|where` | 删除数据 |
+| `sqlite_count` | `path\|table` | 统计行数 |
 
 ---
 
@@ -101,6 +117,40 @@ python -X utf8 run_agent.py "你的问题"
 
 # 直接执行三言代码
 python -X utf8 run_agent.py "(设 x 10)(输出(加 x 5))"
+```
+
+### 规则管理命令
+
+```bash
+# 列出所有规则
+python -X utf8 run_agent.py --list-rules
+
+# 审批待生成的规则
+python -X utf8 run_agent.py --approve-rule
+
+# 拒绝待生成的规则
+python -X utf8 run_agent.py --reject-rule
+
+# 导出规则到文件
+python -X utf8 run_agent.py --export-rules my_rules.tar.gz
+
+# 从文件导入规则
+python -X utf8 run_agent.py --import-rules my_rules.tar.gz
+```
+
+### 学习命令
+
+```bash
+# 从 git 历史批量学习项目风格
+python -X utf8 run_agent.py --learn
+```
+
+### 模型选择命令
+
+```bash
+# 指定模型
+python -X utf8 run_agent.py "任务" --model deepseek-v4-pro
+python -X utf8 run_agent.py "任务" --model local/qwen2.5-0.5b
 ```
 
 ### 进化系统命令

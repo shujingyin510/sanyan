@@ -1187,6 +1187,51 @@ from agent_system.agent_metaconfig import MetaConfigSystem
 # ======  End AgentRuntime imports ======
 
 
+def _save_execution_log(path: str, task: str, result: dict, rt):
+    """保存执行日志到文件"""
+    import datetime
+
+    lines = [
+        '=== Agent 执行日志 ===',
+        f'时间: {datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")}',
+        f'任务: {task}',
+        '',
+        '=== 执行历史 ===',
+    ]
+
+    memory = result.get('memory', {})
+    history = memory.get('history', [])
+
+    for i, entry in enumerate(history, 1):
+        tool = entry.get('tool', 'unknown')
+        params = entry.get('params', '')
+        result_str = entry.get('result', '')
+        duration = entry.get('duration', 0)
+        trit = entry.get('trit', 0)
+
+        status = '✓' if trit == 1 else '✗' if trit == -1 else '○'
+        lines.append(f'[r{i}] {status} {tool} ({duration:.1f}s)')
+        if params:
+            lines.append(f'  参数: {params[:100]}')
+        if result_str:
+            lines.append(f'  结果: {result_str[:200]}')
+        lines.append('')
+
+    lines.append('=== 结果 ===')
+    lines.append(f'答案: {result.get("answer", "无")}')
+    lines.append(f'修改文件: {", ".join(memory.get("modified", []))}')
+
+    # 性能报告
+    lines.append('')
+    lines.append('=== 性能 ===')
+    lines.append(rt.get_performance_report())
+
+    with open(path, 'w', encoding='utf-8') as f:
+        f.write('\n'.join(lines))
+
+    print(f'[日志] 已保存到: {path}')
+
+
 def main():
     # 解析命令行参数
     parser = argparse.ArgumentParser(description='三言 Agent — 可读决策 DSL + 自主编程助手')
@@ -1199,6 +1244,7 @@ def main():
     parser.add_argument('--list-tasks', action='store_true', help='查看任务历史')
     parser.add_argument('--dashboard', action='store_true', help='显示实时仪表盘')
     parser.add_argument('--trace', action='store_true', help='显示决策追踪')
+    parser.add_argument('--log', type=str, default='', help='保存执行日志到文件')
     parser.add_argument('--perf', action='store_true', help='显示性能报告')
     parser.add_argument('--sandbox', action='store_true', help='启用安全沙箱（只读模式）')
     parser.add_argument('--parallel', action='store_true', help='启用并行执行')
@@ -1209,6 +1255,13 @@ def main():
     parser.add_argument('--auto-evolve', action='store_true', help='运行自动化进化闭环')
     parser.add_argument('--code-evolve', action='store_true', help='Agent自主改代码闭环')
     parser.add_argument('--review-evolve', action='store_true', help='带审查的进化闭环')
+    parser.add_argument('--learn', action='store_true', help='从git历史批量学习项目风格')
+    parser.add_argument('--approve-rule', action='store_true', help='审批待生成的规则')
+    parser.add_argument('--reject-rule', action='store_true', help='拒绝待生成的规则')
+    parser.add_argument('--list-rules', action='store_true', help='列出所有规则')
+    parser.add_argument('--export-rules', type=str, default='', help='导出规则到文件')
+    parser.add_argument('--import-rules', type=str, default='', help='从文件导入规则')
+    parser.add_argument('--model', type=str, default='', help='指定模型 (deepseek-v4-pro/deepseek-coder/claude/gpt4)')
     parser.add_argument('--evo-dashboard', action='store_true', help='进化仪表盘')
     parser.add_argument('--validate', action='store_true', help='运行进化验证（100次随机+收敛+Reviewer）')
     parser.add_argument('--metaconfig', action='store_true', help='MetaConfig进化（配置参数验证）')
@@ -1310,6 +1363,53 @@ def main():
     # Phase 3: 显示性能报告
     if args.perf:
         print(rt.get_performance_report())
+        return
+
+    # 批量学习
+    if args.learn:
+        print('从 git 历史批量学习项目风格...')
+        output_path = rt.batch_learn_from_git()
+        if output_path:
+            print(f'\n风格已保存到: {output_path}')
+        return
+
+    # 规则管理
+    if args.approve_rule:
+        if rt.rule_engine.approve_rule():
+            print('规则已审批通过并保存')
+        else:
+            print('没有待审批的规则')
+        return
+
+    if args.reject_rule:
+        if rt.rule_engine.reject_rule():
+            print('规则已拒绝')
+        else:
+            print('没有待审批的规则')
+        return
+
+    if args.list_rules:
+        print(rt.rule_engine.get_rules_summary())
+        return
+
+    # 规则导出导入
+    if args.export_rules:
+        from agent_system.project_migrator import export_project_rules
+
+        output = export_project_rules(args.export_rules)
+        print(f'规则已导出到: {output}')
+        return
+
+    if args.import_rules:
+        from agent_system.project_migrator import import_project_rules
+
+        result = import_project_rules(args.import_rules)
+        print('导入结果:')
+        print(f'  规则: {result["rules_imported"]} 条')
+        print(f'  模板: {result["templates_imported"]} 个')
+        print(f'  学习记录: {"是" if result["styles_imported"] else "否"}')
+        if result['errors']:
+            print(f'  错误: {result["errors"]}')
         return
 
     # Layer 3: 约束进化验证
@@ -1420,8 +1520,19 @@ def main():
         return
 
     if args.question:
+        # 设置日志文件
+        log_path = args.log if args.log else ''
+
         result = rt.run(args.question, max_rounds=max_r, dry_run=args.dry_run)
         print(f'\n→ {result["answer"]}')
+
+        # 保存执行日志
+        if log_path:
+            import datetime
+
+            if os.path.isdir(log_path):
+                log_path = os.path.join(log_path, f'agent_{datetime.datetime.now().strftime("%Y%m%d_%H%M%S")}.log')
+            _save_execution_log(log_path, args.question, result, rt)
         if args.report:
             m = result['memory']
             print(f'\n=== 报告 ===\n阶段: {m["stage"]}\n工具: {len(m["history"])}次\n修改: {m["modified"]}')

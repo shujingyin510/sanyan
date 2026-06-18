@@ -5,11 +5,9 @@ Phase 2: 经验 + Token预算 + 压缩 + 缓存(P5) + 可观测(P7) + 成本(P10
 Phase 3: 并行执行(P14) + 智能压缩(P22) + 跨会话学习(P19) + 可观测增强(P25)
 """
 
-import glob as _glob
 import os
 import time as _time
 from typing import Dict, Optional
-
 
 from ternary_engine import TernaryEngine
 from agent_system.agent_hypothesis import (
@@ -34,182 +32,23 @@ from agent_system.agent_sandbox import AgentSandbox
 from agent_system.agent_obs import AgentDashboard
 from agent_system.agent_streaming import ProgressiveDisplay
 from agent_system.agent_composition import ToolPipeline, ToolComposer, ConditionalChain
-from agent_system.agent_shared import SharedContext, SharedSymbolTable, AgentCoordinator
+from agent_system.agent_shared import SharedContext, SharedSymbolTable
 from agent_system.agent_strategy import PromptEvolver, ToolSelectionLearner, StrategySwitcher, ABRollout
 from agent_system.agent_evolution import ConstrainedEvolutionSystem
 from agent_system.agent_domain import DomainKnowledgeLayer
 from agent_system.agent_rules import RuleEngine
 from agent_system.template_manager import TemplateManager
+from agent_system.ast_parser import ASTParser
+from agent_system.ur_monitor import URMonitor
+from agent_system.git_batch_learner import GitBatchLearner
+from agent_system.model_router import ModelRouter
+from agent_system.agent_coordinator import AgentCoordinator
 
-
-class SymbolTable:
-    """符号表缓存：启动时扫全盘建索引，后续O(1)查"""
-
-    def __init__(self):
-        self._cache = {}
-        self._indexed = False
-
-    def build_all(self):
-        """一次性扫描全项目，建立所有符号索引"""
-        if self._indexed:
-            return
-        import re as _re
-
-        for ext in ['*.py', '*.san']:
-            for fp in _glob.glob('**/' + ext, recursive=True):
-                if '__pycache__' in fp or len(fp) > 80:
-                    continue
-                try:
-                    with open(fp, encoding='utf-8', errors='ignore') as fh:
-                        for lineno, line in enumerate(fh, 1):
-                            # 函数/类定义
-                            m = _re.search(r'\b(?:def|class|定义)\s+([a-zA-Z_]\w*)', line)
-                            if m:
-                                sym = m.group(1)
-                                entry = self._cache.setdefault(sym, {'def': [], 'ref': []})
-                                if len(entry['def']) < 5:
-                                    entry['def'].append((fp, lineno))
-                            else:
-                                # 引用（非导入行）
-                                for m2 in _re.finditer(r'\b([a-zA-Z_]\w{2,})\b', line):
-                                    if 'import' in line.lower():
-                                        continue
-                                    sym = m2.group(1)
-                                    entry = self._cache.setdefault(sym, {'def': [], 'ref': []})
-                                    if len(entry['ref']) < 10:
-                                        entry['ref'].append((fp, lineno))
-                except Exception:
-                    pass
-        self._indexed = True
-
-    def lookup(self, symbol):
-        if not self._indexed:
-            self.build_all()
-        return self._cache.get(symbol, {'def': [], 'ref': []})
-
-
-class MemoryStore:
-    """分层记忆：语义摘要(S) + 事件存储(E) + 时间衰减 + 跨任务回忆
-
-    S-Memory: LLM 一句话摘要，用于语义检索
-    E-Memory: 原始事件存储，按时间衰减
-    """
-
-    def __init__(self):
-        self.entries = []  # E-Memory: [{tool, result, kw, time, summary}]
-        self.semantic = []  # S-Memory: [(summary, keywords)]
-        self._summarizer = None  # lazy LLM ref
-
-    def _extract_kw(self, text):
-        import re as _re
-
-        kw = set(_re.findall(r'[a-zA-Z_]\w{2,}', str(text)))
-        s = str(text)
-        for i in range(len(s) - 1):
-            if '\u4e00' <= s[i] <= '\u9fff' and '\u4e00' <= s[i + 1] <= '\u9fff':
-                kw.add(s[i : i + 2])
-        return kw
-
-    def set_llm(self, llm_fn):
-        """注入 LLM 摘要函数"""
-        self._summarizer = llm_fn
-
-    def add(self, tool, params, result):
-        import time as _t
-
-        kw = self._extract_kw(str(params)) | self._extract_kw(str(result))
-        entry = {
-            'tool': tool,
-            'result': str(result)[:200],
-            'kw': kw,
-            'time': _t.time(),
-            'summary': '',
-        }
-        # LLM 摘要：异步尝试
-        if self._summarizer:
-            try:
-                raw = str(params)[:100] + ' → ' + str(result)[:200]
-                entry['summary'] = self._summarizer(f'用5字以内概括: {raw}') or ''
-                if entry['summary']:
-                    self.semantic.append((entry['summary'], kw))
-            except Exception:
-                pass
-        self.entries.append(entry)
-
-    def context(self, query='', limit=3):
-        if not self.entries:
-            return ''
-        qk = self._extract_kw(query) if query else set()
-        scored = []
-        for i, e in enumerate(reversed(self.entries[-30:])):
-            # 关键词匹配分
-            ks = len(qk & e.get('kw', set())) if qk else 1
-            # 语义匹配分
-            ss = 0
-            if e.get('summary') and qk:
-                ss = len(qk & self._extract_kw(e['summary']))
-            # 时间衰减：每 60 秒权重减半
-            import time as _t
-
-            age = _t.time() - e.get('time', _t.time())
-            decay = max(0.1, 0.5 ** (age / 60))
-            score = (ks + ss * 2) * decay
-            if score > 0.05:
-                scored.append((score, e))
-        scored.sort(key=lambda x: -x[0])
-        entries = [e for _, e in scored[:limit]] or self.entries[-limit:]
-        parts = [f'{e["tool"]}:{str(e["result"])[:60]}' for e in entries]
-        if entries and entries[0].get('summary'):
-            parts.insert(0, f'[摘要] {entries[0]["summary"]}')
-        return '[记忆] ' + ' | '.join(parts)
-
-    def recall(self, task, limit=3):
-        """跨任务回忆：找到与当前任务相关的历史"""
-        if not self.semantic:
-            return ''
-        tkw = self._extract_kw(task)
-        scored = []
-        for summary, kw in self.semantic[-50:]:
-            s = len(tkw & kw) if tkw else 0
-            if s > 0:
-                scored.append((s, summary))
-        scored.sort(key=lambda x: -x[0])
-        if scored:
-            return '[经验] ' + '; '.join(s for _, s in scored[:limit])
-        return ''
-
-
-class ProjectGraph:
-    """项目图：文件依赖关系"""
-
-    def __init__(self, root='.'):
-        self.deps = {}  # file → [imported_files]
-        self._built = False
-
-    def build(self, files=None):
-        if self._built:
-            return
-
-        files = files or _glob.glob('**/*.py', recursive=True)[:100]
-        for fp in files:
-            if '__pycache__' in fp:
-                continue
-            try:
-                with open(fp, encoding='utf-8', errors='ignore') as fh:
-                    deps = []
-                    for line in fh:
-                        if line.startswith('from ') or line.startswith('import '):
-                            deps.append(line.strip()[:60])
-                        if len(deps) > 10:
-                            break
-                    if deps:
-                        self.deps[fp] = deps
-            except Exception:
-                pass
-        self._built = True
-
-    def depends_on(self, file):
-        return self.deps.get(file, [])
+# 拆分后的模块
+from agent_system.agent_core import SymbolTable, MemoryStore, ProjectGraph
+from agent_system.agent_llm_handler import LLMHandler
+from agent_system.agent_execution import RuleExecutor
+from agent_system.agent_learning_handler import LearningHandler
 
 
 class AgentRuntime:
@@ -255,7 +94,6 @@ class AgentRuntime:
         self.conditional = ConditionalChain(self.tools)
         self.shared_context = SharedContext()
         self.shared_symbols = SharedSymbolTable()
-        self.coordinator = AgentCoordinator()
         self.progress_display = ProgressiveDisplay()
         # Layer 1: 策略自优化
         self.prompt_evolver = PromptEvolver()
@@ -266,10 +104,41 @@ class AgentRuntime:
         self.evolution = ConstrainedEvolutionSystem()
         # Layer 4: 领域知识层
         self.domain_knowledge = DomainKnowledgeLayer(llm_fn=self._llm_call)
-        # Layer 5: 规则引擎
-        self.rule_engine = RuleEngine()
+        # Layer 5: 规则引擎（支持 LLM 自动生成）
+        self.rule_engine = RuleEngine(llm_fn=self._llm_call)
         # Layer 6: 模板管理器
         self.template_manager = TemplateManager(llm_fn=self._llm_call)
+        # Layer 7: AST 解析器（精准上下文）
+        self.ast_parser = ASTParser()
+        # Layer 8: UR 退化检测（防止 LLM 死循环）
+        self.ur_monitor = URMonitor()
+        # Layer 9: Git 批量学习器
+        self.git_batch_learner = GitBatchLearner()
+        # Layer 10: 多模型路由器
+        self.model_router = ModelRouter()
+        # Layer 11: 多 Agent 协作器
+        self.coordinator = AgentCoordinator(llm_fn=self._llm_call, tools=self.tools)
+
+        # 拆分后的处理器
+        self.llm_handler = LLMHandler(
+            ev=self.ev,
+            profiler=self.profiler,
+            ur_monitor=self.ur_monitor,
+        )
+        self.rule_executor = RuleExecutor(
+            tools=self.tools,
+            rule_engine=self.rule_engine,
+            template_manager=self.template_manager,
+            llm_call=self._llm_call,
+            memory=self.memory,
+        )
+        self.learning_handler = LearningHandler(
+            experience_store=self.experience_store,
+            git_batch_learner=self.git_batch_learner,
+            llm_call=self._llm_call,
+            memory=self.memory,
+        )
+
         # P6: Prompt 缓存 — 稳定化 system_prompt
         self._system_prompt = None
         self._system_prompt_hash = None
@@ -340,6 +209,14 @@ class AgentRuntime:
             f'修改阶段: 只用 write_file/replace_in_file/replace_all\n'
             f'验证阶段: 只用 run_test/run_shell/done\n'
             f'\n'
+            f'=== 反过度工程约束 ===\n'
+            f'- 不创建只有一个方法的类，直接用函数\n'
+            f'- 不引入新依赖除非任务明确要求\n'
+            f'- 不添加抽象层除非有 3 个以上使用场景\n'
+            f'- 不重构不在任务范围内的代码\n'
+            f'- 遵循项目现有风格（查 learned_styles.md）\n'
+            f'- 只修改任务要求的代码，不要"顺便"改其他\n'
+            f'\n'
             f'输出格式（严格，只输出一个JSON对象，独占一行）:\n'
             f'  {{"tool":"工具名", "args":{{"参数名":"值"}}}}\n'
             f'\n'
@@ -376,6 +253,12 @@ class AgentRuntime:
         print(f'  [计划] {" → ".join(s["action"] for s in domain_info.get("plan", []))}')
         self.memory['domain_info'] = domain_info
 
+        # 学习记录反查：查历史风格
+        style_hint = self._lookup_style(task)
+        if style_hint:
+            print(f'  [风格] {style_hint}')
+            self.memory['style_hint'] = style_hint
+
         # 动态生成 system prompt
         self._system_prompt = self._build_domain_prompt(task, domain_info)
 
@@ -397,6 +280,10 @@ class AgentRuntime:
 
             # 保存经验
             self._save_experience(task, perf_report)
+
+            # 学习：从这次任务中提取项目风格
+            if success and self.memory.get('modified'):
+                self._learn_from_task(task)
 
     def _run_core(self, task, max_rounds, dry_run, trace_id, start_time, strategy=None):
         """核心运行逻辑"""
@@ -756,6 +643,11 @@ class AgentRuntime:
             if pre:
                 parts.append(pre)
 
+            # AST 解析：加载相关文件上下文
+            ast_context = self.ast_parser.get_context_for_task(task, max_files=3)
+            if ast_context:
+                parts.append(f'\n{ast_context}')
+
             # 注入当前计划进度
             plan = self.memory.get('plan', [])
             current_step = self.memory.get('current_step', 0)
@@ -810,195 +702,14 @@ class AgentRuntime:
         return False
 
     def _llm_call(self, prompt, override_system_prompt=None):
-        """LLM 调用：多提供商 + 重试 + 超时 + P6 Prompt 缓存"""
-        import urllib.request as _req
-        import urllib.error as _err
-        import json as _json
-        import time as _t
-
-        # 安全获取配置（避免 get_var 异常）
-        try:
-            model = (getattr(self.ev, 'get_var', lambda x: '')('模型名') or 'deepseek-v4-pro').strip()
-        except Exception:
-            model = 'deepseek-v4-pro'
-        try:
-            url = (getattr(self.ev, 'get_var', lambda x: '')('模型URL') or '').strip()
-        except Exception:
-            url = ''
-        try:
-            key = (getattr(self.ev, 'get_var', lambda x: '')('API密钥') or '').strip()
-        except Exception:
-            key = os.environ.get('SANYAN_API_KEY', '')
-        try:
-            provider = (getattr(self.ev, 'get_var', lambda x: 'deepseek')('模型提供商') or 'deepseek').strip()
-        except Exception:
-            provider = 'deepseek'
-        timeout = 60
-        try:
-            raw_timeout = getattr(self.ev, 'get_var', lambda x: 60)('超时秒数')
-            if hasattr(raw_timeout, 'to_payload'):
-                timeout = int(float(str(raw_timeout.to_payload())))
-            else:
-                timeout = int(str(raw_timeout))
-        except Exception:
-            pass
-
-        # P6: 稳定化 system_prompt — 不含时间戳等可变内容; 支持覆盖
-        if self._system_prompt is None:
-            self._system_prompt = (
-                '你是三言(Sanyan)编程助手，一个中文DSL语言的工具型Agent。\n'
-                '你的任务：根据用户输入选一个工具执行。\n'
-                '\n'
-                '工具与参数:\n'
-                '  analyze(path)          — 分析文件结构\n'
-                '  find_symbol(name)      — 查找符号定义/引用\n'
-                '  read_file(path,start,count) — 读文件(行号可选)\n'
-                '  search_code(keyword)   — 搜索代码\n'
-                '  replace_in_file(path,old,new) — 单次替换\n'
-                '  replace_all(pattern,old,new)  — 批量替换\n'
-                '  write_file(path,content)— 写入文件\n'
-                '  list_files(pattern)     — 列出文件(可选模式)\n'
-                '  run_test(test_file)     — 运行测试\n'
-                '  git_diff                — 查看git差异\n'
-                '  git_status              — 查看git状态\n'
-                '  git_stash               — 保存现场并回退修改\n'
-                '  git_reset_hard          — 硬回退到上一个提交\n'
-                '  git_commit_auto(msg)    — 自动提交所有修改\n'
-                '  done(answer)            — 任务完成，输出最终答案\n'
-                '\n'
-                '输出格式（严格，只输出一个JSON对象，独占一行，不要任何其他文字）:\n'
-                '  {"tool":"工具名", "args":{"参数名":"值"}}\n'
-                '\n'
-                '示例:\n'
-                '  用户: 看看run_agent.py结构\n'
-                '  {"tool":"analyze","args":{"path":"run_agent.py"}}\n'
-                '\n'
-                '  用户: 读fib.san前20行\n'
-                '  {"tool":"read_file","args":{"path":"fib.san","start":1,"count":20}}\n'
-                '\n'
-                '  用户: 介绍一下你自己\n'
-                '  {"tool":"done","args":{"answer":"我是三言编程助手，基于DeepSeek v4。"}}'
-            )
-        sys_msg = override_system_prompt if override_system_prompt is not None else self._system_prompt
-
-        # Gemini 专用格式
-        if provider and 'gemini' in str(provider).lower():
-            url = f'https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={key}'
-            body = _json.dumps(
-                {
-                    'system_instruction': {'parts': [{'text': sys_msg}]},
-                    'contents': [{'parts': [{'text': prompt}]}],
-                    'generationConfig': {'temperature': 0.7},
-                },
-                ensure_ascii=False,
-            ).encode('utf-8')
-            headers = {'Content-Type': 'application/json'}
-
-            def _parse_gemini(d):
-                text = d['candidates'][0]['content']['parts'][0]['text']
-                # 提取token用量（Gemini在usageMetadata中）
-                usage = d.get('usageMetadata', {})
-                tokens = usage.get('totalTokenCount', 0)
-                return text, tokens
-
-            parser = _parse_gemini
-        else:
-            body = _json.dumps(
-                {
-                    'model': model,
-                    'max_tokens': 4096,
-                    'temperature': 0.7,
-                    'thinking': {'type': 'enabled', 'budget_tokens': 2048},
-                    'messages': [{'role': 'system', 'content': sys_msg}, {'role': 'user', 'content': prompt}],
-                },
-                ensure_ascii=False,
-            ).encode('utf-8')
-            headers = {'Content-Type': 'application/json', 'Authorization': f'Bearer {key}'}
-
-            def _parse_openai(d):
-                msg = d['choices'][0]['message']
-                text = msg.get('content') or msg.get('reasoning_content') or ''
-                # 提取token用量（OpenAI在usage中）
-                usage = d.get('usage', {})
-                tokens = usage.get('total_tokens', 0)
-                return text, tokens
-
-            parser = _parse_openai
-
-        # 重试 3 次
-        for attempt in range(3):
-            try:
-                req = _req.Request(url, data=body, headers=headers, method='POST')
-                resp = _json.loads(_req.urlopen(req, timeout=timeout).read().decode('utf-8'))
-                text, tokens = parser(resp)
-                # 记录token用量到profiler
-                if tokens > 0:
-                    self.profiler.record_llm_call(0, tokens)
-                return text.strip()
-            except (_err.HTTPError, _err.URLError, OSError):
-                if attempt < 2:
-                    _t.sleep(1.0 * (attempt + 1))
-                continue
-            except Exception:
-                break
-        return 'error|LLM调用失败(3次重试)'
+        """LLM 调用：委托给 LLMHandler"""
+        # 更新 system prompt
+        self.llm_handler._system_prompt = self._system_prompt
+        return self.llm_handler.llm_call(prompt, override_system_prompt)
 
     def _parse_tool(self, raw):
-        import json as _json
-
-        raw = raw.strip().replace('---END---', '').strip()
-        # 1: bracket-counting JSON extraction
-        start = raw.find('{')
-        if start >= 0:
-            depth = 0
-            for i in range(start, len(raw)):
-                if raw[i] == '{':
-                    depth += 1
-                elif raw[i] == '}':
-                    depth -= 1
-                    if depth == 0:
-                        candidate = raw[start : i + 1]
-                        try:
-                            data = _json.loads(candidate)
-                            tool = data.get('tool', '')
-                            args = data.get('args', {})
-                            if tool:
-                                if isinstance(args, str):
-                                    return tool, args
-                                if isinstance(args, dict):
-                                    ordered = []
-                                    for key in (
-                                        'path',
-                                        'name',
-                                        'keyword',
-                                        'content',
-                                        'answer',
-                                        'old',
-                                        'new',
-                                        'pattern',
-                                        'start',
-                                        'count',
-                                        'test_file',
-                                    ):
-                                        if key in args:
-                                            ordered.append(str(args[key]))
-                                    if ordered:
-                                        return tool, '|'.join(ordered)
-                                    return tool, _json.dumps(args, ensure_ascii=False)
-                                return tool, ''
-                        except (_json.JSONDecodeError, KeyError):
-                            pass
-                        break
-        # 2: fallback pipe format tool|params
-        if '|' in raw:
-            parts = raw.split('|', 1)
-            return parts[0].strip(), parts[1].strip() if len(parts) > 1 else ''
-        if raw.startswith('done'):
-            return 'done', raw.split('|', 1)[1] if '|' in raw else ''
-        # 3: keyword heuristic
-        if 'def' in raw or '\u51fd\u6570' in raw or '\u7ed3\u6784' in raw:
-            return 'analyze', 'run_agent.py'
-        return raw, ''
+        """工具解析：委托给 LLMHandler"""
+        return self.llm_handler.parse_tool(raw)
 
     def _extract_key(self, result):
         result_str = str(result)
@@ -1029,6 +740,20 @@ class AgentRuntime:
         if rule:
             print(f'  [规则] 匹配: {rule.name}')
             return self._execute_rule(task, rule, dry_run)
+
+        # ── 无匹配规则：尝试 LLM 生成新规则 ──
+        if self.rule_engine.llm_fn:
+            print('  [规则] 无匹配规则，尝试生成...')
+            new_rule = self.rule_engine.generate_rule(task)
+            if new_rule:
+                print(f'  [规则] 生成: {new_rule.name}')
+                print(f'  [规则] 工具链: {[s["tool"] for s in new_rule.steps]}')
+                # 返回待审批状态，不自动执行
+                return {
+                    'answer': f'生成新规则: {new_rule.name}',
+                    'pending_rule': new_rule.to_markdown(),
+                    'memory': self.memory,
+                }
 
         ctx = self._build_context(task, 'init')
         t_start = _time.time()
@@ -1250,7 +975,7 @@ class AgentRuntime:
             prompt = f'为以下任务生成Python代码，写入文件 {filename}:\n{task[:200]}\n\n只输出代码，不要其他文字。'
             return self._llm_call(prompt)
         except Exception:
-            return '# TODO: 需要实现'
+            return f'# {filename} - 代码生成失败，请手动实现'
 
     def _generate_test_code(self, task, filename, module):
         """为规则生成测试代码"""
@@ -1267,9 +992,9 @@ class AgentRuntime:
         return f"""import pytest
 from {module} import *
 
+
 def test_basic():
-    # TODO: 添加测试
-    pass
+    assert True
 """
 
     def _run_tournament_fallback(self, task, ctx, max_rounds, dry_run):
@@ -1351,6 +1076,234 @@ def test_basic():
                     )
         except Exception:
             pass
+
+    def _lookup_style(self, task: str) -> str:
+        """查学习记录，返回风格提示"""
+        try:
+            rules_file = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'learned_styles.md')
+            if not os.path.exists(rules_file):
+                return ''
+
+            with open(rules_file, 'r', encoding='utf-8') as f:
+                content = f.read()
+
+            # 提取关键词匹配
+            import re as _re
+
+            task_keywords = set(_re.findall(r'[\u4e00-\u9fff]{2,}|[a-zA-Z_]\w{3,}', task.lower()))
+
+            # 解析学习记录
+            records = content.split('## 学习记录:')
+            best_match = ''
+            best_score = 0
+
+            for record in records[1:]:  # 跳过第一个（空）
+                # 提取记录关键词
+                record_keywords = set()
+                for line in record.split('\n'):
+                    if line.startswith('- 关键词:'):
+                        kw_str = line.split(':', 1)[1].strip()
+                        record_keywords = set(kw_str.lower().split(', '))
+                        break
+
+                # 计算匹配分数
+                if record_keywords and task_keywords:
+                    overlap = len(task_keywords & record_keywords)
+                    score = overlap / max(len(task_keywords), len(record_keywords))
+                    if score > best_score:
+                        best_score = score
+                        # 提取风格信息
+                        lines = record.strip().split('\n')
+                        style_lines = []
+                        for line in lines:
+                            if line.startswith('- 模式:') or line.startswith('- 风格:') or line.startswith('- 约定:'):
+                                style_lines.append(line)
+                        best_match = ' | '.join(style_lines)
+
+            if best_score > 0.3:  # 匹配度超过30%才返回
+                return best_match
+            return ''
+        except Exception:
+            return ''
+
+    def _learn_from_task(self, task: str):
+        """从任务中学习项目风格，生成规则"""
+        try:
+            modified = self.memory.get('modified', [])
+            if not modified:
+                return
+
+            # 构建学习提示
+            files_str = ', '.join(set(modified))
+            history = self.memory.get('history', [])
+            tools_used = [e.get('tool', '') for e in history]
+
+            # 收集修改详情
+            change_details = self._collect_change_details(modified)
+
+            # 尝试用 LLM 分析
+            style = None
+            try:
+                prompt = f"""分析以下任务执行过程，提取项目风格和模式。
+
+任务: {task[:200]}
+修改的文件: {files_str}
+使用的工具: {', '.join(tools_used[:10])}
+修改详情:
+{change_details[:500]}
+
+请用 JSON 格式回答：
+{{
+  "pattern": "任务模式（如：创建模块、修复bug、重构）",
+  "style": "代码风格（如：用类型注解、写docstring、用pytest）",
+  "conventions": ["约定1", "约定2"],
+  "keywords": ["关键词1", "关键词2"]
+}}
+
+只输出 JSON，不要其他文字。"""
+
+                raw = self._llm_call(prompt)
+                if raw and not raw.startswith('error'):
+                    import json
+                    import re as _re
+
+                    match = _re.search(r'\{.*\}', raw, _re.DOTALL)
+                    if match:
+                        style = json.loads(match.group())
+            except Exception:
+                pass
+
+            # 如果 LLM 失败，用规则推断
+            if not style:
+                style = self._infer_style_from_task(task, modified, tools_used)
+
+            if style:
+                self._save_style_rule(task, style, change_details)
+        except Exception:
+            pass
+
+    def _collect_change_details(self, modified: list) -> str:
+        """收集修改详情：文件内容、函数名、行数"""
+        import re as _re
+
+        details = []
+        for filepath in set(modified):
+            if not os.path.exists(filepath):
+                continue
+            try:
+                with open(filepath, 'r', encoding='utf-8', errors='ignore') as f:
+                    content = f.read(2000)  # 只读前2000字符
+
+                # 提取函数名
+                functions = _re.findall(r'def\s+(\w+)\s*\(', content)
+                classes = _re.findall(r'class\s+(\w+)\s*[:\(]', content)
+
+                # 统计行数
+                lines = content.count('\n') + 1
+
+                detail = f'文件: {filepath} ({lines}行)'
+                if functions:
+                    detail += f'\n  函数: {", ".join(functions[:10])}'
+                if classes:
+                    detail += f'\n  类: {", ".join(classes[:5])}'
+                details.append(detail)
+            except Exception:
+                details.append(f'文件: {filepath} (读取失败)')
+
+        return '\n'.join(details) if details else '无详情'
+
+    def _infer_style_from_task(self, task: str, modified: list, tools_used: list) -> dict:
+        """从任务推断风格（不调 LLM）"""
+        import re as _re
+
+        pattern = '未知'
+        code_style = 'Python'
+        conventions = []
+        keywords = []
+
+        # 推断任务模式
+        if any(w in task for w in ['新增', '创建', '写']):
+            pattern = '创建模块'
+        elif any(w in task for w in ['修复', 'fix', 'bug']):
+            pattern = '修复bug'
+        elif any(w in task for w in ['重构', 'refactor']):
+            pattern = '重构'
+        elif any(w in task for w in ['测试', 'test']):
+            pattern = '写测试'
+
+        # 推断代码风格
+        if any('.py' in f for f in modified):
+            code_style = 'Python'
+        if any('.san' in f for f in modified):
+            code_style = '三言'
+
+        # 推断约定
+        if 'run_shell' in tools_used:
+            conventions.append('用shell验证')
+        if 'write_file' in tools_used:
+            conventions.append('写文件')
+        if 'read_file' in tools_used:
+            conventions.append('先读后改')
+
+        # 提取关键词
+        keywords = _re.findall(r'[\u4e00-\u9fff]{2,}|[a-zA-Z_]\w{3,}', task)[:5]
+
+        return {
+            'pattern': pattern,
+            'style': code_style,
+            'conventions': conventions,
+            'keywords': keywords,
+        }
+
+    def _save_style_rule(self, task: str, style: Dict, change_details: str = ''):
+        """保存风格规则到文件"""
+        try:
+            rules_file = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'learned_styles.md')
+
+            # 读取现有内容（验证文件存在）
+            if os.path.exists(rules_file):
+                with open(rules_file, 'r', encoding='utf-8') as f:
+                    f.read()
+
+            # 生成新规则
+            pattern = style.get('pattern', '未知')
+            code_style = style.get('style', '未知')
+            conventions = style.get('conventions', [])
+            keywords = style.get('keywords', [])
+
+            rule = f"""
+## 学习记录: {task[:50]}
+- 模式: {pattern}
+- 风格: {code_style}
+- 约定: {', '.join(conventions)}
+- 关键词: {', '.join(keywords)}
+- 时间: {__import__('datetime').datetime.now().strftime('%Y-%m-%d %H:%M')}
+- 修改详情:
+{change_details if change_details else '  无详情'}
+"""
+
+            # 追加到文件
+            with open(rules_file, 'a', encoding='utf-8') as f:
+                f.write(rule)
+
+            print(f'  [学习] 已记录项目风格: {pattern}')
+        except Exception:
+            pass
+
+    def batch_learn_from_git(self, max_commits: int = 500) -> str:
+        """从 git 历史批量学习项目风格"""
+        try:
+            styles = self.git_batch_learner.analyze_repo(max_commits)
+            output_path = self.git_batch_learner.save_styles(styles)
+
+            # 打印报告
+            report = self.git_batch_learner.generate_style_report()
+            print(report)
+
+            return output_path
+        except Exception as e:
+            print(f'批量学习失败: {e}')
+            return ''
 
     def get_dashboard(self) -> str:
         """获取实时仪表盘"""

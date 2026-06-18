@@ -84,7 +84,23 @@ python -X utf8 run_agent.py
 
 | Tool | Parameters | Description |
 |------|------------|-------------|
+| `run_shell` | `cmd` | Execute shell command |
 | `done` | `answer` | Task complete, output final answer |
+
+### SQLite Operations
+
+| Tool | Parameters | Description |
+|------|------------|-------------|
+| `sqlite_open` | `path` | Open database connection |
+| `sqlite_close` | `path` | Close connection |
+| `sqlite_exec` | `path\|sql` | Execute SQL |
+| `sqlite_query` | `path\|sql` | Query SQL (returns list) |
+| `sqlite_tables` | `path` | List all tables |
+| `sqlite_schema` | `path\|table` | Get table structure |
+| `sqlite_insert` | `path\|table\|dict` | Insert data |
+| `sqlite_update` | `path\|table\|dict\|where` | Update data |
+| `sqlite_delete` | `path\|table\|where` | Delete data |
+| `sqlite_count` | `path\|table` | Count rows |
 
 ---
 
@@ -101,6 +117,40 @@ python -X utf8 run_agent.py "your question"
 
 # Execute Sanyan code directly
 python -X utf8 run_agent.py "(set x 10)(print(add x 5))"
+```
+
+### Rule Management Commands
+
+```bash
+# List all rules
+python -X utf8 run_agent.py --list-rules
+
+# Approve pending rule
+python -X utf8 run_agent.py --approve-rule
+
+# Reject pending rule
+python -X utf8 run_agent.py --reject-rule
+
+# Export rules to file
+python -X utf8 run_agent.py --export-rules my_rules.tar.gz
+
+# Import rules from file
+python -X utf8 run_agent.py --import-rules my_rules.tar.gz
+```
+
+### Learning Commands
+
+```bash
+# Batch learn project style from git history
+python -X utf8 run_agent.py --learn
+```
+
+### Model Selection Commands
+
+```bash
+# Specify model
+python -X utf8 run_agent.py "task" --model deepseek-v4-pro
+python -X utf8 run_agent.py "task" --model local/qwen2.5-0.5b
 ```
 
 ### Evolution System Commands

@@ -2,6 +2,65 @@
 
 ---
 
+## [v3.41.0] — 2026-06-18 (规则库扩充 + 模板库 + 学习系统 + 多模型 + SQLite + 三言运行时)
+
+### 规则库扩充
+- **200 条规则**（从 72 条扩充）：覆盖创建/修复/重构/测试/文档/添加功能
+- **15 种错误类型**：索引/键/属性/值/文件/权限/编码/递归/内存/超时/...
+- **9 种重构模式**：提取常量/变量/简化条件/消除重复/早返回/循环优化/...
+- **76 种测试场景**：单元/集成/参数化/异常/覆盖率/并行/重试/超时/...
+
+### 模板库扩充
+- **11 个模板**（从 5 个扩充）：数学(3)/数据结构(2)/算法(3)/工具(3)
+- `math/linear_algebra.py` — 矩阵运算、向量运算
+- `math/statistics.py` — 均值/中位数/标准差/线性回归
+- `data_structures/advanced.py` — 图/字典树/并查集/跳表
+- `algorithms/searching.py` — 8 种搜索算法
+- `algorithms/graph.py` — Dijkstra/Bellman-Ford/Floyd-Warshall/Kruskal/Prim/拓扑排序
+- `utils/file_utils.py` — 文件读写/目录操作
+- `utils/datetime_utils.py` — 日期时间处理
+
+### 学习系统增强
+- **git_batch_learner.py**：从 git 历史批量学习项目风格
+- **--learn 标志**：`python -X utf8 run_agent.py --learn`
+- **learned_styles.md**：自动记录项目风格（模式/风格/约定/关键词/修改详情）
+
+### 规则自动生成
+- **LLM 生成规则**：无匹配规则时自动生成新规则
+- **用户审批**：--approve-rule / --reject-rule
+- **--list-rules**：列出所有规则
+
+### 跨项目迁移
+- **project_migrator.py**：规则/模板/学习记录导出导入
+- **--export-rules / --import-rules**：导出到 tar.gz 包
+
+### 多 Agent 协作 + 多模型路由
+- **model_router.py**：任务分类→模型选择（DeepSeek/Claude/GPT-4/本地）
+- **agent_coordinator.py**：任务分解→并行执行→结果汇总
+- **LocalProvider**：HuggingFace 本地模型（Qwen2.5-0.5B/GPT-2）
+
+### 文件拆分
+- **agent_core.py**：SymbolTable, MemoryStore, ProjectGraph（175 行）
+- **agent_llm_handler.py**：LLM 调用和工具解析（234 行）
+- **agent_execution.py**：规则执行和代码生成（200 行）
+- **agent_learning_handler.py**：学习和经验管理（279 行）
+- **agent_runtime.py**：从 1659 行降到 1326 行（-20%）
+
+### SQLite 内置操作
+- **ops/sqlite_ops.py**：10 个操作 + 中文别名
+- 支持：打开/关闭/执行/查询/表列表/表结构/插入/更新/删除/计数
+
+### 三言版 Agent 运行时
+- **agent_system/sanyan/agent_runtime.san**：270 行
+- 核心决策循环 + SQLite 学习记录 + 规则匹配 + LLM 兜底
+
+### Bug 修复
+- **C VM NOT 操作**：`非 0` 返回 1 应为 0（csrc/runtime.c）
+- **test_coverage_boost8.py**：修复 28 个测试（API 变更）
+- **ruff 格式修复**：4 个 csrc 文件
+
+---
+
 ## [v3.40.0] — 2026-06-18 (Agent 架构重构 + 规则引擎 + 领域知识层)
 
 ### 核心改进：规则引擎

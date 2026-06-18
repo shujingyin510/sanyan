@@ -31,43 +31,34 @@ python -X utf8 run_agent.py "把AGENTS.md里v0.3改成v0.4" --dry-run
 ```
 用户任务
   │
-  ├─ _force_tool()        智能首轮：检测"函数"→直接 analyze，省一次 LLM
-  ├─ SemanticCache        P5: 语义缓存，重复任务零成本
+  ├─ 规则引擎        200+ 规则匹配，0 LLM 调用
+  ├─ 模板管理器      11 个模板库，代码生成
+  ├─ 领域知识层      LLM 动态生成领域知识
   │
   ▼
-  DecompositionEngine    Phase 0: 任务分解 → 递归拆解 → 每层摘要
-  │  ├─ ComplexityClassifier  复杂度分级（simple/medium/complex）
-  │  ├─ BoundedContext        有界上下文（硬限 4000 token）
-  │  └─ ToolDependencyGraph   P1: 工具链合法性校验
+  DecompositionEngine    Phase 0: 任务分解
+  │  ├─ ComplexityClassifier  复杂度分级
+  │  ├─ BoundedContext        有界上下文
+  │  └─ ASTParser             精准上下文加载
   │
   ▼
-  HypothesisGenerator    Phase 1: 多假设生成
-  │  ├─ LLM 生成 5 个候选方案
-  │  ├─ P1 依赖图过滤    工具顺序合法性
-  │  ├─ P9 能力匹配过滤  任务需求 vs 工具能力
-  │  └─ P8 多样性去重    关键词聚类，避免 5≈1
+  DomainKnowledgeLayer   领域知识
+  │  ├─ LLM 动态生成    组件/验证/终止条件
+  │  ├─ SQLite 缓存     同类任务只问一次
+  │  └─ 反模式约束      防止过度工程
   │
   ▼
-  Tournament             Phase 1: 锦标赛
-  │  ├─ P2 并行早停      每假设执行 2 步，低置信度淘汰
-  │  ├─ 经典淘汰         置信度差距 / 步骤差距 / LLM 兜底
-  │  ├─ P3 失败分类      6 类 FailureMode + 重试策略
-  │  └─ P4 自适应阈值    50 轮后从历史自动调参
+  RuleEngine / LLM       执行
+  │  ├─ 规则匹配        200+ 规则，0 成本
+  │  ├─ 模板生成        11 个模板库
+  │  ├─ LLM 兜底        DeepSeek V4 Pro
+  │  └─ UR 退化检测     防止死循环
   │
   ▼
-  Execute 最优假设 ──→ TernaryEngine.step()
-  │                    ├─ classify()   分类：AFFIRM/NEGATE/UNCERT
-  │                    ├─ map_trit()   映射：1/0/-1
-  │                    ├─ propagate()  Kleene 传播
-  │                    ├─ confidence() 贝叶斯置信度衰减
-  │                    └─ protect()    门控：高风险+不确定=拦截
-  │
-  ▼
-  ResourceManager        Phase 2: 资源统一管控
-  │  ├─ tool_reliability()    工具可靠性（时间衰减）
-  │  ├─ P7 MetricsCollector   全链路可观测指标
-  │  ├─ P10 CostPredictor     成本预测（历史数据）
-  │  └─ P11 ReplayEngine      执行回放 + diff 对比
+  LearningHandler        学习
+  │  ├─ SQLite 记录     执行历史
+  │  ├─ 风格提取        项目风格
+  │  └─ Git 批量学习    历史分析
   │
   ▼
   反思 ──→ 继续 / 修正 / 完成
@@ -75,18 +66,77 @@ python -X utf8 run_agent.py "把AGENTS.md里v0.3改成v0.4" --dry-run
 
 ### 文件分层
 
-| 文件 | 职责 | 补丁 |
-|------|------|------|
-| `ternary_engine.py` | 三态决策引擎（Kleene + 贝叶斯 + 门控） | — |
-| `agent_tool_graph.py` | 工具依赖图 + 能力注册表 + 任务能力提取 | P1+P9 |
-| `agent_decompose.py` | 任务分解引擎 + 有界上下文 + 复杂度分类器 | Phase 0 |
-| `agent_hypothesis.py` | 多假设 + 多样性控制 + 锦标赛 + 失败分类 + 自适应阈值 | P2+P3+P4+P8 |
-| `agent_resource.py` | 资源统一管控 + 语义缓存 + 可观测 + 成本预测 + 回放 | P5+P7+P10+P11 |
-| `agent_runtime.py` | V5 运行时（三阶段全集成） | — |
-| `agent_tools.py` | 工具层（12 个工具，纯函数，0 外部依赖） | — |
-| `agent_policy.san` | 策略配置（模型 / 阈值 / 场景规则，热重载） | — |
-| `decision.san` | 旧引擎决策核心（待迁移） | — |
-| `run_agent.py` | 启动器（CLI 参数 + 双引擎切换） | — |
+| 文件 | 职责 |
+|------|------|
+| `agent_runtime.py` | 主运行时（流程控制 + 协调） |
+| `agent_core.py` | 基础类（SymbolTable, MemoryStore, ProjectGraph） |
+| `agent_llm_handler.py` | LLM 调用和工具解析 |
+| `agent_execution.py` | 规则执行和代码生成 |
+| `agent_learning_handler.py` | 学习和经验管理 |
+| `agent_domain.py` | 领域知识层（LLM 动态生成） |
+| `agent_rules.py` | 规则引擎（200+ 规则） |
+| `template_manager.py` | 模板管理器（11 个模板） |
+| `ast_parser.py` | AST 解析器（精准上下文） |
+| `ur_monitor.py` | UR 退化检测 |
+| `model_router.py` | 多模型路由器 |
+| `agent_coordinator.py` | 多 Agent 协作 |
+| `project_migrator.py` | 跨项目迁移 |
+| `git_batch_learner.py` | Git 批量学习 |
+| `agent_llm.py` | LLM Provider（含本地模型） |
+| `ternary_engine.py` | 三态决策引擎 |
+| `decision.san` | 旧引擎决策核心（已迁移到 Python） |
+| `agent_runtime.san` | 三言版 Agent 运行时 |
+
+### 目录结构
+
+```
+agent_system/
+├── 核心运行时
+│   ├── agent_runtime.py          # 主运行时
+│   ├── agent_core.py             # 基础类
+│   ├── agent_llm_handler.py      # LLM 调用
+│   ├── agent_execution.py        # 规则执行
+│   └── agent_learning_handler.py # 学习管理
+│
+├── 智能层
+│   ├── agent_domain.py           # 领域知识
+│   ├── agent_rules.py            # 规则引擎
+│   ├── template_manager.py       # 模板管理
+│   ├── ast_parser.py             # AST 解析
+│   ├── ur_monitor.py             # UR 退化检测
+│   └── model_router.py           # 多模型路由
+│
+├── 协作与迁移
+│   ├── agent_coordinator.py      # 多 Agent 协作
+│   ├── project_migrator.py       # 跨项目迁移
+│   └── git_batch_learner.py      # Git 批量学习
+│
+├── 模板库
+│   └── templates/
+│       ├── math/                 # 数学函数
+│       ├── data_structures/      # 数据结构
+│       ├── algorithms/           # 算法
+│       ├── utils/                # 工具函数
+│       └── test_generator.py     # 测试生成器
+│
+├── 三言实现
+│   └── sanyan/
+│       ├── agent_runtime.san     # 三言版运行时
+│       ├── agent.san             # Agent 主逻辑
+│       ├── decision.san          # 决策核心
+│       └── llm_iface.san         # LLM 接口
+│
+├── 数据库
+│   ├── domain_knowledge.db       # 领域知识缓存
+│   ├── git_task_knowledge.db     # Git 任务知识
+│   └── *.db                      # 其他 SQLite 数据库
+│
+└── 文档
+    ├── README.md                 # 中文文档
+    ├── README_EN.md              # 英文文档
+    ├── agent_operations.md       # 操作手册（中文）
+    └── agent_operations_en.md    # 操作手册（英文）
+```
 
 ### 测试覆盖
 
@@ -140,7 +190,7 @@ v5.0: 三阶段重构
 
 ```bash
 python -X utf8 run_agent.py "任务"              # 单次提问（V3 引擎）
-python -X utf8 run_agent.py                      # 交互模式（旧引擎）
+python -X utf8 run_agent.py                      # 交互模式（V5 引擎）
 python -X utf8 run_agent.py "任务" --auto        # 自主模式：跑完才停
 python -X utf8 run_agent.py "任务" --dry-run     # 只读不改：写操作返回预览
 python -X utf8 run_agent.py "任务" --report      # 完成后输出任务报告

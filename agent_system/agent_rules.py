@@ -14,7 +14,7 @@
 
 import os
 import re
-from typing import Dict, List, Optional
+from typing import Callable, Dict, List, Optional
 
 
 RULES_FILE = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'agent_rules.md')
@@ -36,13 +36,24 @@ class AgentRule:
         except re.error:
             return self.pattern.lower() in task.lower()
 
+    def to_markdown(self) -> str:
+        """转为 markdown 格式"""
+        steps = '\n'.join(f'{i + 1}. {s["tool"]}({s["args_desc"]}) — {s["desc"]}' for i, s in enumerate(self.steps))
+        return f"""## 规则：{self.name}
+匹配：{self.pattern}
+工具链：
+{steps}
+验证：{self.validation}"""
+
 
 class RuleEngine:
     """规则引擎：读取规则 → 匹配 → 执行"""
 
-    def __init__(self, rules_file: Optional[str] = None):
+    def __init__(self, rules_file: Optional[str] = None, llm_fn: Optional[Callable] = None):
         self.rules_file = rules_file or RULES_FILE
         self.rules: List[AgentRule] = []
+        self.llm_fn = llm_fn
+        self._pending_rule: Optional[AgentRule] = None
         self._load_rules()
 
     def _load_rules(self):
@@ -96,6 +107,114 @@ class RuleEngine:
             if rule.match(task):
                 return rule
         return None
+
+    def generate_rule(self, task: str, context: str = '') -> Optional[AgentRule]:
+        """用 LLM 生成新规则"""
+        if not self.llm_fn:
+            return None
+
+        # 构建提示
+        prompt = f"""为以下任务生成一个 Agent 工具链规则。
+
+任务: {task[:300]}
+上下文: {context[:200]}
+
+可用工具:
+- analyze(path) — 分析文件结构
+- read_file(path,start,count) — 读文件
+- search_code(keyword) — 搜索代码
+- replace_in_file(path,old,new) — 单次替换
+- write_file(path,content) — 写入文件
+- list_files(pattern) — 列出文件
+- run_test(test_file) — 运行测试
+- run_shell(cmd) — 执行shell命令
+- done(answer) — 任务完成
+
+请用 JSON 格式回答:
+{{
+  "name": "规则名称",
+  "pattern": "匹配正则表达式",
+  "steps": [
+    {{"tool": "工具名", "args_desc": "参数描述", "desc": "步骤描述"}}
+  ],
+  "validation": "验证命令"
+}}
+
+要求:
+1. pattern 必须是有效的正则表达式
+2. steps 按执行顺序排列
+3. validation 必须是可在终端执行的命令
+4. 只输出 JSON，不要其他文字"""
+
+        try:
+            raw = self.llm_fn(prompt)
+            # 提取 JSON
+            match = re.search(r'\{.*\}', raw, re.DOTALL)
+            if match:
+                import json
+
+                data = json.loads(match.group())
+
+                # 构建规则
+                name = data.get('name', '未命名规则')
+                pattern = data.get('pattern', '')
+                steps = data.get('steps', [])
+                validation = data.get('validation', 'echo done')
+
+                # 验证格式
+                if not pattern or not steps:
+                    return None
+
+                # 尝试编译正则
+                try:
+                    re.compile(pattern)
+                except re.error:
+                    return None
+
+                rule = AgentRule(name, pattern, steps, validation)
+                self._pending_rule = rule
+                return rule
+        except Exception:
+            pass
+
+        return None
+
+    def approve_rule(self) -> bool:
+        """审批通过，保存规则到文件"""
+        if not self._pending_rule:
+            return False
+
+        rule = self._pending_rule
+
+        # 读取现有内容
+        with open(self.rules_file, 'r', encoding='utf-8') as f:
+            content = f.read()
+
+        # 追加新规则
+        rule_md = rule.to_markdown()
+        content = content.rstrip() + '\n\n' + rule_md + '\n'
+
+        # 写入文件
+        with open(self.rules_file, 'w', encoding='utf-8') as f:
+            f.write(content)
+
+        # 添加到内存
+        self.rules.append(rule)
+        self._pending_rule = None
+
+        return True
+
+    def reject_rule(self) -> bool:
+        """拒绝规则"""
+        if not self._pending_rule:
+            return False
+
+        self._pending_rule = None
+        return True
+
+    def get_pending_rule(self) -> Optional[AgentRule]:
+        """获取待审批的规则"""
+        return self._pending_rule
 
     def get_rules_summary(self) -> str:
         """获取规则摘要"""

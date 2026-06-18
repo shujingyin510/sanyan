@@ -2,7 +2,7 @@
 
 支持模型厂商：
 - OpenAI (gpt-5, gpt-5-mini, gpt-5-nano)
-- DeepSeek (deepseek-chat, deepseek-reasoner)
+- DeepSeek (deepseek-v4-pro, deepseek-v4-flash)
 - Anthropic Claude (claude-sonnet-4, claude-opus-4) — 需单独适配
 - Google Gemini (gemini-2.5-pro, gemini-2.5-flash)
 - 阿里 Qwen (qwen-max, qwen-plus, qwen-turbo)
@@ -391,6 +391,147 @@ class OpenRouterProvider(LLMProvider):
     ) -> Dict[str, Any]:
         # OpenRouter 使用 OpenAI 兼容格式
         return OpenAIProvider.chat(self, messages, temperature, max_tokens, **kwargs)
+
+
+# ── 本地模型 ──
+
+
+class LocalProvider(LLMProvider):
+    """本地模型提供者（HuggingFace transformers）
+
+    支持模型：
+    - Qwen/Qwen2.5-0.5B (954 MB)
+    - openai-community/gpt2 (526 MB)
+    - openai-community/gpt2-medium (1.5 GB)
+    - openai-community/gpt2-large (3.1 GB)
+
+    用法：
+        provider = LocalProvider.create('qwen2.5-0.5b')
+        response = provider.chat([{'role': 'user', 'content': '你好'}])
+    """
+
+    # 模型别名映射
+    MODEL_ALIASES = {
+        'qwen2.5-0.5b': 'Qwen/Qwen2.5-0.5B',
+        'qwen': 'Qwen/Qwen2.5-0.5B',
+        'gpt2': 'openai-community/gpt2',
+        'gpt2-medium': 'openai-community/gpt2-medium',
+        'gpt2-large': 'openai-community/gpt2-large',
+    }
+
+    def __init__(self, model_name: str = 'Qwen/Qwen2.5-0.5B', **kwargs):
+        super().__init__(api_key='local', model=model_name)
+        self._model = None
+        self._tokenizer = None
+
+    def _load_model(self):
+        """懒加载模型（从本地缓存）"""
+        if self._model is not None:
+            return
+
+        try:
+            from transformers import AutoModelForCausalLM, AutoTokenizer
+            import torch
+
+            # 尝试从本地缓存加载
+            local_path = self._get_local_path()
+
+            print(f'[本地模型] 加载 {self.model}...')
+            self._tokenizer = AutoTokenizer.from_pretrained(
+                local_path,
+                local_files_only=True,  # 只用本地文件
+            )
+            self._model = AutoModelForCausalLM.from_pretrained(
+                local_path,
+                torch_dtype=torch.float32,
+                device_map='cpu',
+                local_files_only=True,
+            )
+            print('[本地模型] 加载完成')
+        except Exception as e:
+            raise RuntimeError(f'加载本地模型失败: {e}')
+
+    def _get_local_path(self) -> str:
+        """获取本地缓存路径"""
+        import os
+
+        # HuggingFace 缓存目录
+        cache_dir = os.path.expanduser('~/.cache/huggingface/hub')
+
+        # 模型目录名
+        model_name = self.model.replace('/', '--')
+        model_dir = os.path.join(cache_dir, f'models--{model_name}')
+
+        if os.path.exists(model_dir):
+            # 找 snapshots 目录下的最新版本
+            snapshots_dir = os.path.join(model_dir, 'snapshots')
+            if os.path.exists(snapshots_dir):
+                snapshots = os.listdir(snapshots_dir)
+                if snapshots:
+                    return os.path.join(snapshots_dir, snapshots[0])
+
+        # 如果找不到缓存，返回原始名称
+        return self.model
+
+    def chat(
+        self, messages: List[Dict[str, str]], temperature: float = 0.7, max_tokens: int = 512, **kwargs
+    ) -> Dict[str, Any]:
+        """发送聊天请求"""
+        self._load_model()
+
+        import torch
+
+        # 构建 prompt
+        prompt = self._messages_to_prompt(messages)
+
+        # 编码
+        inputs = self._tokenizer(prompt, return_tensors='pt')
+
+        # 生成
+        with torch.no_grad():
+            outputs = self._model.generate(
+                **inputs,
+                max_new_tokens=max_tokens,
+                temperature=temperature if temperature > 0 else None,
+                do_sample=temperature > 0,
+                top_p=0.9 if temperature > 0 else None,
+                pad_token_id=self._tokenizer.eos_token_id,
+            )
+
+        # 解码
+        generated = outputs[0][inputs['input_ids'].shape[1] :]
+        text = self._tokenizer.decode(generated, skip_special_tokens=True)
+
+        return {
+            'content': text.strip(),
+            'model': self.model,
+            'usage': {
+                'input_tokens': inputs['input_ids'].shape[1],
+                'output_tokens': len(generated),
+            },
+        }
+
+    def _messages_to_prompt(self, messages: List[Dict[str, str]]) -> str:
+        """将消息列表转为 prompt"""
+        parts = []
+        for msg in messages:
+            role = msg.get('role', 'user')
+            content = msg.get('content', '')
+            if role == 'system':
+                parts.append(f'System: {content}')
+            elif role == 'user':
+                parts.append(f'User: {content}')
+            elif role == 'assistant':
+                parts.append(f'Assistant: {content}')
+        parts.append('Assistant:')
+        return '\n'.join(parts)
+
+    @classmethod
+    def create(cls, model: str, **kwargs) -> 'LocalProvider':
+        """创建本地模型实例"""
+        # 解析别名
+        model_name = cls.MODEL_ALIASES.get(model.lower(), model)
+        return cls(model_name=model_name, **kwargs)
 
 
 # ── 配置管理 ──

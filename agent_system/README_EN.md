@@ -115,7 +115,7 @@ User Task
 
 ```bash
 python -X utf8 run_agent.py "task"              # Single-shot (V3 engine)
-python -X utf8 run_agent.py                      # Interactive (legacy)
+python -X utf8 run_agent.py                      # Interactive (V5 engine)
 python -X utf8 run_agent.py "task" --auto        # Autonomous
 python -X utf8 run_agent.py "task" --dry-run     # Read-only preview
 python -X utf8 run_agent.py "task" --report      # Task report
