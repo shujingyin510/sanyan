@@ -1,42 +1,31 @@
 > ⚠️ Archived — see [README.md](../README.md) for current version.
 
-# Tri-State Cognitive Framework Sanyan v3.29.0
+# Tri-State Cognitive Framework Sanyan v3.39.0
 
 [![VS Code Extension](https://img.shields.io/badge/VS%20Code-Syntax%20Highlight-%23007ACC?logo=visualstudiocode)](sanyan-vscode/README.md)
 [![CI](https://github.com/shujingyin510/sanyan/actions/workflows/test.yml/badge.svg)](https://github.com/shujingyin510/sanyan/actions)
+[![PyPI](https://img.shields.io/pypi/v/ternary-engine?label=ternary-engine)](https://pypi.org/project/ternary-engine/)
 
-> **One person. Six weeks. A compiler, a VM, a cognitive runtime, and an agent framework — built from scratch.** A cognitive computing framework for uncertainty-oriented decision making. The real world isn't binary — sensors glitch, users hesitate, code breaks. The Sanyan framework uses Kleene logic × Bayesian confidence × safety gating to let programs naturally express, propagate, and accumulate "not sure yet" — deferring decision until evidence is sufficient.
+> **Tri-State Cognitive Framework** — The evolution from ternary language to Knowledge Runtime. Core contribution: a verifiable self-improving Agent knowledge system proving the causal chain Knowledge → Calibration → Selection → Success.
 
-[中文版](README.md)
-
----
-
-## Origin
-
-In 1958, Moscow State University built a ternary computer called **Setun**. Each bit wasn't 0 or 1, but **positive, zero, or negative**. It ran reliably for thirty years at one-third the power consumption of binary computers of the same era. Then it was discontinued — not because the technology didn't work, but because Soviet industrial standards had fully shifted to binary.
-
-In 2024, while building a smart home system on STM32, I noticed every sensor was feeding me three states: person detected, no person, signal unstable. But my code could only handle `if` and `else`. "Signal unstable" was forced into 0 or 1, and I added thresholds, state machines, and comments to patch the missing information.
-
-**What if a programming language natively supported a third state?**
-
-That's how Sanyan was born. From May 2026 to now — six weeks, one person — a full compiler, VM, cognitive runtime, and agent framework. What once required a team months now took one person weeks. AI helped write a lot of code, but the direction, the architecture, the judgment calls — the things AI can't figure out on its own — those were human.
+[中文版](README_archive.md) | [Operations Manual](../agent_system/agent_operations_en.md)
 
 ---
 
-## What is Sanyan?
+## v3.39 Update Summary
 
-Sanyan = **Ternary Language (DSL)** + **Ternary Engine (TernaryEngine)** + **Ternary Applications (Agent / IoT / Village)**.
-The language is the interface — the core is the Kleene three-value logic propagation + Bayesian confidence decay + protection gating decision engine.
+- **UR≈0.30 Degeneration Threshold**: A single unique_ratio threshold reliably distinguishes degenerate from coherent generation across 4 models, 3 architectures, and 3 orders of magnitude in parameter count
+  - TinyStories 3.6M (GPT-Neo): True positive rate 98%
+  - TinyStories 28M (GPT-Neo): True positive rate 100%
+  - GPT-2 124M: True positive rate 99.3%
+  - Qwen2.5 0.5B/3B: True positive rate 98-100%
+  - Human baseline (WikiText-2, n=60): avg UR=0.849, <0.30 only 0.2%
+- **Agent Safety Benchmark**: 49 bug injections, 5-layer detection pipeline, 100% detection rate
+- **Agent Honesty Benchmark**: 100 questions × 5 types, cognitive overreach rate -16.7%
+- **LLM Provider Abstraction**: Supports 9 model providers (DeepSeek/OpenAI/Anthropic/Gemini/Qwen/GLM/Moonshot/SiliconFlow/OpenRouter)
+- **Agent System Reorganization**: All agent_*.py files moved to agent_system/ folder
 
----
-
-## What's New in v3.37
-
-- **Agent Autonomous Loop**: `agent_system/auto_verify.py` — commit triggers full test suite → auto-commit on pass / auto-rollback on fail. Three paths tested and verified.
-- **Deep LLM Integration**: Upgraded to `deepseek-v4-pro` with explicit thinking control (`budget_tokens: 2048`). JSON tool call format. Cross-task experience library for learning from failures.
-- **Cognitive Runtime**: Toggle detection, same-error-twice escalation, structured retry history — the Agent knows when it's going in circles.
-- **Bootstrap Level 2–4**: Self-compiling compiler (fixpoint verified) → 318-line C seed VM → 617-line x86_64 NASM assembly VM. Zero external dependencies.
-- **Full CI Green**: 1650+ tests, one-command preflight, multi-backend consistency verification.
+See [CHANGELOG](../CHANGELOG.md)
 
 ---
 

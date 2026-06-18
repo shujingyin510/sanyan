@@ -1,25 +1,31 @@
 > ⚠️ Archived — see [README.md](../README.md) for current version.
 
-# 三态认知框架 Sanyan v3.29.0
+# 三态认知框架 Sanyan v3.39.0
 
 [![VS Code Extension](https://img.shields.io/badge/VS%20Code-%E8%AF%AD%E6%B3%95%E9%AB%98%E4%BA%AE-%23007ACC?logo=visualstudiocode)](sanyan-vscode/README.md)
 [![CI](https://github.com/shujingyin510/sanyan/actions/workflows/test.yml/badge.svg)](https://github.com/shujingyin510/sanyan/actions)
+[![PyPI](https://img.shields.io/pypi/v/ternary-engine?label=ternary-engine)](https://pypi.org/project/ternary-engine/)
 
 > **三态认知框架** — 从三进制语言到 Knowledge Runtime 的演进。核心贡献：构建了一个可验证的自改进 Agent 知识系统，证明了 Knowledge → Calibration → Selection → Success 的因果链。
 
-[English](README_EN.md)
+[English](README_EN_archive.md)
 
 ---
 
-## v3.37 更新摘要
+## v3.39 更新摘要
 
-- **统一 CLI**：`sanyan` 命令入口，替换散落式 `--flag`（agent run/chat/evolve/dashboard/bench）
-- **Agent 安全基准**：49 种 bug 注入，五层检测管道，检出率 98%，逻辑类 100%
-- **Agent 诚实度基准**：100 题 × 5 类，三维评分（正确率+校准ECE+认知越界），Truth Calibration 越界率 -15.2%
-- **五层检测下放规则层**：语义 diff + 逻辑审计 + Truth Calibration 接入 Agent 运行时
-- **全量 CI 绿**：1650+ 测试，mypy 零错误，ruff 零错误，preflight 一键检查
+- **UR≈0.30 退化检测阈值**：单一 unique_ratio 阈值在 4 个模型、3 种架构、3 个数量级参数跨度上可靠区分退化与连贯生成
+  - TinyStories 3.6M (GPT-Neo): 真阳性 98%
+  - TinyStories 28M (GPT-Neo): 真阳性 100%
+  - GPT-2 124M: 真阳性 99.3%
+  - Qwen2.5 0.5B/3B: 真阳性 98-100%
+  - 人类基线 (WikiText-2, n=60): avg UR=0.849, <0.30仅0.2%
+- **Agent 安全基准**：49 种 bug 注入，五层检测管道，检出率 100%
+- **Agent 诚实度基准**：100 题 × 5 类，认知越界率 -16.7%
+- **LLM Provider 抽象层**：支持 9 个模型厂商（DeepSeek/OpenAI/Anthropic/Gemini/Qwen/GLM/Moonshot/SiliconFlow/OpenRouter）
+- **Agent 系统整合**：所有 agent_*.py 文件移动到 agent_system/ 文件夹
 
-详见 [CHANGELOG](CHANGELOG.md)
+详见 [CHANGELOG](../CHANGELOG.md)
 
 ---
 
