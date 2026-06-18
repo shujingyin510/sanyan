@@ -56,6 +56,7 @@ Human blind evaluation across 100 prompts: **ternary gating preferred 79.7% vs. 
 | Text Type | Avg UR | UR < 0.30 |
 |-----------|--------|-----------|
 | Human (literature) | **0.704** | **0.0%** |
+| Human (WikiText-2, n=60) | **0.849** | **0.2%** |
 | Degenerative (GPT-2) | **0.101** | **99.7%** |
 
 **Decoding strategy comparison** on GPT-2 124M:
