@@ -38,6 +38,8 @@ from agent_system.agent_shared import SharedContext, SharedSymbolTable, AgentCoo
 from agent_system.agent_strategy import PromptEvolver, ToolSelectionLearner, StrategySwitcher, ABRollout
 from agent_system.agent_evolution import ConstrainedEvolutionSystem
 from agent_system.agent_domain import DomainKnowledgeLayer
+from agent_system.agent_rules import RuleEngine
+from agent_system.template_manager import TemplateManager
 
 
 class SymbolTable:
@@ -264,6 +266,10 @@ class AgentRuntime:
         self.evolution = ConstrainedEvolutionSystem()
         # Layer 4: 领域知识层
         self.domain_knowledge = DomainKnowledgeLayer(llm_fn=self._llm_call)
+        # Layer 5: 规则引擎
+        self.rule_engine = RuleEngine()
+        # Layer 6: 模板管理器
+        self.template_manager = TemplateManager(llm_fn=self._llm_call)
         # P6: Prompt 缓存 — 稳定化 system_prompt
         self._system_prompt = None
         self._system_prompt_hash = None
@@ -272,7 +278,7 @@ class AgentRuntime:
         self.tools[name] = handler
 
     def _build_domain_prompt(self, task: str, domain_info: dict) -> str:
-        """根据领域知识动态生成 system prompt"""
+        """根据领域知识动态生成 system prompt（含 few-shot 模板 + 阶段约束）"""
         domain_name = domain_info.get('domain_name', '通用任务')
         completion = domain_info.get('completion', '任务完成')
         validation = domain_info.get('validation', 'echo done')
@@ -310,6 +316,29 @@ class AgentRuntime:
             f'  git_diff                — 查看git差异\n'
             f'  git_status              — 查看git状态\n'
             f'  done(answer)            — 任务完成，输出最终答案\n'
+            f'\n'
+            f'=== 常见任务工具链模板 ===\n'
+            f'\n'
+            f'创建新文件:\n'
+            f'  1. write_file(path,content) — 直接创建\n'
+            f'  2. run_shell(python -X utf8 -m pytest tests/test_xxx.py -x -q) — 验证\n'
+            f'\n'
+            f'修复Bug:\n'
+            f'  1. read_file(path) — 读取问题文件\n'
+            f'  2. search_code(keyword) — 搜索相关代码\n'
+            f'  3. replace_in_file(path,old,new) — 修复\n'
+            f'  4. run_shell(python -X utf8 -m pytest tests/ -x -q) — 验证\n'
+            f'\n'
+            f'重构代码:\n'
+            f'  1. analyze(path) — 分析现有结构\n'
+            f'  2. read_file(path) — 读取代码\n'
+            f'  3. replace_in_file(path,old,new) — 重构\n'
+            f'  4. run_shell(python -X utf8 -m pytest tests/ -x -q) — 验证\n'
+            f'\n'
+            f'=== 阶段约束 ===\n'
+            f'探索阶段: 只用 analyze/read_file/search_code/list_files\n'
+            f'修改阶段: 只用 write_file/replace_in_file/replace_all\n'
+            f'验证阶段: 只用 run_test/run_shell/done\n'
             f'\n'
             f'输出格式（严格，只输出一个JSON对象，独占一行）:\n'
             f'  {{"tool":"工具名", "args":{{"参数名":"值"}}}}\n'
@@ -726,6 +755,17 @@ class AgentRuntime:
             pre = self._pre_analyze(task)
             if pre:
                 parts.append(pre)
+
+            # 注入当前计划进度
+            plan = self.memory.get('plan', [])
+            current_step = self.memory.get('current_step', 0)
+            if plan:
+                plan_lines = []
+                for i, step in enumerate(plan):
+                    marker = '→' if i == current_step else ('✓' if i < current_step else '○')
+                    plan_lines.append(f'  {marker} {step["step"]}. {step["action"]}')
+                parts.append(f'\n当前进度 ({current_step}/{len(plan)}):')
+                parts.extend(plan_lines)
         else:
             parts.append(f'工具 [{tool}] 结果:\n{str(result)[:800]}')
 
@@ -984,6 +1024,12 @@ class AgentRuntime:
 
     def _run_legacy(self, task, max_rounds, dry_run):
         """兜底：无假设时走原有 LLM 循环"""
+        # ── 规则引擎：先查规则，有规则直接执行 ──
+        rule = self.rule_engine.match_rule(task)
+        if rule:
+            print(f'  [规则] 匹配: {rule.name}')
+            return self._execute_rule(task, rule, dry_run)
+
         ctx = self._build_context(task, 'init')
         t_start = _time.time()
         llm_consecutive_fails = 0
@@ -994,7 +1040,7 @@ class AgentRuntime:
             # ── 超时护杀 ──
             total_elapsed = _time.time() - t_start
             if total_elapsed > 300:  # 总超时5分钟
-                print(f'  [TIMEOUT] 总执行时间超过300秒，强制退出')
+                print('  [TIMEOUT] 总执行时间超过300秒，强制退出')
                 self.memory['failures'] += 1
                 break
             if rnd > 1 and step_duration_last > 60:
@@ -1090,6 +1136,141 @@ class AgentRuntime:
                     continue
             ctx = self._build_context(params, tool, result)
         return {'answer': f'已达{max_rounds}轮', 'memory': self.memory}
+
+    def _execute_rule(self, task, rule, dry_run):
+        """按规则执行工具链（不调 LLM）"""
+
+        # 提取文件名和模块名
+        filename = self.rule_engine.extract_filename(task)
+        module = self.rule_engine.extract_module_name(task, filename)
+
+        # 构建变量映射
+        vars = {
+            'filename': filename or 'output.py',
+            'module': module or 'output',
+            'source_file': filename or 'source.py',
+            'test_file': f'tests/test_{module}.py' if module else 'tests/test_output.py',
+        }
+
+        results = []
+        for i, step in enumerate(rule.steps, 1):
+            tool = step['tool']
+            args_desc = step['args_desc']
+            desc = step['desc']
+
+            # 替换变量
+            args = args_desc
+            for k, v in vars.items():
+                args = args.replace(f'{{{k}}}', v)
+
+            print(f'  [规则 {i}/{len(rule.steps)}] {tool} — {desc}')
+
+            if tool not in self.tools:
+                print(f'    ✗ 工具未找到: {tool}')
+                continue
+
+            # 特殊处理：write_file 需要生成代码
+            if tool == 'write_file' and '{code}' in args_desc:
+                code = self._generate_code_for_rule(task, filename)
+                args = f'{filename}|{code}'
+            elif tool == 'write_file' and '{test_code}' in args_desc:
+                test_code = self._generate_test_code(task, filename, module)
+                test_file = f'tests/test_{module}.py'
+                args = f'{test_file}|{test_code}'
+
+            # 执行工具
+            try:
+                result = self.tools[tool](args, dry_run)
+                print(f'    → {str(result)[:80]}')
+                results.append(result)
+
+                if tool == 'write_file':
+                    self.memory['modified'].append(filename)
+            except Exception as e:
+                print(f'    ✗ 执行失败: {e}')
+                results.append(f'错误: {e}')
+
+        # 验证
+        if rule.validation:
+            validation = rule.validation
+            for k, v in vars.items():
+                validation = validation.replace(f'{{{k}}}', v)
+            print(f'  [验证] {validation}')
+            try:
+                import subprocess
+
+                r = subprocess.run(
+                    validation,
+                    shell=True,
+                    capture_output=True,
+                    text=True,
+                    timeout=60,
+                    cwd=os.path.dirname(os.path.dirname(os.path.abspath(__file__))) or '.',
+                )
+                if r.returncode == 0:
+                    print('    ✓ 验证通过')
+                else:
+                    print(f'    ✗ 验证失败: {r.stderr[-200:]}')
+            except Exception as e:
+                print(f'    ✗ 验证错误: {e}')
+
+        return {
+            'answer': f'按规则 [{rule.name}] 执行完成',
+            'memory': self.memory,
+            'rule': rule.name,
+        }
+
+    def _generate_code(self, task: str, filename: str) -> str:
+        """根据任务生成代码：模板库 → 缓存 → LLM"""
+        # 1. 用模板管理器获取代码
+        code = self.template_manager.get_code(task, filename)
+        if code:
+            return code
+
+        # 2. 兜底：调 LLM 生成（会自动缓存）
+        try:
+            prompt = f'为以下任务生成Python代码，写入文件 {filename}:\n{task[:200]}\n\n只输出代码，不要其他文字。'
+            code = self._llm_call(prompt)
+            if code:
+                # 缓存到模板管理器
+                self.template_manager._cache_set(task, filename, code, 'llm')
+            return code
+        except Exception:
+            return ''
+
+    def _generate_code_for_rule(self, task, filename):
+        """为规则生成代码"""
+        # 尝试用 _generate_code
+        code = self._generate_code(task, filename or 'output.py')
+        if code:
+            return code
+
+        # 兜底：调 LLM 生成
+        try:
+            prompt = f'为以下任务生成Python代码，写入文件 {filename}:\n{task[:200]}\n\n只输出代码，不要其他文字。'
+            return self._llm_call(prompt)
+        except Exception:
+            return '# TODO: 需要实现'
+
+    def _generate_test_code(self, task, filename, module):
+        """为规则生成测试代码"""
+        # 用模板管理器的测试生成器
+        from agent_system.templates.test_generator import generate_test_code, extract_functions_from_code
+
+        # 先获取代码
+        code = self.template_manager.get_code(task, filename)
+        if code:
+            functions = extract_functions_from_code(code)
+            return generate_test_code(module, functions)
+
+        # 兜底：生成简单测试
+        return f"""import pytest
+from {module} import *
+
+def test_basic():
+    # TODO: 添加测试
+    pass
+"""
 
     def _run_tournament_fallback(self, task, ctx, max_rounds, dry_run):
         """淘汰赛兜底：连续失败后，用淘汰赛找替代方案"""

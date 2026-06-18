@@ -198,11 +198,14 @@ class DomainKnowledgeLayer:
                 'validation': 'echo done',
             },
         }
-        fb = fallbacks.get(domain, {
-            'domain_name': domain,
-            'components': ['分析任务', '执行任务', '验证结果'],
-            'validation': 'echo done',
-        })
+        fb = fallbacks.get(
+            domain,
+            {
+                'domain_name': domain,
+                'components': ['分析任务', '执行任务', '验证结果'],
+                'validation': 'echo done',
+            },
+        )
         return {
             **fb,
             'completion': DEFAULT_COMPLETION,

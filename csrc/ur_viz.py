@@ -1,6 +1,9 @@
 #!/usr/bin/env python -X utf8
 """UR双分布图 — ASCII + matplotlib"""
-import numpy as np, json, os
+
+import numpy as np
+import json
+import os
 
 # Use actual measured distribution parameters
 degen_mean, degen_std = 0.102, 0.060
@@ -18,7 +21,7 @@ human = np.clip(human, 0.40, 0.98)
 # ═══════════════════════════════════════
 # ASCII art for report
 # ═══════════════════════════════════════
-ascii_art = '''
+ascii_art = """
 ### UR 双分布叠加图
 
 ```
@@ -47,7 +50,7 @@ UR
     └────────────────────────────→
          退化                正常
 ```
-'''
+"""
 
 print(ascii_art)
 
@@ -56,6 +59,7 @@ print(ascii_art)
 # ═══════════════════════════════════════
 try:
     import matplotlib
+
     matplotlib.use('Agg')
     import matplotlib.pyplot as plt
 
@@ -63,9 +67,9 @@ try:
 
     # KDE-like using histograms
     bins = np.linspace(0, 1.0, 50)
-    ax.hist(degen, bins=bins, alpha=0.6, label=f'Degenerative (n=294, μ=0.10)', color='#e74c3c')
-    ax.hist(human, bins=bins, alpha=0.6, label=f'Human text (n=60, μ=0.73)', color='#3498db')
-    ax.hist(normal, bins=bins, alpha=0.6, label=f'Normal GPT-2 nucleus (n=860, μ=0.77)', color='#2ecc71')
+    ax.hist(degen, bins=bins, alpha=0.6, label='Degenerative (n=294, μ=0.10)', color='#e74c3c')
+    ax.hist(human, bins=bins, alpha=0.6, label='Human text (n=60, μ=0.73)', color='#3498db')
+    ax.hist(normal, bins=bins, alpha=0.6, label='Normal GPT-2 nucleus (n=860, μ=0.77)', color='#2ecc71')
 
     # Threshold lines
     ax.axvline(x=0.30, color='orange', linestyle='--', linewidth=2, label='UR=0.30 (our threshold)')
@@ -89,11 +93,15 @@ except ImportError:
 
 # Also save distribution data
 with open('benchmarks/ur_distribution.json', 'w') as f:
-    json.dump({
-        'degen': {'n': 294, 'mean': float(np.mean(degen)), 'std': float(np.std(degen))},
-        'normal': {'n': 860, 'mean': float(np.mean(normal)), 'std': float(np.std(normal))},
-        'human': {'n': 60, 'mean': float(np.mean(human)), 'std': float(np.std(human))},
-        'threshold': 0.30,
-        'separation_band': [0.20, 0.40],
-    }, f, indent=2)
+    json.dump(
+        {
+            'degen': {'n': 294, 'mean': float(np.mean(degen)), 'std': float(np.std(degen))},
+            'normal': {'n': 860, 'mean': float(np.mean(normal)), 'std': float(np.std(normal))},
+            'human': {'n': 60, 'mean': float(np.mean(human)), 'std': float(np.std(human))},
+            'threshold': 0.30,
+            'separation_band': [0.20, 0.40],
+        },
+        f,
+        indent=2,
+    )
 print('Saved: benchmarks/ur_distribution.json')

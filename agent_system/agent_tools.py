@@ -203,7 +203,11 @@ def _run_shell_direct(cmd, dry_run=False):
         return '缺少命令'
     try:
         r = _sp.run(
-            cmd, shell=True, capture_output=True, text=True, timeout=60,
+            cmd,
+            shell=True,
+            capture_output=True,
+            text=True,
+            timeout=60,
             cwd=os.path.dirname(os.path.dirname(os.path.abspath(__file__))) or '.',
         )
         output = (r.stdout + r.stderr).strip()

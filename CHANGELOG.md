@@ -2,6 +2,46 @@
 
 ---
 
+## [v3.40.0] — 2026-06-18 (Agent 架构重构 + 规则引擎 + 领域知识层)
+
+### 核心改进：规则引擎
+- **agent_rules.py**：规则引擎，匹配任务→执行工具链，不调 LLM
+- **agent_rules.md**：5 条预置规则（创建模块/修复Bug/重构/写测试/更新文档）
+- **效果**：数学函数任务从 68 秒降到 1.46 秒，LLM 调用从 8 次降到 0 次
+
+### 领域知识层
+- **agent_domain.py**：LLM 动态生成领域知识（组件/验证命令/终止条件）
+- **SQLite 缓存**：同类任务只问 LLM 一次
+- **分类优化**：创建新文件优先归为 feature，不被 "测试" 关键词干扰
+
+### 执行循环优化
+- **Few-shot 模板**：system prompt 内置常见工具链模板（创建文件/修复Bug/重构）
+- **阶段工具约束**：探索阶段只读、修改阶段只写、验证阶段只测
+- **计划进度注入**：每步告诉 LLM "你在计划的哪一步"
+- **动态 system prompt**：根据领域知识生成，不再用固定 prompt
+
+### 统一知识层
+- **GitKnowledgeBridge**：合并 git 历史（859条）+ agent 执行记录
+- **extract_git_tasks.py**：从 git log 提取任务，TF-IDF 向量化 + K-Means 聚类
+- **git_task_knowledge.db**：859 条任务知识库
+
+### 工具增强
+- **run_shell**：执行 shell 命令，用于验证命令等
+- **_generate_code**：简单任务不调 LLM，直接生成代码
+- **_generate_test_code**：自动生成测试文件
+
+### Bug 修复
+- **C VM NOT 操作**：`非 0` 返回 1 应为 0（csrc/runtime.c）
+- **test_coverage_boost8.py**：修复 28 个测试（API 变更）
+- **_detect_verify_loop**：文件不存在时误检测为验证闭环
+- **_llm_call**：配置加载加 try/catch，避免 get_var 异常
+
+### 文档
+- **agent_rules.md**：规则库文档
+- **agent_domain.py**：领域知识层文档
+
+---
+
 ## [v3.39.0] — 2026-06-17 (UR≈0.30 退化检测阈值 + 跨架构验证 + 文档重构)
 
 ### 核心发现

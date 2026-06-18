@@ -647,7 +647,7 @@ int vm_run(VM *vm) {
         case LTE: b = pop(vm); a = pop(vm);
             push(vm, tag_i(to_int(a) <= to_int(b) ? 1 : -1)); break;
         case NOT: a = pop(vm);
-            { intptr_t v = to_int(a); push(vm, tag_i(v > 0 ? -1 : 1)); } break;
+            { intptr_t v = to_int(a); push(vm, tag_i(v == 0 ? 0 : (v > 0 ? -1 : 1))); } break;
 
         case LOAD: {
             uint8_t idx = rd_u8(vm->code, &vm->pc);
