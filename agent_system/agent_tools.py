@@ -195,6 +195,27 @@ def _run_test_direct(test_path, dry_run=False):
         return f'测试错误: {e}'
 
 
+def _run_shell_direct(cmd, dry_run=False):
+    """执行 shell 命令"""
+    if dry_run:
+        return f'[干跑] 将执行: {cmd}'
+    if not cmd or not cmd.strip():
+        return '缺少命令'
+    try:
+        r = _sp.run(
+            cmd, shell=True, capture_output=True, text=True, timeout=60,
+            cwd=os.path.dirname(os.path.dirname(os.path.abspath(__file__))) or '.',
+        )
+        output = (r.stdout + r.stderr).strip()
+        if r.returncode != 0:
+            return f'失败 rc={r.returncode}\n{output[-800:]}'
+        return output[-500:] or '成功'
+    except _sp.TimeoutExpired:
+        return '命令超时(60s)'
+    except Exception as e:
+        return f'命令错误: {e}'
+
+
 def _git_diff_direct():
 
     try:

@@ -6,6 +6,7 @@ Phase 3: 并行执行(P14) + 智能压缩(P22) + 跨会话学习(P19) + 可观�
 """
 
 import glob as _glob
+import os
 import time as _time
 from typing import Dict, Optional
 
@@ -36,6 +37,7 @@ from agent_system.agent_composition import ToolPipeline, ToolComposer, Condition
 from agent_system.agent_shared import SharedContext, SharedSymbolTable, AgentCoordinator
 from agent_system.agent_strategy import PromptEvolver, ToolSelectionLearner, StrategySwitcher, ABRollout
 from agent_system.agent_evolution import ConstrainedEvolutionSystem
+from agent_system.agent_domain import DomainKnowledgeLayer
 
 
 class SymbolTable:
@@ -260,12 +262,64 @@ class AgentRuntime:
         self.ab_rollout = ABRollout()
         # Layer 3: 约束进化
         self.evolution = ConstrainedEvolutionSystem()
+        # Layer 4: 领域知识层
+        self.domain_knowledge = DomainKnowledgeLayer(llm_fn=self._llm_call)
         # P6: Prompt 缓存 — 稳定化 system_prompt
         self._system_prompt = None
         self._system_prompt_hash = None
 
     def register(self, name, handler):
         self.tools[name] = handler
+
+    def _build_domain_prompt(self, task: str, domain_info: dict) -> str:
+        """根据领域知识动态生成 system prompt"""
+        domain_name = domain_info.get('domain_name', '通用任务')
+        completion = domain_info.get('completion', '任务完成')
+        validation = domain_info.get('validation', 'echo done')
+        plan = domain_info.get('plan', [])
+
+        plan_lines = []
+        for step in plan:
+            marker = '★' if step.get('validate') else '○'
+            plan_lines.append(f'    {marker} {step["step"]}. {step["action"]}')
+        plan_text = '\n'.join(plan_lines)
+
+        return (
+            f'你是三言(Sanyan)编程助手。当前任务属于「{domain_name}」领域。\n'
+            f'\n'
+            f'任务目标:\n'
+            f'  {task[:200]}\n'
+            f'\n'
+            f'执行计划:\n'
+            f'{plan_text}\n'
+            f'\n'
+            f'完成标准: {completion}\n'
+            f'验证命令: {validation}\n'
+            f'\n'
+            f'工具与参数:\n'
+            f'  analyze(path)          — 分析文件结构\n'
+            f'  find_symbol(name)      — 查找符号定义/引用\n'
+            f'  read_file(path,start,count) — 读文件(行号可选)\n'
+            f'  search_code(keyword)   — 搜索代码\n'
+            f'  replace_in_file(path,old,new) — 单次替换\n'
+            f'  replace_all(pattern,old,new)  — 批量替换\n'
+            f'  write_file(path,content)— 写入文件\n'
+            f'  list_files(pattern)     — 列出文件(可选模式)\n'
+            f'  run_test(test_file)     — 运行测试\n'
+            f'  run_shell(cmd)          — 执行shell命令\n'
+            f'  git_diff                — 查看git差异\n'
+            f'  git_status              — 查看git状态\n'
+            f'  done(answer)            — 任务完成，输出最终答案\n'
+            f'\n'
+            f'输出格式（严格，只输出一个JSON对象，独占一行）:\n'
+            f'  {{"tool":"工具名", "args":{{"参数名":"值"}}}}\n'
+            f'\n'
+            f'重要:\n'
+            f'  1. 按执行计划顺序完成，每步先读代码再修改\n'
+            f'  2. 修改完代码后必须跑验证命令确认\n'
+            f'  3. 验证失败时分析错误原因再修复，不要盲目重试\n'
+            f'  4. 所有步骤完成后调 done 输出结果'
+        )
 
     def run(self, task, max_rounds=15, dry_run=False):
         """主运行入口：集成Phase 0/1/2/3/4 + Layer 1策略自优化"""
@@ -286,6 +340,15 @@ class AgentRuntime:
         # Layer 1: 策略选择
         strategy = self.strategy_switcher.select_strategy(task)
         print(f'  [策略] {strategy["name"]} ({strategy["complexity"]})')
+
+        # Layer 4: 领域知识分析
+        domain_info = self.domain_knowledge.analyze(task)
+        print(f'  [领域] {domain_info["domain_name"]} (置信度: {domain_info["confidence"]:.0%})')
+        print(f'  [计划] {" → ".join(s["action"] for s in domain_info.get("plan", []))}')
+        self.memory['domain_info'] = domain_info
+
+        # 动态生成 system prompt
+        self._system_prompt = self._build_domain_prompt(task, domain_info)
 
         result = None
         try:
@@ -379,28 +442,21 @@ class AgentRuntime:
                         'ternary': f'{cog}→{self.ternary.summary()}',
                     }
 
-        # Phase 1: 生成假设 + 锦标赛
-        hypotheses = self.hypothesis_generator.generate(
-            lambda p: self._llm_call(p, override_system_prompt=''), task, ctx, self.resource
-        )
-        self.resource.metrics.total_hypotheses = len(hypotheses)
-        best_hypothesis = None
-        if len(hypotheses) > 1:
-            # Phase 3: 并行验证假设
-            print(f'  [并行验证] {len(hypotheses)}个假设同时验证...')
-            validated = self.hypothesis_paraller.parallel_validate(hypotheses, ctx, steps=2)
-            validated.sort(key=lambda x: -x[1])
-            best_hypothesis = validated[0][0] if validated else hypotheses[0]
-            print(f'  [锦标赛] 最优: H{best_hypothesis.id} conf={best_hypothesis.confidence:.2f}')
-        elif hypotheses:
-            best_hypothesis = hypotheses[0]
+        # 主循环：先直接执行（跳过淘汰赛）
+        # 简单任务不需要淘汰赛，直接走 _run_legacy
+        # 失败后再用淘汰赛找替代方案
+        self.memory['tournament_used'] = False
+        result = self._run_legacy(task, max_rounds, dry_run)
 
-        # 主循环：执行最优假设的工具链
-        if best_hypothesis:
-            return self._execute_hypothesis(best_hypothesis, task, ctx, max_rounds, dry_run)
+        # 如果执行失败且未用过淘汰赛，用淘汰赛找替代方案
+        if result and 'answer' not in result and not self.memory.get('tournament_used'):
+            failures = self.memory.get('failures', 0)
+            if failures >= 2:
+                print(f'  [淘汰赛] 连续失败{failures}次，启动替代方案搜索...')
+                self.memory['tournament_used'] = True
+                return self._run_tournament_fallback(task, ctx, max_rounds, dry_run)
 
-        # 兜底：无假设时走原有逻辑
-        return self._run_legacy(task, max_rounds, dry_run)
+        return result
 
     def _execute_hypothesis(self, hypothesis, task, ctx, max_rounds, dry_run):
         """执行假设的工具链 — 集成并行执行 + 安全检查 + 可观测"""
@@ -720,10 +776,23 @@ class AgentRuntime:
         import json as _json
         import time as _t
 
-        model = (getattr(self.ev, 'get_var', lambda x: '')('模型名') or 'deepseek-v4-pro').strip()
-        url = (getattr(self.ev, 'get_var', lambda x: '')('模型URL') or '').strip()
-        key = (getattr(self.ev, 'get_var', lambda x: '')('API密钥') or '').strip()
-        provider = (getattr(self.ev, 'get_var', lambda x: 'deepseek')('模型提供商') or 'deepseek').strip()
+        # 安全获取配置（避免 get_var 异常）
+        try:
+            model = (getattr(self.ev, 'get_var', lambda x: '')('模型名') or 'deepseek-v4-pro').strip()
+        except Exception:
+            model = 'deepseek-v4-pro'
+        try:
+            url = (getattr(self.ev, 'get_var', lambda x: '')('模型URL') or '').strip()
+        except Exception:
+            url = ''
+        try:
+            key = (getattr(self.ev, 'get_var', lambda x: '')('API密钥') or '').strip()
+        except Exception:
+            key = os.environ.get('SANYAN_API_KEY', '')
+        try:
+            provider = (getattr(self.ev, 'get_var', lambda x: 'deepseek')('模型提供商') or 'deepseek').strip()
+        except Exception:
+            provider = 'deepseek'
         timeout = 60
         try:
             raw_timeout = getattr(self.ev, 'get_var', lambda x: 60)('超时秒数')
@@ -916,11 +985,49 @@ class AgentRuntime:
     def _run_legacy(self, task, max_rounds, dry_run):
         """兜底：无假设时走原有 LLM 循环"""
         ctx = self._build_context(task, 'init')
+        t_start = _time.time()
+        llm_consecutive_fails = 0
+        step_duration_last = 0.0
+        self.memory['failures'] = self.memory.get('failures', 0)
+
         for rnd in range(1, max_rounds + 1):
+            # ── 超时护杀 ──
+            total_elapsed = _time.time() - t_start
+            if total_elapsed > 300:  # 总超时5分钟
+                print(f'  [TIMEOUT] 总执行时间超过300秒，强制退出')
+                self.memory['failures'] += 1
+                break
+            if rnd > 1 and step_duration_last > 60:
+                print(f'  [TIMEOUT] 单步耗时{step_duration_last:.0f}秒，强制退出')
+                self.memory['failures'] += 1
+                break
+
+            # ── 上下文压缩 ──
             if len(ctx) > 7000:
                 ctx = self._compress_ctx(ctx)
-            raw = self._llm_call(ctx)
+
+            # ── LLM 调用 ──
+            try:
+                raw = self._llm_call(ctx)
+            except Exception as e:
+                llm_consecutive_fails += 1
+                print(f'  [LLM] 调用失败 (r={rnd}): {e}')
+                if llm_consecutive_fails >= 3:
+                    print(f'  [LLM] 连续{llm_consecutive_fails}次调用失败，退出')
+                    self.memory['failures'] += 1
+                    break
+                continue
+            else:
+                llm_consecutive_fails = 0
+
             tool, params = self._parse_tool(raw)
+            if tool is None:
+                self.memory['failures'] += 1
+                print(f'  [PARSE] LLM返回格式错误 (r={rnd}): {str(raw)[:100]}')
+                continue
+
+            print(f'  [r{rnd}] 工具={tool} 参数={str(params)[:60]}')
+
             if self._fail_closed(tool, params, dry_run):
                 continue
             if self._constraint_violation(tool):
@@ -932,7 +1039,9 @@ class AgentRuntime:
                     result = self.tools[tool](params, dry_run)
                 except Exception as e:
                     result = f'工具执行异常: {e}'
+                    self.memory['failures'] += 1
                 step_duration = _time.time() - step_start
+                step_duration_last = step_duration
                 self.profiler.record_step(rnd, tool, step_duration)
 
                 trit, conf, gate, cog = self.ternary.step(tool, result)
@@ -981,6 +1090,30 @@ class AgentRuntime:
                     continue
             ctx = self._build_context(params, tool, result)
         return {'answer': f'已达{max_rounds}轮', 'memory': self.memory}
+
+    def _run_tournament_fallback(self, task, ctx, max_rounds, dry_run):
+        """淘汰赛兜底：连续失败后，用淘汰赛找替代方案"""
+        # 1. 生成多种假设
+        hypotheses = self.hypothesis_generator.generate(
+            lambda p: self._llm_call(p, override_system_prompt=''), task, ctx, self.resource
+        )
+        if not hypotheses:
+            return {'answer': '淘汰赛无法生成替代方案', 'memory': self.memory}
+
+        print(f'  [淘汰赛] 生成{len(hypotheses)}个替代方案')
+
+        # 2. 并行验证假设
+        if len(hypotheses) > 1:
+            validated = self.hypothesis_paraller.parallel_validate(hypotheses, ctx, steps=2)
+            validated.sort(key=lambda x: -x[1])
+            best = validated[0][0] if validated else hypotheses[0]
+        else:
+            best = hypotheses[0]
+
+        print(f'  [淘汰赛] 最优方案: H{best.id} conf={best.confidence:.2f}')
+
+        # 3. 执行最优方案
+        return self._execute_hypothesis(best, task, ctx, max_rounds, dry_run)
 
     def _needs_plan(self, task):
         return len(task) > 6 and any(w in task for w in ['改', '修', '加', '新增', '实现', '重构', '优化', '替换'])
