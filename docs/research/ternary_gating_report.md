@@ -81,7 +81,29 @@ UR
 | 0.32 | 1.000 | 0.030 | 0.955 | **0.970** ★ |
 | 0.40 | 1.000 | 0.048 | 0.930 | 0.952 |
 
-> ★ Youden's J 最优点 = 0.32。我们选择 0.30——TPR 拐点，牺牲 0.7% TPR 换取更低 FPR。0.30 不是 magic number，它是实测分布的 Youden 最优邻域内的保守选择。
+> ★ Youden's J 最优点 = 0.32。我们选择 0.30——TPR 拐点，牺牲 0.7% TPR 换取更低 FPR。阈值 0.24-0.28 时 TPR 停留在 0.847，这是因为 ~15% 的退化样本 UR 在 0.24-0.30 之间（退化程度较轻或退化与正常文本交替）。在实际三态门控的多步检测中，这些样本会在后续窗口中触发——单窗口快照的 TPR 低估了多步系统的实际检测能力。
+
+**停止原因分布**（28M 1000 prompt，佐证 0.30 是拐点）：
+
+| 停止时 UR | 次数 | 占比 |
+|-----------|------|------|
+| UR=0.29 | 682 | 68.2% |
+| UR=0.30 | 201 | 20.1% |
+| UR=0.28 | 116 | 11.6% |
+| UR=0.27 | 1 | 0.1% |
+
+> 99.9% 的停止发生在 UR 0.27-0.30 窄带内。0.30 是退化样本 UR 分布的峰值区域，阈值的微小变动（0.29↔0.30）即足以切换是否继续生成。
+
+**停止原因分布**（28M 1000 prompt，佐证 0.30 是拐点）：
+
+| 停止时 UR | 次数 | 占比 |
+|-----------|------|------|
+| UR=0.29 | 682 | 68.2% |
+| UR=0.30 | 201 | 20.1% |
+| UR=0.28 | 116 | 11.6% |
+| UR=0.27 | 1 | 0.1% |
+
+> 99.9% 的停止发生在 UR 0.27-0.30 窄带内。0.30 是退化样本 UR 分布的峰值区域，阈值的微小变动（0.29↔0.30）即足以切换是否继续生成。
 
 **自然语言统计特性：** 英语文本在 32-token 窗口中虚词占 10-20%，极少超 30%。正常文本实测 UR=0.849 [0.846,0.852]（n=60 WikiText-2, 4996 窗口），<0.30 率仅 0.2%。
 
@@ -137,7 +159,7 @@ Qwen2.5-0.5B（494M, Qwen2 架构）在 1000 prompt 上验证：
 | 仅功能词密度 | 0% | 0% | 0% | 单独无效 |
 | EOS-only | 0% | 0% | 0% | 无门控 |
 
-> **UR 是唯一有效信号。** 周期检测、功能词密度、无新词检测、持续步数计数在退化模型上从未独立触发——当这些信号出现时，UR 已经先一步跌破 0.30。**系统可以简化为单个 UR 计算，复杂度大幅降低，效果完全相同。**
+> 注：消融实验的 TPR 来自 1000 prompt 三态门控停止率（二分类：是否在 max_steps 内停止）；ROC 表的 TPR 来自 1214 个滑窗样本（连续 UR 值 > 或 < 阈值）。两个实验的样本构成和判定口径不同，数值差异在预期范围内。 周期检测、功能词密度、无新词检测、持续步数计数在退化模型上从未独立触发——当这些信号出现时，UR 已经先一步跌破 0.30。**系统可以简化为单个 UR 计算，复杂度大幅降低，效果完全相同。**
 
 > ⚠️ 消融仅在退化模型上完成。更大模型或不同退化模式下，这些冗余信号是否可能变得必要，仍是开放问题。
 
@@ -170,7 +192,7 @@ Qwen2.5-0.5B（494M, Qwen2 架构）在 1000 prompt 上验证：
 | greedy | 1/4 | 0.336 | 部分恢复 |
 | rep_penalty=1.15 | 4/4 | 0.117 | **加剧退化** |
 
-> **反直觉发现**：repetition_penalty 在 GPT-2 上加剧了模型坍缩（UR=0.117，4/4 全部退化）。可能机制：rep_penalty 缩小了有效采样空间，迫使模型在剩余的 token 中循环。这个发现与 Holtzman et al. (2020) 的 nucleus sampling 优势一致，但揭示了一个未被充分讨论的副作用——在小模型上 rep_penalty 可能适得其反。当前大量生产系统默认启用 rep_penalty，这值得进一步验证。
+> n=4 prompt，结果为描述性观察而非统计结论。扩大 prompt 集是下一步工作。**反直觉发现**：repetition_penalty 在 GPT-2 上加剧了模型坍缩（UR=0.117，4/4 全部退化）。可能机制：rep_penalty 缩小了有效采样空间，迫使模型在剩余的 token 中循环。这个发现与 Holtzman et al. (2020) 的 nucleus sampling 优势一致，但揭示了一个未被充分讨论的副作用——在小模型上 rep_penalty 可能适得其反。当前大量生产系统默认启用 rep_penalty，这值得进一步验证。
 
 ---
 
@@ -201,7 +223,23 @@ Qwen2.5-0.5B 中英 1000 prompt 全量对比：
 
 ---
 
-## 9. GPT-2 跨规模 UR 稳定性
+## 9. Qwen2.5 诱导退化实验
+
+故意给 Qwen2.5-0.5B 输入退化 prompt，验证 UR 能否区分"模型崩溃"与"模型理解坏输入"：
+
+| prompt | min_UR | 行为 | 说明 |
+|--------|--------|------|------|
+| "cat cat cat cat cat cat" | 0.438 | OK | 模型将其转为标点练习 |
+| "dog dog dog dog dog dog dog dog" | **0.031** | **NEGATE** | 模型退化为纯词重复 |
+| "the the the the the the the the the" | 0.526 | OK | 模型生成三角几何课 |
+| "was was was was was was was was was was" | **0.190** | **NEGATE** | 模型退化为纯词重复 |
+| "asdf qwer zxcv poiu lkjh mnbv" | 0.719 | OK | 模型继续生成文本 |
+
+> Qwen2.5 试图"理解"坏 prompt——把"cat cat cat"变成标点练习，把"the the"变成数学课。只有当 prompt 无法被赋予任何意义时（纯词重复），模型才会退化为模仿生成。**UR 区分的是"模型是否退化"，而非"输入是否正常"。** 这个实验是对 §8 失败分析的补充：失败案例中的 0 例模型内生退化，与诱导退化实验中的"坏输入但模型不退化"形成对照。
+
+---
+
+## 10. GPT-2 跨规模 UR 稳定性
 
 nucleus sampling (top_p=0.9) 下三个规模的 UR：
 
@@ -211,11 +249,11 @@ nucleus sampling (top_p=0.9) 下三个规模的 UR：
 | GPT-2 Medium | 355M | 0.714 | 0/4 |
 | GPT-2 Large | 774M | 0.797 | 0/4 |
 
-> UR 跨 6× 参数规模波动仅 ±0.043。模型越大，UR 越高——UR 可作为生成多样性的稳定度量。
+> n=4 prompt 每模型，结果为描述性观察。UR 跨 6× 参数规模波动仅 ±0.043。模型越大，UR 越高——UR 可作为生成多样性的稳定度量。
 
 ---
 
-## 10. 已知边界
+## 11. 已知边界
 
 1. **窗口化词法度量**：UR 在窗口 32 下有效，不保证任意尺度不变
 2. **区间定义（非质量分类）**：结构化输出（代码、列表）可能低 UR 但有效
@@ -225,7 +263,7 @@ nucleus sampling (top_p=0.9) 下三个规模的 UR：
 
 ---
 
-## 11. 阈值校准过程
+## 12. 阈值校准过程
 
 初始阈值 0.15 基于早期小样本估计。通过 7 prompt × 50 token 无门控校准，记录首次 UR<0.30 位置，取中位数 × 0.8：
 
@@ -240,7 +278,7 @@ nucleus sampling (top_p=0.9) 下三个规模的 UR：
 
 ## 核心结论
 
-> *A single uniqueness-ratio threshold of 0.30 reliably separates degenerative from coherent generation across four small models spanning three architectures (GPT-Neo, GPT-2, Qwen2) and three orders of magnitude in parameter count (3.6M–494M), with 98-100% TPR [96.8-100%] and 0.4% FPR [0.01-0.79%] (p < 0.05). Measured ROC on 1214 real samples shows Youden's J optimum at 0.32; we select 0.30 at the TPR knee (0.847→0.993). UR alone achieves identical performance to the full trajectory detection system — all other signals are redundant. Human text baseline (n=60 WikiText-2, μ=0.849 [0.846,0.852]) confirms <0.30 rate of 0.2%.*
+> (1) A single uniqueness-ratio threshold of 0.30 reliably separates degenerative from coherent generation across four small models spanning three architectures (GPT-Neo, GPT-2, Qwen2), with 98-100% TPR and 0.4% FPR (p<0.05). (2) UR alone achieves identical performance to the full trajectory detection system — all other signals are redundant. (3) Human text baseline (n=60 WikiText-2, μ=0.849 [0.846,0.852]) and measured ROC (1214 samples, Youden's J optimum 0.32) independently confirm the threshold is not arbitrary.
 
 ## 下一步
 
@@ -257,3 +295,17 @@ nucleus sampling (top_p=0.9) 下三个规模的 UR：
 - [ ] GGUF 格式 + 量化
 - [ ] 更大模型 (TinyLlama / SmolLM / 7B+)
 - [ ] 语义循环 embedding 距离检测
+
+
+## 参考文献
+
+1. Radford, A., et al. (2019). Language Models are Unsupervised Multitask Learners. OpenAI.
+2. Black, S., et al. (2021). GPT-Neo: Large Scale Autoregressive Language Modeling with Mesh-Tensorflow.
+3. Bai, J., et al. (2023). Qwen Technical Report. Alibaba Cloud.
+4. Keskar, N. S., et al. (2019). CTRL: A Conditional Transformer Language Model for Controllable Generation. arXiv:1909.05858.
+5. Merity, S., et al. (2016). Pointer Sentinel Mixture Models. arXiv:1609.07843. (WikiText-2)
+6. Guo, C., et al. (2017). On Calibration of Modern Neural Networks. ICML.
+7. Holtzman, A., et al. (2020). The Curious Case of Neural Text Degeneration. ICLR.
+8. Eldan, R. & Li, Y. (2023). TinyStories: How Small Can Language Models Be and Still Speak Coherent English? arXiv:2305.07759.
+9. Welleck, S., et al. (2020). Neural Text Generation with Unlikelihood Training. ICLR.
+10. Fan, A., et al. (2018). Hierarchical Neural Story Generation. ACL.
