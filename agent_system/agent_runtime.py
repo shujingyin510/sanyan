@@ -851,6 +851,13 @@ class AgentRuntime:
         self.memory['failures'] = self.memory.get('failures', 0)
 
         for rnd in range(1, max_rounds + 1):
+            # ── UR 退化检测 ──
+            if rnd >= 2:
+                recent = [str(h.get('result', ''))[:80] for h in self.memory.get('history', [])[-4:] if 'result' in h]
+                if len(recent) >= 2 and len(set(recent)) == 1:
+                    print(f'  [UR] 连续{len(recent)}轮相同输出 → 退化，强制停止')
+                    break
+
             # ── 超时护杀 ──
             total_elapsed = _time.time() - t_start
             if total_elapsed > 300:  # 总超时5分钟
@@ -930,9 +937,13 @@ class AgentRuntime:
                     self.memory['modified'].append(params.split('|')[0] if '|' in params else params)
             else:
                 result = f'未知工具: {tool}'
-            if tool in ('analyze', 'find_symbol') and '未找到' not in str(result):
-                return {'answer': self._extract_key(result), 'memory': self.memory}
+            # 不再硬编码"成功"——让 UR 退化检测判定是否该停止
             if tool == 'done':
+                # UR 保护：第一轮就 done 说明无实质进展，继续观察
+                if rnd == 1:
+                    print('  [UR] 首轮done → 可能无实质进展，继续观察')
+                    ctx = self._build_context(params, tool, result)
+                    continue
                 calibrated_answer = params if params else '完成'
                 try:
                     from agent_system.truth_calibration import get_calibrator

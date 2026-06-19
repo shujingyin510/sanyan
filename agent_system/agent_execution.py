@@ -48,6 +48,17 @@ class RuleExecutor:
         ternary = TernaryEngine()
         results = []
         for i, step in enumerate(rule.steps, 1):
+            # ── UR 退化检测：不需要"成功"，只需要"是否在恶化" ──
+            if i >= 4:
+                recent = [str(r)[:60] for r in results[-6:]]
+                unique = len(set(recent))
+                if unique <= 1:
+                    print(f'  [UR] 连续{len(recent)}步输出完全相同 → 退化，强制停止')
+                    break
+                if unique <= 2 and len(recent) >= 5:
+                    print(f'  [UR] 输出多样性极低({unique}/{len(recent)}) → 强制停止')
+                    break
+
             # ── 门控检查：上一步失败时是否继续 ──
             if ternary.history:
                 last_trit, last_conf = ternary.history[-1]
@@ -192,7 +203,12 @@ class RuleExecutor:
                 if r.returncode == 0:
                     print('    ✓ 验证通过')
                 else:
-                    print(f'    ✗ 验证失败: {r.stderr[-200:]}')
+                    # 不判"失败"，检查是否退化
+                    stderr_short = r.stderr[-200:] if r.stderr else ''
+                    if len(stderr_short) < 20 and 'error' not in stderr_short.lower():
+                        print(f'    ⚠ 验证未通过但非严重错误 (rc={r.returncode})')
+                    else:
+                        print(f'    ✗ 验证失败: {stderr_short[-100:]}')
             except Exception as e:
                 print(f'    ✗ 验证错误: {e}')
 
