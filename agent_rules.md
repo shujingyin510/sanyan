@@ -1573,3 +1573,12 @@
 1. write_file({filename}|{code}) — 创建插件
 2. run_shell(python -X utf8 -m pytest tests/ -x -q) — 运行测试
 验证：echo done
+
+## 规则：代码解释
+匹配：解释.*代码|分析.*代码逻辑|这段代码|每一行|说明.*代码|看懂.*代码
+工具链：
+1. read_file({filename}) — 读取目标文件
+2. analyze({filename}) — 分析代码结构
+3. done(解释结果) — 输出解释
+验证：echo 代码解释完成
+

@@ -321,7 +321,11 @@ class RuleEngine:
     def extract_filename(self, task: str, rule: Optional[AgentRule] = None) -> Optional[str]:
         """从任务中提取文件名（含路径前缀）"""
         path_prefix = self.extract_path(task)
-        # 仅匹配 ASCII 文件名（避免 \w 匹配中文）
+        # 匹配完整路径+文件名: csrc/gpt2_engine.py
+        match = re.search(r'([a-zA-Z0-9_/\\-]+/[a-zA-Z0-9_]+\.py)', task)
+        if match:
+            return match.group(1).replace('\\', '/')
+        # 匹配纯文件名: gpt2_engine.py
         match = re.search(r'[a-zA-Z0-9_]+\.py', task)
         if match:
             fname = match.group(0)
@@ -338,11 +342,15 @@ class RuleEngine:
             r'在([\w_/\\-]+(?:目录)?)(?:下|中)(?:新建|创建|添加)',
             r'([\w_/\\-]+)(?:目录)?下(?:新建|创建|添加)',
             r'在([\w_/\\-]+)(?:下|中)(?:写|放|存)',
+            r'(?:解释|分析|看懂|说明)(?:.*?)([\w_]+\.py)',  # 解释代码 → 提取文件名
         ]
         for pat in patterns:
             m = re.search(pat, task)
             if m:
                 p = m.group(1).rstrip('目录').replace('\\', '/')
+                # 如果是文件名（.py 结尾），不作为目录路径
+                if p.endswith('.py'):
+                    return None
                 # 验证路径合理性
                 if 1 <= len(p) <= 30 and not p.startswith('.') and '/' not in p.lstrip('/'):
                     return p

@@ -55,6 +55,23 @@ class RuleExecutor:
             for k, v in vars.items():
                 args = args.replace(f'{{{k}}}', v)
 
+            # 自动修正 LLM 生成的占位符参数
+            if 'path:' in args or '文件路径' in args or '起始行' in args:
+                if tool == 'read_file' and filename:
+                    args = filename  # 直接用提取的文件名
+                elif tool == 'search_code':
+                    args = filename if filename else '.'
+            if args_desc.strip() == tool or len(args_desc) < 5:
+                # LLM 没提供参数，自动补齐
+                if tool == 'read_file':
+                    args = filename or 'output.py'
+                elif tool == 'list_files':
+                    args = '**/*.py' if filename else '*.py'
+                elif tool == 'search_code':
+                    args = 'import|from|class|def'
+                elif tool == 'done':
+                    args = f'完成: {task[:100]}'
+
             print(f'  [规则 {i}/{len(rule.steps)}] {tool} — {desc}')
 
             if tool not in self.tools:

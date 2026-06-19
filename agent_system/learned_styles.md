@@ -291,3 +291,12 @@
 - 修改详情:
 文件: resize.py (59行)
   函数: resize_image
+
+## 学习记录: 解释csrc/gpt2_engine.py的代码逻辑
+- 模式: 未知
+- 风格: Python
+- 约定: 
+- 关键词: 解释, csrc, gpt2_engine, py的代码逻辑
+- 时间: 2026-06-19 17:13
+- 修改详情:
+无详情
