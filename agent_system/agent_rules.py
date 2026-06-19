@@ -118,7 +118,15 @@ class RuleEngine:
         if len(candidates) > 1:
             return candidates[0]
 
-        # 5. 如果没有候选，返回 None
+        # 5. 如果没有候选但有代码意图，用 LLM 生成规则（仅限简单任务）
+        if not candidates and primary_intent and self.llm_fn:
+            # 只在有明显代码意图且任务较短时生成规则
+            if len(task) < 80:
+                rule = self.generate_rule(task)
+                if rule:
+                    return rule
+
+        # 6. 完全没有匹配，返回 None
         return None
 
     def _find_candidates(self, task: str) -> List[AgentRule]:

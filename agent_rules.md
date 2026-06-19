@@ -24,7 +24,7 @@
 验证：python -X utf8 -m pytest {test_file} -x -q
 
 ## 规则：创建Python类
-匹配：创建.*类|定义.*class|新增.*类|写.*类
+匹配：创建.*类|定义.*class|新增.*类|写.*类|实现.*类|写.*类|添加.*类|实现.*中间件|添加.*中间件|实现.*缓存|LRU|实现.*功能|文件上传
 工具链：
 1. write_file({filename}|{code}) — 创建文件
 2. write_file({test_file}|{test_code}) — 创建测试文件

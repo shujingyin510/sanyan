@@ -3,15 +3,15 @@
     "id": "A1",
     "task": "在csrc下新建logger.py，实现日志功能",
     "cat": "规则",
-    "rule": false,
+    "rule": true,
     "llm": 0,
-    "ternary": 0,
+    "ternary": 4,
     "ur_min": 1.0,
     "ur_stop": false,
-    "negate": false,
+    "negate": true,
     "crashed": false,
-    "done": false,
-    "time": "40.0s"
+    "done": true,
+    "time": "10.0s"
   },
   {
     "id": "A2",
@@ -25,35 +25,35 @@
     "negate": false,
     "crashed": false,
     "done": true,
-    "time": "34.7s"
+    "time": "7.0s"
   },
   {
     "id": "A3",
     "task": "给calculator.py写单元测试",
     "cat": "规则",
-    "rule": false,
+    "rule": true,
     "llm": 0,
-    "ternary": 0,
+    "ternary": 5,
     "ur_min": 1.0,
     "ur_stop": false,
     "negate": false,
     "crashed": false,
-    "done": false,
-    "time": "40.0s"
+    "done": true,
+    "time": "8.4s"
   },
   {
     "id": "A4",
     "task": "重构main.py中的冗余代码",
     "cat": "规则",
-    "rule": false,
+    "rule": true,
     "llm": 0,
-    "ternary": 0,
+    "ternary": 4,
     "ur_min": 1.0,
     "ur_stop": false,
-    "negate": false,
+    "negate": true,
     "crashed": false,
-    "done": false,
-    "time": "40.0s"
+    "done": true,
+    "time": "3.9s"
   },
   {
     "id": "A5",
@@ -73,15 +73,15 @@
     "id": "B6",
     "task": "实现一个计时器工具类",
     "cat": "LLM",
-    "rule": false,
+    "rule": true,
     "llm": 0,
-    "ternary": 0,
+    "ternary": 4,
     "ur_min": 1.0,
     "ur_stop": false,
-    "negate": false,
+    "negate": true,
     "crashed": false,
-    "done": false,
-    "time": "0.8s"
+    "done": true,
+    "time": "7.7s"
   },
   {
     "id": "B7",
@@ -95,21 +95,21 @@
     "negate": true,
     "crashed": false,
     "done": true,
-    "time": "32.7s"
+    "time": "6.4s"
   },
   {
     "id": "B8",
     "task": "写一个LRU缓存实现",
     "cat": "LLM",
-    "rule": false,
+    "rule": true,
     "llm": 0,
-    "ternary": 0,
+    "ternary": 4,
     "ur_min": 1.0,
     "ur_stop": false,
-    "negate": false,
+    "negate": true,
     "crashed": false,
-    "done": false,
-    "time": "0.9s"
+    "done": true,
+    "time": "14.4s"
   },
   {
     "id": "B9",
@@ -117,27 +117,27 @@
     "cat": "LLM",
     "rule": false,
     "llm": 0,
-    "ternary": 9,
+    "ternary": 0,
     "ur_min": 1.0,
-    "ur_stop": true,
-    "negate": true,
-    "crashed": false,
-    "done": true,
-    "time": "35.6s"
+    "ur_stop": false,
+    "negate": false,
+    "crashed": true,
+    "done": false,
+    "time": "0.3s"
   },
   {
     "id": "B10",
     "task": "实现文件上传功能",
     "cat": "LLM",
-    "rule": false,
+    "rule": true,
     "llm": 0,
-    "ternary": 9,
+    "ternary": 4,
     "ur_min": 1.0,
-    "ur_stop": true,
-    "negate": false,
-    "crashed": true,
+    "ur_stop": false,
+    "negate": true,
+    "crashed": false,
     "done": true,
-    "time": "10.6s"
+    "time": "1.4s"
   },
   {
     "id": "C11",
@@ -149,9 +149,9 @@
     "ur_min": 1.0,
     "ur_stop": false,
     "negate": false,
-    "crashed": false,
+    "crashed": true,
     "done": false,
-    "time": "40.0s"
+    "time": "0.3s"
   },
   {
     "id": "C12",
@@ -165,7 +165,7 @@
     "negate": false,
     "crashed": false,
     "done": true,
-    "time": "28.8s"
+    "time": "24.1s"
   },
   {
     "id": "C13",
@@ -173,27 +173,27 @@
     "cat": "退化",
     "rule": false,
     "llm": 0,
-    "ternary": 6,
+    "ternary": 0,
     "ur_min": 1.0,
-    "ur_stop": true,
-    "negate": true,
-    "crashed": false,
-    "done": true,
-    "time": "20.5s"
+    "ur_stop": false,
+    "negate": false,
+    "crashed": true,
+    "done": false,
+    "time": "0.3s"
   },
   {
     "id": "C14",
     "task": "解释量子纠错在拓扑量子计算中的应用",
     "cat": "退化",
     "rule": false,
-    "llm": 1,
+    "llm": 0,
     "ternary": 0,
     "ur_min": 1.0,
     "ur_stop": false,
     "negate": false,
-    "crashed": false,
-    "done": true,
-    "time": "20.0s"
+    "crashed": true,
+    "done": false,
+    "time": "0.3s"
   },
   {
     "id": "C15",
@@ -205,9 +205,9 @@
     "ur_min": 1.0,
     "ur_stop": false,
     "negate": false,
-    "crashed": false,
+    "crashed": true,
     "done": false,
-    "time": "0.9s"
+    "time": "0.3s"
   },
   {
     "id": "D16",
@@ -219,9 +219,9 @@
     "ur_min": 1.0,
     "ur_stop": false,
     "negate": false,
-    "crashed": false,
+    "crashed": true,
     "done": false,
-    "time": "0.9s"
+    "time": "0.3s"
   },
   {
     "id": "D17",
@@ -229,13 +229,13 @@
     "cat": "边界",
     "rule": false,
     "llm": 0,
-    "ternary": 6,
+    "ternary": 0,
     "ur_min": 1.0,
-    "ur_stop": true,
-    "negate": true,
+    "ur_stop": false,
+    "negate": false,
     "crashed": true,
-    "done": true,
-    "time": "6.5s"
+    "done": false,
+    "time": "0.3s"
   },
   {
     "id": "D18",
@@ -247,9 +247,9 @@
     "ur_min": 1.0,
     "ur_stop": false,
     "negate": false,
-    "crashed": false,
+    "crashed": true,
     "done": false,
-    "time": "0.8s"
+    "time": "0.3s"
   },
   {
     "id": "D19",
@@ -263,7 +263,7 @@
     "negate": true,
     "crashed": false,
     "done": true,
-    "time": "1.7s"
+    "time": "4.3s"
   },
   {
     "id": "D20",
@@ -271,12 +271,12 @@
     "cat": "边界",
     "rule": false,
     "llm": 0,
-    "ternary": 2,
+    "ternary": 0,
     "ur_min": 1.0,
     "ur_stop": false,
     "negate": false,
     "crashed": true,
-    "done": true,
-    "time": "8.0s"
+    "done": false,
+    "time": "0.3s"
   }
 ]
