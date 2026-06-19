@@ -430,22 +430,25 @@ class LocalProvider(LLMProvider):
             return
 
         try:
+            import os as _os
+            _os.environ['HF_HUB_OFFLINE'] = '1'
+            _os.environ['TRANSFORMERS_OFFLINE'] = '1'
+
             from transformers import AutoModelForCausalLM, AutoTokenizer
             import torch
 
-            # 尝试从本地缓存加载
-            local_path = self._get_local_path()
-
-            print(f'[本地模型] 加载 {self.model}...')
+            model_id = self.MODEL_ALIASES.get(self.model, self.model)
+            print(f'[本地模型] 加载 {model_id}...')
             self._tokenizer = AutoTokenizer.from_pretrained(
-                local_path,
-                local_files_only=True,  # 只用本地文件
+                model_id,
+                local_files_only=True,
+                trust_remote_code=True,
             )
             self._model = AutoModelForCausalLM.from_pretrained(
-                local_path,
+                model_id,
                 torch_dtype=torch.float32,
-                device_map='cpu',
                 local_files_only=True,
+                trust_remote_code=True,
             )
             print('[本地模型] 加载完成')
         except Exception as e:

@@ -261,3 +261,33 @@
 文件: csrc/logger.py (42行)
   函数: __init__, log, info, warning, error, debug, close
   类: SimpleLogger
+
+## 学习记录: 创建email_utils.py，实现send_email和validate_email两个函数
+- 模式: 创建新模块
+- 风格: 使用Python函数，添加类型注解和docstring，用pytest编写测试
+- 约定: 函数使用snake_case命名, 每个模块配套测试文件, 遵循功能开发流程：创建-测试-验证
+- 关键词: send_email, validate_email, email_utils
+- 时间: 2026-06-19 16:51
+- 修改详情:
+文件: email_utils.py (83行)
+  函数: now, today, format_datetime, parse_datetime, format_date, parse_date, format_time, timestamp, from_timestamp, add_days
+
+## 学习记录: 创建json_utils.py，实现read_json_file和write_json_file两个
+- 模式: 创建模块
+- 风格: 函数式编程，每个函数完成单一文件操作，返回适当数据类型，可能使用类型注解和文档字符串。
+- 约定: 函数命名使用 read_/write_ 前缀, 支持多种文件格式：文本、行、JSON、CSV, 使用上下文管理器处理文件
+- 关键词: json, csv, text, file, utils
+- 时间: 2026-06-19 16:51
+- 修改详情:
+文件: json_utils.py (69行)
+  函数: read_text, write_text, append_text, read_lines, write_lines, read_json, write_json, read_csv, write_csv
+
+## 学习记录: 修复resize.py的导入错误
+- 模式: 修复bug
+- 风格: 函数式编程，模块化，可能有类型注解和docstring，使用pytest进行测试驱动
+- 约定: 使用pytest作为测试框架, 模块化组织代码，每个文件负责单一功能, 运行验证命令确认修复, 通过命令行参数设置编码（python -X utf8）
+- 关键词: resize, 图像处理, 导入错误, pytest
+- 时间: 2026-06-19 16:53
+- 修改详情:
+文件: resize.py (59行)
+  函数: resize_image

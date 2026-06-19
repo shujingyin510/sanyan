@@ -39,6 +39,10 @@ class LLMHandler:
         provider = self._get_config('模型提供商', 'deepseek')
         timeout = self._get_timeout()
 
+        # ── 本地模型 ──
+        if provider in ('local', '本地'):
+            return self._local_call(model, prompt, override_system_prompt)
+
         # 如果 URL 为空，根据 provider 构建默认 URL
         if not url:
             provider_urls = {
@@ -90,6 +94,31 @@ class LLMHandler:
                 break
 
         return 'error|LLM调用失败(3次重试)'
+
+    def _local_call(self, model: str, prompt: str, override_system_prompt=None) -> str:
+        """本地模型调用（HuggingFace transformers + 本地缓存）"""
+        try:
+            from agent_system.agent_llm import LocalProvider
+            # 懒初始化并缓存
+            if not hasattr(self, '_local_provider'):
+                self._local_provider = LocalProvider(model_name=model)
+                self._local_provider._load_model()
+            provider = self._local_provider
+
+            sys_msg = override_system_prompt if override_system_prompt else self._system_prompt
+            if sys_msg is None:
+                sys_msg = self._default_system_prompt()
+
+            response = provider.chat([
+                {'role': 'system', 'content': sys_msg},
+                {'role': 'user', 'content': prompt},
+            ])
+            # chat() 返回 dict {'content': text, ...}，提取文本
+            if isinstance(response, dict):
+                return response.get('content', str(response))
+            return str(response)
+        except Exception as e:
+            return f'error|本地模型调用失败: {e}'
 
     def _get_config(self, key: str, default: str) -> str:
         """安全获取配置（优先 evaluator，其次环境变量）"""
