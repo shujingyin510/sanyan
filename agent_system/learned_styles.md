@@ -300,3 +300,13 @@
 - 时间: 2026-06-19 17:13
 - 修改详情:
 无详情
+
+## 学习记录: 在csrc下新建timer.py，实现带参数的超时装饰器timeout(seconds)
+- 模式: 创建模块
+- 风格: 使用类型注解，编写docstring，用pytest测试
+- 约定: 函数命名用snake_case, 模块放在csrc下, 测试放在tests目录
+- 关键词: timer, timeout, datetime, 装饰器, 类型注解, pytest
+- 时间: 2026-06-19 17:20
+- 修改详情:
+文件: csrc/timer.py (83行)
+  函数: now, today, format_datetime, parse_datetime, format_date, parse_date, format_time, timestamp, from_timestamp, add_days
