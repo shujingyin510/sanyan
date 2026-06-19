@@ -39,6 +39,19 @@ class LLMHandler:
         provider = self._get_config('模型提供商', 'deepseek')
         timeout = self._get_timeout()
 
+        # 如果 URL 为空，根据 provider 构建默认 URL
+        if not url:
+            provider_urls = {
+                'deepseek': 'https://api.deepseek.com/v1/chat/completions',
+                'openai': 'https://api.openai.com/v1/chat/completions',
+                'anthropic': 'https://api.anthropic.com/v1/messages',
+                'gemini': f'https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent',
+                'qwen': 'https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions',
+                'glm': 'https://open.bigmodel.cn/api/paas/v4/chat/completions',
+                'moonshot': 'https://api.moonshot.cn/v1/chat/completions',
+            }
+            url = provider_urls.get(provider, provider_urls['deepseek'])
+
         # 获取 system prompt
         sys_msg = override_system_prompt if override_system_prompt is not None else self._system_prompt
         if sys_msg is None:
@@ -79,11 +92,28 @@ class LLMHandler:
         return 'error|LLM调用失败(3次重试)'
 
     def _get_config(self, key: str, default: str) -> str:
-        """安全获取配置"""
+        """安全获取配置（优先 evaluator，其次环境变量）"""
         try:
-            return (getattr(self.ev, 'get_var', lambda x: '')(key) or default).strip()
+            value = getattr(self.ev, 'get_var', lambda x: '')(key)
+            if value:
+                return value.strip()
         except Exception:
-            return default
+            pass
+
+        # 环境变量回退
+        env_map = {
+            'API密钥': 'SANYAN_API_KEY',
+            '模型名': 'LLM_MODEL',
+            '模型URL': 'LLM_URL',
+            '模型提供商': 'LLM_PROVIDER',
+        }
+        env_key = env_map.get(key)
+        if env_key:
+            env_value = os.environ.get(env_key, '')
+            if env_value:
+                return env_value.strip()
+
+        return default
 
     def _get_timeout(self) -> int:
         """获取超时时间"""
@@ -118,6 +148,14 @@ class LLMHandler:
             '\n'
             '输出格式（严格，只输出一个JSON对象，独占一行）:\n'
             '  {"tool":"工具名", "args":{"参数名":"值"}}\n'
+        )
+
+    def _code_generation_prompt(self) -> str:
+        """代码生成 system prompt"""
+        return (
+            '你是一个代码生成器。只输出Python代码，不要输出其他内容。\n'
+            '不要输出JSON、不要输出解释、不要输出markdown。\n'
+            '直接输出可运行的Python代码。\n'
         )
 
     def _build_gemini_request(self, model: str, key: str, sys_msg: str, prompt: str) -> tuple:
@@ -178,8 +216,10 @@ class LLMHandler:
                 elif raw[i] == '}':
                     depth -= 1
                     if depth == 0:
-                        candidate = raw[start : i + 1]
+                        candidate = raw[start:i + 1]
                         try:
+                            # 修复 JSON 中的换行符
+                            candidate = self._fix_json_newlines(candidate)
                             data = _json.loads(candidate)
                             tool = data.get('tool', '')
                             args = data.get('args', {})
@@ -187,20 +227,15 @@ class LLMHandler:
                                 if isinstance(args, str):
                                     return tool, args
                                 if isinstance(args, dict):
+                                    # 特殊处理 write_file 的 content 参数
+                                    if tool == 'write_file' and 'content' in args:
+                                        path = args.get('path', '')
+                                        content = args['content']
+                                        return tool, f'{path}|{content}'
+
                                     ordered = []
-                                    for key in (
-                                        'path',
-                                        'name',
-                                        'keyword',
-                                        'content',
-                                        'answer',
-                                        'old',
-                                        'new',
-                                        'pattern',
-                                        'start',
-                                        'count',
-                                        'test_file',
-                                    ):
+                                    for key in ('path', 'name', 'keyword', 'content', 'answer',
+                                                'old', 'new', 'pattern', 'start', 'count', 'test_file'):
                                         if key in args:
                                             ordered.append(str(args[key]))
                                     if ordered:
@@ -224,6 +259,34 @@ class LLMHandler:
             return 'analyze', 'run_agent.py'
 
         return raw, ''
+
+    def _fix_json_newlines(self, s: str) -> str:
+        """修复 JSON 字符串中的换行符"""
+        # 将字符串值中的实际换行符替换为转义的 \n
+        result = []
+        in_string = False
+        escape_next = False
+
+        for char in s:
+            if escape_next:
+                result.append(char)
+                escape_next = False
+            elif char == '\\':
+                result.append(char)
+                escape_next = True
+            elif char == '"':
+                in_string = not in_string
+                result.append(char)
+            elif in_string and char == '\n':
+                result.append('\\n')
+            elif in_string and char == '\r':
+                result.append('\\r')
+            elif in_string and char == '\t':
+                result.append('\\t')
+            else:
+                result.append(char)
+
+        return ''.join(result)
 
     def extract_key(self, result) -> str:
         """从结果中提取关键信息"""

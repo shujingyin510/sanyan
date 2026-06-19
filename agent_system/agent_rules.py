@@ -102,11 +102,99 @@ class RuleEngine:
         return None
 
     def match_rule(self, task: str) -> Optional[AgentRule]:
-        """匹配任务到规则"""
-        for rule in self.rules:
-            if rule.match(task):
-                return rule
+        """匹配任务到规则（语义匹配）"""
+        # 1. 先用关键词快速筛选候选规则
+        candidates = self._find_candidates(task)
+
+        # 2. 如果只有一条候选，直接返回
+        if len(candidates) == 1:
+            return candidates[0]
+
+        # 3. 如果有多条候选，用 LLM 选最匹配的
+        if len(candidates) > 1 and self.llm_fn:
+            return self._llm_select_rule(task, candidates)
+
+        # 4. 如果有多条候选但没有 LLM，返回第一条
+        if len(candidates) > 1:
+            return candidates[0]
+
+        # 5. 如果没有候选，返回 None
         return None
+
+    def _find_candidates(self, task: str) -> List[AgentRule]:
+        """用关键词快速筛选候选规则（考虑主要意图）"""
+        candidates = []
+        task_lower = task.lower()
+
+        # 提取主要意图关键词（优先级：创建 > 修复 > 重构 > 测试）
+        intent_keywords = {
+            '创建': ['创建', '新增', '写一个', '实现', '添加模块'],
+            '修复': ['修复', 'fix', 'bug', '错误', '报错'],
+            '重构': ['重构', 'refactor', '优化', '整理'],
+            '测试': ['测试', 'test', '验证'],
+        }
+
+        # 确定主要意图
+        primary_intent = None
+        for intent, keywords in intent_keywords.items():
+            if any(kw in task for kw in keywords):
+                primary_intent = intent
+                break
+
+        for rule in self.rules:
+            # 跳过约束规则
+            if rule.pattern == '.*':
+                continue
+
+            # 检查关键词匹配
+            try:
+                if re.search(rule.pattern, task, re.IGNORECASE):
+                    # 如果有主要意图，优先匹配同类型的规则
+                    if primary_intent:
+                        rule_name_lower = rule.name.lower()
+                        if primary_intent in rule_name_lower:
+                            candidates.insert(0, rule)  # 插入到前面
+                        else:
+                            candidates.append(rule)
+                    else:
+                        candidates.append(rule)
+            except re.error:
+                if rule.pattern.lower() in task_lower:
+                    candidates.append(rule)
+
+        return candidates
+
+    def _llm_select_rule(self, task: str, candidates: List[AgentRule]) -> Optional[AgentRule]:
+        """用 LLM 从候选规则中选最匹配的"""
+        if not self.llm_fn:
+            return candidates[0] if candidates else None
+
+        # 构建候选列表
+        rule_list = []
+        for i, rule in enumerate(candidates):
+            steps_desc = ', '.join(s['desc'] for s in rule.steps[:3])
+            rule_list.append(f'{i+1}. {rule.name} — {steps_desc}')
+
+        prompt = f"""任务: {task[:200]}
+
+候选规则:
+{chr(10).join(rule_list)}
+
+选择最匹配任务的规则编号。只输出数字，不要其他文字。"""
+
+        try:
+            raw = self.llm_fn(prompt)
+            # 提取数字
+            match = re.search(r'\d+', raw)
+            if match:
+                idx = int(match.group()) - 1
+                if 0 <= idx < len(candidates):
+                    return candidates[idx]
+        except Exception:
+            pass
+
+        # 兜底：返回第一条
+        return candidates[0] if candidates else None
 
     def generate_rule(self, task: str, context: str = '') -> Optional[AgentRule]:
         """用 LLM 生成新规则"""
@@ -231,18 +319,42 @@ class RuleEngine:
         return f'[规则] {rule.name}\n工具链:\n{steps}\n验证: {rule.validation}'
 
     def extract_filename(self, task: str, rule: Optional[AgentRule] = None) -> Optional[str]:
-        """从任务中提取文件名"""
-        # 匹配 .py 文件
-        match = re.search(r'[\w_]+\.py', task)
+        """从任务中提取文件名（含路径前缀）"""
+        path_prefix = self.extract_path(task)
+        # 仅匹配 ASCII 文件名（避免 \w 匹配中文）
+        match = re.search(r'[a-zA-Z0-9_]+\.py', task)
         if match:
-            return match.group(0)
+            fname = match.group(0)
+            if path_prefix:
+                return f'{path_prefix}/{fname}'
+            return fname
+        return None
+
+    def extract_path(self, task: str) -> Optional[str]:
+        """从任务描述中提取目标目录路径
+        支持: '在X下新建', '在X目录下创建', '在X中新建', 'X目录下', 'X下'
+        """
+        patterns = [
+            r'在([\w_/\\-]+(?:目录)?)(?:下|中)(?:新建|创建|添加)',
+            r'([\w_/\\-]+)(?:目录)?下(?:新建|创建|添加)',
+            r'在([\w_/\\-]+)(?:下|中)(?:写|放|存)',
+        ]
+        for pat in patterns:
+            m = re.search(pat, task)
+            if m:
+                p = m.group(1).rstrip('目录').replace('\\', '/')
+                # 验证路径合理性
+                if 1 <= len(p) <= 30 and not p.startswith('.') and '/' not in p.lstrip('/'):
+                    return p
         return None
 
     def extract_module_name(self, task: str, filename: Optional[str] = None) -> Optional[str]:
         """提取模块名（用于测试文件名）"""
         if filename:
-            return filename.replace('.py', '')
-        match = re.search(r'(\w+)\.py', task)
+            # 取文件名部分（去掉路径前缀）
+            base = filename.replace('\\', '/').split('/')[-1]
+            return base.replace('.py', '')
+        match = re.search(r'([a-zA-Z0-9_]+)\.py', task)
         if match:
             return match.group(1)
         return None

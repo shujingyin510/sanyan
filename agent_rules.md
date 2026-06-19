@@ -16,7 +16,7 @@
 ---
 
 ## 规则：创建Python模块
-匹配：新增.*模块.*\.py|创建.*\.py|写.*函数.*到|实现.*模块
+匹配：新增|创建.*\.py|写.*函数|实现.*模块|写.*模块
 工具链：
 1. write_file({filename}|{code}) — 创建文件
 2. write_file({test_file}|{test_code}) — 创建测试文件

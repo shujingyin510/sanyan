@@ -6,6 +6,7 @@ Phase 3: 并行执行(P14) + 智能压缩(P22) + 跨会话学习(P19) + 可观�
 """
 
 import os
+import re
 import time as _time
 from typing import Dict, Optional
 
@@ -290,6 +291,20 @@ class AgentRuntime:
         if strategy is None:
             strategy = {'name': 'single', 'complexity': 'medium', 'use_llm': True, 'max_rounds': 5}
 
+        # 优先：规则引擎匹配
+        rule = self.rule_engine.match_rule(task)
+        if rule:
+            print(f'  [规则] 匹配: {rule.name}')
+            from agent_system.agent_execution import RuleExecutor
+            executor = RuleExecutor(
+                tools=self.tools,
+                rule_engine=self.rule_engine,
+                template_manager=self.template_manager,
+                llm_call=self._llm_call,
+                memory=self.memory,
+            )
+            return executor.execute_rule(task, rule, dry_run)
+
         # 验证闭环检测
         vloop = self._detect_verify_loop(task)
         if vloop:
@@ -536,7 +551,7 @@ class AgentRuntime:
         return None
 
     def _detect_verify_loop(self, task):
-        """检测'修复X让Y测试通过'模式"""
+        """检测'修复X让Y测试通过'模式（文件必须存在）"""
         import re as _re
 
         # 找.py文件名
@@ -544,9 +559,12 @@ class AgentRuntime:
         if len(files) >= 2:
             src_file, test_file = files[0], files[1]
             if 'test' in test_file.lower():
-                return {'file': src_file, 'test': test_file}
+                # 检查文件是否存在
+                if os.path.exists(src_file) and os.path.exists(test_file):
+                    return {'file': src_file, 'test': test_file}
             if 'test' in src_file.lower():
-                return {'file': test_file, 'test': src_file}
+                if os.path.exists(test_file) and os.path.exists(src_file):
+                    return {'file': test_file, 'test': src_file}
         return None
 
     def _run_verify_loop(self, src_file, test_file, dry_run):
@@ -872,6 +890,7 @@ class AgentRuntime:
         # 构建变量映射
         vars = {
             'filename': filename or 'output.py',
+            'file': filename or 'output.py',  # alias
             'module': module or 'output',
             'source_file': filename or 'source.py',
             'test_file': f'tests/test_{module}.py' if module else 'tests/test_output.py',
@@ -885,8 +904,11 @@ class AgentRuntime:
 
             # 替换变量
             args = args_desc
+            print(f'    [调试] args_desc={args_desc!r} vars_keys={list(vars.keys())}')  # DEBUG
             for k, v in vars.items():
-                args = args.replace(f'{{{k}}}', v)
+                args = args.replace(f'{{{k}}}', str(v))
+            if args != args_desc:
+                print(f'    [调试] args={args!r}')
 
             print(f'  [规则 {i}/{len(rule.steps)}] {tool} — {desc}')
 
@@ -957,9 +979,19 @@ class AgentRuntime:
             prompt = f'为以下任务生成Python代码，写入文件 {filename}:\n{task[:200]}\n\n只输出代码，不要其他文字。'
             code = self._llm_call(prompt)
             if code:
+                # 检测并拒绝 LLM 返回工具调用 JSON 而非代码
+                stripped = code.strip()
+                if stripped.startswith('{') and ('"tool"' in stripped or '"tool_name"' in stripped):
+                    print(f'    [代码生成] LLM返回工具调用JSON而非代码，重试...')
+                    # 重试一次
+                    retry_prompt = f'请直接输出Python代码，不要JSON格式:\n{task[:200]}'
+                    code = self._llm_call(retry_prompt)
+                    if code and (code.strip().startswith('{') and '"tool"' in code.strip()):
+                        return ''  # 第二次仍失败则放弃
                 # 缓存到模板管理器
-                self.template_manager._cache_set(task, filename, code, 'llm')
-            return code
+                if code and not code.strip().startswith('{'):
+                    self.template_manager._cache_set(task, filename, code, 'llm')
+            return code if code and not code.strip().startswith('{') else ''
         except Exception:
             return ''
 

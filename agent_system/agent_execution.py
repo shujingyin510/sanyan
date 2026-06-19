@@ -38,6 +38,7 @@ class RuleExecutor:
         # 构建变量映射
         vars = {
             'filename': filename or 'output.py',
+            'file': filename or 'output.py',  # alias for rules using {file}
             'module': module or 'output',
             'source_file': filename or 'source.py',
             'test_file': f'tests/test_{module}.py' if module else 'tests/test_output.py',
@@ -61,10 +62,11 @@ class RuleExecutor:
                 continue
 
             # 特殊处理：write_file 需要生成代码
-            if tool == 'write_file' and '{code}' in args_desc:
-                code = self._generate_code_for_rule(task, filename)
+            if tool == 'write_file' and '{code}' in args:
+                code = self._generate_code(task, filename)
+                print(f'    [代码生成] 长度: {len(code)}, 预览: {code[:50]}...')
                 args = f'{filename}|{code}'
-            elif tool == 'write_file' and '{test_code}' in args_desc:
+            elif tool == 'write_file' and '{test_code}' in args:
                 test_code = self._generate_test_code(task, filename, module)
                 test_file = f'tests/test_{module}.py'
                 args = f'{test_file}|{test_code}'
@@ -74,6 +76,14 @@ class RuleExecutor:
                 result = self.tools[tool](args, dry_run)
                 print(f'    → {str(result)[:80]}')
                 results.append(result)
+
+                # 文件不存在时自动切换为创建规则
+                if tool in ('read_file', 'replace_in_file') and 'No such file' in str(result):
+                    # 找到创建类规则
+                    create_rules = [r for r in self.rule_engine.rules if '创建' in r.name and ('模块' in r.name or '类' in r.name)]
+                    if create_rules and i == 1:
+                        print(f'    → 文件不存在，切换为创建规则: {create_rules[0].name}')
+                        return self.execute_rule(task, create_rules[0], dry_run)
 
                 if tool == 'write_file':
                     self.memory['modified'].append(filename)
@@ -114,29 +124,74 @@ class RuleExecutor:
         # 1. 用模板管理器获取代码
         code = self.template_manager.get_code(task, filename)
         if code:
-            return code
+            # 清理缓存的代码（可能在之前运行时被污染）
+            code = self._clean_code(code)
+            if code and not code.strip().startswith('{'):
+                return code
 
         # 2. 兜底：调 LLM 生成（会自动缓存）
         try:
             prompt = f'为以下任务生成Python代码，写入文件 {filename}:\n{task[:200]}\n\n只输出代码，不要其他文字。'
-            code = self._llm_call(prompt)
+            code = self._llm_call(prompt, override_system_prompt='你是一个代码生成器。只输出Python代码，不要输出其他内容。直接输出可运行的Python代码。')
             if code:
-                self.template_manager._cache_set(task, filename, code, 'llm')
-            return code
-        except Exception:
-            return ''
-
-    def _generate_code_for_rule(self, task: str, filename: str) -> str:
-        """为规则生成代码"""
-        code = self._generate_code(task, filename or 'output.py')
-        if code:
-            return code
-
-        try:
-            prompt = f'为以下任务生成Python代码，写入文件 {filename}:\n{task[:200]}\n\n只输出代码，不要其他文字。'
-            return self._llm_call(prompt)
+                # 先尝试清理代码（去除 JSON 包装、markdown 标记等）
+                code = self._clean_code(code)
+                # 如果清理后仍是 JSON（代码生成完全失败），重试
+                stripped = code.strip()
+                if stripped.startswith('{') and ('"tool"' in stripped or '"tool_name"' in stripped):
+                    print(f'    [代码生成] LLM返回工具调用JSON，重试...')
+                    retry_prompt = f'请直接输出Python代码，不要JSON格式:\n{task[:200]}'
+                    code = self._llm_call(retry_prompt, override_system_prompt='你是一个代码生成器。只输出Python代码，不要输出其他内容。')
+                    code = self._clean_code(code)
+                if code and not code.strip().startswith('{'):
+                    self.template_manager._cache_set(task, filename, code, 'llm')
+            return code if code and not code.strip().startswith('{') else f'# {filename} - 代码生成失败'
         except Exception:
             return f'# {filename} - 代码生成失败，请手动实现'
+
+    def _clean_code(self, code: str) -> str:
+        """清理代码，去掉 markdown 标记和 JSON 包装"""
+        # 检测并提取 JSON 中的代码内容
+        stripped = code.strip()
+        if stripped.startswith('{') and ('"tool"' in stripped or '"content"' in stripped):
+            # 方法 1: JSON 解析
+            try:
+                import json
+                data = json.loads(stripped)
+                if 'args' in data and 'content' in data.get('args', {}):
+                    return data['args']['content'].strip()
+                if 'content' in data:
+                    return data['content'].strip()
+            except (json.JSONDecodeError, KeyError):
+                pass
+            # 方法 2: 查找 content 字段（处理多行 JSON）
+            import re
+            # 找到 "content":" 的位置，提取到结尾的 "}}
+            m = re.search(r'"content"\s*:\s*"', stripped)
+            if m:
+                start = m.end()
+                # 从 start 开始找最后一个 "} 或 "}} 之前的内容
+                # 简单策略：取从 start 到结尾，去掉末尾的 "}} 或 "}
+                rest = stripped[start:]
+                # 去掉末尾的 JSON 闭合标记
+                rest = re.sub(r'"\s*\}\s*\}?\s*$', '', rest)
+                # 还原转义字符
+                rest = rest.replace('\\n', '\n').replace('\\t', '\t').replace('\\"', '"').replace('\\\\', '\\')
+                return rest.strip()
+        
+        # 去掉 ```python ... ``` 标记
+        if '```' in code:
+            lines = code.split('\n')
+            clean_lines = []
+            in_code = False
+            for line in lines:
+                if line.strip().startswith('```'):
+                    in_code = not in_code
+                    continue
+                if in_code:
+                    clean_lines.append(line)
+            code = '\n'.join(clean_lines)
+        return code.strip()
 
     def _generate_test_code(self, task: str, filename: str, module: str) -> str:
         """为规则生成测试代码"""
