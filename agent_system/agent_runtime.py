@@ -305,6 +305,20 @@ class AgentRuntime:
             )
             return executor.execute_rule(task, rule, dry_run)
 
+        # 无规则匹配 + 非代码任务 → LLM 直接回答
+        code_keywords = ['创建', '写', '新建', '实现', '修复', '重构', '测试', '删除', '添加',
+                         'create', 'write', 'implement', 'fix', 'refactor', 'test']
+        is_code_task = any(kw in task for kw in code_keywords)
+        if not is_code_task:
+            print('  [问答] 非代码任务，LLM 直接回答...')
+            try:
+                answer = self._llm_call(f'请直接回答以下问题，简洁明了:\n{task}')
+                if answer:
+                    answer = self._clean_llm_response(answer)
+                    return {'answer': answer, 'memory': self.memory}
+            except Exception:
+                pass  # 失败则继续走原有流程
+
         # 验证闭环检测
         vloop = self._detect_verify_loop(task)
         if vloop:
@@ -721,6 +735,32 @@ class AgentRuntime:
 
     def _llm_call(self, prompt, override_system_prompt=None):
         """LLM 调用：委托给 LLMHandler"""
+        # 更新 system prompt
+        self.llm_handler._system_prompt = self._system_prompt
+        return self.llm_handler.llm_call(prompt, override_system_prompt)
+
+    def _clean_llm_response(self, text: str) -> str:
+        """清理 LLM 回答（去除 JSON 包装、工具调用格式等）"""
+        stripped = text.strip()
+        # 尝试 JSON 解析
+        if stripped.startswith('{'):
+            try:
+                import json
+                data = json.loads(stripped)
+                if 'args' in data and 'answer' in data.get('args', {}):
+                    return data['args']['answer']
+                if 'content' in data:
+                    return data['content']
+                if 'answer' in data:
+                    return data['answer']
+            except (json.JSONDecodeError, KeyError):
+                pass
+        # 去除 markdown 代码块
+        if stripped.startswith('```'):
+            lines = stripped.split('\n')
+            if len(lines) > 2:
+                return '\n'.join(lines[1:-1])
+        return stripped
         # 更新 system prompt
         self.llm_handler._system_prompt = self._system_prompt
         return self.llm_handler.llm_call(prompt, override_system_prompt)

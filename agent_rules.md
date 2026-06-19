@@ -1600,3 +1600,24 @@
 工具链：
 1. done({answer}) — 日常回复
 验证：echo 聊天完成
+
+## 规则：创建Java类
+匹配：Java.*类|java.*class|创建.*\.java|新建.*\.java
+工具链：
+1. write_file({filename}|{code}) — 创建Java文件
+2. write_file({test_file}|{test_code}) — 创建测试文件
+3. run_shell(javac {filename} && java {module}) — 编译运行
+验证：javac {filename}
+
+## 规则：创建Go模块
+匹配：Go.*文件|golang|\.go|创建.*go.*文件|新建.*\.go
+工具链：
+1. write_file({filename}|{code}) — 创建Go文件
+2. run_shell(go run {filename}) — 运行Go文件
+验证：go run {filename}
+
+## 规则：多语言代码问答
+匹配：Java|Go语言|Rust|C\+\+|TypeScript|Kotlin|Swift|\.java|\.go|\.rs|\.kt|golang
+工具链：
+1. done({answer}) — 直接回答技术问题
+验证：echo 问答完成

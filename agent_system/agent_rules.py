@@ -321,12 +321,16 @@ class RuleEngine:
     def extract_filename(self, task: str, rule: Optional[AgentRule] = None) -> Optional[str]:
         """从任务中提取文件名（含路径前缀）"""
         path_prefix = self.extract_path(task)
-        # 匹配完整路径+文件名: csrc/gpt2_engine.py
-        match = re.search(r'([a-zA-Z0-9_/\\-]+/[a-zA-Z0-9_]+\.py)', task)
+        lang = self.detect_language(task)
+        ext = self.LANG_EXTENSIONS.get(lang, '.py')
+        ext_pattern = ext.replace('.', r'\.')
+
+        # 匹配完整路径+文件名: csrc/foo.ext
+        match = re.search(rf'([a-zA-Z0-9_/\\-]+/[a-zA-Z0-9_]+{ext_pattern})', task)
         if match:
             return match.group(1).replace('\\', '/')
-        # 匹配纯文件名: gpt2_engine.py
-        match = re.search(r'[a-zA-Z0-9_]+\.py', task)
+        # 匹配纯文件名: foo.ext
+        match = re.search(rf'[a-zA-Z0-9_]+{ext_pattern}', task)
         if match:
             fname = match.group(0)
             if path_prefix:
@@ -334,7 +338,72 @@ class RuleEngine:
             return fname
         return None
 
+    # 语言扩展名映射
+    LANG_EXTENSIONS = {
+        'python': '.py', 'py': '.py',
+        'java': '.java',
+        'go': '.go', 'golang': '.go',
+        'javascript': '.js', 'js': '.js', 'node': '.js',
+        'typescript': '.ts', 'ts': '.ts',
+        'rust': '.rs', 'rs': '.rs',
+        'c': '.c', 'cpp': '.cpp', 'c++': '.cpp',
+        'ruby': '.rb', 'rb': '.rb',
+        'php': '.php',
+        'swift': '.swift',
+        'kotlin': '.kt', 'kt': '.kt',
+        'scala': '.scala',
+        'r': '.r',
+        'sql': '.sql',
+        'html': '.html', 'css': '.css',
+        'shell': '.sh', 'bash': '.sh',
+        'yaml': '.yml', 'yml': '.yml', 'toml': '.toml',
+        'markdown': '.md', 'md': '.md',
+        'text': '.txt', 'txt': '.txt',
+    }
+
+    def detect_language(self, task: str) -> str:
+        """从任务描述中检测编程语言"""
+        task_lower = task.lower()
+        lang_keywords = {
+            'python': ['python', '.py', 'pytest', 'pip', 'django', 'flask', 'fastapi', 'numpy', 'pandas'],
+            'java': ['java', '.java', 'maven', 'gradle', 'spring', 'jvm', 'jar', 'class '],
+            'go': ['go', 'golang', '.go', 'goroutine', 'go mod'],
+            'javascript': ['javascript', '.js', 'node', 'npm', 'react', 'vue', 'angular'],
+            'typescript': ['typescript', '.ts', 'tsx', 'ts-node'],
+            'rust': ['rust', '.rs', 'cargo', 'crate'],
+            'c': ['c语言', ' c ', '.c ', 'gcc', 'makefile'],
+            'cpp': ['c++', 'cpp', '.cpp', 'cmake', 'qt'],
+            'ruby': ['ruby', '.rb', 'rails', 'gem'],
+            'php': ['php', '.php', 'laravel', 'composer'],
+            'kotlin': ['kotlin', '.kt', 'gradle.kts'],
+            'swift': ['swift', '.swift', 'xcode', 'ios'],
+            'shell': ['shell', 'bash', '.sh', 'script'],
+        }
+        for lang, keywords in lang_keywords.items():
+            for kw in keywords:
+                if kw in task_lower:
+                    return lang
+        return 'python'
+
     def extract_path(self, task: str) -> Optional[str]:
+        """从任务描述中提取目标目录路径
+        支持: '在X下新建', '在X目录下创建', '在X中新建', 'X目录下', 'X下'
+        """
+        patterns = [
+            r'在([\w_/\\-]+(?:目录)?)(?:下|中)(?:新建|创建|添加)',
+            r'([\w_/\\-]+)(?:目录)?下(?:新建|创建|添加)',
+            r'在([\w_/\\-]+)(?:下|中)(?:写|放|存)',
+            r'(?:解释|分析|看懂|说明)(?:.*?)([\w_]+\.py)',
+        ]
+        for pat in patterns:
+            m = re.search(pat, task)
+            if m:
+                p = m.group(1).rstrip('目录').replace('\\', '/')
+                if p.endswith('.py'):
+                    return None
+                if 1 <= len(p) <= 30 and not p.startswith('.') and '/' not in p.lstrip('/'):
+                    return p
+        return None
         """从任务描述中提取目标目录路径
         支持: '在X下新建', '在X目录下创建', '在X中新建', 'X目录下', 'X下'
         """
@@ -359,10 +428,12 @@ class RuleEngine:
     def extract_module_name(self, task: str, filename: Optional[str] = None) -> Optional[str]:
         """提取模块名（用于测试文件名）"""
         if filename:
-            # 取文件名部分（去掉路径前缀）
             base = filename.replace('\\', '/').split('/')[-1]
-            return base.replace('.py', '')
-        match = re.search(r'([a-zA-Z0-9_]+)\.py', task)
+            return base.rsplit('.', 1)[0] if '.' in base else base
+        lang = self.detect_language(task)
+        ext = self.LANG_EXTENSIONS.get(lang, '.py')
+        ext_pattern = ext.replace('.', r'\.')
+        match = re.search(rf'([a-zA-Z0-9_]+){ext_pattern}', task)
         if match:
             return match.group(1)
         return None
