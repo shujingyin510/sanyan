@@ -431,6 +431,7 @@ class LocalProvider(LLMProvider):
 
         try:
             import os as _os
+
             _os.environ['HF_HUB_OFFLINE'] = '1'
             _os.environ['TRANSFORMERS_OFFLINE'] = '1'
 

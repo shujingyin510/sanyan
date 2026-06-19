@@ -371,17 +371,18 @@ class TestTernaryEngine(unittest.TestCase):
         self.assertEqual(self.engine.classify('analyze', '函数列表...'), 'AFFIRM')
 
     def test_classify_negate(self):
-        self.assertEqual(self.engine.classify('read_file', '未找到文件'), 'NEGATE')
+        self.assertEqual(self.engine.classify('read_file', '未找到文件'), 'UNCERT')  # 文件不存在是可恢复的
+        self.assertEqual(self.engine.classify('run_test', 'FAIL test_foo'), 'NEGATE')
 
     def test_classify_uncert(self):
         self.assertEqual(self.engine.classify('replace_in_file', '已替换'), 'AFFIRM')
         self.assertEqual(self.engine.classify('replace_in_file', '操作完成'), 'UNCERT')
 
     def test_classify_fail(self):
-        self.assertEqual(self.engine.classify('run_test', 'FAIL test_foo'), 'NEGATE')
+        self.assertEqual(self.engine.classify('run_test', 'traceback error'), 'NEGATE')
 
     def test_classify_default(self):
-        self.assertEqual(self.engine.classify('unknown', 'result'), 'AFFIRM')
+        self.assertEqual(self.engine.classify('unknown', 'result'), 'UNCERT')  # 默认不确定
 
     def test_map_trit(self):
         self.assertEqual(self.engine.map_trit('AFFIRM'), 1)
@@ -411,13 +412,14 @@ class TestTernaryEngine(unittest.TestCase):
 
     def test_protect_hesitation(self):
         self.engine.hesitation = 5
-        gate = self.engine.protect('低', 1, 0.9, [(1, 0.8)])
+        gate = self.engine.protect('低', 0, 0.9, [(1, 0.8)])  # trit=0 才触发犹豫
         self.assertEqual(gate['action'], 'block')
 
     def test_protect_low_gain(self):
         self.engine.history = [(1, 0.81), (1, 0.82), (1, 0.83)]
-        gate = self.engine.protect('低', 1, 0.815, self.engine.history)
-        self.assertEqual(gate['reason'], '信息增益不足')
+        self.engine.hesitation = 0
+        gate = self.engine.protect('低', 0, 0.815, self.engine.history)
+        self.assertIn('不确定', gate['reason'])  # trit=0 → UNCERT
 
     def test_protect_continue(self):
         gate = self.engine.protect('低', 1, 0.9, [])

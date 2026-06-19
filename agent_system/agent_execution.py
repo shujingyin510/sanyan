@@ -44,6 +44,7 @@ class RuleExecutor:
 
         # 三态引擎：驱动决策
         from ternary_engine import TernaryEngine
+
         ternary = TernaryEngine()
         results = []
         for i, step in enumerate(rule.steps, 1):
@@ -52,7 +53,7 @@ class RuleExecutor:
                 last_trit, last_conf = ternary.history[-1]
                 if last_trit == -1 and last_conf > 0.7:
                     # 高置信度 NEGATE → 跳过后续步骤
-                    print(f'  [三态] 上一步高置信拒绝({last_conf:.2f})，跳过剩余{len(rule.steps)-i+1}步')
+                    print(f'  [三态] 上一步高置信拒绝({last_conf:.2f})，跳过剩余{len(rule.steps) - i + 1}步')
                     break
                 if ternary.hesitation >= 3:
                     # 连续不确定 ≥3 → 停止
@@ -61,8 +62,11 @@ class RuleExecutor:
                 if last_trit == 0 and last_conf < 0.3:
                     # 低置信度不确定 → 尝试切换规则
                     print(f'  [三态] 低置信不确定({last_conf:.2f})，尝试替代方案...')
-                    alt_rules = [r for r in self.rule_engine.rules
-                                 if r.name != rule.name and any(kw in r.name for kw in ['创建', '修复', '重构'])]
+                    alt_rules = [
+                        r
+                        for r in self.rule_engine.rules
+                        if r.name != rule.name and any(kw in r.name for kw in ['创建', '修复', '重构'])
+                    ]
                     if alt_rules and i <= 2:
                         print(f'  [三态] 切换到: {alt_rules[0].name}')
                         return self.execute_rule(task, alt_rules[0], dry_run)
@@ -116,6 +120,7 @@ class RuleExecutor:
                     code = self._generate_code(task, filename)
                     # 提取文件名
                     import re
+
                     fm = re.search(r'[\w_]+\.py', args)
                     target = fm.group(0) if fm else (filename or 'output.py')
                     # 如果是测试文件，用测试代码
@@ -129,7 +134,9 @@ class RuleExecutor:
             try:
                 if tool == 'done' and ('{answer}' in args_desc or args.startswith('完成')):
                     # 需要 LLM 生成回答
-                    answer_prompt = f'根据以下任务给出有用的回答:\n{task}\n\n请直接输出回答内容，不要JSON格式，不要工具调用。'
+                    answer_prompt = (
+                        f'根据以下任务给出有用的回答:\n{task}\n\n请直接输出回答内容，不要JSON格式，不要工具调用。'
+                    )
                     answer = self._llm_call(answer_prompt)
                     # 清理 JSON 包装或工具调用格式
                     answer = self._clean_code(answer)
@@ -151,7 +158,9 @@ class RuleExecutor:
                 # 文件不存在时自动切换为创建规则
                 if tool in ('read_file', 'replace_in_file') and 'No such file' in str(result):
                     # 找到创建类规则
-                    create_rules = [r for r in self.rule_engine.rules if '创建' in r.name and ('模块' in r.name or '类' in r.name)]
+                    create_rules = [
+                        r for r in self.rule_engine.rules if '创建' in r.name and ('模块' in r.name or '类' in r.name)
+                    ]
                     if create_rules and i == 1:
                         print(f'    → 文件不存在，切换为创建规则: {create_rules[0].name}')
                         return self.execute_rule(task, create_rules[0], dry_run)
@@ -213,16 +222,21 @@ class RuleExecutor:
         # 2. 兜底：调 LLM 生成（会自动缓存）
         try:
             prompt = f'为以下任务生成Python代码，写入文件 {filename}:\n{task[:200]}\n\n只输出代码，不要其他文字。'
-            code = self._llm_call(prompt, override_system_prompt='你是一个代码生成器。只输出Python代码，不要输出其他内容。直接输出可运行的Python代码。')
+            code = self._llm_call(
+                prompt,
+                override_system_prompt='你是一个代码生成器。只输出Python代码，不要输出其他内容。直接输出可运行的Python代码。',
+            )
             if code:
                 # 先尝试清理代码（去除 JSON 包装、markdown 标记等）
                 code = self._clean_code(code)
                 # 如果清理后仍是 JSON（代码生成完全失败），重试
                 stripped = code.strip()
                 if stripped.startswith('{') and ('"tool"' in stripped or '"tool_name"' in stripped):
-                    print(f'    [代码生成] LLM返回工具调用JSON，重试...')
+                    print('    [代码生成] LLM返回工具调用JSON，重试...')
                     retry_prompt = f'请直接输出Python代码，不要JSON格式:\n{task[:200]}'
-                    code = self._llm_call(retry_prompt, override_system_prompt='你是一个代码生成器。只输出Python代码，不要输出其他内容。')
+                    code = self._llm_call(
+                        retry_prompt, override_system_prompt='你是一个代码生成器。只输出Python代码，不要输出其他内容。'
+                    )
                     code = self._clean_code(code)
                 if code and not code.strip().startswith('{'):
                     self.template_manager._cache_set(task, filename, code, 'llm')
@@ -238,6 +252,7 @@ class RuleExecutor:
             # 方法 1: JSON 解析
             try:
                 import json
+
                 data = json.loads(stripped)
                 if 'args' in data and 'content' in data.get('args', {}):
                     return data['args']['content'].strip()
@@ -247,6 +262,7 @@ class RuleExecutor:
                 pass
             # 方法 2: 查找 content 字段（处理多行 JSON）
             import re
+
             # 找到 "content":" 的位置，提取到结尾的 "}}
             m = re.search(r'"content"\s*:\s*"', stripped)
             if m:
@@ -259,7 +275,7 @@ class RuleExecutor:
                 # 还原转义字符
                 rest = rest.replace('\\n', '\n').replace('\\t', '\t').replace('\\"', '"').replace('\\\\', '\\')
                 return rest.strip()
-        
+
         # 去掉 ```python ... ``` 标记
         if '```' in code:
             lines = code.split('\n')

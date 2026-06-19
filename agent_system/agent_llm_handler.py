@@ -99,6 +99,7 @@ class LLMHandler:
         """本地模型调用（HuggingFace transformers + 本地缓存）"""
         try:
             from agent_system.agent_llm import LocalProvider
+
             # 懒初始化并缓存
             if not hasattr(self, '_local_provider'):
                 self._local_provider = LocalProvider(model_name=model)
@@ -109,10 +110,12 @@ class LLMHandler:
             if sys_msg is None:
                 sys_msg = self._default_system_prompt()
 
-            response = provider.chat([
-                {'role': 'system', 'content': sys_msg},
-                {'role': 'user', 'content': prompt},
-            ])
+            response = provider.chat(
+                [
+                    {'role': 'system', 'content': sys_msg},
+                    {'role': 'user', 'content': prompt},
+                ]
+            )
             # chat() 返回 dict {'content': text, ...}，提取文本
             if isinstance(response, dict):
                 return response.get('content', str(response))
@@ -245,7 +248,7 @@ class LLMHandler:
                 elif raw[i] == '}':
                     depth -= 1
                     if depth == 0:
-                        candidate = raw[start:i + 1]
+                        candidate = raw[start : i + 1]
                         try:
                             # 修复 JSON 中的换行符
                             candidate = self._fix_json_newlines(candidate)
@@ -263,8 +266,19 @@ class LLMHandler:
                                         return tool, f'{path}|{content}'
 
                                     ordered = []
-                                    for key in ('path', 'name', 'keyword', 'content', 'answer',
-                                                'old', 'new', 'pattern', 'start', 'count', 'test_file'):
+                                    for key in (
+                                        'path',
+                                        'name',
+                                        'keyword',
+                                        'content',
+                                        'answer',
+                                        'old',
+                                        'new',
+                                        'pattern',
+                                        'start',
+                                        'count',
+                                        'test_file',
+                                    ):
                                         if key in args:
                                             ordered.append(str(args[key]))
                                     if ordered:

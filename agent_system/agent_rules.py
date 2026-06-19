@@ -173,7 +173,7 @@ class RuleEngine:
         rule_list = []
         for i, rule in enumerate(candidates):
             steps_desc = ', '.join(s['desc'] for s in rule.steps[:3])
-            rule_list.append(f'{i+1}. {rule.name} — {steps_desc}')
+            rule_list.append(f'{i + 1}. {rule.name} — {steps_desc}')
 
         prompt = f"""任务: {task[:200]}
 
@@ -340,25 +340,41 @@ class RuleEngine:
 
     # 语言扩展名映射
     LANG_EXTENSIONS = {
-        'python': '.py', 'py': '.py',
+        'python': '.py',
+        'py': '.py',
         'java': '.java',
-        'go': '.go', 'golang': '.go',
-        'javascript': '.js', 'js': '.js', 'node': '.js',
-        'typescript': '.ts', 'ts': '.ts',
-        'rust': '.rs', 'rs': '.rs',
-        'c': '.c', 'cpp': '.cpp', 'c++': '.cpp',
-        'ruby': '.rb', 'rb': '.rb',
+        'go': '.go',
+        'golang': '.go',
+        'javascript': '.js',
+        'js': '.js',
+        'node': '.js',
+        'typescript': '.ts',
+        'ts': '.ts',
+        'rust': '.rs',
+        'rs': '.rs',
+        'c': '.c',
+        'cpp': '.cpp',
+        'c++': '.cpp',
+        'ruby': '.rb',
+        'rb': '.rb',
         'php': '.php',
         'swift': '.swift',
-        'kotlin': '.kt', 'kt': '.kt',
+        'kotlin': '.kt',
+        'kt': '.kt',
         'scala': '.scala',
         'r': '.r',
         'sql': '.sql',
-        'html': '.html', 'css': '.css',
-        'shell': '.sh', 'bash': '.sh',
-        'yaml': '.yml', 'yml': '.yml', 'toml': '.toml',
-        'markdown': '.md', 'md': '.md',
-        'text': '.txt', 'txt': '.txt',
+        'html': '.html',
+        'css': '.css',
+        'shell': '.sh',
+        'bash': '.sh',
+        'yaml': '.yml',
+        'yml': '.yml',
+        'toml': '.toml',
+        'markdown': '.md',
+        'md': '.md',
+        'text': '.txt',
+        'txt': '.txt',
     }
 
     def detect_language(self, task: str) -> str:

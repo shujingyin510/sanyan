@@ -72,7 +72,7 @@ class TernaryEngine:
                 return 'UNCERT'  # 可能目标文本不精确，非代码错误
             if '已' in r or '共' in r:
                 return 'AFFIRM'
-        if tool == 'read_file' and ('No such file' in r or '读文件错误' in r):
+        if tool == 'read_file' and ('No such file' in r or '读文件错误' in r or '未找到' in r):
             return 'UNCERT'  # 文件不存在是可恢复的
         if tool == 'done':
             return 'AFFIRM'
@@ -80,8 +80,7 @@ class TernaryEngine:
         # ── AFFIRM: 明确成功 ──
         if '通过' in r or 'ok' in r or 'success' in result_str:
             return 'AFFIRM'
-        if tool in ('analyze', 'find_symbol', 'read_file', 'search_code',
-                     'list_files', 'git_diff', 'git_status'):
+        if tool in ('analyze', 'find_symbol', 'read_file', 'search_code', 'list_files', 'git_diff', 'git_status'):
             return 'AFFIRM'  # 读操作默认成功
         if '⚠' in r and len(r) > 50:
             return 'AFFIRM'  # 分析结果（有内容）
@@ -125,7 +124,12 @@ class TernaryEngine:
         if trit == 0:
             if self.hesitation >= self.max_hesitation:
                 vote = self._majority(history)
-                return {'action': 'block', 'reason': f'犹豫{self.hesitation}次，多数判定={vote}', 'vote': vote, 'conf': confidence}
+                return {
+                    'action': 'block',
+                    'reason': f'犹豫{self.hesitation}次，多数判定={vote}',
+                    'vote': vote,
+                    'conf': confidence,
+                }
             return {'action': 'continue', 'reason': f'不确定({confidence:.2f})，继续观察', 'conf': confidence}
 
         # CONFLICTED → 降级为 UNCERT 处理

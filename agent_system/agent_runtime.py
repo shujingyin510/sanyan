@@ -6,7 +6,6 @@ Phase 3: 并行执行(P14) + 智能压缩(P22) + 跨会话学习(P19) + 可观�
 """
 
 import os
-import re
 import time as _time
 from typing import Dict, Optional
 
@@ -296,6 +295,7 @@ class AgentRuntime:
         if rule:
             print(f'  [规则] 匹配: {rule.name}')
             from agent_system.agent_execution import RuleExecutor
+
             executor = RuleExecutor(
                 tools=self.tools,
                 rule_engine=self.rule_engine,
@@ -306,8 +306,30 @@ class AgentRuntime:
             return executor.execute_rule(task, rule, dry_run)
 
         # 无规则匹配 + 非代码任务 → LLM 直接回答
-        code_keywords = ['创建', '写', '新建', '实现', '修复', '重构', '测试', '删除', '添加',
-                         'create', 'write', 'implement', 'fix', 'refactor', 'test']
+        code_keywords = [
+            '创建',
+            '写',
+            '新建',
+            '实现',
+            '修复',
+            '重构',
+            '测试',
+            '删除',
+            '添加',
+            'create',
+            'write',
+            'implement',
+            'fix',
+            'refactor',
+            'test',
+            '分析',
+            '查找',
+            '搜索',
+            '定位',
+            '在哪',
+            '哪些',
+            '多少行',
+        ]
         is_code_task = any(kw in task for kw in code_keywords)
         if not is_code_task:
             print('  [问答] 非代码任务，LLM 直接回答...')
@@ -735,7 +757,6 @@ class AgentRuntime:
 
     def _llm_call(self, prompt, override_system_prompt=None):
         """LLM 调用：委托给 LLMHandler"""
-        # 更新 system prompt
         self.llm_handler._system_prompt = self._system_prompt
         return self.llm_handler.llm_call(prompt, override_system_prompt)
 
@@ -746,6 +767,7 @@ class AgentRuntime:
         if stripped.startswith('{'):
             try:
                 import json
+
                 data = json.loads(stripped)
                 if 'args' in data and 'answer' in data.get('args', {}):
                     return data['args']['answer']
@@ -761,7 +783,9 @@ class AgentRuntime:
             if len(lines) > 2:
                 return '\n'.join(lines[1:-1])
         return stripped
-        # 更新 system prompt
+
+    def _llm_call(self, prompt, override_system_prompt=None):
+        """LLM 调用：委托给 LLMHandler"""
         self.llm_handler._system_prompt = self._system_prompt
         return self.llm_handler.llm_call(prompt, override_system_prompt)
 
@@ -808,6 +832,7 @@ class AgentRuntime:
                 print(f'  [规则] 工具链: {[s["tool"] for s in new_rule.steps]}')
                 # 立即执行生成的规则
                 from agent_system.agent_execution import RuleExecutor
+
                 executor = RuleExecutor(
                     tools=self.tools,
                     rule_engine=self.rule_engine,
@@ -1028,7 +1053,7 @@ class AgentRuntime:
                 # 检测并拒绝 LLM 返回工具调用 JSON 而非代码
                 stripped = code.strip()
                 if stripped.startswith('{') and ('"tool"' in stripped or '"tool_name"' in stripped):
-                    print(f'    [代码生成] LLM返回工具调用JSON而非代码，重试...')
+                    print('    [代码生成] LLM返回工具调用JSON而非代码，重试...')
                     # 重试一次
                     retry_prompt = f'请直接输出Python代码，不要JSON格式:\n{task[:200]}'
                     code = self._llm_call(retry_prompt)
