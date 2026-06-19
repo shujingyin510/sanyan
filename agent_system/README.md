@@ -106,9 +106,7 @@ python -X utf8 run_agent.py "把AGENTS.md里v0.3改成v0.4" --dry-run
 | `project_migrator.py` | 跨项目迁移 |
 | `git_batch_learner.py` | Git 批量学习 |
 | `agent_llm.py` | LLM Provider（含本地模型） |
-| `ternary_engine.py` | 三态决策引擎 |
-| `decision.san` | 旧引擎决策核心（已迁移到 Python） |
-| `agent_runtime.san` | 三言版 Agent 运行时 |
+| `ternary_engine.py` | 三态决策引擎（五态分类 + Kleene传播 + 门控） |
 
 ### 目录结构
 
