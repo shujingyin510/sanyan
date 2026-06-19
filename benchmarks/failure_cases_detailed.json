@@ -1,0 +1,119 @@
+[
+  {
+    "lang": "en",
+    "prompt": "The cat cat",
+    "min_ur": 0.571,
+    "step": -1,
+    "status": "OK",
+    "cat": "broken_grammar",
+    "output": "The cat cat.jpg\n10/02/2019\n\n# What is 16 as a Fraction in Simplest Form\n\n### What is 16 as a Fractio"
+  },
+  {
+    "lang": "en",
+    "prompt": "The cat car",
+    "min_ur": 0.656,
+    "step": -1,
+    "status": "OK",
+    "cat": "broken_grammar",
+    "output": "The cat car has ____ passengers.\nA. 5\nB. 6\nC. 7\nD. 8\nAnswer:\nC\n\nWhich of the following is NOT a type"
+  },
+  {
+    "lang": "en",
+    "prompt": "They went to boy",
+    "min_ur": 0.688,
+    "step": -1,
+    "status": "OK",
+    "cat": "broken_grammar",
+    "output": "They went to boy's college with a(n) _______ of 800 pounds.\nA. average\nB. proportion\nC. average\nD. p"
+  },
+  {
+    "lang": "en",
+    "prompt": "She went to boy",
+    "min_ur": 0.8,
+    "step": -1,
+    "status": "OK",
+    "cat": "broken_grammar",
+    "output": "She went to boy's school as ____ as her mother. 作为……的女儿\nas\nthe\nof\nin\n答案:\nA\n\n“有志者，事竟成，破釜沉舟，百"
+  },
+  {
+    "lang": "en",
+    "prompt": "The cat cat",
+    "min_ur": 0.594,
+    "step": -1,
+    "status": "OK",
+    "cat": "broken_grammar",
+    "output": "The cat cat eats 20 pounds of food in one day. The dog dog eats 10 more pounds of food than the cat "
+  },
+  {
+    "lang": "en",
+    "prompt": "The little house",
+    "min_ur": 0.656,
+    "step": -1,
+    "status": "OK",
+    "cat": "broken_grammar",
+    "output": "The little house on the corner was a pretty house. What color was it?\nOptions:\n- colorless\n- shabby\n"
+  },
+  {
+    "lang": "en",
+    "prompt": "Once upon a time cat",
+    "min_ur": 0.688,
+    "step": -1,
+    "status": "OK",
+    "cat": "broken_grammar",
+    "output": "Once upon a time cat and mouse (or cat and monkey) was a popular game. One of the most popular versi"
+  },
+  {
+    "lang": "zh",
+    "prompt": "小猫在",
+    "min_ur": 0.688,
+    "step": -1,
+    "status": "OK",
+    "cat": "pure_repeat",
+    "output": "小猫在公园散步，它发现了一条小径。小径上有一排数列植物，每个植物都有一个数字。小猫随机选择了一个植物，然后离开小径。她把植物"
+  },
+  {
+    "lang": "zh",
+    "prompt": "他说了",
+    "min_ur": 0.594,
+    "step": -1,
+    "status": "OK",
+    "cat": "pure_repeat",
+    "output": "他说了什么话，其他人也听懂了这句话，但不知他们是否记得这句话的具体内容。\nA. 他们同意了。\nB. 他们没有同意。\nC. 他们没有明白这句话"
+  },
+  {
+    "lang": "zh",
+    "prompt": "那条路",
+    "min_ur": 0.625,
+    "step": -1,
+    "status": "OK",
+    "cat": "pure_repeat",
+    "output": "那条路，不是我走的。我上边听呀，下边听呀，脚上就勾住了树干，朝下走，一直走到了房顶。黑漆漆的，"
+  },
+  {
+    "lang": "zh",
+    "prompt": "下雨了",
+    "min_ur": 0.562,
+    "step": -1,
+    "status": "OK",
+    "cat": "pure_repeat",
+    "output": "下雨了，不知道怎么处理，天亮了，可不知道怎么睡着了，一直醒了，眼睛都不在被子里，不知道怎么睡着了\n如果您在下雨天醒来后感到眼睛不适"
+  },
+  {
+    "lang": "zh",
+    "prompt": "今天天气",
+    "min_ur": 0.75,
+    "step": -1,
+    "status": "OK",
+    "cat": "pure_repeat",
+    "output": "今天天气很好。在客厅里吃饭，用意念按摩法，很舒服，而且只用了一个小时就完成了，非常有效。 你提到的“意念按摩法”可能是指通过"
+  },
+  {
+    "lang": "zh",
+    "prompt": "小明每天",
+    "min_ur": 0.781,
+    "step": -1,
+    "status": "OK",
+    "cat": "pure_repeat",
+    "output": "小明每天骑自行车上学，他骑自行车的速度是每小时6千米，从家到学校需要骑行20分钟。请问，小明家到学校的距离是多少千米？ 为了计算小明"
+  }
+]
