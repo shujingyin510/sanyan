@@ -296,6 +296,7 @@ def main():
             'self-host': cmd_agent_self_host,
             'review-evolve': cmd_agent_review_evolve,
             'chat': cmd_agent_chat,
+            'tui': cmd_agent_tui,
         }[a.agent_command or 'run'](a),
         'bench': cmd_bench,
         'compile': cmd_compile,
