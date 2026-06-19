@@ -882,6 +882,19 @@ class AgentRuntime:
             # ── LLM 调用 ──
             try:
                 raw = self._llm_call(ctx)
+                # ═══ UR 退化检测：在 LLM 文本输出上计算 ═══
+                llm_history = self.memory.setdefault('llm_outputs', [])
+                llm_history.append(str(raw)[:200])  # 取前200字符
+                if len(llm_history) >= 4:
+                    recent = llm_history[-4:]
+                    # 用字符级UR（每10字符为1个token，避免tokenizer依赖）
+                    tokens = [str(r)[i:i+10] for r in recent for i in range(0, min(len(str(r)), 100), 10)]
+                    if len(tokens) >= 8:
+                        ur = len(set(tokens)) / len(tokens)
+                        if ur < 0.30:
+                            print(f'  [UR] LLM输出退化 (UR={ur:.2f})，强制停止')
+                            self.memory['failures'] += 1
+                            break
             except Exception as e:
                 llm_consecutive_fails += 1
                 print(f'  [LLM] 调用失败 (r={rnd}): {e}')
