@@ -231,3 +231,33 @@
 文件: cache.py (66行)
   函数: __init__, get, put, __contains__
   类: LRUCache
+
+## 学习记录: 在csrc下新建string_utils.py，实现三个函数：reverse_string反转字符串
+- 模式: 创建模块
+- 风格: 使用纯函数形式，可能包含类型注解、docstring，以pytest进行测试
+- 约定: 模块放置在csrc目录下, 函数采用下划线命名, 使用pytest编写测试
+- 关键词: string_utils, pytest, 类型注解
+- 时间: 2026-06-19 16:42
+- 修改详情:
+文件: csrc/string_utils.py (78行)
+  函数: mean, median, mode, variance, standard_deviation, covariance, correlation
+
+## 学习记录: 新建config_loader.py，实现ConfigLoader类，支持从JSON文件加载配置
+- 模式: 功能开发
+- 风格: 模块化，使用类型注解，docstring，使用pytest进行测试
+- 约定: 文件名snake_case, 类名PascalCase, 测试文件在tests/目录, 优先使用函数而非单方法类
+- 关键词: config_loader, ConfigLoader, JSON, pytest
+- 时间: 2026-06-19 16:44
+- 修改详情:
+无详情
+
+## 学习记录: 在csrc下创建logger.py，实现一个简单的日志记录器
+- 模式: 创建模块
+- 风格: 使用类封装功能，方法命名snake_case，文件命名小写，使用pytest测试框架，可能包含类型注解和docstring
+- 约定: 类名PascalCase, 方法snake_case, 测试文件放置在tests目录, 使用pytest运行测试, 模块文件放在csrc目录下
+- 关键词: logger, SimpleLogger, csrc, pytest
+- 时间: 2026-06-19 16:46
+- 修改详情:
+文件: csrc/logger.py (42行)
+  函数: __init__, log, info, warning, error, debug, close
+  类: SimpleLogger

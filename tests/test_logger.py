@@ -1,5 +1,5 @@
 import pytest
-from string_utils import *
+from logger import *
 
 def test_basic():
     # TODO: 添加测试

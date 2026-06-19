@@ -62,14 +62,28 @@ class RuleExecutor:
                 continue
 
             # 特殊处理：write_file 需要生成代码
-            if tool == 'write_file' and '{code}' in args:
-                code = self._generate_code(task, filename)
-                print(f'    [代码生成] 长度: {len(code)}, 预览: {code[:50]}...')
-                args = f'{filename}|{code}'
-            elif tool == 'write_file' and '{test_code}' in args:
-                test_code = self._generate_test_code(task, filename, module)
-                test_file = f'tests/test_{module}.py'
-                args = f'{test_file}|{test_code}'
+            if tool == 'write_file':
+                if '{code}' in args or '{test_code}' in args:
+                    if '{code}' in args:
+                        code = self._generate_code(task, filename)
+                        args = f'{filename}|{code}'
+                    else:
+                        test_code = self._generate_test_code(task, filename, module)
+                        test_file = f'tests/test_{module}.py'
+                        args = f'{test_file}|{test_code}'
+                elif '|' not in args:
+                    # LLM生成的规则可能没有用标准格式，自动注入代码
+                    code = self._generate_code(task, filename)
+                    # 提取文件名
+                    import re
+                    fm = re.search(r'[\w_]+\.py', args)
+                    target = fm.group(0) if fm else (filename or 'output.py')
+                    # 如果是测试文件，用测试代码
+                    if 'test' in target.lower() or 'test' in args.lower():
+                        test_code = self._generate_test_code(task, filename, module)
+                        args = f'{target}|{test_code}'
+                    else:
+                        args = f'{target}|{code}'
 
             # 执行工具
             try:

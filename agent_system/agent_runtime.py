@@ -759,19 +759,25 @@ class AgentRuntime:
             print(f'  [规则] 匹配: {rule.name}')
             return self._execute_rule(task, rule, dry_run)
 
-        # ── 无匹配规则：尝试 LLM 生成新规则 ──
+        # ── 无匹配规则：尝试 LLM 生成新规则并立即执行 ──
         if self.rule_engine.llm_fn:
             print('  [规则] 无匹配规则，尝试生成...')
             new_rule = self.rule_engine.generate_rule(task)
             if new_rule:
-                print(f'  [规则] 生成: {new_rule.name}')
+                print(f'  [规则] 生成并执行: {new_rule.name}')
                 print(f'  [规则] 工具链: {[s["tool"] for s in new_rule.steps]}')
-                # 返回待审批状态，不自动执行
-                return {
-                    'answer': f'生成新规则: {new_rule.name}',
-                    'pending_rule': new_rule.to_markdown(),
-                    'memory': self.memory,
-                }
+                # 立即执行生成的规则
+                from agent_system.agent_execution import RuleExecutor
+                executor = RuleExecutor(
+                    tools=self.tools,
+                    rule_engine=self.rule_engine,
+                    template_manager=self.template_manager,
+                    llm_call=self._llm_call,
+                    memory=self.memory,
+                )
+                result = executor.execute_rule(task, new_rule, dry_run)
+                result['auto_rule'] = new_rule.name
+                return result
 
         ctx = self._build_context(task, 'init')
         t_start = _time.time()
