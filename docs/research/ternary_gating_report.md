@@ -271,6 +271,50 @@ nucleus sampling (top_p=0.9) 下三个规模的 UR：
 
 > (1) A single uniqueness-ratio threshold of 0.30 reliably separates degenerative from coherent generation across four small models spanning three architectures (GPT-Neo, GPT-2, Qwen2), with 98-100% TPR and 0.4% FPR (p<0.05). (2) UR alone achieves identical performance to the full trajectory detection system — all other signals are redundant. (3) Human text baseline (n=60 WikiText-2, μ=0.849 [0.846,0.852]) and measured ROC (1214 samples, Youden's J optimum 0.32) independently confirm the threshold is not arbitrary.
 
+
+
+## 13. 自适应闭环控制：检测→干预
+
+将 UR 信号从被动检测升级为主动调控——在生成过程中动态调整惩罚参数：
+
+| UR 区间 | 策略 | 参数 |
+|---------|------|------|
+| > 0.40 (正常) | 无干预 | temperature=0.8 |
+| 0.30–0.40 (预警) | 加强惩罚 | penalty=1.30, temperature=0.9 |
+| < 0.30 (退化) | 贪心回退 | greedy argmax |
+
+GPT-2 124M 30 prompt 对比：
+
+| 策略 | 平均 UR | 说明 |
+|------|--------|------|
+| greedy | 0.291 | "I was a girl. I was a girl..." |
+| rep_penalty=1.15 | 0.076 | 最差，加剧坍缩 |
+| sampling (top-k=50) | 0.764 | 基线 |
+| **adaptive (UR-based)** | **0.790** | **最优，提前预防退化** |
+
+> 自适应策略在 UR 降到预警区时自动加强惩罚，降到退化区时回退到贪心。不仅事后检测，更**提前预防**——adaptive 的 UR 甚至高于正常 sampling（0.79 vs 0.76），说明动态调控在保持多样性的同时有效压制了退化倾向。
+
+## 14. 双通道检测：UR（词法）+ SBERT（语义）
+
+UR 只能检测词级重复（"was was was"），无法检测语义循环（词不同但意思不变）。引入 Sentence-BERT (all-MiniLM-L6-v2) 作为第二通道：
+
+| 检测通道 | 信号 | 阈值 | 检测目标 |
+|----------|------|------|----------|
+| 通道 1 | unique_ratio | < 0.30 | 词级坍缩 (lexical collapse) |
+| 通道 2 | SBERT cosine similarity | > 0.85 | 语义循环 (semantic loop) |
+
+**SBERT 语义相似度验证：**
+
+| 测试对 | 相似度 | 判定 |
+|--------|--------|------|
+| "cat sat" vs "feline rested" | 0.54 | OK（MiniLM 太轻，未捕获换词） |
+| "capital of France?" vs "which city is capital?" | **0.90** | **语义循环** ✅ |
+| 正常不同话题 | 0.13 | OK |
+| 完全重复 | 1.00 | 循环 |
+
+> 双通道组合判断：UR < 0.30 → 词法循环；UR > 0.30 且 sim > 0.85 → 语义循环；sim > 0.90 且 UR < 0.50 → 严重语义循环。MiniLM-L6-v2 对 subtle paraphrase ("cat"→"feline") 的敏感度有限，换用更强的 embedding 模型（mpnet-base）可提升召回率。
+
+
 ## 下一步
 
 - [x] 1000 prompt 基准（4 模型）
