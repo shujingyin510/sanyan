@@ -1,0 +1,108 @@
+{
+  "accuracy": {
+    "file": 1.0,
+    "func": 0.6
+  },
+  "results": [
+    {
+      "task": "在csrc下新建utils.py，实现一个计时器",
+      "file": "utils.py",
+      "expected_file": "utils.py",
+      "file_ok": true,
+      "func": "计时器",
+      "expected_func": "timer",
+      "func_ok": false,
+      "dir": "csrc"
+    },
+    {
+      "task": "在agent_system下创建health.py，实现HealthCheck类",
+      "file": "health.py",
+      "expected_file": "health.py",
+      "file_ok": true,
+      "func": "HealthCheck类",
+      "expected_func": "HealthCheck",
+      "func_ok": false,
+      "dir": "agent_system"
+    },
+    {
+      "task": "给src/config.py添加load_config函数",
+      "file": "config.py",
+      "expected_file": "config.py",
+      "file_ok": true,
+      "func": "load_config",
+      "expected_func": "load_config",
+      "func_ok": true,
+      "dir": "给src"
+    },
+    {
+      "task": "修复lib/db.py的连接超时bug",
+      "file": "db.py",
+      "expected_file": "db.py",
+      "file_ok": true,
+      "func": null,
+      "expected_func": null,
+      "func_ok": true,
+      "dir": "修复lib"
+    },
+    {
+      "task": "重构models/user.py的validate方法",
+      "file": "user.py",
+      "expected_file": "user.py",
+      "file_ok": true,
+      "func": null,
+      "expected_func": "validate",
+      "func_ok": false,
+      "dir": "重构models"
+    },
+    {
+      "task": "在tests下新建test_api.py",
+      "file": "test_api.py",
+      "expected_file": "test_api.py",
+      "file_ok": true,
+      "func": null,
+      "expected_func": null,
+      "func_ok": true,
+      "dir": "tests"
+    },
+    {
+      "task": "给utils/string_utils.py添加is_email函数",
+      "file": "string_utils.py",
+      "expected_file": "string_utils.py",
+      "file_ok": true,
+      "func": "is_email",
+      "expected_func": "is_email",
+      "func_ok": true,
+      "dir": "给utils"
+    },
+    {
+      "task": "创建scripts/deploy.sh部署脚本",
+      "file": "deploy.sh",
+      "expected_file": "deploy.sh",
+      "file_ok": true,
+      "func": null,
+      "expected_func": null,
+      "func_ok": true,
+      "dir": "创建scripts"
+    },
+    {
+      "task": "在src下创建services/auth.py，实现JWT认证",
+      "file": "auth.py",
+      "expected_file": "auth.py",
+      "file_ok": true,
+      "func": "JWT认证",
+      "expected_func": "jwt",
+      "func_ok": false,
+      "dir": "src"
+    },
+    {
+      "task": "修复core/engine.py的内存泄漏",
+      "file": "engine.py",
+      "expected_file": "engine.py",
+      "file_ok": true,
+      "func": null,
+      "expected_func": null,
+      "func_ok": true,
+      "dir": "修复core"
+    }
+  ]
+}

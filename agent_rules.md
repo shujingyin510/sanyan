@@ -1621,3 +1621,27 @@
 工具链：
 1. done({answer}) — 直接回答技术问题
 验证：echo 问答完成
+
+## 规则：创建日志模块
+匹配：logger|日志功能|日志记录|logging
+工具链：
+1. write_file({filename}|{code}) — 创建日志模块
+2. write_file({test_file}|{test_code}) — 创建测试
+3. run_shell(python -X utf8 -m pytest {test_file} -x -q) — 运行测试
+验证：python -X utf8 -m pytest {test_file} -x -q
+
+## 规则：添加单元测试
+匹配：写.*测试|单元测试|测试.*文件|给.*写.*test
+工具链：
+1. read_file({filename}) — 读取源文件
+2. write_file({test_file}|{test_code}) — 创建测试
+3. run_shell(python -X utf8 -m pytest {test_file} -x -q) — 运行测试
+验证：python -X utf8 -m pytest {test_file} -x -q
+
+## 规则：重构代码
+匹配：重构.*代码|提取.*变量|简化.*条件|消除.*重复|冗余代码|代码.*优化
+工具链：
+1. read_file({filename}) — 读取文件
+2. replace_in_file({filename}|{old_code}|{new_code}) — 执行重构
+3. run_shell(python -X utf8 -m pytest tests/ -x -q) — 验证重构
+验证：python -X utf8 -m pytest tests/ -x -q

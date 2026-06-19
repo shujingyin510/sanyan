@@ -358,3 +358,13 @@
 - 时间: 2026-06-19 21:13
 - 修改详情:
 无详情
+
+## 学习记录: 创建一个HTTP请求模块，命名为requests.py
+- 模式: 创建模块
+- 风格: 模块级函数，私有辅助函数以下划线开头，使用类型注解和docstring
+- 约定: HTTP方法函数（get/post/put/delete）封装通用request函数, 使用json_parser作为默认响应解析器, _build_response构造统一响应对象
+- 关键词: requests, HTTP, get, post, put, delete, json
+- 时间: 2026-06-19 21:25
+- 修改详情:
+文件: requests.py (49行)
+  函数: _build_response, json_parser, request, get, post, put, delete
