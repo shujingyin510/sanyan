@@ -310,3 +310,32 @@
 - 修改详情:
 文件: csrc/timer.py (83行)
   函数: now, today, format_datetime, parse_datetime, format_date, parse_date, format_time, timestamp, from_timestamp, add_days
+
+## 学习记录: 在csrc下新建hello.py，打印hello world
+- 模式: 创建新模块
+- 风格: 极简风格，无类型注解或docstring
+- 约定: 模块文件放在csrc目录下, 文件名使用小写字母加下划线
+- 关键词: hello world, csrc
+- 时间: 2026-06-19 17:31
+- 修改详情:
+无详情
+
+## 学习记录: 修复一个不存在的文件nonexist.py的导入错误
+- 模式: 修复导入错误
+- 风格: 工具函数模块，函数式风格，每个函数独立完成一项文件操作
+- 约定: 函数命名使用 snake_case, 每个函数专注于单一文件操作, 使用 Python 标准库进行文件读写
+- 关键词: 文件操作, 导入错误, 工具函数
+- 时间: 2026-06-19 17:31
+- 修改详情:
+文件: nonexist.py (69行)
+  函数: read_text, write_text, append_text, read_lines, write_lines, read_json, write_json, read_csv, write_csv
+
+## 学习记录: 在csrc下新建hello.py
+- 模式: 未知
+- 风格: Python
+- 约定: 
+- 关键词: csrc下新建hello
+- 时间: 2026-06-19 17:32
+- 修改详情:
+文件: csrc/hello.py (14行)
+  函数: hello

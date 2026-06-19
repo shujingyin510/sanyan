@@ -30,19 +30,42 @@ class RuleExecutor:
         self.memory = memory
 
     def execute_rule(self, task: str, rule: Any, dry_run: bool = False) -> Dict:
-        """按规则执行工具链（不调 LLM）"""
-        # 提取文件名和模块名
+        """按规则执行工具链（三态门控驱动）"""
         filename = self.rule_engine.extract_filename(task)
         module = self.rule_engine.extract_module_name(task, filename)
 
-        # 构建变量映射
         vars = {
             'filename': filename or 'output.py',
-            'file': filename or 'output.py',  # alias for rules using {file}
+            'file': filename or 'output.py',
             'module': module or 'output',
             'source_file': filename or 'source.py',
             'test_file': f'tests/test_{module}.py' if module else 'tests/test_output.py',
         }
+
+        # 三态引擎：驱动决策
+        from ternary_engine import TernaryEngine
+        ternary = TernaryEngine()
+        results = []
+        for i, step in enumerate(rule.steps, 1):
+            # ── 门控检查：上一步失败时是否继续 ──
+            if ternary.history:
+                last_trit, last_conf = ternary.history[-1]
+                if last_trit == -1 and last_conf > 0.7:
+                    # 高置信度 NEGATE → 跳过后续步骤
+                    print(f'  [三态] 上一步高置信拒绝({last_conf:.2f})，跳过剩余{len(rule.steps)-i+1}步')
+                    break
+                if ternary.hesitation >= 3:
+                    # 连续不确定 ≥3 → 停止
+                    print(f'  [三态] 连续{ternary.hesitation}次不确定，停止执行')
+                    break
+                if last_trit == 0 and last_conf < 0.3:
+                    # 低置信度不确定 → 尝试切换规则
+                    print(f'  [三态] 低置信不确定({last_conf:.2f})，尝试替代方案...')
+                    alt_rules = [r for r in self.rule_engine.rules
+                                 if r.name != rule.name and any(kw in r.name for kw in ['创建', '修复', '重构'])]
+                    if alt_rules and i <= 2:
+                        print(f'  [三态] 切换到: {alt_rules[0].name}')
+                        return self.execute_rule(task, alt_rules[0], dry_run)
 
         results = []
         for i, step in enumerate(rule.steps, 1):
@@ -119,6 +142,12 @@ class RuleExecutor:
                     print(f'    → {str(result)[:80]}')
                 results.append(result)
 
+                # 三态门控：记录每步执行结果
+                if tool != 'done':
+                    ternary.step(tool, str(result))
+                    last_trit, last_conf = ternary.history[-1][:2] if ternary.history else (1, 1.0)
+                    print(f'    [三态] {ternary.trit_display(last_trit, last_conf)}')
+
                 # 文件不存在时自动切换为创建规则
                 if tool in ('read_file', 'replace_in_file') and 'No such file' in str(result):
                     # 找到创建类规则
@@ -132,6 +161,7 @@ class RuleExecutor:
             except Exception as e:
                 print(f'    ✗ 执行失败: {e}')
                 results.append(f'错误: {e}')
+                ternary.step(tool, f'错误: {e}')
 
         # 验证
         if rule.validation:
@@ -157,10 +187,17 @@ class RuleExecutor:
             except Exception as e:
                 print(f'    ✗ 验证错误: {e}')
 
+        # 三态摘要
+        if ternary.history:
+            final_trit, final_conf = ternary.history[-1]
+            verdict = '通过' if final_trit == 1 else ('拒绝' if final_trit == -1 else '不确定')
+            print(f'  [三态] 最终判定: {verdict} ({ternary.summary()})')
+
         return {
             'answer': f'按规则 [{rule.name}] 执行完成',
             'memory': self.memory,
             'rule': rule.name,
+            'ternary': ternary.summary(),
         }
 
     def _generate_code(self, task: str, filename: str) -> str:
