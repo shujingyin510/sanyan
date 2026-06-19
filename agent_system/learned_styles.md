@@ -461,3 +461,34 @@
 文件: calculator.py (41行)
   函数: add, subtract, multiply, divide, test_add, test_subtract, test_multiply, test_divide
   类: TestCalculator
+
+## 学习记录: 在csrc下新建logger.py，实现日志功能
+- 模式: 功能开发（创建新模块）
+- 风格: 使用标准库logging，函数式设计，模块命名logger.py
+- 约定: 函数命名为snake_case, 提供配置函数和获取实例函数, 使用标准库logging, 模块仅包含两个公开函数
+- 关键词: logging, logger, configure_logging, get_logger
+- 时间: 2026-06-19 21:45
+- 修改详情:
+文件: csrc/logger.py (35行)
+  函数: configure_logging, get_logger
+
+## 学习记录: 创建一个HTTP请求模块，命名为requests.py
+- 模式: 创建模块
+- 风格: 函数式编程，模块级函数，无类，使用标准库实现HTTP请求，提供类似requests库的便捷API
+- 约定: 私有函数以下划线开头, 函数名使用下划线命名, 提供HTTP方法对应的便捷函数(get, post等)
+- 关键词: HTTP请求, requests, response, JSON解析, GET/POST/PUT/DELETE
+- 时间: 2026-06-19 21:45
+- 修改详情:
+文件: requests.py (49行)
+  函数: _build_response, json_parser, request, get, post, put, delete
+
+## 学习记录: 给calculator.py写单元测试
+- 模式: 添加单元测试
+- 风格: 使用pytest框架，将测试与实现代码混合写在同一个calculator.py文件中，测试通过独立的test_函数和TestCalculator测试类组织
+- 约定: 测试直接写在被测模块文件中, 测试函数以test_开头, 测试类以Test开头
+- 关键词: calculator, 单元测试, pytest, test_add, TestCalculator
+- 时间: 2026-06-19 21:46
+- 修改详情:
+文件: calculator.py (41行)
+  函数: add, subtract, multiply, divide, test_add, test_subtract, test_multiply, test_divide
+  类: TestCalculator

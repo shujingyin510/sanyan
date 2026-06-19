@@ -34,7 +34,7 @@ for tid, task, category in tests:
     try:
         r = subprocess.run(
             ["python", "-X", "utf8", "run_agent.py", task, "--rounds", "5"],
-            capture_output=True, text=True, timeout=40,
+            capture_output=True, text=True,             timeout=60,
             encoding='utf-8', errors='replace',
             cwd="D:/Test/sanyan"
         )

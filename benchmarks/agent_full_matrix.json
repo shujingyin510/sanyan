@@ -11,7 +11,7 @@
     "negate": true,
     "crashed": false,
     "done": true,
-    "time": "10.0s"
+    "time": "12.8s"
   },
   {
     "id": "A2",
@@ -25,7 +25,7 @@
     "negate": false,
     "crashed": false,
     "done": true,
-    "time": "7.0s"
+    "time": "17.6s"
   },
   {
     "id": "A3",
@@ -39,7 +39,7 @@
     "negate": false,
     "crashed": false,
     "done": true,
-    "time": "8.4s"
+    "time": "10.5s"
   },
   {
     "id": "A4",
@@ -53,7 +53,7 @@
     "negate": true,
     "crashed": false,
     "done": true,
-    "time": "3.9s"
+    "time": "56.7s"
   },
   {
     "id": "A5",
@@ -81,7 +81,7 @@
     "negate": true,
     "crashed": false,
     "done": true,
-    "time": "7.7s"
+    "time": "1.4s"
   },
   {
     "id": "B7",
@@ -95,7 +95,7 @@
     "negate": true,
     "crashed": false,
     "done": true,
-    "time": "6.4s"
+    "time": "3.3s"
   },
   {
     "id": "B8",
@@ -109,7 +109,7 @@
     "negate": true,
     "crashed": false,
     "done": true,
-    "time": "14.4s"
+    "time": "1.4s"
   },
   {
     "id": "B9",
@@ -117,13 +117,13 @@
     "cat": "LLM",
     "rule": false,
     "llm": 0,
-    "ternary": 0,
+    "ternary": 8,
     "ur_min": 1.0,
-    "ur_stop": false,
-    "negate": false,
-    "crashed": true,
-    "done": false,
-    "time": "0.3s"
+    "ur_stop": true,
+    "negate": true,
+    "crashed": false,
+    "done": true,
+    "time": "23.2s"
   },
   {
     "id": "B10",
@@ -143,15 +143,15 @@
     "id": "C11",
     "task": "实现Raft分布式一致性协议",
     "cat": "退化",
-    "rule": false,
-    "llm": 0,
-    "ternary": 0,
+    "rule": true,
+    "llm": 1,
+    "ternary": 7,
     "ur_min": 1.0,
-    "ur_stop": false,
+    "ur_stop": true,
     "negate": false,
     "crashed": true,
-    "done": false,
-    "time": "0.3s"
+    "done": true,
+    "time": "48.0s"
   },
   {
     "id": "C12",
@@ -165,7 +165,7 @@
     "negate": false,
     "crashed": false,
     "done": true,
-    "time": "24.1s"
+    "time": "27.6s"
   },
   {
     "id": "C13",
@@ -173,69 +173,69 @@
     "cat": "退化",
     "rule": false,
     "llm": 0,
-    "ternary": 0,
+    "ternary": 3,
     "ur_min": 1.0,
     "ur_stop": false,
     "negate": false,
     "crashed": true,
-    "done": false,
-    "time": "0.3s"
+    "done": true,
+    "time": "24.3s"
   },
   {
     "id": "C14",
     "task": "解释量子纠错在拓扑量子计算中的应用",
     "cat": "退化",
     "rule": false,
-    "llm": 0,
+    "llm": 1,
     "ternary": 0,
     "ur_min": 1.0,
     "ur_stop": false,
     "negate": false,
-    "crashed": true,
-    "done": false,
-    "time": "0.3s"
+    "crashed": false,
+    "done": true,
+    "time": "7.3s"
   },
   {
     "id": "C15",
     "task": "实现一个完整的ORM框架",
     "cat": "退化",
-    "rule": false,
+    "rule": true,
     "llm": 0,
     "ternary": 0,
     "ur_min": 1.0,
-    "ur_stop": false,
+    "ur_stop": true,
     "negate": false,
     "crashed": true,
     "done": false,
-    "time": "0.3s"
+    "time": "27.8s"
   },
   {
     "id": "D16",
     "task": "修复一个不存在目录里的bug",
     "cat": "边界",
-    "rule": false,
+    "rule": true,
     "llm": 0,
-    "ternary": 0,
+    "ternary": 6,
     "ur_min": 1.0,
-    "ur_stop": false,
+    "ur_stop": true,
     "negate": false,
     "crashed": true,
-    "done": false,
-    "time": "0.3s"
+    "done": true,
+    "time": "10.1s"
   },
   {
     "id": "D17",
     "task": "修复main.py里不存在的竞态条件",
     "cat": "边界",
-    "rule": false,
+    "rule": true,
     "llm": 0,
-    "ternary": 0,
+    "ternary": 5,
     "ur_min": 1.0,
-    "ur_stop": false,
-    "negate": false,
+    "ur_stop": true,
+    "negate": true,
     "crashed": true,
-    "done": false,
-    "time": "0.3s"
+    "done": true,
+    "time": "10.3s"
   },
   {
     "id": "D18",
@@ -247,9 +247,9 @@
     "ur_min": 1.0,
     "ur_stop": false,
     "negate": false,
-    "crashed": true,
+    "crashed": false,
     "done": false,
-    "time": "0.3s"
+    "time": "60.0s"
   },
   {
     "id": "D19",
@@ -263,7 +263,7 @@
     "negate": true,
     "crashed": false,
     "done": true,
-    "time": "4.3s"
+    "time": "4.4s"
   },
   {
     "id": "D20",
@@ -271,12 +271,12 @@
     "cat": "边界",
     "rule": false,
     "llm": 0,
-    "ternary": 0,
+    "ternary": 2,
     "ur_min": 1.0,
     "ur_stop": false,
     "negate": false,
     "crashed": true,
-    "done": false,
-    "time": "0.3s"
+    "done": true,
+    "time": "11.3s"
   }
 ]
