@@ -339,3 +339,22 @@
 - 修改详情:
 文件: csrc/hello.py (14行)
   函数: hello
+
+## 学习记录: 创建math_utils.py，实现is_prime和gcd
+- 模式: 创建模块
+- 风格: 使用类型注解和docstring，模块化函数，无类，遵循Python标准库风格
+- 约定: 函数名小写加下划线, 使用pytest进行单元测试, 测试文件放置在tests/目录下
+- 关键词: math_utils, is_prime, gcd, pytest
+- 时间: 2026-06-19 21:13
+- 修改详情:
+文件: math_utils.py (104行)
+  函数: is_narcissistic, is_prime, fibonacci, factorial, gcd, lcm, is_perfect_number, collatz_length
+
+## 学习记录: 创建string_utils.py，实现reverse_string
+- 模式: 创建模块
+- 风格: 使用独立函数实现，可能包含docstring和类型注解
+- 约定: 使用pytest编写测试, 测试文件放在tests/目录下, 不创建只有一个方法的类，直接用函数, 不引入新依赖
+- 关键词: reverse_string, string_utils, pytest
+- 时间: 2026-06-19 21:13
+- 修改详情:
+无详情

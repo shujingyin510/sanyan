@@ -1,0 +1,132 @@
+[
+  {
+    "task": "创建math_utils.py，实现is_prime和gcd",
+    "cat": "规则",
+    "actual": "纯规则",
+    "rule": true,
+    "llm": false,
+    "ternary": 4,
+    "success": true,
+    "time": "12.5s"
+  },
+  {
+    "task": "创建string_utils.py，实现reverse_string",
+    "cat": "规则",
+    "actual": "纯规则",
+    "rule": true,
+    "llm": false,
+    "ternary": 4,
+    "success": true,
+    "time": "11.7s"
+  },
+  {
+    "task": "修复csrc/gpt2_engine.py的导入错误",
+    "cat": "规则",
+    "actual": "纯规则",
+    "rule": true,
+    "llm": false,
+    "ternary": 5,
+    "success": true,
+    "time": "5.1s"
+  },
+  {
+    "task": "列出csrc下所有Python文件",
+    "cat": "规则",
+    "actual": "LLM直答",
+    "rule": false,
+    "llm": true,
+    "ternary": 0,
+    "success": true,
+    "time": "1.6s"
+  },
+  {
+    "task": "解释run_agent.py的代码逻辑",
+    "cat": "规则",
+    "actual": "纯规则",
+    "rule": true,
+    "llm": false,
+    "ternary": 3,
+    "success": true,
+    "time": "10.4s"
+  },
+  {
+    "task": "Python的GIL是什么",
+    "cat": "LLM",
+    "actual": "规则+LLM",
+    "rule": true,
+    "llm": true,
+    "ternary": 0,
+    "success": true,
+    "time": "8.2s"
+  },
+  {
+    "task": "设计一个博客系统的数据库ER图",
+    "cat": "LLM",
+    "actual": "纯规则",
+    "rule": true,
+    "llm": false,
+    "ternary": 0,
+    "success": true,
+    "time": "11.5s"
+  },
+  {
+    "task": "量子纠缠能超光速通信吗",
+    "cat": "LLM",
+    "actual": "LLM直答",
+    "rule": false,
+    "llm": true,
+    "ternary": 0,
+    "success": true,
+    "time": "2.7s"
+  },
+  {
+    "task": "Java的volatile和Go的channel有什么区别",
+    "cat": "LLM",
+    "actual": "规则+LLM",
+    "rule": true,
+    "llm": true,
+    "ternary": 0,
+    "success": true,
+    "time": "11.4s"
+  },
+  {
+    "task": "推荐几部好看的科幻电影",
+    "cat": "LLM",
+    "actual": "LLM直答",
+    "rule": false,
+    "llm": true,
+    "ternary": 0,
+    "success": true,
+    "time": "4.3s"
+  },
+  {
+    "task": "创建一个不存在的目录下的文件",
+    "cat": "边界",
+    "actual": "其他",
+    "rule": false,
+    "llm": false,
+    "ternary": 0,
+    "success": false,
+    "time": "0.8s"
+  },
+  {
+    "task": "修复一个不存在的bug",
+    "cat": "边界",
+    "actual": "其他",
+    "rule": false,
+    "llm": false,
+    "ternary": 0,
+    "success": false,
+    "time": "0.9s"
+  },
+  {
+    "task": "用Brainfuck写一个hello world",
+    "cat": "边界",
+    "actual": "其他",
+    "rule": false,
+    "llm": false,
+    "ternary": 0,
+    "success": false,
+    "time": "0.9s"
+  }
+]
