@@ -265,6 +265,7 @@ class AgentRuntime:
         result = None
         try:
             result = self._run_core(task, max_rounds, dry_run, trace_id, start_time, strategy)
+            self._print_panel(result)
             return result
         finally:
             # 结束追踪
@@ -790,10 +791,32 @@ class AgentRuntime:
                 return '\n'.join(lines[1:-1])
         return stripped
 
-    def _llm_call(self, prompt, override_system_prompt=None):
-        """LLM 调用：委托给 LLMHandler"""
-        self.llm_handler._system_prompt = self._system_prompt
-        return self.llm_handler.llm_call(prompt, override_system_prompt)
+    def _print_panel(self, result):
+        """执行完毕后输出可视化面板"""
+        mem = result.get('memory', {})
+        hist = mem.get('history', [])
+        ts = result.get('ternary', '无记录')
+        rule_name = result.get('rule', '—')
+        modified = mem.get('modified', [])
+        answer = result.get('answer', '')[:200]
+
+        w = 56
+        print(f'╔{"═"*w}╗')
+        print(f'║  {"AGENT EXECUTION PANEL":^{w}}  ║')
+        print(f'╠{"═"*w}╣')
+        print(f'║  三态判定: {ts:<46} ║')
+        print(f'║  规则命中: {rule_name:<46} ║')
+        print(f'║  工具步骤: {len(hist):<46} ║')
+        for h in hist[-3:]:
+            t = h.get('tool','?'); tv = h.get('trit',0)
+            m = '✓' if tv==1 else ('✗' if tv==-1 else '?')
+            print(f'║    {m} {t:<44} ║')
+        if modified:
+            print(f'║  修改文件: {", ".join(modified[-3:]):<46} ║')
+        if answer:
+            print(f'║  输出预览: {answer[:46]:<46} ║')
+        print(f'╚{"═"*w}╝')
+        print()
 
     def _parse_tool(self, raw):
         """工具解析：委托给 LLMHandler"""
