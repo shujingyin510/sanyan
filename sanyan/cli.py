@@ -85,6 +85,12 @@ def cmd_agent_chat(args):
     run()
 
 
+def cmd_agent_tui(args):
+    from sanyan.agent_tui import run
+
+    run()
+
+
 def cmd_bench(args):
     import sys as _sys
 
@@ -211,6 +217,7 @@ def _build_parser():
     p = agent_sub.add_parser('validate', help='进化仿真验证（100随机+收敛+Reviewer）')
     p = agent_sub.add_parser('dashboard', help='进化仪表盘')
     p = agent_sub.add_parser('chat', help='多轮对话')
+    p = agent_sub.add_parser('tui', help='交互式终端面板（三栏布局）')
     p = agent_sub.add_parser('self-host', help='自举验证')
     p = agent_sub.add_parser('review-evolve', help='带审查的进化闭环')
 
