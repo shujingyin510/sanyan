@@ -2,6 +2,45 @@
 
 ---
 
+## [v3.42.0] — 2026-06-19 (三态引擎驱动Agent + 多语言通用QA + CI全绿)
+
+### Agent 核心升级
+- **三态引擎升级**：从"旁观者"到"决策者"——Kleene传播 + 五态分类 + 保护门控 + 最终判定
+- **五态 classify**：NEGATE（明确失败）/ UNCERT（可恢复）/ AFFIRM（成功）/ CONFLICTED（矛盾）/ PENDING
+- **三态门控**：高置信拒绝 → 跳过后续；连续不确定 → 停止；低置信 → 切换策略
+- **多语言通用 QA**：非代码任务自动 LLM 直答，不限语言（Python/Java/Go/Rust/Scala/Haskell + 天文/地理/历史/电影）
+- **语言检测框架**：自动识别 13 种编程语言 + 对应文件扩展名
+- **代码解释规则**：read_file → analyze → done，自动分析代码结构
+- **日常聊天 + 项目规划规则**：done → LLM 直接生成回答
+
+### Agent 执行修复
+- **LLM 生成规则自动执行**：不再 pending，立即执行
+- **文件不存在回退**：read_file 失败 → 自动切换创建规则
+- **超时护杀**：总超时 300s + 单步超时 60s
+- **LLM 连续失败计数**：连续 3 次 → 退出
+- **每步日志**：`[r{rnd}] 工具={tool} 参数=...`
+- **淘汰赛触发修复**：失败计数正确递增
+- **`{file}` 变量别名**：修复规则模板变量不替换
+- **路径提取**：支持"在X下新建Y" → `X/Y`
+- **ASCII-only regex**：避免 \w 匹配中文
+- **本地模型支持**：`LocalProvider` + `HF_HUB_OFFLINE` 离线加载
+- **subprocess UTF-8 修复**：`encoding='utf-8', errors='replace'`
+
+### 推理引擎实验
+- **自适应闭环控制**：UR 动态惩罚调度，avg UR=0.79（vs greedy 0.29）
+- **双通道检测器**：UR（词法）+ SBERT（语义），检测 paraphrastic loop
+- **阈值敏感性 ROC**：实测 1214 样本，Youden's J 最优=0.32，选 0.30
+- **GPT-2 跨规模验证**：124M/355M/774M，UR 波动 ±0.043
+
+### CI
+- ruff format/check 全绿
+- mypy 零错误（csrc.* ignore_errors）
+- pytest 1634 通过
+- preflight 12/12 全绿
+- coverage omit 修复（.coveragerc 排除 agent_system/*）
+
+---
+
 ## [v3.41.0] — 2026-06-18 (规则库扩充 + 模板库 + 学习系统 + 多模型 + SQLite + 三言运行时)
 
 ### 规则库扩充
