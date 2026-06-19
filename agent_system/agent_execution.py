@@ -104,8 +104,19 @@ class RuleExecutor:
 
             # 执行工具
             try:
-                result = self.tools[tool](args, dry_run)
-                print(f'    → {str(result)[:80]}')
+                if tool == 'done' and ('{answer}' in args_desc or args.startswith('完成')):
+                    # 需要 LLM 生成回答
+                    answer_prompt = f'根据以下任务给出有用的回答:\n{task}\n\n请直接输出回答内容，不要JSON格式，不要工具调用。'
+                    answer = self._llm_call(answer_prompt)
+                    # 清理 JSON 包装或工具调用格式
+                    answer = self._clean_code(answer)
+                    if not answer or len(answer) < 10:
+                        answer = f'完成: {task[:100]}'
+                    result = answer
+                    print(f'    → {str(result)[:200]}')
+                else:
+                    result = self.tools[tool](args, dry_run)
+                    print(f'    → {str(result)[:80]}')
                 results.append(result)
 
                 # 文件不存在时自动切换为创建规则
