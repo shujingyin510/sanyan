@@ -11,7 +11,7 @@ class TernaryEngine:
     每步工具调用 → cog分类 → 三态映射(-1/0/1) → Kleene传播 → 置信度衰减 → 保护门控
     """
 
-    COG_MAP = {'AFFIRM': 1, 'NEGATE': -1}
+    COG_MAP = {'AFFIRM': 1, 'NEGATE': -1, 'CONFLICTED': -1}
     COG_NAMES = {'AFFIRM': '确信', 'NEGATE': '拒绝', 'UNCERT': '不确定', 'CONFLICTED': '矛盾', 'PENDING': '待定'}
     TRIT_NAMES = {1: '真', -1: '假', 0: '可能'}
     KLEENE = {
@@ -46,18 +46,52 @@ class TernaryEngine:
         self.min_gain = min_gain
 
     def classify(self, tool, result, scene_risk='低'):
-        """工具执行后分类认知态"""
+        """工具执行后分类认知态 — 五态（非简单二值）"""
         result_str = str(result).lower()
-        if '未找到' in result_str or 'error' in result_str:
+        r = str(result)
+
+        # ── NEGATE: 明确失败 ──
+        if 'error' in result_str and 'No such file' not in r:
             return 'NEGATE'
-        if '⚠' in str(result) or '通过' in str(result) or 'ok' in str(result):
+        if 'fail' in result_str or 'traceback' in result_str:
+            return 'NEGATE'
+        if '不支持' in r or 'denied' in result_str or 'forbidden' in result_str:
+            return 'NEGATE'
+        if tool == 'run_shell' and ('rc=1' in r or 'rc=2' in r):
+            return 'NEGATE'
+        if tool == 'run_test' and ('FAIL' in r or 'fail' in r or '失败' in r):
+            return 'NEGATE'
+
+        # ── UNCERT: 模糊/部分成功 ──
+        if 'No such file' in r or '找不到' in r:
+            return 'UNCERT'  # 可能是路径问题，非逻辑错误
+        if tool == 'write_file' and '已写入' in r:
             return 'AFFIRM'
-        if 'fail' in result_str or '失败' in result_str or '错误' in result_str:
-            return 'NEGATE'
-        # 修改类工具成功 → AFFIRM
-        if tool in ('replace_in_file', 'replace_all', 'write_file'):
-            return 'AFFIRM' if '已' in str(result) or '共' in str(result) else 'UNCERT'
-        return 'AFFIRM'
+        if tool in ('replace_in_file', 'replace_all'):
+            if '未找到' in r:
+                return 'UNCERT'  # 可能目标文本不精确，非代码错误
+            if '已' in r or '共' in r:
+                return 'AFFIRM'
+        if tool == 'read_file' and ('No such file' in r or '读文件错误' in r):
+            return 'UNCERT'  # 文件不存在是可恢复的
+        if tool == 'done':
+            return 'AFFIRM'
+
+        # ── AFFIRM: 明确成功 ──
+        if '通过' in r or 'ok' in r or 'success' in result_str:
+            return 'AFFIRM'
+        if tool in ('analyze', 'find_symbol', 'read_file', 'search_code',
+                     'list_files', 'git_diff', 'git_status'):
+            return 'AFFIRM'  # 读操作默认成功
+        if '⚠' in r and len(r) > 50:
+            return 'AFFIRM'  # 分析结果（有内容）
+
+        # ── CONFLICTED: 矛盾信号 ──
+        if 'error' in result_str and 'ok' in result_str:
+            return 'CONFLICTED'
+
+        # ── 默认：不确定 ──
+        return 'UNCERT'
 
     def map_trit(self, cog):
         return self.COG_MAP.get(cog, 0)
@@ -74,17 +108,37 @@ class TernaryEngine:
         return min(0.99, max(0.01, upstream_conf * current_conf))
 
     def protect(self, risk, trit, confidence, history):
+        """三态门控：基于认知态决定执行策略"""
+        # 高风险 + 非肯定 → 拒绝
         if risk == '高' and trit <= 0:
             return {'action': 'block', 'reason': '高风险+不确定=拒绝', 'conf': confidence}
-        if self.hesitation >= self.max_hesitation:
-            vote = self._majority(history)
-            return {'action': 'block', 'reason': f'犹豫{self.hesitation}次', 'vote': vote, 'conf': confidence}
-        # 增益计算
+
+        # NEGATE + 高置信 → 停止
+        if trit == -1 and confidence > 0.6:
+            return {'action': 'block', 'reason': f'高置信拒绝({confidence:.2f})', 'conf': confidence}
+
+        # NEGATE + 低置信 → 可重试（可能是临时错误）
+        if trit == -1 and confidence < 0.4:
+            return {'action': 'retry', 'reason': f'低置信拒绝({confidence:.2f})，可重试', 'conf': confidence}
+
+        # UNCERT 积累 → 犹豫计数
+        if trit == 0:
+            if self.hesitation >= self.max_hesitation:
+                vote = self._majority(history)
+                return {'action': 'block', 'reason': f'犹豫{self.hesitation}次，多数判定={vote}', 'vote': vote, 'conf': confidence}
+            return {'action': 'continue', 'reason': f'不确定({confidence:.2f})，继续观察', 'conf': confidence}
+
+        # CONFLICTED → 降级为 UNCERT 处理
+        if trit == 0 and self.hesitation > 0:  # CONFLICTED maps to trit=0
+            return {'action': 'continue', 'reason': '信号矛盾，继续收集信息', 'conf': confidence}
+
+        # 置信度衰减检测
         if history:
             hist_avg = sum(c for _, c in history[-5:]) / min(len(history), 5)
             gain = abs(confidence - hist_avg)
-            if gain < self.min_gain:
-                return {'action': 'continue', 'reason': '信息增益不足', 'conf': confidence}
+            if gain < self.min_gain and len(history) >= 4:
+                return {'action': 'block', 'reason': '信息增益不足，建议人工介入', 'conf': confidence}
+
         return {'action': 'continue', 'reason': '', 'conf': confidence}
 
     def step(self, tool, result, risk='低'):
