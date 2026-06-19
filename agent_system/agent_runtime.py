@@ -351,7 +351,10 @@ class AgentRuntime:
             if result:
                 return result
 
-        # P5: 语义缓存快速通道
+        # 无规则匹配 → 直接走 LLM 兜底（带 UR 监控）
+        if rule is None:
+            self.memory['tournament_used'] = False
+            return self._run_legacy(task, max_rounds, dry_run)
         cached = self.resource.semantic_cache.lookup(task)
         if cached:
             self.resource.metrics.record_cache_hit()
@@ -376,9 +379,9 @@ class AgentRuntime:
         ctx = BoundedContext(budget=4000)
         ctx.set_task(task)
 
-        # 智能首轮
+        # 智能首轮 — 仅当有规则匹配或简单代码任务时使用
         forced = self._force_tool(task)
-        if forced:
+        if forced and rule is not None:  # 只有规则匹配时才走强制工具路径
             tool, params = forced
             # Phase 3: 安全检查
             safe, reason = self.security_sandbox.check_tool(tool, params, dry_run)

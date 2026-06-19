@@ -104,7 +104,7 @@ class RuleEngine:
     def match_rule(self, task: str) -> Optional[AgentRule]:
         """匹配任务到规则（语义匹配）"""
         # 1. 先用关键词快速筛选候选规则
-        candidates = self._find_candidates(task)
+        candidates, primary_intent = self._find_candidates(task)
 
         # 2. 如果只有一条候选，直接返回
         if len(candidates) == 1:
@@ -170,7 +170,7 @@ class RuleEngine:
                 if rule.pattern.lower() in task_lower:
                     candidates.append(rule)
 
-        return candidates
+        return candidates, primary_intent
 
     def _llm_select_rule(self, task: str, candidates: List[AgentRule]) -> Optional[AgentRule]:
         """用 LLM 从候选规则中选最匹配的"""
