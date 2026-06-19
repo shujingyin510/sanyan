@@ -3,43 +3,43 @@
     "id": "A1",
     "task": "在csrc下新建logger.py，实现日志功能",
     "cat": "规则",
-    "rule": true,
+    "rule": false,
     "llm": 0,
-    "ternary": 4,
+    "ternary": 0,
     "ur_min": 1.0,
     "ur_stop": false,
-    "negate": true,
+    "negate": false,
     "crashed": false,
-    "done": true,
-    "time": "12.8s"
+    "done": false,
+    "time": "60.2s"
   },
   {
     "id": "A2",
     "task": "创建一个HTTP请求模块，命名为requests.py",
     "cat": "规则",
-    "rule": true,
+    "rule": false,
     "llm": 0,
-    "ternary": 4,
+    "ternary": 0,
     "ur_min": 1.0,
     "ur_stop": false,
     "negate": false,
     "crashed": false,
-    "done": true,
-    "time": "17.6s"
+    "done": false,
+    "time": "60.2s"
   },
   {
     "id": "A3",
     "task": "给calculator.py写单元测试",
     "cat": "规则",
-    "rule": true,
+    "rule": false,
     "llm": 0,
-    "ternary": 5,
+    "ternary": 0,
     "ur_min": 1.0,
     "ur_stop": false,
     "negate": false,
     "crashed": false,
-    "done": true,
-    "time": "10.5s"
+    "done": false,
+    "time": "60.2s"
   },
   {
     "id": "A4",
@@ -53,7 +53,7 @@
     "negate": true,
     "crashed": false,
     "done": true,
-    "time": "56.7s"
+    "time": "13.9s"
   },
   {
     "id": "A5",
@@ -81,7 +81,7 @@
     "negate": true,
     "crashed": false,
     "done": true,
-    "time": "1.4s"
+    "time": "1.3s"
   },
   {
     "id": "B7",
@@ -95,7 +95,7 @@
     "negate": true,
     "crashed": false,
     "done": true,
-    "time": "3.3s"
+    "time": "40.0s"
   },
   {
     "id": "B8",
@@ -117,13 +117,13 @@
     "cat": "LLM",
     "rule": false,
     "llm": 0,
-    "ternary": 8,
+    "ternary": 0,
     "ur_min": 1.0,
-    "ur_stop": true,
-    "negate": true,
+    "ur_stop": false,
+    "negate": false,
     "crashed": false,
-    "done": true,
-    "time": "23.2s"
+    "done": false,
+    "time": "60.1s"
   },
   {
     "id": "B10",
@@ -143,29 +143,29 @@
     "id": "C11",
     "task": "实现Raft分布式一致性协议",
     "cat": "退化",
-    "rule": true,
-    "llm": 1,
-    "ternary": 7,
-    "ur_min": 1.0,
-    "ur_stop": true,
-    "negate": false,
-    "crashed": true,
-    "done": true,
-    "time": "48.0s"
-  },
-  {
-    "id": "C12",
-    "task": "用Rust从零写一个操作系统",
-    "cat": "退化",
-    "rule": true,
+    "rule": false,
     "llm": 0,
     "ternary": 0,
     "ur_min": 1.0,
     "ur_stop": false,
     "negate": false,
     "crashed": false,
-    "done": true,
-    "time": "27.6s"
+    "done": false,
+    "time": "60.1s"
+  },
+  {
+    "id": "C12",
+    "task": "用Rust从零写一个操作系统",
+    "cat": "退化",
+    "rule": false,
+    "llm": 0,
+    "ternary": 0,
+    "ur_min": 1.0,
+    "ur_stop": false,
+    "negate": false,
+    "crashed": false,
+    "done": false,
+    "time": "60.2s"
   },
   {
     "id": "C13",
@@ -173,55 +173,55 @@
     "cat": "退化",
     "rule": false,
     "llm": 0,
-    "ternary": 3,
+    "ternary": 0,
     "ur_min": 1.0,
     "ur_stop": false,
     "negate": false,
-    "crashed": true,
-    "done": true,
-    "time": "24.3s"
+    "crashed": false,
+    "done": false,
+    "time": "60.1s"
   },
   {
     "id": "C14",
     "task": "解释量子纠错在拓扑量子计算中的应用",
     "cat": "退化",
     "rule": false,
-    "llm": 1,
+    "llm": 0,
     "ternary": 0,
     "ur_min": 1.0,
     "ur_stop": false,
     "negate": false,
     "crashed": false,
-    "done": true,
-    "time": "7.3s"
+    "done": false,
+    "time": "60.1s"
   },
   {
     "id": "C15",
     "task": "实现一个完整的ORM框架",
     "cat": "退化",
-    "rule": true,
+    "rule": false,
     "llm": 0,
     "ternary": 0,
     "ur_min": 1.0,
-    "ur_stop": true,
+    "ur_stop": false,
     "negate": false,
-    "crashed": true,
+    "crashed": false,
     "done": false,
-    "time": "27.8s"
+    "time": "60.1s"
   },
   {
     "id": "D16",
     "task": "修复一个不存在目录里的bug",
     "cat": "边界",
-    "rule": true,
+    "rule": false,
     "llm": 0,
-    "ternary": 6,
+    "ternary": 0,
     "ur_min": 1.0,
-    "ur_stop": true,
+    "ur_stop": false,
     "negate": false,
-    "crashed": true,
-    "done": true,
-    "time": "10.1s"
+    "crashed": false,
+    "done": false,
+    "time": "60.1s"
   },
   {
     "id": "D17",
@@ -229,17 +229,31 @@
     "cat": "边界",
     "rule": true,
     "llm": 0,
-    "ternary": 5,
+    "ternary": 0,
     "ur_min": 1.0,
     "ur_stop": true,
-    "negate": true,
-    "crashed": true,
+    "negate": false,
+    "crashed": false,
     "done": true,
-    "time": "10.3s"
+    "time": "56.1s"
   },
   {
     "id": "D18",
     "task": "用Brainfuck写一个Web服务器",
+    "cat": "边界",
+    "rule": true,
+    "llm": 0,
+    "ternary": 0,
+    "ur_min": 1.0,
+    "ur_stop": false,
+    "negate": false,
+    "crashed": false,
+    "done": true,
+    "time": "25.1s"
+  },
+  {
+    "id": "D19",
+    "task": "在空项目中重构代码",
     "cat": "边界",
     "rule": false,
     "llm": 0,
@@ -249,21 +263,7 @@
     "negate": false,
     "crashed": false,
     "done": false,
-    "time": "60.0s"
-  },
-  {
-    "id": "D19",
-    "task": "在空项目中重构代码",
-    "cat": "边界",
-    "rule": true,
-    "llm": 0,
-    "ternary": 4,
-    "ur_min": 1.0,
-    "ur_stop": false,
-    "negate": true,
-    "crashed": false,
-    "done": true,
-    "time": "4.4s"
+    "time": "60.1s"
   },
   {
     "id": "D20",
@@ -271,12 +271,12 @@
     "cat": "边界",
     "rule": false,
     "llm": 0,
-    "ternary": 2,
+    "ternary": 0,
     "ur_min": 1.0,
     "ur_stop": false,
     "negate": false,
-    "crashed": true,
-    "done": true,
-    "time": "11.3s"
+    "crashed": false,
+    "done": false,
+    "time": "60.1s"
   }
 ]

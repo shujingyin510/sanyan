@@ -492,3 +492,34 @@
 文件: calculator.py (41行)
   函数: add, subtract, multiply, divide, test_add, test_subtract, test_multiply, test_divide
   类: TestCalculator
+
+## 学习记录: 在csrc下新建logger.py，实现日志功能
+- 模式: 功能开发（创建新模块）
+- 风格: 函数式, 类型注解, docstring, pytest测试
+- 约定: 模块文件放在csrc目录, 使用pytest进行测试，测试文件在tests目录, 文件命名小写蛇形, 验证命令：python -X utf8 -m pytest tests/ -x -q
+- 关键词: 日志, logging, configure_logging, get_logger
+- 时间: 2026-06-19 21:57
+- 修改详情:
+文件: csrc/logger.py (35行)
+  函数: configure_logging, get_logger
+
+## 学习记录: 创建一个HTTP请求模块，命名为requests.py
+- 模式: 创建模块
+- 风格: 使用类型注解、编写docstring、遵循PEP8命名规范、私有函数以下划线开头
+- 约定: 使用下划线命名私有辅助函数, 将HTTP方法定义为顶层函数 (get, post, put, delete), 将响应构建逻辑封装为独立函数, 解析JSON的辅助函数独立定义
+- 关键词: HTTP请求模块, requests.py, 客户端封装, REST API
+- 时间: 2026-06-19 21:57
+- 修改详情:
+文件: requests.py (49行)
+  函数: _build_response, json_parser, request, get, post, put, delete
+
+## 学习记录: 给calculator.py写单元测试
+- 模式: 在业务模块中嵌入单元测试（直接在calculator.py内添加测试代码）
+- 风格: 使用Python标准库unittest框架，测试类继承TestCase，测试方法以test_开头，被测函数为模块级函数，无类型注解和docstring
+- 约定: 测试类命名TestXxx, 测试方法命名test_xxx, 被测函数与测试代码共存于同一文件
+- 关键词: calculator, unittest, TestCase, test_add, test_subtract
+- 时间: 2026-06-19 21:57
+- 修改详情:
+文件: calculator.py (41行)
+  函数: add, subtract, multiply, divide, test_add, test_subtract, test_multiply, test_divide
+  类: TestCalculator
