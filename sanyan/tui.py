@@ -12,11 +12,11 @@ ROOT = Path(__file__).parent.parent
 class FileTree(Tree):
     """左侧可展开文件树"""
 
-    def __init__(self):
-        super().__init__('📁 sanyan')
-        self._build(ROOT, self.root)
+    def __init__(self, *args, **kwargs):
+        super().__init__("📁 sanyan", *args, **kwargs)
+        self._populate(ROOT, self.root)
 
-    def _build(self, path: Path, parent):
+    def _populate(self, path: Path, parent):
         try:
             entries = sorted(path.iterdir())
         except PermissionError:
@@ -37,7 +37,7 @@ class FileTree(Tree):
         ]
         for d in dirs[:12]:
             branch = parent.add(f'📁 {d.name}/', expand=False)
-            self._build(d, branch)
+            self._populate(d, branch)
         for f in files[:10]:
             icon = '🐍' if f.suffix == '.py' else ('📜' if f.suffix == '.san' else '📄')
             parent.add_leaf(f'{icon} {f.name}')
@@ -73,10 +73,17 @@ class ChatLog(RichLog):
 class SanyanTUI(App):
     CSS = """
     #left { width: 28; border: solid gray; }
+    #left.hidden { width: 0; border: none; visibility: hidden; }
     #right { width: 30; border: solid gray; }
+    #right.hidden { width: 0; border: none; visibility: hidden; }
     #chat { height: 1fr; }
     #input { dock: bottom; }
     """
+
+    BINDINGS = [
+        ("ctrl+b", "toggle_tree", "文件树"),
+        ("ctrl+r", "toggle_panel", "三态面板"),
+    ]
 
     def compose(self) -> ComposeResult:
         yield Header()
@@ -89,9 +96,15 @@ class SanyanTUI(App):
         yield Footer()
 
     def on_mount(self):
-        self.title = 'SanYan'
-        self.sub_title = 'v3.42.0'
-        self.query_one('#chat', ChatLog).write('[bold green]SanYan Agent 就绪[/]')
+        self.title = "SanYan"
+        self.sub_title = "v3.42.0 | Ctrl+B 文件树 | Ctrl+R 面板"
+        self.query_one("#chat", ChatLog).write("[bold green]SanYan Agent 就绪[/]")
+
+    def action_toggle_tree(self):
+        self.query_one("#left").toggle_class("hidden")
+
+    def action_toggle_panel(self):
+        self.query_one("#right").toggle_class("hidden")
 
     def on_input_submitted(self, event: Input.Submitted):
         task = event.value.strip()
