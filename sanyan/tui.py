@@ -1,7 +1,7 @@
 """SanYan TUI — 三栏布局 (文件树 | Chat | 三态面板)"""
 
 from textual.app import App, ComposeResult
-from textual.widgets import Header, Footer, Input, Static, RichLog, Tree
+from textual.widgets import Footer, Input, Static, RichLog, Tree
 from textual.containers import Horizontal, Vertical
 from textual.reactive import reactive
 from pathlib import Path
@@ -72,6 +72,8 @@ class ChatLog(RichLog):
 
 class SanyanTUI(App):
     CSS = """
+    #topbar { height: 1; dock: top; }
+    #title-label { width: 1fr; content-align: center middle; }
     #left { width: 28; border: solid gray; }
     #left.hidden { width: 0; border: none; visibility: hidden; }
     #right { width: 30; border: solid gray; }
@@ -86,18 +88,27 @@ class SanyanTUI(App):
     ]
 
     def compose(self) -> ComposeResult:
-        yield Header()
+        from textual.widgets import Button, Label
+        # 自定义顶部栏
+        with Horizontal(id="topbar"):
+            yield Button("📁", id="tree-btn")
+            yield Label(" SanYan v3.42.0", id="title-label")
+            yield Button("⚡", id="panel-btn")
         with Horizontal():
-            yield FileTree(id='left')
-            with Vertical(id='center'):
-                yield ChatLog(id='chat', markup=True, wrap=True)
-                yield Input(id='input', placeholder='Ask SanYan...')
-            yield TernaryPanel(id='right')
+            yield FileTree(id="left")
+            with Vertical(id="center"):
+                yield ChatLog(id="chat", markup=True, wrap=True)
+                yield Input(id="input", placeholder="Ask SanYan...")
+            yield TernaryPanel(id="right")
         yield Footer()
 
+    def on_button_pressed(self, event):
+        if event.button.id == "tree-btn":
+            self.action_toggle_tree()
+        elif event.button.id == "panel-btn":
+            self.action_toggle_panel()
+
     def on_mount(self):
-        self.title = "SanYan"
-        self.sub_title = "v3.42.0 | Ctrl+B 文件树 | Ctrl+R 面板"
         self.query_one("#chat", ChatLog).write("[bold green]SanYan Agent 就绪[/]")
 
     def action_toggle_tree(self):
