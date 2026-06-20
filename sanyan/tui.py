@@ -161,7 +161,7 @@ class SanyanTUI(App):
                     chat.insert(f'🤖 {answer}\n')
                 return result
 
-            rt._run_core = wrapped
+            rt._run_core = wrapped  # type: ignore[method-assign]
             panel.state = '执行中...'
             rt.run(task, max_rounds=5)
 

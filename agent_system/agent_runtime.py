@@ -856,6 +856,27 @@ class AgentRuntime:
 
     def _run_legacy(self, task, max_rounds, dry_run):
         """兜底：无假设时走原有 LLM 循环"""
+        # ── dry_run 快速路径：跳过 LLM，直接执行强制工具 ──
+        if dry_run:
+            forced = self._force_tool(task)
+            if forced:
+                tool, params = forced
+                if tool in self.tools:
+                    result = self.tools[tool](params, dry_run)
+                    self.ternary.step(tool, result)
+                    self.memory['history'].append(
+                        {
+                            'tool': tool,
+                            'params': params,
+                            'result': str(result)[:300],
+                            'round': 1,
+                            'trit': 1,
+                            'conf': 0.9,
+                        }
+                    )
+                    return {'answer': self._extract_key(result), 'memory': self.memory}
+            return {'answer': 'dry_run完成', 'memory': self.memory}
+
         # ── 规则引擎：先查规则，有规则直接执行 ──
         rule = self.rule_engine.match_rule(task)
         if rule:

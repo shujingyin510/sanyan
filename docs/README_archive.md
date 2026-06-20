@@ -1,4 +1,4 @@
-# 三态认知框架 Sanyan v3.41.0
+# 三态认知框架 Sanyan v3.43.0
 
 [![VS Code Extension](https://img.shields.io/badge/VS%20Code-%E8%AF%AD%E6%B3%95%E9%AB%98%E4%BA%AE-%23007ACC?logo=visualstudiocode)](sanyan-vscode/README.md)
 [![CI](https://github.com/shujingyin510/sanyan/actions/workflows/test.yml/badge.svg)](https://github.com/shujingyin510/sanyan/actions)
@@ -10,8 +10,22 @@
 
 ---
 
-## v3.41 更新摘要
+## v3.43 更新摘要
 
+### v3.43 (2026-06-20)
+- **Token 用量显示**：面板新增 LLM 调用次数 + API Token 消耗量
+- **三态状态修复**：done 工具不再跳过三态记录，面板正确显示判定状态
+- **动态置信度**：每次执行后根据三态结果反馈更新置信度，同领域跨轮次累积
+- **CI 修复**：mypy method-assign 修复、dry_run 快速路径（0.03s）、CRLF/LF 修复
+
+### v3.42 (2026-06-19)
+- **三态引擎升级**：五态 classify + Kleene 传播 + 保护门控 + 最终判定
+- **多语言 QA**：非代码任务 LLM 直答，不限语言/领域
+- **200 条规则** + **11 个模板** + **领域知识层**
+- **规则引擎**：匹配任务→执行工具链，80% 任务 0 LLM 调用
+- **多 Agent 协作**：任务分解→并行执行→结果汇总
+
+### v3.41 (2026-06-18)
 - **规则引擎**：200+ 规则，匹配任务→执行工具链，0 LLM 调用
 - **模板库**：11 个模板（数学/数据结构/算法/工具），代码生成
 - **领域知识层**：LLM 动态生成领域知识，SQLite 缓存

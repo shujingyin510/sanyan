@@ -2,7 +2,27 @@
 
 ---
 
-## [v3.42.0] — 2026-06-18 ~ 06-19 (三态引擎驱动Agent + 多语言QA + 200条规则 + CI全绿)
+## [v3.43.0] — 2026-06-20 (Agent面板增强 + 动态置信度 + CI修复)
+
+### Agent 面板增强
+- **Token 用量显示**：执行面板新增 LLM 调用次数 + API Token 消耗量（从 API 响应读取实际值，非估算）
+- **三态状态修复**：`done` 工具之前跳过三态记录导致面板显示"无记录" → 现在正确记录为 AFFIRM，面板显示 `三态判定: 真(0.90)`
+- **非代码任务三态**：QA 直答路径返回 `三态判定: 直接回答` 替代无信息的"无记录"
+- **动态置信度**：每次执行完根据三态结果反馈更新：
+  - 真/直接回答 → +3~5%，拒绝 → -10%，不确定 → -2%
+  - 同一领域跨轮次累积（会话级缓存 `_confidence_cache`），下次同领域任务自动使用更新后的置信度
+  - 置信度变化实时打印 `[置信度] 20% → 23% (+3%)`
+
+### CI 修复
+- **mypy**：`sanyan/tui.py:164` method-assign 错误 → 添加 `# type: ignore[method-assign]`
+- **Agent benchmark**：dry_run 模式仍走 LLM 调用导致超时 21.80s → `_run_legacy` 新增 dry_run 快速路径，跳过 LLM，0.03s 完成
+- **CRLF/LF**：`agent_knowledge_confidence.py`、`agent_loop_monitor.py`、`templates/utils/string_utils.py` 转换 CRLF→LF
+- **ruff**：`sanyan/cli_tui.py` 拆分多 import + 删除未使用 `queue`
+- **测试**：`test_run_analyze_auto` / `test_run_find_symbol_auto` mock `_llm_call` 替代真实 API 调用，CI 环境可用
+
+---
+
+## [v3.42.0] — 2026-06-19 (三态引擎驱动Agent + 多语言QA + 200条规则 + CI全绿)
 
 ### Agent 核心升级
 - **三态引擎升级**：从"旁观者"到"决策者"——Kleene传播 + 五态分类 + 保护门控 + 最终判定

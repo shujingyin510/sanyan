@@ -1,4 +1,4 @@
-# Tri-State Cognitive Framework Sanyan v3.41.0
+# Tri-State Cognitive Framework Sanyan v3.43.0
 
 [![VS Code Extension](https://img.shields.io/badge/VS%20Code-Syntax%20Highlight-%23007ACC?logo=visualstudiocode)](sanyan-vscode/README.md)
 [![CI](https://github.com/shujingyin510/sanyan/actions/workflows/test.yml/badge.svg)](https://github.com/shujingyin510/sanyan/actions)
@@ -10,8 +10,22 @@
 
 ---
 
-## v3.41 Update Summary
+## v3.43 Update Summary
 
+### v3.43 (2026-06-20)
+- **Token usage display**: Panel shows LLM call count + API token consumption
+- **Ternary state fix**: done tool no longer skipped, panel correctly shows judgment
+- **Dynamic confidence**: Confidence updates after each execution based on ternary results, accumulates across tasks in same domain
+- **CI fixes**: mypy method-assign fix, dry_run fast path (0.03s), CRLF/LF fixes
+
+### v3.42 (2026-06-19)
+- **Ternary engine upgrade**: 5-state classify + Kleene propagation + protection gating + final judgment
+- **Multi-language QA**: Non-code tasks answered directly by LLM, any language/domain
+- **200 rules** + **11 templates** + **domain knowledge layer**
+- **Rule engine**: 80% tasks with 0 LLM calls
+- **Multi-agent collaboration**: Task decomposition → parallel execution → result aggregation
+
+### v3.41 (2026-06-18)
 - **Rule Engine**: 200+ rules, task→tool chain matching, 0 LLM calls
 - **Template Library**: 11 templates (math/data structures/algorithms/utils), code generation
 - **Domain Knowledge Layer**: LLM dynamic generation, SQLite caching
