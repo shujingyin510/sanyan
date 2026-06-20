@@ -71,8 +71,6 @@ class SanyanTUI(App):
     BINDINGS = [
         ("ctrl+b", "toggle_tree", "文件树"),
         ("ctrl+r", "toggle_panel", "三态面板"),
-        ("ctrl+c", "copy", "复制"),
-        ("ctrl+q", "quit", "退出"),
     ]
 
     def compose(self) -> ComposeResult:
@@ -105,16 +103,6 @@ class SanyanTUI(App):
 
     def action_toggle_panel(self):
         self.query_one("#right").toggle_class("hidden")
-
-    def action_quit(self):
-        self.exit()
-
-    def action_copy(self):
-        chat = self.query_one("#chat", TextArea)
-        text = chat.selected_text or chat.text
-        if text:
-            import pyperclip
-            pyperclip.copy(text[:5000])
 
     def on_input_submitted(self, event: Input.Submitted):
         task = event.value.strip()
