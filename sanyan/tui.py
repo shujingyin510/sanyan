@@ -1,9 +1,7 @@
-"""SanYan TUI — 三栏布局 (文件树 | Chat | 三态面板)
-基于 textual 框架，零外部终端依赖
-"""
+"""SanYan TUI — 三栏布局 (文件树 | Chat | 三态面板)"""
 
 from textual.app import App, ComposeResult
-from textual.widgets import Header, Footer, Input, Static, RichLog
+from textual.widgets import Header, Footer, Input, Static, RichLog, Tree
 from textual.containers import Horizontal, Vertical
 from textual.reactive import reactive
 from pathlib import Path
@@ -11,42 +9,38 @@ from pathlib import Path
 ROOT = Path(__file__).parent.parent
 
 
-class FileTree(Static):
-    """左侧文件树"""
+class FileTree(Tree):
+    """左侧可展开文件树"""
 
-    def on_mount(self):
-        self.update(self._build())
+    def __init__(self):
+        super().__init__('📁 sanyan')
+        self._build(ROOT, self.root)
 
-    def _build(self, path=ROOT, depth=0):
-        if depth > 2 or path.name.startswith('.'):
-            return ''
+    def _build(self, path: Path, parent):
         try:
             entries = sorted(path.iterdir())
         except PermissionError:
-            return ''
-        lines = []
-        indent = '  ' * depth
+            return
         dirs = [
             e
             for e in entries
             if e.is_dir()
             and not e.name.startswith('.')
-            and e.name not in ('__pycache__', '.git', '.github', 'node_modules')
+            and e.name not in ('__pycache__', '.git', '.github', 'node_modules', 'build', 'dist')
         ]
         files = [
             e
             for e in entries
             if e.is_file()
             and not e.name.startswith('.')
-            and e.suffix in ('.py', '.san', '.md', '.txt', '.toml', '.json', '.yml')
+            and e.suffix in ('.py', '.san', '.md', '.txt', '.toml', '.json', '.yml', '.yaml', '.cfg')
         ]
-        for d in dirs[:8]:
-            lines.append(f'{indent}📁 {d.name}/')
-            lines.append(self._build(d, depth + 1))
-        for f in files[:6]:
+        for d in dirs[:12]:
+            branch = parent.add(f'📁 {d.name}/', expand=False)
+            self._build(d, branch)
+        for f in files[:10]:
             icon = '🐍' if f.suffix == '.py' else ('📜' if f.suffix == '.san' else '📄')
-            lines.append(f'{indent}  {icon} {f.name}')
-        return '\n'.join(filter(None, lines))
+            parent.add_leaf(f'{icon} {f.name}')
 
 
 class TernaryPanel(Static):
@@ -106,11 +100,9 @@ class SanyanTUI(App):
         chat = self.query_one('#chat', ChatLog)
         panel = self.query_one('#right', TernaryPanel)
         inp = self.query_one('#input', Input)
-
         inp.clear()
         chat.write(f'\n🧑 [bold]{task}[/]\n')
 
-        # 调用 Agent
         try:
             import sys
 
@@ -122,7 +114,6 @@ class SanyanTUI(App):
             ev = init_evaluator(api_key)
             rt = AgentRuntime(ev)
 
-            # 注入回调
             original = rt._run_core
 
             def wrapped(*a, **kw):
