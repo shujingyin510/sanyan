@@ -161,9 +161,12 @@ class RuleExecutor:
                 results.append(result)
 
                 # 三态门控：记录每步执行结果
-                if tool != 'done':
+                if tool == 'done':
+                    ternary.step(tool, '完成')
+                else:
                     ternary.step(tool, str(result))
-                    last_trit, last_conf = ternary.history[-1][:2] if ternary.history else (1, 1.0)
+                last_trit, last_conf = ternary.history[-1][:2] if ternary.history else (1, 1.0)
+                if tool != 'done':
                     print(f'    [三态] {ternary.trit_display(last_trit, last_conf)}')
 
                 # 文件不存在时自动切换为创建规则

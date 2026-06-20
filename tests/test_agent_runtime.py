@@ -96,6 +96,23 @@ class TestAgentRuntime(unittest.TestCase):
         self.rt.register('done', lambda p, d: p if p else '完成')
         self.rt.register('git_diff', lambda p, d: '(无修改)')
         self.rt.register('git_status', lambda p, d: '(干净)')
+        # Mock LLM 调用：避免 CI 无网络时失败，模拟工具调用+done流程
+        self._mock_llm_round = 0
+
+        def mock_llm(prompt, override=None):
+            self._mock_llm_round += 1
+            if self._mock_llm_round == 1:
+                if '超过50行' in str(prompt) or '哪些函数' in str(prompt):
+                    return 'analyze|run_agent.py'
+                if 'main' in str(prompt) and ('调用' in str(prompt) or '在哪' in str(prompt)):
+                    return 'find_symbol|main'
+            # 第2轮及以后：done，带第一轮工具结果
+            if self.rt.memory.get('history'):
+                last = self.rt.memory['history'][-1]
+                return f'done|结果: {last.get("result", "完成")}'
+            return 'done|任务已完成'
+
+        self.rt._llm_call = mock_llm
 
     def test_force_tool_analyze(self):
         tool, params = self.rt._force_tool('这个文件有哪些函数')
@@ -172,12 +189,14 @@ class TestAgentRuntime(unittest.TestCase):
 
     def test_run_analyze_auto(self):
         """完整 run() 流程：analyze 任务自动完成"""
+        self._mock_llm_round = 0
         result = self.rt.run('run_agent.py哪些函数超过50行', max_rounds=2)
         self.assertIn('answer', result)
         self.assertIn('⚠', result['answer'])
 
     def test_run_find_symbol_auto(self):
         """find_symbol 任务自动完成"""
+        self._mock_llm_round = 0
         result = self.rt.run('main在哪里被调用', max_rounds=2)
         self.assertIn('answer', result)
         self.assertIn('符号', result['answer'])

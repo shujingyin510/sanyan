@@ -266,6 +266,8 @@ class AgentRuntime:
         try:
             result = self._run_core(task, max_rounds, dry_run, trace_id, start_time, strategy)
             self._print_panel(result)
+            # 动态置信度：根据执行结果反馈更新
+            self._update_confidence(domain_info, result)
             return result
         finally:
             # 结束追踪
@@ -341,7 +343,7 @@ class AgentRuntime:
                 answer = self._llm_call(f'请直接回答以下问题，简洁明了:\n{task}')
                 if answer:
                     answer = self._clean_llm_response(answer)
-                    return {'answer': answer, 'memory': self.memory}
+                    return {'answer': answer, 'memory': self.memory, 'ternary': '直接回答'}
             except Exception:
                 pass  # 失败则继续走原有流程
 
@@ -765,7 +767,12 @@ class AgentRuntime:
     def _llm_call(self, prompt, override_system_prompt=None):
         """LLM 调用：委托给 LLMHandler"""
         self.llm_handler._system_prompt = self._system_prompt
-        return self.llm_handler.llm_call(prompt, override_system_prompt)
+        result = self.llm_handler.llm_call(prompt, override_system_prompt)
+        tokens = getattr(self.llm_handler, '_last_tokens', 0)
+        mem = self.memory
+        mem['llm_calls'] = mem.get('llm_calls', 0) + 1
+        mem['total_tokens'] = mem.get('total_tokens', 0) + tokens
+        return result
 
     def _clean_llm_response(self, text: str) -> str:
         """清理 LLM 回答（去除 JSON 包装、工具调用格式等）"""
@@ -807,6 +814,8 @@ class AgentRuntime:
         print(f'║  三态判定: {ts:<46} ║')
         print(f'║  规则命中: {rule_name:<46} ║')
         print(f'║  工具步骤: {len(hist):<46} ║')
+        print(f'║  LLM调用:  {mem.get("llm_calls", 0):<46} ║')
+        print(f'║  Token用量: {mem.get("total_tokens", 0):<46} ║')
         for h in hist[-3:]:
             t = h.get('tool', '?')
             tv = h.get('trit', 0)
@@ -1208,6 +1217,32 @@ def test_basic():
         ):
             return True
         return False
+
+    def _update_confidence(self, domain_info: dict, result: dict):
+        """根据执行结果反馈更新领域置信度"""
+        if not domain_info or not result:
+            return
+        old_conf = domain_info.get('confidence', 0.2)
+        ts = result.get('ternary', '')
+        # 三态结果解析
+        if '真' in ts:
+            delta = +0.05
+        elif '拒绝' in ts or '假' in ts:
+            delta = -0.10
+        elif '不确定' in ts:
+            delta = -0.02
+        elif ts == '直接回答':
+            answer = result.get('answer', '')
+            delta = +0.03 if len(answer) > 20 else -0.05
+        else:
+            delta = 0.0
+        new_conf = max(0.05, min(0.95, old_conf + delta))
+        domain_info['confidence'] = new_conf
+        # 持久化到会话级缓存（同一领域后续任务生效）
+        self.domain_knowledge.update_confidence(domain_info.get('domain', ''), new_conf)
+        if delta != 0:
+            sign = '+' if delta > 0 else ''
+            print(f'  [置信度] {old_conf:.0%} → {new_conf:.0%} ({sign}{delta:+.0%})')
 
     def _save_experience(self, task: str, perf_report: Dict = None):
         """保存本次运行经验到跨会话存储"""

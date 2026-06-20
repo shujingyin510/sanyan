@@ -58,6 +58,7 @@ class DomainKnowledgeLayer:
         self.llm_fn = llm_fn
         self.db_path = db_path or os.path.join(os.path.dirname(os.path.abspath(__file__)), 'domain_knowledge.db')
         self._init_db()
+        self._confidence_cache: Dict[str, float] = {}  # 会话级置信度缓存
 
     def _init_db(self):
         """初始化缓存数据库"""
@@ -96,6 +97,10 @@ class DomainKnowledgeLayer:
 
         best = max(scores, key=scores.get)
         return best, min(0.95, scores[best] + 0.3)
+
+    def update_confidence(self, domain: str, new_conf: float):
+        """会话级动态更新置信度（同一领域后续任务生效）"""
+        self._confidence_cache[domain] = max(0.05, min(0.95, new_conf))
 
     # ── 缓存（SQLite）──
 
@@ -218,6 +223,9 @@ class DomainKnowledgeLayer:
         """分析任务，返回领域知识（优先缓存，其次 LLM）"""
         # 1. 分类
         domain, confidence = self.classify(task)
+        # 会话级动态置信度覆盖
+        if domain in self._confidence_cache:
+            confidence = self._confidence_cache[domain]
 
         # 2. 查缓存
         cached = self._cache_get(domain)

@@ -73,6 +73,7 @@ class LLMHandler:
                 req = _req.Request(url, data=body, headers=headers, method='POST')
                 resp = _json.loads(_req.urlopen(req, timeout=timeout).read().decode('utf-8'))
                 text, tokens = parser(resp)
+                self._last_tokens = tokens
 
                 # 记录 token 用量
                 if tokens > 0 and self.profiler:
