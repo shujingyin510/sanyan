@@ -86,9 +86,9 @@ def cmd_agent_chat(args):
 
 
 def cmd_agent_tui(args):
-    from sanyan.agent_tui import run
+    from sanyan.tui import SanyanTUI
 
-    run()
+    SanyanTUI().run()
 
 
 def cmd_bench(args):

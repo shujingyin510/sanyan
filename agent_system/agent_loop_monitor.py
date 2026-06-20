@@ -294,7 +294,7 @@ class HealthMonitor:
 class RollbackVerifier:
     """回滚验证：stash 后验证代码状态"""
 
-    def __init__(self):
+    def __init__(self):  # STUB: placeholder
         pass
 
     def verify_clean(self) -> bool:

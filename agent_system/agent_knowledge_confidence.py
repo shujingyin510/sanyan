@@ -27,7 +27,7 @@ ROOT = os.path.dirname(os.path.abspath(__file__))
 class KnowledgeConfidence:
     """知识置信度计算"""
 
-    def __init__(self):
+    def __init__(self):  # STUB: placeholder
         pass
 
     def calculate(self, n_samples: int, success_rate: float, consistency: float = 1.0) -> float:

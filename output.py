@@ -3,6 +3,7 @@ import threading
 from functools import wraps
 from typing import Callable, Optional
 
+
 class TokenBucketRateLimiter:
     """Token bucket rate limiter for API calls.
 
@@ -20,9 +21,9 @@ class TokenBucketRateLimiter:
             burst: Maximum burst size (if None, defaults to capacity).
         """
         if rate <= 0:
-            raise ValueError("rate must be positive")
+            raise ValueError('rate must be positive')
         if capacity <= 0:
-            raise ValueError("capacity must be positive")
+            raise ValueError('capacity must be positive')
         self.rate = rate
         self.capacity = capacity
         self.burst = burst if burst is not None else capacity
@@ -50,7 +51,7 @@ class TokenBucketRateLimiter:
             True if tokens were consumed, False if not enough tokens.
         """
         if tokens <= 0:
-            raise ValueError("tokens must be positive")
+            raise ValueError('tokens must be positive')
         with self.lock:
             self._refill()
             if tokens <= self.tokens:
@@ -70,7 +71,7 @@ class TokenBucketRateLimiter:
             True if tokens obtained, False on timeout.
         """
         if tokens > self.capacity:
-            raise ValueError("tokens cannot exceed capacity")
+            raise ValueError('tokens cannot exceed capacity')
         deadline = time.monotonic() + timeout if timeout is not None else None
         while True:
             if self.consume(tokens):
@@ -92,40 +93,44 @@ class TokenBucketRateLimiter:
         Returns:
             Decorated function.
         """
+
         def decorator(func: Callable):
             @wraps(func)
             def wrapper(*args, **kwargs):
                 if block:
                     if not self.wait_for_token(tokens, timeout):
-                        raise RateLimitExceeded("Rate limit exceeded and timeout reached")
+                        raise RateLimitExceeded('Rate limit exceeded and timeout reached')
                 else:
                     if not self.consume(tokens):
-                        raise RateLimitExceeded("Rate limit exceeded")
+                        raise RateLimitExceeded('Rate limit exceeded')
                 return func(*args, **kwargs)
+
             return wrapper
+
         return decorator
 
 
 class RateLimitExceeded(Exception):
     """Raised when the rate limit is exceeded."""
+
     pass
 
 
 # Example usage
-if __name__ == "__main__":
+if __name__ == '__main__':
     # Create a rate limiter: 5 requests per second, bucket size 10, burst 10.
     limiter = TokenBucketRateLimiter(rate=5.0, capacity=10)
 
     @limiter.decorate(tokens=1, block=False)
     def api_endpoint(data):
         # Simulate API processing
-        return f"Processed: {data}"
+        return f'Processed: {data}'
 
     # Test: make several rapid calls
     for i in range(15):
         try:
-            result = api_endpoint(f"request {i}")
+            result = api_endpoint(f'request {i}')
             print(result)
         except RateLimitExceeded:
-            print(f"Request {i} blocked by rate limiter")
+            print(f'Request {i} blocked by rate limiter')
         time.sleep(0.1)  # small delay to see effect
