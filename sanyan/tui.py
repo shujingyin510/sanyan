@@ -122,7 +122,7 @@ class SanyanTUI(App):
 
             api_key = load_api_key()
             ev = init_evaluator(api_key)
-            rt = AgentRuntime(ev)
+            rt = AgentRuntime(ev, False)
 
             original = rt._run_core
 
