@@ -1,6 +1,6 @@
 # 三言 三态门控推理 — 完整实验报告
 
-> 版本: v3.39.0 | 日期: 2026-06-16 ~ 06-18 | 模型: TinyStories 3.6M / 28M / GPT-2 124M / Qwen2.5-0.5B
+> 日期: 2026-06-16 ~ 06-18 | 模型: TinyStories 3.6M / 28M / GPT-2 124M / Qwen2.5-0.5B
 
 ## English Abstract
 
