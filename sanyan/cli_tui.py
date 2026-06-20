@@ -89,10 +89,14 @@ def run():
     chat = []
     tern = {"symbol": "———", "state": "就绪", "conf": 0.0, "ur": 1.0, "rule": "—", "tools": []}
     buf = ""
-    agent_queue = queue.Queue()
     _running = True
+    _dirty = True
+    _last_chat_len = 0
+    _last_tern = {}
+    _last_buf = ""
 
     def agent_thread(task):
+        nonlocal _dirty
         try:
             sys.path.insert(0, str(ROOT))
             from run_agent import load_api_key, init_evaluator
@@ -103,7 +107,9 @@ def run():
             rt = AgentRuntime(ev, False)
 
             original = rt._run_core
+
             def wrapped(*a, **kw):
+                nonlocal _dirty
                 result = original(*a, **kw)
                 if isinstance(result, dict):
                     mem = result.get("memory", {})
@@ -119,19 +125,31 @@ def run():
                         tern["symbol"] = "◐◐◐"; tern["state"] = "UNCERT"
                     answer = result.get("answer", str(result))[:300]
                     chat.append(f"🤖 {answer}")
+                    _dirty = True
                 return result
+
             rt._run_core = wrapped
             tern["state"] = "执行中..."
+            _dirty = True
             rt.run(task, max_rounds=5)
             tern["state"] = "就绪"
+            _dirty = True
         except Exception as e:
             chat.append(f"❌ {e}")
             tern["state"] = "错误"
+            _dirty = True
 
-    threading.Thread(target=lambda: None, daemon=True).start()  # warm up
-
+    clear()
     while _running:
-        draw_frame(chat, tern, buf)
+        # 只在有变化时重绘
+        changed = (_dirty or buf != _last_buf or len(chat) != _last_chat_len
+                   or str(tern) != str(_last_tern))
+        if changed:
+            draw_frame(chat, tern, buf)
+            _last_chat_len = len(chat)
+            _last_tern = dict(tern)
+            _last_buf = buf
+            _dirty = False
 
         # 非阻塞读取键盘
         if msvcrt.kbhit():
@@ -141,13 +159,15 @@ def run():
                     task = buf.strip()
                     chat.append(f"🧑 {task}")
                     buf = ""
+                    _dirty = True
                     threading.Thread(target=agent_thread, args=(task,), daemon=True).start()
             elif ch == b"\x08":  # Backspace
                 buf = buf[:-1]
             elif ch == b"\x1b":  # ESC
                 buf = ""
             elif ch == b"\x03":  # Ctrl+C
-                chat.append("[Ctrl+C] 忽略 — 用 Ctrl+D 退出")
+                chat.append("[Ctrl+C] 忽略")
+                _dirty = True
             elif ch == b"\x04":  # Ctrl+D
                 _running = False
                 break
