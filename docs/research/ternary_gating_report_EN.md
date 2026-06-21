@@ -4,7 +4,7 @@
 
 ## Abstract
 
-This report evaluates a degeneration detector based on `unique_ratio < 0.30` across 4 models spanning 3 architectures (GPT-Neo, GPT-2, Qwen2) and 3 orders of magnitude in parameter count (3.6M–494M). The threshold achieves 98-100% true positive rate on degenerating models [95%CI: 96.8-100%] and 0.4% false positive rate on coherent ones [0.01-0.79%] (p < 0.05). Human text baseline (n=60 WikiText-2 passages, 4996 sliding windows, GPT-2 tokenizer): avg UR=0.849 [0.846,0.852], <0.30 rate=0.2%. Ablation shows UR alone is the only effective signal — all other trajectory detection signals are redundant. Measured ROC over 1214 real samples yields Youden's J optimum at 0.32; we choose the more conservative 0.30 at the TPR knee point (0.847→0.993).
+This report evaluates a degeneration detector based on `unique_ratio < 0.30` across 4 models spanning 3 architectures (GPT-Neo, GPT-2, Qwen2) and 3 orders of magnitude in parameter count (3.6M–494M). On TinyStories (3.6M, 28M) which degenerate regardless of sampling strategy, stop rate is 100%. On GPT-2 124M with clean sampling (temperature=0.8, top_k=50), stop rate is 2% — GPT-2 almost never degenerates on its own. On Qwen2.5-0.5B, false positive rate is 0.4% (p < 0.05). The original GPT-2 TPR of 100% was a rep_penalty-induced artifact (§3.5). Human text baseline (n=60 WikiText-2, μ=0.849 [0.846,0.852]) and measured ROC (1214 samples, Youden's J=0.32) independently confirm the threshold. UR is the dominant signal; auxiliary signals provide marginal early warning in 3.6% of cases (§4).
 
 ---
 
@@ -38,7 +38,7 @@ Alternative approaches tested:
 | n-gram entropy (bigram) | Shannon entropy of token bigrams | Always ~2.3, 0% stop | ❌ GPT-2's large vocabulary makes token IDs naturally diverse |
 | n-gram entropy (trigram) | Trigram entropy | Pure repetition H=0, otherwise H≈1 | ❌ "was had could the a" are also different trigrams |
 | Adaptive unique ratio | Smaller window, higher threshold | avg_len=64, stop=0% | ❌ Degenerate tokens are still diverse |
-| **UR < 0.30** | Sliding window unique_ratio | 98-100% stop | ✅ Single signal, cross-architecture |
+| **UR < 0.30** | Sliding window unique_ratio | 100% on degenerating, 2% on GPT-2 clean | ✅ Single signal, tracks actual degeneration |
 
 ### 2.2 Window Size Ablation
 
@@ -83,7 +83,7 @@ UR
 
 > ★ Youden's J optimum = 0.32. We choose 0.30 — the TPR knee point, sacrificing 0.7% TPR for lower FPR. At thresholds 0.24-0.28, TPR stays at 0.847 because ~15% of degenerate samples have UR between 0.24-0.30 (milder degeneration or alternation with normal text). In actual ternary-gated multi-step detection, these samples trigger in subsequent windows — single-window snapshot TPR underestimates the multi-step system's actual detection capability.
 >
-> For the full stop-reason distribution across 1000 prompts (original and clean-run), see §3.2 and §3.4.
+> For the full stop-reason distribution across 1000 prompts (original and clean-run), see §3.2. The original run with rep_penalty is documented in §3.5.
 
 **Natural language statistics:** English text in 32-token windows has function words at 10-20%, rarely exceeding 30%. Measured UR for normal text = 0.849 [0.846,0.852] (n=60 WikiText-2, 4996 windows), with <0.30 rate of only 0.2%.
 
@@ -93,19 +93,31 @@ UR
 
 ## 3. Cross-Architecture Validation
 
-### 3.1 Degenerating Models: True Positive Rate (Original Run — with rep_penalty=1.15)
+All results in §3.1–§3.3 use **clean decoding**: temperature=0.8, top_k=50, no rep_penalty, no confidence-gated argmax switch. This ensures no sampling-induced confound. The original run with rep_penalty is documented in §3.5 as historical record.
 
-1000 prompt benchmark (temperature=0.8, top_k=50, rep_penalty=1.15, 3.6M/28M also had top_prob>0.9→argmax switch):
+### 3.1 Degenerating Models
 
-| Model | Architecture | Params | TPR | 95% CI | Avg Stop Length |
-|-------|-------------|--------|-----|--------|----------------|
-| TinyStories 3.6M | GPT-Neo | 3.6M | 98% | [96.8,99.2] | 18.1 tk |
-| TinyStories 28M | GPT-Neo | 28M | 100% | [99.6,100] | 20.6 tk |
-| GPT-2 124M | GPT-2 | 124M | 100% | [99.6,100] | 12.2 tk |
+TinyStories models (GPT-Neo architecture) tested on 1000 prompts with identical clean decoding:
 
-> ⚠️ **Important confound discovered**: GPT-2's 100% TPR in this run was **induced by rep_penalty**. With clean sampling (see §3.4), GPT-2 rarely degenerates. rep_penalty=1.15 shrinks the effective sampling space and causes the model to collapse — exactly the counterintuitive finding from §6. This means the original cross-architecture TPR comparison was confounded: TinyStories models degenerate regardless of sampling, while GPT-2's degeneration was sampling-induced.
+| Model | Architecture | Params | Stop Rate | Avg Stop Length |
+|-------|-------------|--------|-----------|----------------|
+| TinyStories 3.6M | GPT-Neo | 3.6M | 100% | 10.8 tk |
+| TinyStories 28M | GPT-Neo | 28M | 100% | 9.1 tk |
 
-### 3.2 28M Stop-Trigger UR Distribution (Original Run)
+> Both models degenerate at 100% rate regardless of sampling strategy. UR=0.30 correctly detects all cases. TinyStories are small enough (~3-28M params) that they have not learned to avoid token collapse — they transition from coherent generation to repetition within ~10 tokens on virtually every prompt.
+
+### 3.2 28M Stop-Trigger UR Distribution
+
+**Clean Run** (temperature=0.8, top_k=50, no rep_penalty):
+
+| Stop Signal | Count | Proportion | Type |
+|-------------|-------|------------|------|
+| UR=0.29 | 501 | 50.1% | Pure UR |
+| UR=0.27 | 461 | 46.1% | Pure UR |
+| CYC2;NONEW;UR=0.31 | 36 | 3.6% | Multi-signal (cycle+no-new-word) |
+| UR=0.25 | 2 | 0.2% | Pure UR |
+
+**Original Run** (with rep_penalty=1.15):
 
 | UR at Stop | Count | Proportion |
 |------------|-------|------------|
@@ -114,52 +126,42 @@ UR
 | UR=0.28 | 116 | 11.6% |
 | UR=0.27 | 1 | 0.1% |
 
-> 99.9% of stops occur within UR 0.27-0.30. 0.30 is the peak region.
+> Both runs converge on the 0.27-0.30 band as the degradation boundary. In the clean run, 36 cases (3.6%) triggered via cycle+no-new-word at UR=0.31 — multi-signal detection provided **early warning** before UR crossed 0.30 (§4). 96.4% of stops remain pure-UR. The distribution is robust to sampling changes.
 
-### 3.3 Normal Model: False Positive Rate (Clean — no rep_penalty)
+### 3.3 Normal Models (clean decoding — no rep_penalty)
 
-Qwen2.5-0.5B (494M, Qwen2 architecture) verified on 1000 prompts (temperature=0.8, top_k=50, **no rep_penalty**):
+These models do NOT degenerate under clean sampling. UR correctly produces near-zero stop rates:
 
-| Language | N | FPR | 95% CI | avg min_UR |
-|----------|----|------|--------|------------|
-| English | 1000 | 0.4% | [0.01,0.79] | 0.717 |
-| Chinese | 1000 | 0.6% | [0.15,1.05] | 0.714 |
+| Model | Architecture | Params | N | Stop Rate | 95% CI | avg min_UR |
+|-------|-------------|--------|---|-----------|--------|------------|
+| Qwen2.5-0.5B (EN) | Qwen2 | 494M | 1000 | 0.4% | [0.01,0.79] | 0.717 |
+| Qwen2.5-0.5B (ZH) | Qwen2 | 494M | 1000 | 0.6% | [0.15,1.05] | 0.714 |
+| GPT-2 124M | GPT-2 | 124M | 1000 | 2.0% | — | — |
 
-> All FPR cases are input-induced (grammatically broken or pure-repetition prompts). On normal prompts, the false positive rate is 0. UR does not produce false positives on Qwen2.5 — degeneration detection is independent of generation quality. Qwen2.5 was run with clean sampling (no rep_penalty) — FPR numbers are uncontaminated.
-
-### 3.4 Re-run with Clean Decoding (temperature=0.8, top_k=50, NO rep_penalty, NO argmax switch)
-
-All three models re-run with **identical decoding**: pure temperature=0.8 + top_k=50, no rep_penalty, no confidence-gated argmax fallback:
-
-| Model | Architecture | Params | TPR | Avg Stop Length |
-|-------|-------------|--------|-----|----------------|
-| TinyStories 3.6M | GPT-Neo | 3.6M | 100% | 10.8 tk |
-| TinyStories 28M | GPT-Neo | 28M | 100% | 9.1 tk |
-| GPT-2 124M | GPT-2 | 124M | 2% | 63.5 tk |
-
-> **Key finding**: With clean, identical decoding across all models, TinyStories models still degenerate at 100% rate (UR correctly detects), while GPT-2 124M shows only 2% stop rate — meaning GPT-2 with clean sampling almost never degenerates. The 20 stops (2%) correspond to prompts that genuinely induce repetition even under clean sampling. This validates UR as a precise detector: it tracks actual degeneration, not sampling artifacts.
+> All FPR/stop cases are input-induced (grammatically broken or pure-repetition prompts). On normal prompts, the rate is effectively zero. GPT-2's 2% (20/1000) reflects prompts that genuinely induce repetition — the model is not degenerating on its own. UR correctly distinguishes between models that actually degenerate (§3.1) and those that do not (§3.3).
 >
-> The original GPT-2 TPR of 100% was a **rep_penalty-induced artifact**. rep_penalty=1.15 caused the model to collapse, which UR correctly detected. The cross-architecture "universality" claim at 100% TPR must therefore be qualified: UR=0.30 correctly signals degeneration when it occurs, but cleanly-sampled models above a quality threshold (≥124M with good sampling) may simply not degenerate.
+> Qwen2.5 is incoherent but non-repetitive; GPT-2 is coherent but occasionally repetitive on degenerate prompts. UR tracks repetition, not coherence — which is exactly the intended design.
 
-**28M Stop-Trigger UR Distribution (Clean Run)**:
+### 3.4 Statistical Significance
 
-| UR at Stop | Count | Proportion | Trigger Type |
-|------------|-------|------------|-------------|
-| UR=0.29 | 501 | 50.1% | Pure UR |
-| UR=0.27 | 461 | 46.1% | Pure UR |
-| CYC2;NONEW;UR=0.31 | 36 | 3.6% | Multi-signal (cycle+no-new-word) |
-| UR=0.25 | 2 | 0.2% | Pure UR |
-
-> 36 cases (3.6%) triggered via cycle + no-new-word detection at UR=0.31, *before* UR crossed below 0.30. These are cases where multi-signal detection provided **early warning** — the model was beginning to loop (CYC2) and produce no new tokens (NONEW) while UR was still at 0.31. This refines the ablation conclusion (§4): other signals are not necessary for TPR, but they can detect degeneration onset 1-2 steps earlier than pure UR.
->
-> 96.4% of stops are pure UR-only (UR=0.25-0.29). The 0.30 threshold remains the dominant signal.
-
-Binomial test on Qwen2.5-0.5B 1000 prompt FPR:
+Binomial test on Qwen2.5-0.5B (English) FPR:
 
 - H₀: FPR ≥ 1%
 - Observed: 4/1000 = 0.4%
 - P(X ≤ 4 | n=1000, p=0.01) = **0.0287**
 - **p < 0.05**, reject H₀
+
+### 3.5 Confound Note: Original Run with rep_penalty (historical)
+
+The original benchmark used temperature=0.8, top_k=50, **rep_penalty=1.15**, with TinyStories models also having a top_prob>0.9→argmax switch:
+
+| Model | TPR | Avg Stop Length | Notes |
+|-------|-----|----------------|-------|
+| TinyStories 3.6M | 98% | 18.1 tk | — |
+| TinyStories 28M | 100% | 20.6 tk | — |
+| GPT-2 124M | 100% | 12.2 tk | ⚠️ **rep_penalty-induced** |
+
+> GPT-2's 100% TPR in this run was caused by rep_penalty=1.15 shrinking the effective sampling space and forcing the model to collapse — the same counterintuitive effect confirmed in §6. With clean sampling (§3.3), GPT-2 stops at 2%. This run is retained for transparency but the §3.1–§3.3 clean-decoding results are the primary claims.
 
 ---
 
@@ -199,6 +201,8 @@ The ternary gating system was decomposed into independent signals and compared o
 | GPT-2 | Stop timing | 83 | 6 | 11 | 83% [75,91] |
 
 > Consistent ternary win rates (~78%) across both models indicate stable evaluation that is reproducible across architectures.
+>
+> Note: the blind eval was conducted on the original run (with rep_penalty), where GPT-2 did degenerate. Under clean sampling, GPT-2's stop rate is only 2% (§3.3) and a blind comparison would be largely meaningless (both ternary and EOS generate ~64 tokens of similar quality). The blind eval validates that *when degeneration occurs*, ternary-gated early stopping produces measurably better output.
 
 ---
 
@@ -214,7 +218,7 @@ Compared different strategies on GPT-2 124M (4 prompts, 50 steps):
 
 > n=4 prompts; results are descriptive observations rather than statistical conclusions. Expanding the prompt set is future work. **Counterintuitive finding:** repetition_penalty on GPT-2 worsens model collapse (UR=0.117, 4/4 degenerate). Possible mechanism: rep_penalty shrinks the effective sampling space, forcing the model to cycle within the remaining tokens. This finding is consistent with Holtzman et al. (2020)'s nucleus sampling advantage but reveals an under-discussed side effect — on small models, rep_penalty can backfire. Many production systems enable rep_penalty by default; this warrants further investigation.
 >
-> **Confirmation at scale (§3.4)**: The rep_penalty-induced degeneration is confirmed by the 1000-prompt re-run — with clean decoding (no rep_penalty), GPT-2's stop rate drops from 100% to 2%, confirming that rep_penalty was artificially inducing degeneration in the original benchmark.
+> **Confirmation at scale (§3.5)**: The rep_penalty-induced degeneration is confirmed by the 1000-prompt re-run — with clean decoding (no rep_penalty), GPT-2's stop rate drops from 100% to 2%, confirming that rep_penalty was artificially inducing degeneration in the original benchmark.
 
 ---
 
@@ -302,7 +306,7 @@ Both GPT-Neo architecture models calibrate to the same value. The threshold was 
 
 ## Core Conclusions
 
-> (1) A uniqueness-ratio threshold of 0.30 detects lexical degeneration in small language models. On TinyStories (3.6M, 28M), TPR=100% regardless of sampling; on GPT-2 124M with clean sampling (temperature=0.8, top_k=50), the stop rate is 2% — reflecting that GPT-2 simply does not degenerate under clean decoding, a finding validated by UR's near-zero false trigger rate. The original GPT-2 TPR of 100% was a rep_penalty-induced artifact (§3.4).
+> (1) A uniqueness-ratio threshold of 0.30 detects lexical degeneration in small language models. On TinyStories (3.6M, 28M), TPR=100% regardless of sampling; on GPT-2 124M with clean sampling (temperature=0.8, top_k=50), the stop rate is 2% — reflecting that GPT-2 simply does not degenerate under clean decoding, a finding validated by UR's near-zero false trigger rate. The original GPT-2 TPR of 100% was a rep_penalty-induced artifact (§3.5).
 >
 > (2) UR is the dominant and necessary signal: it alone achieves identical 1000-prompt TPR as the full trajectory detection system. Auxiliary signals (cycle detection, no-new-word) provide early warning in 3.6% of cases but are not required for stop rate. The system can be simplified to pure UR computation with negligible TPR loss.
 >
@@ -361,7 +365,7 @@ UR can only detect word-level repetition ("was was was") but cannot detect seman
 - [x] Cross-architecture validation (3 architectures)
 - [x] Calibration gap discovery
 - [x] Ablation experiment (UR-only = full system)
-- [x] Human blind evaluation (100 prompts, 3 dimensions)
+- [x] Automated rule-based blind evaluation (100 prompts, 3 dimensions)
 - [x] Measured ROC threshold analysis (1214 samples)
 - [x] Cross-lingual validation (EN+ZH, 1000 each)
 - [x] Failure analysis
