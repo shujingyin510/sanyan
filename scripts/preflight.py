@@ -303,7 +303,7 @@ def run_all_tests():
 def doc_sync_check():
     """文档一致性检查"""
     r = subprocess.run(
-        [sys.executable, '-X', 'utf8', 'doc_sync.py'],
+        [sys.executable, '-X', 'utf8', 'scripts/doc_sync.py'],
         capture_output=True,
         text=True,
         cwd=str(ROOT),
