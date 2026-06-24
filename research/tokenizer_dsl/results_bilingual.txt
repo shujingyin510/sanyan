@@ -1,0 +1,27 @@
+Bilingual Sentence Control: Tokenizer Language Preference
+
+中文              GPT2  Qwen 英文snake                 GPT2  Qwen 英文camel                 GPT2  Qwen
+----------------------------------------------------------------------------------
+获取用户               9     2 get_user                   3     2 getUser                    2     1
+计算总和              11     3 calc_sum                   4     2 calcSum                    3     2
+打印日志               8     3 print_log                  3     2 printLog                   2     2
+检查权限              11     2 check_permission           4     2 checkPermission            3     2
+删除缓存              10     3 delete_cache               3     2 deleteCache                2     2
+更新配置              11     2 update_config              3     2 updateConfig               2     2
+发送请求               9     2 send_request               3     2 sendRequest                2     2
+读取文件               8     3 read_file                  3     2 readFile                   2     2
+关闭连接               9     2 close_connection           3     2 closeConnection            2     2
+处理错误               9     2 handle_error               3     2 handleError                2     2
+验证输入              10     2 validate_input             4     2 validateInput              3     2
+批量查询               9     2 batch_query                3     2 batchQuery                 2     2
+异步调用               9     4 async_call                 4     2 asyncCall                  3     2
+回滚事务               9     3 rollback_transaction       5     2 rollbackTransaction        3     2
+初始化模块             12     2 init_module                3     2 initModule                 2     2
+----------------------------------------------------------------------------------
+TOTAL            144    37                           51    30                           35    29
+
+Token 比 (中文/英文):
+  GPT-2: 144/51=2.8x (snake)  144/35=4.1x (camel)
+  Qwen:  37/30=1.2x (snake)  37/29=1.3x (camel)
+
+GPT-2 更偏好英文 2.8x. Qwen 几乎一样 1.2x.

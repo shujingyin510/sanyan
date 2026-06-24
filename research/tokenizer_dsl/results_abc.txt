@@ -1,0 +1,133 @@
+======================================================================
+A) 关键词规模扩展实验
+======================================================================
+
+--- 规模: 71 个中文关键词 ---
+                    GPT-2     Qwen      OPT   Pythia
+----------------------------------------------------
+         GPT-2>       313     4.4avg     0% 1tk
+          Qwen>        83     1.2avg    83% 1tk
+           OPT>       384     5.4avg     0% 1tk
+        Pythia>       206     2.9avg    11% 1tk
+
+--- 规模: 200 个中文关键词 ---
+                    GPT-2     Qwen      OPT   Pythia
+----------------------------------------------------
+         GPT-2>       844     4.2avg     0% 1tk
+          Qwen>       245     1.2avg    78% 1tk
+           OPT>      1044     5.2avg     0% 1tk
+        Pythia>       567     2.8avg     8% 1tk
+
+--- 规模: 500 个中文关键词 ---
+                    GPT-2     Qwen      OPT   Pythia
+----------------------------------------------------
+         GPT-2>      1005     4.2avg     0% 1tk
+          Qwen>       291     1.2avg    79% 1tk
+           OPT>      1243     5.2avg     0% 1tk
+        Pythia>       677     2.8avg     9% 1tk
+
+
+======================================================================
+B) 跨语言对照：Python / Java 关键词
+======================================================================
+
+--- Python (30 keywords) ---
+Keyword           GPT-2   Qwen    OPT Pythia
+------------------------------------------
+def                   0      0      1      0
+class                 0      0      1      0
+return                0      0      1      0
+if                    0      0      1      0
+else                  0      0      1      0
+elif                  1      0      2      0
+for                   0      0      1      0
+while                 0      0      1      0
+try                   0      0      1      0
+except                0      0      1      0
+finally               0      0      1      0
+import                0      0      1      0
+from                  0      0      1      0
+as                    0      0      1      0
+with                  0      0      1      0
+lambda                0      0      1      0
+yield                 0      0      1      0
+raise                 0      0      1      0
+assert                0      0      1      0
+pass                  0      0      1      0
+break                 0      0      1      0
+continue              0      0      1      0
+and                   0      0      1      0
+or                    0      0      1      0
+not                   0      0      1      0
+in                    0      0      1      0
+is                    0      0      1      0
+None                  0      0      1      0
+True                  0      0      1      0
+False                 0      0      1      0
+------------------------------------------
+AVERAGE            0.0    0.0    1.0    0.0
+
+--- Java (30 keywords) ---
+Keyword           GPT-2   Qwen    OPT Pythia
+------------------------------------------
+public                0      0      1      0
+private               0      0      1      0
+protected             0      0      1      0
+static                0      0      1      0
+void                  0      0      1      0
+class                 0      0      1      0
+extends               0      0      1      0
+implements            0      0      1      0
+interface             0      0      1      0
+abstract              0      0      1      0
+final                 0      0      1      0
+new                   0      0      1      0
+return                0      0      1      0
+if                    0      0      1      0
+else                  0      0      1      0
+for                   0      0      1      0
+while                 0      0      1      0
+try                   0      0      1      0
+catch                 0      0      1      0
+finally               0      0      1      0
+throw                 0      0      1      0
+throws                0      0      1      0
+import                0      0      1      0
+package               0      0      1      0
+this                  0      0      1      0
+super                 0      0      1      0
+synchronized          0      0      1      0
+volatile              0      0      1      0
+transient             0      0      1      0
+native                0      0      1      0
+------------------------------------------
+AVERAGE            0.0    0.0    1.0    0.0
+
+
+======================================================================
+C) 随机中文文本（排除编程偏差）
+======================================================================
+
+--- 编程 ---
+  GPT-2    avg=4.2 tk  0/20 1tk (0%)
+  Qwen     avg=1.2 tk  15/20 1tk (75%)
+  OPT      avg=5.2 tk  0/20 1tk (0%)
+  Pythia   avg=2.5 tk  4/20 1tk (20%)
+
+--- AI/技术 ---
+  GPT-2    avg=4.7 tk  0/20 1tk (0%)
+  Qwen     avg=1.2 tk  15/20 1tk (75%)
+  OPT      avg=5.7 tk  0/20 1tk (0%)
+  Pythia   avg=2.9 tk  2/20 1tk (10%)
+
+--- 日常词汇 ---
+  GPT-2    avg=3.4 tk  0/20 1tk (0%)
+  Qwen     avg=1.1 tk  18/20 1tk (90%)
+  OPT      avg=4.4 tk  0/20 1tk (0%)
+  Pythia   avg=2.5 tk  3/20 1tk (15%)
+
+领域            GPT2 avg  Qwen avg   OPT avg Pythia avg
+----------------------------------------------------
+编程DSL             4.1       1.2       5.1       2.7
+AI/技术             4.8       1.4       5.8       3.0
+日常                3.6       1.1       4.6       2.6

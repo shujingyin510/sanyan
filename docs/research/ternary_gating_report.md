@@ -4,7 +4,7 @@
 
 ## English Abstract
 
-This report evaluates a degeneration detector based on `unique_ratio < 0.30` across 4 models spanning 3 architectures (GPT-Neo, GPT-2, Qwen2) and 3 orders of magnitude in parameter count (3.6M–494M). The threshold achieves 98-100% true positive rate on degenerating models [95%CI: 96.8-100%] and 0.4% false positive rate on coherent ones [0.01-0.79%] (p < 0.05). Human text baseline (n=60 WikiText-2 passages, 4996 sliding windows, GPT-2 tokenizer): avg UR=0.849 [0.846,0.852], <0.30 rate=0.2%. Ablation shows UR alone is the only effective signal — all other trajectory detection signals are redundant. Measured ROC over 1214 real samples yields Youden's J optimum at 0.32; we choose the more conservative 0.30 at the TPR knee point (0.847→0.993).
+This report evaluates a degeneration detector based on `unique_ratio < 0.30` across 4 models spanning 3 architectures (GPT-Neo, GPT-2, Qwen2) and 3 orders of magnitude in parameter count (3.6M–494M). On TinyStories (3.6M, 28M) which degenerate regardless of sampling strategy, stop rate is 100%. On GPT-2 124M with clean sampling (temperature=0.8, top_k=50), stop rate is 2% — GPT-2 almost never degenerates on its own. On Qwen2.5-0.5B, false positive rate is 0.4% (p < 0.05). The original GPT-2 TPR of 100% was a rep_penalty-induced artifact (§3.5). Human text baseline (n=60 WikiText-2, μ=0.849 [0.846,0.852]) and measured ROC (1214 samples, Youden's J=0.32) independently confirm the threshold. UR is the dominant signal; auxiliary signals provide marginal early warning in 3.6% of cases (§4).
 
 ---
 
@@ -93,19 +93,31 @@ UR
 
 ## 3. 跨架构验证
 
-### 3.1 退化模型：真阳性率（原始运行 — 含 rep_penalty=1.15）
+以下 §3.1–§3.3 全部使用 **干净解码**：temperature=0.8, top_k=50, 无 rep_penalty, 无置信度门控 argmax 切换。原始含 rep_penalty 的运行见 §3.5。
 
-1000 prompt 基准（temperature=0.8, top_k=50, rep_penalty=1.15, 3.6M/28M 另有 top_prob>0.9→argmax 切换）：
+### 3.1 退化模型
 
-| 模型 | 架构 | 参数 | TPR | 95% CI | 平均停止长度 |
-|------|------|------|-----|--------|-------------|
-| TinyStories 3.6M | GPT-Neo | 3.6M | 98% | [96.8,99.2] | 18.1 tk |
-| TinyStories 28M | GPT-Neo | 28M | 100% | [99.6,100] | 20.6 tk |
-| GPT-2 124M | GPT-2 | 124M | 100% | [99.6,100] | 12.2 tk |
+TinyStories 系列（GPT-Neo 架构），1000 prompt，统一干净解码：
 
-> ⚠️ **重要混淆因子**：此轮 GPT-2 的 100% TPR 是 **rep_penalty 诱导** 的。用 clean sampling（见 §3.4）后 GPT-2 几乎不退化。rep_penalty=1.15 缩小了有效采样空间导致模型坍缩——这正是 §6 的反直觉发现。这意味着原始跨架构 TPR 比较存在混淆：TinyStories 系列无论如何采样都会退化，而 GPT-2 的退化是采样策略诱导的。
+| 模型 | 架构 | 参数 | 停止率 | 平均停止长度 |
+|------|------|------|--------|-------------|
+| TinyStories 3.6M | GPT-Neo | 3.6M | 100% | 10.8 tk |
+| TinyStories 28M | GPT-Neo | 28M | 100% | 9.1 tk |
 
-### 3.2 28M 停止时 UR 分布（原始运行）
+> 两个模型无论如何采样都 100% 退化。UR=0.30 正确检测全部案例。TinyStories 参数太小（3-28M），未学会避免 token 坍缩——几乎每条 prompt 都在 ~10 token 内从连贯生成转为循环重复。
+
+### 3.2 28M 停止时 UR 分布
+
+**Clean Run**（temperature=0.8, top_k=50, 无 rep_penalty）：
+
+| 停止信号 | 次数 | 占比 | 类型 |
+|---------|------|------|------|
+| UR=0.29 | 501 | 50.1% | 纯 UR |
+| UR=0.27 | 461 | 46.1% | 纯 UR |
+| CYC2;NONEW;UR=0.31 | 36 | 3.6% | 多信号联合（周期+无新词） |
+| UR=0.25 | 2 | 0.2% | 纯 UR |
+
+**原始运行**（含 rep_penalty=1.15）：
 
 | 停止时 UR | 次数 | 占比 |
 |-----------|------|------|
@@ -114,52 +126,42 @@ UR
 | UR=0.28 | 116 | 11.6% |
 | UR=0.27 | 1 | 0.1% |
 
-> 99.9% 的停止发生在 UR 0.27-0.30 窄带内。0.30 是退化样本 UR 分布的峰值区域。
+> 两次运行收敛于同一区间 0.27-0.30。Clean Run 中 36 例（3.6%）在 UR=0.31 时被周期+无新词提前拦截（§4），96.4% 仍为纯 UR。分布对采样策略变化稳健。
 
-### 3.3 正常模型：假阳性率（干净解码 — 无 rep_penalty）
+### 3.3 正常模型（干净解码 — 无 rep_penalty）
 
-Qwen2.5-0.5B（494M, Qwen2 架构）在 1000 prompt 上验证（temperature=0.8, top_k=50, **无 rep_penalty**）：
+以下模型在干净采样下不退化。UR 正确给出近零停止率：
 
-| 语言 | N | FPR | 95% CI | avg min_UR |
-|------|----|------|--------|------------|
-| 英文 | 1000 | 0.4% | [0.01,0.79] | 0.717 |
-| 中文 | 1000 | 0.6% | [0.15,1.05] | 0.714 |
+| 模型 | 架构 | 参数 | N | 停止率 | 95% CI | avg min_UR |
+|------|------|------|---|--------|--------|------------|
+| Qwen2.5-0.5B (EN) | Qwen2 | 494M | 1000 | 0.4% | [0.01,0.79] | 0.717 |
+| Qwen2.5-0.5B (ZH) | Qwen2 | 494M | 1000 | 0.6% | [0.15,1.05] | 0.714 |
+| GPT-2 124M | GPT-2 | 124M | 1000 | 2.0% | — | — |
 
-> 全部 FPR 案例均为输入诱导（语法破碎或纯重复 prompt）。在正常 prompt 上假阳性率为 0。Qwen2.5 使用干净采样（无 rep_penalty），FPR 数据无污染。
+> 全部停止案例均为输入诱导（语法破碎或纯重复 prompt）。正常 prompt 上停止率实际为 0。GPT-2 的 2%（20/1000）来自真正诱导出重复的 prompt——模型自身不退化。UR 正确区分了实际退化模型（§3.1）和非退化模型（§3.3）。
+>
+> Qwen2.5 不连贯但不重复；GPT-2 连贯但偶有重复。UR 追踪的是重复退化，而非连贯性——这正是检测器的设计目标。
 
 ### 3.4 统计显著性
 
-对 Qwen2.5-0.5B 1000 prompt FPR 进行二项检验：
+对 Qwen2.5-0.5B 英文 FPR 进行二项检验：
 
 - H₀: FPR ≥ 1%
 - 观测: 4/1000 = 0.4%
 - P(X ≤ 4 | n=1000, p=0.01) = **0.0287**
 - **p < 0.05**，拒绝 H₀
 
-### 3.5 Clean Decoding 重跑（temperature=0.8, top_k=50, 无 rep_penalty, 无 argmax 切换）
+### 3.5 混淆因子注记：原始运行含 rep_penalty（历史记录）
 
-三个模型用**完全一致**的解码设置重跑：纯 temperature=0.8 + top_k=50，无 rep_penalty，无置信度门控 argmax 切换：
+原始基准使用 temperature=0.8, top_k=50, **rep_penalty=1.15**，TinyStories 模型另有 top_prob>0.9→argmax 切换：
 
-| 模型 | 架构 | 参数 | TPR | 平均停止长度 |
-|------|------|------|-----|-------------|
-| TinyStories 3.6M | GPT-Neo | 3.6M | 100% | 10.8 tk |
-| TinyStories 28M | GPT-Neo | 28M | 100% | 9.1 tk |
-| GPT-2 124M | GPT-2 | 124M | 2% | 63.5 tk |
+| 模型 | TPR | 平均停止长度 | 说明 |
+|------|-----|-------------|------|
+| TinyStories 3.6M | 98% | 18.1 tk | — |
+| TinyStories 28M | 100% | 20.6 tk | — |
+| GPT-2 124M | 100% | 12.2 tk | ⚠️ **rep_penalty 诱导** |
 
-> **核心发现**：完全一致的干净解码下，TinyStories 模型仍然 100% 退化（UR 正确检测），而 GPT-2 124M 仅 2% 停止率——即 GPT-2 在干净采样下几乎不退化。20 次停止（2%）对应真正诱导出重复的 prompt。这验证了 UR 是精准检测器：只在实际退化时触发，不因采样策略产生假阳性。
->
-> 原 GPT-2 的 TPR=100% 是 **rep_penalty 诱导的人为退化**。跨架构"统一性"需要在这一点上修正：UR=0.30 在退化发生时正确检测，但高质量采样的模型（≥GPT-2 124M + clean sampling）可能根本不退化。
-
-**28M 停止时 UR 分布（Clean Run）**：
-
-| 停止时 UR | 次数 | 占比 | 触发类型 |
-|-----------|------|------|---------|
-| UR=0.29 | 501 | 50.1% | 纯 UR |
-| UR=0.27 | 461 | 46.1% | 纯 UR |
-| CYC2;NONEW;UR=0.31 | 36 | 3.6% | 多信号联合（周期+无新词） |
-| UR=0.25 | 2 | 0.2% | 纯 UR |
-
-> 36 例（3.6%）在 UR=0.31 时被周期+无新词联合检测提前拦截——模型已开始循环但 UR 还没跌破 0.30。这修正了消融结论（§4）：其他信号对 TPR 非必要，但可提供 1-2 步**提前预警**。96.4% 的停止仍为纯 UR。阈值 0.30 仍占主导。
+> 此轮 GPT-2 的 100% TPR 由 rep_penalty=1.15 缩小采样空间导致模型坍缩——正是 §6 确认的反直觉效应。用干净采样（§3.3）后 GPT-2 停止率为 2%。此表保留供追溯，论文主要结论基于 §3.1–§3.3 的干净解码结果。
 
 ---
 
@@ -195,10 +197,12 @@ Qwen2.5-0.5B（494M, Qwen2 架构）在 1000 prompt 上验证（temperature=0.8,
 | 28M | 自然度 | 81 | 2 | 17 | 81% [73,89] |
 | 28M | 停止时机 | 77 | 3 | 20 | 77% [68,86] |
 | GPT-2 | 连贯性 | 78 | 9 | 13 | 78% [69,87] |
-| GPT-2 | 自然度 | 78 | 10 | 12 | 78% [69,87] |
-| GPT-2 | 停止时机 | 83 | 6 | 11 | 83% [75,91] |
+| 28M | 自然度 | 81 | 2 | 17 | 81% [73,89] |
+| 28M | 停止时机 | 77 | 3 | 20 | 77% [68,86] |
 
-> 两个模型三元胜率一致（~78%），说明评价稳定且跨架构可复现。
+> 28M 上三态门控提前停止在三个维度上均优于 EOS（~77%）。28M 在干净采样下仍 100% 退化（§3.1），比较有效：三态在退化发生时提前停止，EOS 继续生成 64 token 重复。
+>
+> GPT-2 被排除在此评估外：干净采样下 GPT-2 停止率仅 2%（§3.3），三元 vs EOS 比较无意义——98% 的 prompt 上两者都生成 ~64 token 相似质量的文本。原始 rep_penalty 运行的 GPT-2 盲评数据因采样混淆不纳入。
 
 ---
 
@@ -358,7 +362,7 @@ UR 只能检测词级重复（"was was was"），无法检测语义循环（词�
 - [x] 跨架构验证（3 架构）
 - [x] 置信度校准差距发现
 - [x] 消融实验（UR-only = 完整系统）
-- [x] 人工盲评（100 prompt, 3 维）
+- [x] 自动规则盲评（100 prompt, 3 维）
 - [x] 实测 ROC 阈值分析（1214 样本）
 - [x] 跨语言验证（中英各 1000 prompt）
 - [x] 失败案例分析

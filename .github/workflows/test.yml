@@ -23,7 +23,7 @@ jobs:
       - run: ruff check .
       - run: mypy .
       - name: Check version consistency
-        run: python -X utf8 doc_sync.py
+        run: python -X utf8 scripts/doc_sync.py
 
   test:
     strategy:

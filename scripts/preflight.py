@@ -1,11 +1,7 @@
 """preflight — 发版前质量门
 
 用法:
-    python preflight.py          # 全部检查
-    python preflight.py --quick  # 快速检查 (跳过慢的)
-    python preflight.py --lint   # 仅 lint
-    python preflight.py --test   # 仅测试
-    python preflight.py --help
+    python scripts/preflight.py          # 全部检查
 
 检查项:
     1. ruff format + check (格式)
@@ -26,7 +22,8 @@ from pathlib import Path
 from dataclasses import dataclass
 from typing import Callable
 
-ROOT = Path(__file__).parent.resolve()
+ROOT = Path(__file__).parent.resolve()  # scripts/ dir
+ROOT = ROOT.parent if ROOT.name == 'scripts' else ROOT  # back to project root
 RED = '\033[31m'
 GREEN = '\033[32m'
 YELLOW = '\033[33m'

@@ -1,156 +1,38 @@
-# 三言 扩展路线图
+# Roadmap
 
-> 已有 52 个三态 API（构造/传播/判定/冲突/融合/衰减/容器/序列化/调试/数学/逻辑/分布/校准/信念），以下为后续扩展方向。
+## Completed
 
----
-
-## 一、运行时扩展 ✅ 已完成
-
-| 方向 | 说明 | 示例 |
-|------|------|------|
-| 文件 I/O | 三态读写、日志带信度 | `三态写("log", 三态(真,0.9))` |
-| 网络请求 | HTTP 三态响应 | `三态请求(url)` → 三态(状态码, 网络信度) |
-| 数据库 | 三态查询结果带信度 | `三态查询("SELECT ...")` |
-| 缓存 | 带信度 LRU/TTL 缓存 | `三态缓存(key, 三态(v,c), ttl)` |
-
-## 二、控制流增强 ✅ 已完成
-
-| 方向 | 说明 | 状态 |
-|------|------|------|
-| `匹配3(值) {真→..., 可能→..., 假→...}` | 三态模式匹配 | ✅ 已实现 |
-| `匹配信度(值, 阈值) {高→..., 中→..., 低→...}` | 置信度区间匹配 | ✅ 已实现 |
-| `链(步骤1, 步骤2, ...)` | 链式信度传播 | ✅ 已实现 |
-| `链断(步骤1, 步骤2, ...)` | 链式执行，假值中断 | ✅ 已实现 |
-| `解包(值 [, 默认值])` | 三态值解包 | ✅ 已实现 |
-| `或解(值, 默认值)` | 或解包，可能/假时返回默认值 | ✅ 已实现 |
-| `尝试链(步骤1, ..., 默认值)` | 链式尝试，失败时继续 | ✅ 已实现 |
-| `信度守卫(值, 阈值) {高→..., 低→...}` | 置信度门控 | ✅ 已实现 |
-
-## 三、并发与分布式 ✅ 已完成
-
-| 方向 | 说明 | 状态 |
-|------|------|------|
-| `并发融合(任务1, 任务2, ...)` | 并发执行+结果融合 | ✅ 已实现 |
-| `并发竞速(超时ms, 任务1, ...)` | 并发竞速，取最先完成 | ✅ 已实现 |
-| `并发全部(任务1, 任务2, ...)` | 并发执行，全部成功才返回真 | ✅ 已实现 |
-| 三态锁 | 信度感知互斥 | ✅ 已有 |
-| `并发{任务1, 任务2}→融合` | 异步并行融合 | ✅ 已实现 |
-
-## 四、类型系统 ✅ 已完成
-
-| 方向 | 说明 | 状态 |
-|------|------|------|
-| `三态集` | 带置信度的集合 | ✅ 已实现 |
-| `三态图` | 带置信度的图结构 | ✅ 已实现 |
-| `三态队列` | 带置信度的队列 | ✅ 已实现 |
-| `三态栈` | 带置信度的栈 | ✅ 已实现 |
-| 三态集操作 | 并集/交集/差集/置信度融合 | ✅ 已实现 |
-| 三态图操作 | 最短路径/连通分量/邻居查询 | ✅ 已实现 |
-
-## 五、Web框架 ✅ 已完成
-
-| 方向 | 说明 | 状态 |
-|------|------|------|
-| `三态Web服务器(端口)` | 创建Web服务器 | ✅ 已实现 |
-| `三态路由(server, 方法, 路径, 处理器)` | 添加路由 | ✅ 已实现 |
-| `三态监听(server)` | 启动服务器 | ✅ 已实现 |
-| 置信度降级 | 低置信度请求自动降级 | ✅ 已实现 |
-| 中间件 | CORS/日志/速率限制/置信度守卫 | ✅ 已实现 |
-
-## 六、数据管线 ✅ 已完成
-
-| 方向 | 说明 | 状态 |
-|------|------|------|
-| `三态管线(名称)` | 创建ETL管线 | ✅ 已实现 |
-| `三态管线加阶段(管线, 名称, 处理器)` | 添加处理阶段 | ✅ 已实现 |
-| `三态管线处理(管线, 数据)` | 处理数据 | ✅ 已实现 |
-| `三态数据(值, 置信度, 来源)` | 创建三态数据单元 | ✅ 已实现 |
-| `三态清洗(数据, 规则)` | 数据清洗 | ✅ 已实现 |
-| `三态聚合(数据列表, 方式)` | 数据聚合 | ✅ 已实现 |
-| `三态验证(数据, 规则)` | 数据验证 | ✅ 已实现 |
-
-## 七、机器学习（待实现）
-
-| 方向 | 说明 |
-|------|------|
-| 三态感知机 | 三态权重更新 |
-| 三态决策树 | 分裂节点信度传播 |
-| 贝叶斯网络 | 条件概率图传播 |
-| 集成学习 | 多模型置信度融合 |
-
-## 八、作用域隔离（实现级，待实现）
-
-| 方向 | 说明 |
-|------|------|
-| 模块导入信度隔离 | `导入("m")` 内部中间信度不泄露到调用方 |
-| 信念集持久化 | `信念写("mem.bin")` / `信念读("mem.bin")` |
-| 推断最小化 | 只保留结论的信度链，中间推导不暴露 |
-
-## 九、调试与可观测性（待实现）
-
-| 方向 | 说明 |
-|------|------|
-| 追踪可视化 | 信度变化火焰图 |
-| 泄漏检测 | 高信度堆积告警 |
-| 性能分析 | 置信度计算开销 |
-| 基准测试 | 带信度 vs 不带信度性能对比 |
-
-## 十、生态工具（部分已实现）
-
-| 方向 | 说明 | 状态 |
-|------|------|------|
-| 包管理器 | 三态库生态 | ✅ 已实现 |
-| REPL | 交互式三态 shell | ✅ 已实现 |
-| IDE 插件 | VSCode 信度高亮 | ✅ 已实现(本地VSIX) |
-| 文档生成 | API 信度注解自动生成 | 待实现 |
-
-## 十一、安全与密码学（待实现）
-
-| 方向 | 说明 |
-|------|------|
-| 三态加密 | 信度感知加密 |
-| 零知识证明 | 三态 ZKP |
-| 安全多方计算 | 信度保密计算 |
-
-## 十二、硬件与近似计算（部分完成）
-
-| 方向 | 说明 | 状态 |
-|------|------|------|
-| 信度量化编码 | 1 字节存值+信度 | ✅ 已有 |
-| LLVM 降频/DVFS | 低信度路径降频 | ✅ 已有 |
-| 循环穿孔 | 低信度代码块跳过 | 待实现 |
-| 神经形态芯片 | 三态硬件加速 | 待实现 |
+| Milestone | Details |
+|-----------|---------|
+| **C VM (ISA v2)** | 16-bit LOAD/STORE, 32-bit CALL, CLOSURE, PUSH_STR16 |
+| **Level 3 Bootstrap** | 318-line C seed VM → TCC-compiled binary |
+| **Level 4 Bootstrap** | 617-line x86_64 NASM assembly VM |
+| **AVX2 GEMM Kernel** | FMA instructions, 256×256, 66 GFLOPS, zero error vs NumPy |
+| **C Operator Library** | LayerNorm (err e-07), Softmax (err e-09), GELU (err e-08) |
+| **TinyStories 3.6M** | GPT-Neo inference, KV Cache, 4ms/token |
+| **TinyStories 28M** | GPT-Neo inference, 1000-prompt benchmark |
+| **GPT-2 124M** | GPT-2 inference (Conv1D + pre-norm), KV Cache, 1000-prompt benchmark |
+| **UR Threshold Calibration** | Auto-calibrated to 0.30 across 3.6M and 28M |
+| **Qwen2.5-0.5B Validation** | 1000-prompt false positive check (0.4%) |
+| **Human Blind Evaluation** | 100 prompts × 3 dimensions, ternary 79.7% preferred |
+| **Ablation Study** | UR-only = full trajectory (all other signals redundant) |
+| **Statistical Significance** | p = 0.0287, 95% CI [0.01%, 0.79%] |
+| **Sanyan → C FFI Demo** | .san → reg_op → C DLL → GPT-2 end-to-end |
+| **Agent Safety Benchmarks** | 49 bug injections, 98% detection rate |
+| **Agent Honesty Benchmarks** | 100 questions × 5 categories, Truth Calibration -11.5% overreach |
+| **Agent Evolution Runtime** | 4-layer architecture, knowledge→calibration→selection→success chain |
 
 ---
 
-## 新增操作一览（2026-06）
+## Next
 
-### 控制流
-- `匹配3` — 三态模式匹配
-- `匹配信度` — 置信度区间匹配
-
-### 并发
-- `并发融合` — 并发执行+结果融合
-- `并发竞速` — 并发竞速
-- `并发全部` — 全部成功检查
-
-### 泛型容器
-- `三态集` / `三态集加` / `三态集删` / `三态集含` / `三态集并` / `三态集交` / `三态集差`
-- `三态图` / `三态图加节点` / `三态图加边` / `三态图最短路` / `三态图连通`
-- `三态队列` / `三态入队` / `三态出队`
-- `三态栈` / `三态压栈` / `三态弹栈`
-
-### 错误处理
-- `链` — 链式信度传播
-- `链断` — 链式执行，假值中断
-- `解包` — 三态值解包
-- `或解` — 或解包
-- `尝试链` — 链式尝试
-- `信度守卫` — 置信度门控
-
-### Web框架
-- `三态Web服务器` / `三态路由` / `三态监听`
-
-### 数据管线
-- `三态管线` / `三态管线加阶段` / `三态管线处理` / `三态管线统计`
-- `三态数据` / `三态清洗` / `三态聚合` / `三态验证`
+| Priority | Item | Notes |
+|----------|------|-------|
+| 🔴 | **TinyLlama-1.1B validation** | Test if UR≈0.30 holds for Llama architecture |
+| 🔴 | **Paper draft** | Ternary gating + UR threshold as main contribution |
+| 🟡 | **GGUF format support** | Quantized model loading (INT8/FP16) |
+| 🟡 | **Semantic loop detection** | Embedding-distance based detection for subtle loops |
+| 🟡 | **GPU inference** | CUDA kernels for GEMM/Attention |
+| 🟢 | **More architectures** | SmolLM, Phi, Mistral |
+| 🟢 | **Larger models** | 1B-7B range for stress-testing false positive rate |
+| 🟢 | **Streaming token-level gate** | Real-time UR check during token generation |

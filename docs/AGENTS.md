@@ -5,7 +5,7 @@
 **每次 `git commit` 前，必须先跑本地测试，绿了才能提交：**
 
 ```bash
-ruff check . && ruff format --check . && mypy . && python -X utf8 preflight.py --quick
+ruff check . && ruff format --check . && mypy . && python -X utf8 scripts/preflight.py --quick
 ```
 
 绿了 → 提交。红灯 → 修完再提。**不允许跳过。不允许 `--no-verify`。**
@@ -24,7 +24,7 @@ ruff check . && ruff format --check . && mypy . && python -X utf8 preflight.py -
 | 🚨 P0 | 不确定文件用途 | 先搜索引用关系 |
 | 🚨 P0 | 不确定修改影响 | 先分析再修改 |
 | 🔴 P1 | 写完任何代码 | 先跑 `ruff check . && ruff format --check . && mypy .` |
-| 🔴 P1 | 推送到 GitHub 前 | 必跑 `python -X utf8 preflight.py --quick`，绿了才能 push |
+| 🔴 P1 | 推送到 GitHub 前 | 必跑 `python -X utf8 scripts/preflight.py --quick`，绿了才能 push |
 | 🔴 P1 | 推送前 | 检查 CHANGELOG 是否更新、版本号是否一致（README/manual/llvm 等） |
 | 🔴 P1 | CHANGELOG | 记录原因，不只记录结果；功能写完就写，同日合并为一个版本号 |
 | 🔴 P1 | 修改代码 | 优先最小变更 |
@@ -296,7 +296,7 @@ nasm -f bin -o sanyan_vm csrc/sanyan_vm_l4.asm
 | 反汇编器 | `disasm.py` | .bin → 反汇编（--hex/--brief/--export） |
 | 验证器 | `verify.py` | JMP/LOAD/STORE 边界检查 |
 | 编译器 | `sanyanc.py` | .san → .bin（S-表达式 + sugar 双语法） |
-| 预检 | `preflight.py` | 发版前全量检查（lint/mypy/全测试/编码/自举） |
+| 预检 | `scripts/preflight.py` | 发版前全量检查（lint/mypy/全测试/编码/自举） |
 
 ## 环境
 
@@ -320,8 +320,8 @@ git commit -m "本地保存：xxx"   # 不加 --push
 
 **⚠ 推送前强制自查**：
 ```bash
-python -X utf8 preflight.py          # 全量: lint + mypy + 全测试 + 编码 + 自举
-python -X utf8 preflight.py --quick  # 快速: 跳过自举
+python -X utf8 scripts/preflight.py          # 全量: lint + mypy + 全测试 + 编码 + 自举
+python -X utf8 scripts/preflight.py --quick  # 快速: 跳过自举
 ```
 
 preflight 绿了 → `git push`。红了 → 修完再推。
@@ -337,7 +337,7 @@ preflight 绿了 → `git push`。红了 → 修完再推。
 ## 测试
 
 ```bash
-python -X utf8 preflight.py          # 包含全部测试
+python -X utf8 scripts/preflight.py          # 包含全部测试
 # 或单独：
 python -X utf8 tests/test_core.py -v      # 138 项
 python -X utf8 tests/test_self_host.py -v # 自举 8 项(含 Level 2+3)

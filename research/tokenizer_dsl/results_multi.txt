@@ -1,0 +1,25 @@
+"""4-model tokenizer benchmark output (cached)"""
+# Results: 2026-06-21
+
+Pattern          GPT2       Qwen        OPT     Pythia
+-------------------------------------------------------
+Loop             -47%        -8%       -44%       -15%
+If/else          -96%       -33%       -92%       -50%
+Func             -80%        -9%       -75%       -38%
+List             -86%       -27%       -80%       -69%
+File             -80%       -13%       -76%       -28%
+Try             -136%       -47%      -130%       -94%
+Class            -85%       -44%       -82%       -63%
+Dict            -162%       -62%      -150%      -100%
+While            -21%        +0%       -20%        +0%
+Return           -50%        +0%       -43%       -17%
+Assign           -78%       -10%       -70%       -56%
+-------------------------------------------------------
+TOTAL            -88%       -25%       -83%       -51%
+
+GPT2       CN=30.5tk PY=16.3tk  gap=-88%  vocab=50257
+Qwen       CN=16.6tk PY=13.3tk  gap=-25%  vocab=151643
+OPT        CN=31.5tk PY=17.3tk  gap=-83%  vocab=50265
+Pythia     CN=21.2tk PY=14.0tk  gap=-51%  vocab=50254
+
+Key: negative gap = Chinese DSL uses MORE tokens than Python (bad for Chinese)

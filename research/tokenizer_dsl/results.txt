@@ -1,0 +1,22 @@
+Pattern         GPT2-CN  GPT2-PY  GPT2-Δ |  QWEN-CN  QWEN-PY  QWEN-Δ
+----------------------------------------------------------------------
+Loop 10x             22       15    -47% |       13       12     -8%
+If/else              47       24    -96% |       24       18    -33%
+Function             27       15    -80% |       12       11     -9%
+List comp            26       14    -86% |       19       15    -27%
+File read            36       20    -80% |       17       15    -13%
+Try/catch            52       22   -136% |       22       15    -47%
+Class                50       27    -85% |       23       16    -44%
+Dict comp            34       13   -162% |       21       13    -62%
+Lambda               13        6   -117% |        8        7    -14%
+Import                9        2   -350% |        3        2    -50%
+While loop           17       14    -21% |       14       14     +0%
+Return                9        6    -50% |        7        7     +0%
+Assign               16       11    -45% |       11       12     +8%
+Nested fn            53       27    -96% |       23       17    -35%
+Map/filter           52       24   -117% |       31       20    -55%
+----------------------------------------------------------------------
+TOTAL               463      240    -93% |      248      194    -28%
+
+GPT-2: Chinese 30.9 tk/snip  Python 16.0 tk/snip  → +93% worse for Chinese
+Qwen:  Chinese 16.5 tk/snip  Python 12.9 tk/snip  → +28% worse for Chinese
