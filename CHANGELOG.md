@@ -2,7 +2,25 @@
 
 ---
 
-## [v3.43.0] — 2026-06-20 (Agent面板增强 + 动态置信度 + CI修复)
+## [v3.43.0] — 2026-06-24 (项目重构：UR实验独立 + 目录整理 + Tokenizer研究)
+
+### 项目架构
+- **UR 退化检测实验独立为新仓库**：`github.com/shujingyin510/UR`，含完整实验数据、模型权重（LFS）、匿名提交
+- **Sanyan 回归语言项目**：首页改中文（三态认知框架），英文版保留为 `README_EN.md`
+- **根目录整理**：文档迁移至 `docs/`，构建/检查脚本迁移至 `scripts/`
+
+### Tokenizer-语言对齐实验（新增）
+- **research/tokenizer_dsl/** — 4 模型（GPT-2/Qwen/OPT/Pythia）× 71 关键词 token 开销对比
+  - GPT-2 中文关键词 avg 4.3 tk，Qwen avg 1.2 tk（80% 单 token）
+  - 跨语言对照：Python/Java/中文 DSL 三组关键词 token 开销
+  - 受控实验：同一段中文 DSL，纯 tokenizer 词表变化 → 2.4× 差距
+  - 自然文本验证：34 段真实中文（日常/技术/注释/API）GPT-2/Qwen = 3.0×
+  - 结论：LLM 时代语言效率 = 语言 × Tokenizer × 训练分布共同决定
+
+### 修复
+- ruff format/check/mypy 全绿
+- CRLF → LF（csrc/ 下 4 个文件）
+- `doc_sync.py` 路径修复，`sanyan/__init__.py` 版本号同步至 v3.43.0
 
 ### Agent 面板增强
 - **Token 用量显示**：执行面板新增 LLM 调用次数 + API Token 消耗量（从 API 响应读取实际值，非估算）
