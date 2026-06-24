@@ -1,227 +1,381 @@
-# Sanyan — A Surprisingly Stable Degeneration Threshold for Small LLMs
+# Tri-State Cognitive Framework Sanyan v3.43.0
 
+[![VS Code Extension](https://img.shields.io/badge/VS%20Code-Syntax%20Highlight-%23007ACC?logo=visualstudiocode)](sanyan-vscode/README.md)
 [![CI](https://github.com/shujingyin510/sanyan/actions/workflows/test.yml/badge.svg)](https://github.com/shujingyin510/sanyan/actions)
-![Tests](https://img.shields.io/badge/tests-1650%2B%20passing-brightgreen)
-![Models](https://img.shields.io/badge/models-GPT--2%20%7C%20Qwen2.5%20%7C%20TinyStories-blue)
-![UR](https://img.shields.io/badge/threshold-UR%E2%89%880.30-orange)
+[![PyPI](https://img.shields.io/pypi/v/ternary-engine?label=ternary-engine)](https://pypi.org/project/ternary-engine/)
 
-> **UR ≈ 0.30 reliably separates degenerative from coherent text generation across 4 small models, 3 architectures, and 3 orders of magnitude in parameter count.**
+> **Tri-State Cognitive Framework** — The evolution from ternary language to Knowledge Runtime. Core contribution: a verifiable self-improving Agent knowledge system proving the causal chain Knowledge → Calibration → Selection → Success.
 
-[中文](README_CN.md) | [Quick Start](QUICK_START.md) | [Results](RESULTS.md) | [Research](docs/research/) | [Roadmap](ROADMAP.md)
+[中文版](README_archive.md) | [Operations Manual](../agent_system/agent_operations_en.md)
 
 ---
 
-## Main Finding
+## v3.43 Update Summary
 
-A single **uniqueness-ratio threshold of 0.30** — the fraction of unique tokens in a sliding 32-token window — detects when a language model has collapsed into repetitive degeneration:
+### v3.43 (2026-06-20)
+- **Token usage display**: Panel shows LLM call count + API token consumption
+- **Ternary state fix**: done tool no longer skipped, panel correctly shows judgment
+- **Dynamic confidence**: Confidence updates after each execution based on ternary results, accumulates across tasks in same domain
+- **CI fixes**: mypy method-assign fix, dry_run fast path (0.03s), CRLF/LF fixes
 
-| Model | Architecture | Params | Behavior | UR=0.30 Result |
-|-------|-------------|--------|----------|----------------|
-| TinyStories 3.6M | GPT-Neo | 3.6M | Degenerates | True Positive 98% |
-| TinyStories 28M | GPT-Neo | 28M | Degenerates | True Positive 100% |
-| GPT-2 124M | GPT-2 | 124M | Degenerates | True Positive 100% |
-| Qwen2.5-0.5B | Qwen2 | 494M | Coherent | False Positive 0.4% |
+### v3.42 (2026-06-19)
+- **Ternary engine upgrade**: 5-state classify + Kleene propagation + protection gating + final judgment
+- **Multi-language QA**: Non-code tasks answered directly by LLM, any language/domain
+- **200 rules** + **11 templates** + **domain knowledge layer**
+- **Rule engine**: 80% tasks with 0 LLM calls
+- **Multi-agent collaboration**: Task decomposition → parallel execution → result aggregation
 
-**Key result**: The threshold has a 98-100% true positive rate on degenerating models and a 0.4% false positive rate on coherent ones (p < 0.05, binomial test). Ablation shows UR alone achieves the same performance as the full trajectory detection system — cycle detection, function-word density, and no-new-word signals are entirely redundant.
+### v3.41 (2026-06-18)
+- **Rule Engine**: 200+ rules, task→tool chain matching, 0 LLM calls
+- **Template Library**: 11 templates (math/data structures/algorithms/utils), code generation
+- **Domain Knowledge Layer**: LLM dynamic generation, SQLite caching
+- **Learning System**: Git batch learning + project style recording
+- **Auto Rule Generation**: LLM generates → user approves → saved
+- **Cross-project Migration**: Export/import rules/templates/learning records
+- **Multi-Agent Collaboration**: Task decomposition → parallel execution → result aggregation
+- **Multi-model Routing**: DeepSeek/Claude/GPT-4/local models
+- **SQLite Built-in**: 10 operations, Sanyan directly operates databases
+- **Sanyan Runtime**: agent_runtime.san, decision loop in native language
+- **File Split**: agent_runtime.py reduced from 1659 to 1326 lines
 
----
-
-## Why It Matters
-
-Small language models frequently collapse into repetitive loops ("was was was...", "and and and...") with **confidence scores remaining at 0.97-1.00** — the model believes it's producing high-quality output while generating garbage. Standard stopping strategies (EOS token, max token limit, repetition penalty) fail to detect this.
-
-**Sanyan's UR-based stopping** catches degeneration the moment it happens:
-
-| Strategy | Avg Length | Stop Rate |
-|----------|-----------|-----------|
-| UR < 0.30 (Sanyan) | 12-20 tokens | **98-100%** |
-| EOS-only | 64 tokens | 0% |
-| Repetition Penalty | 64 tokens | 0% |
-
-Human blind evaluation across 100 prompts: **ternary gating preferred 79.7% vs. EOS-only 8.3%** (12% ties).
-
-### Empirical Validation
-
-**UR trajectories show a phase transition**, not just a statistical drop — UR declines monotonically from ~0.70 to ~0.10, crosses 0.30 at t=18–28, and **no recovery is observed within the evaluated horizon** (≤64 tokens):
-
-| Step | "Once upon a time" | "The little boy" | "A big dog" |
-|------|--------------------|-------------------|-------------|
-| t=9 | 0.62 | 0.88 | 0.50 |
-| t=18 | 0.35 | 0.41 | **0.24** |
-| t=28 | 0.26 | **0.26** | 0.19 |
-| t=48 | 0.16 | 0.03 | 0.06 |
-
-**Human vs. degenerative text separation** (window=32):
-
-| Text Type | Avg UR | UR < 0.30 |
-|-----------|--------|-----------|
-| Human (literature) | **0.704** | **0.0%** |
-| Human (WikiText-2, n=60) | **0.849** | **0.2%** |
-| Degenerative (GPT-2) | **0.101** | **99.7%** |
-
-**Decoding strategy comparison** on GPT-2 124M:
-
-| Strategy | Degeneration Rate | Avg UR |
-|----------|-------------------|--------|
-| nucleus (top_p=0.9) | **0%** | **0.867** |
-| greedy | 25% | 0.336 |
-| rep_penalty=1.15 | **100%** | 0.117 |
-
-> **Counterintuitive**: repetition penalty *amplifies* collapse on GPT-2 by narrowing the effective sampling space. UR correctly reflects each strategy's actual degeneration level independent of the strategy's assumptions.
-
-**GPT-2 cross-size UR stability** (nucleus sampling, top_p=0.9):
-
-| Model | Params | Avg UR | UR < 0.30 |
-|-------|--------|--------|-----------|
-| GPT-2 | 124M | 0.711 | 0% |
-| GPT-2 Medium | 355M | 0.714 | 0% |
-| GPT-2 Large | 774M | 0.797 | 0% |
-
-> UR varies only ±0.043 across 6× scale. Larger models → higher UR → more diverse output. UR functions as a stable generation diversity metric, not just a degeneration detector.
-
-**Cross-language stability**: Qwen2.5-0.5B on Chinese (n=1000): FP=**0.6%**, avg min_UR=**0.714** — vs English FP=0.4%, avg=0.717. UR threshold is language-agnostic at scale.
-
-**Threshold selection** (real-data ROC, 1214 samples): Youden's J optimum = 0.32. We chose **0.30** — the TPR "knee point" where detection jumps from 0.847→0.993. Conservative relative to the optimum, minimizing FPR.
+See [CHANGELOG](../CHANGELOG.md)
 
 ---
 
-## Architecture
+## Why Ternary
 
-```
-Sanyan Language (决策 DSL)
-    ↓
-Python / C VM
-    ↓
-Native FFI (reg_op)
-    ↓
-AVX2 GEMM + C LayerNorm/GELU/Softmax
-    ↓
-GPT-2 / GPT-Neo / Qwen2 Transformer
-    ↓
-KV Cache Inference
-    ↓
-UR-based Degeneration Detection (UR_TH = 0.30)
-```
+Sanyan's native three-valued logic (`true` / `maybe` / `false`) is not a gimmick — it solves real problems that binary logic cannot. Four quantified case studies demonstrate this:
 
----
+- **Circuit simulation** — 9-input truth tables prove ternary correctness by construction
+- **Data cleaning** — `maybe` stops NULL propagation; binary `None` silently produces misleading 0
+- **API health checks** — timeout ≠ down; binary aggregation triggers false alerts
+- **Game NPCs** — hesitation is a legitimate behavior; binary needs extra state variables
 
-## Known Boundaries
-
-The current findings (UR ≈ 0.30 as a degeneration threshold) are empirical and should be interpreted within the following constraints:
-
-### 1. Windowed lexical measurement
-
-`unique_ratio` is computed over a fixed sliding window of tokens. All reported results use a window size of 32 tokens, stride = 1. The threshold is stable under moderate window sizes (32–64), but is not invariant across arbitrary scales.
-
-### 2. Regime definition (not quality classification)
-
-UR measures **repetition-dominated generation regimes**, not semantic correctness or overall output quality. Therefore:
-
-- Structured outputs (code, lists, enumerations)
-- Poetic or stylistically constrained text
-
-may exhibit low UR while remaining valid. These cases are not considered false positives, but a different generation regime outside the detector's target domain.
-
-### 3. Prompt-induced repetition is a separate regime
-
-Repetition explicitly present in the input prompt (e.g., "cat cat cat") is treated as input-conditioned behavior, not model-internal degeneration. The detector is designed for emergent repetition during generation, not echoing input structure.
-
-### 4. Empirical model coverage
-
-The current evaluation includes:
-- TinyStories (3.6M, 28M)
-- GPT-2 (124M)
-- Qwen2.5-0.5B
-
-Results are consistent across these models, but this should be interpreted as *empirical cross-model stability within tested regimes*, not full model-invariance across all architectures.
-
-### 5. Scale limitation
-
-No evaluation has been performed on:
-- 7B+ parameter models (e.g., LLaMA-3, Qwen2.5-7B)
-- Instruction-tuned large chat models in open-ended dialogue regimes
-
-Generalization to large-scale models remains an open question.
+See [Why Ternary](docs/ternary-logic.md) for the full comparison.
 
 ---
 
 ## Quick Start
 
 ```bash
-# Run ternary gating benchmark (GPT-2 124M, 1000 prompts)
-python -X utf8 csrc/gpt2_scale.py
+git clone https://github.com/shujingyin510/sanyan.git
+cd sanyan
+python main.py
+```
 
-# Run Sanyan language demo (.san → reg_op → C DLL → GPT-2)
-python -X utf8 csrc/sanyan_run.py csrc/infer_demo.san
+> **Performance tip**: For performance-sensitive programs, choose from easy to advanced:
+> - [PyPy](https://pypy.org) — drop-in, 5-10x faster: `pypy main.py`
+> - **LLVM native compilation** — machine code, orders of magnitude faster: `pip install llvmlite && python compile_llvmgen.py`
+> - **C VM** — pure C bytecode interpreter, zero Python dependency: `gcc csrc/runtime.c -o vm && ./vm program.bin`
 
-# Compile C kernels
-gcc -shared -O2 -o csrc/transformer_c.dll csrc/transformer_c.c -lm
+Once in the REPL, try:
+
+```text
+sanyan> set a = 10
+sanyan> print(a ^ 2)
+  => 100  (ternary: ++-0+)
+
+sanyan> set state = maybe
+sanyan> print(state)
+  => 0  (ternary: 0)
+```
+
+Run example files:
+
+```bash
+python main.py examples/greenhouse.san
+python main.py examples/sensor_pipeline_simple.san
+python main.py examples/circuit_sim.san     # Ternary truth tables
+python main.py examples/data_cleaning.san   # NULL propagation safety
+python main.py examples/health_check.san    # Timeout ≠ down
+python main.py examples/npc_decision.san    # NPC hesitation behavior
 ```
 
 ---
 
-## Repository Layout
+## Key Features
+
+### Ternary Logic
+
+Sanyan's ternary system is simulated on Python integers (TritValue wraps +1/0/-1). The semantics follow Kleene strong logic:
+
+| A | B | A AND B | A OR B |
+|---|---|---|---|
+| True | Maybe | Maybe | True |
+| False | Maybe | False | Maybe |
+| Maybe | Maybe | Maybe | Maybe |
+
+`Maybe AND Maybe` is still `Maybe`. Stack uncertainty on uncertainty, and the result remains uncertain.
+
+### Dual Syntax
+
+Sanyan has two equivalent syntaxes: **Sugar** (C-like) and **S-Expressions** (Lisp-like). Both compile to the same evaluator.
+
+**Sugar:**
+```c
+set x = 10
+if (x > 5) {
+    print("large")
+} else {
+    print("small")
+}
+```
+
+**S-Expression:**
+```lisp
+(set x 10)
+(if (> x 5)
+    (print "large")
+    (print "small"))
+```
+
+### Native-Language Keywords
+
+Switch keywords to any language via the skin system. Chinese, English, or any other language — the semantics don't change.
+
+### IoT & Sensor Abstraction
+
+Register virtual devices, read/write sensors with ternary values. Perfect for smart home, robotics, and industrial control where uncertainty is the default state.
+
+---
+
+## Features
+
+### Language Core
+
+| Feature | Description |
+|---|---|
+| **Ternary Logic** | Native `true`/`maybe`/`false` (Kleene strong logic), `maybe and maybe` = `maybe` |
+| **Ternary Arithmetic** | Balanced ternary add/sub/mul/div/mod/pow/digit, `TernaryALU` at bit level |
+| **Dual Syntax** | Sugar syntax (C-like) + S-expressions, shared evaluator, can be mixed |
+| **Native Language** | Keywords switchable to any natural language (CN/EN skins), fullwidth symbol support |
+| **Ternary Branch** | `judge (expr) { true → ..., maybe → ..., false → ... }` |
+| **Gradual Typing** | Return type annotation `-> type`, optional type `?type`, runtime auto-validation |
+| **Exception Handling** | `try { } catch (e) { }`, narrow exception catching |
+| **Higher-Order Functions** | `map`/`filter`/`reduce`/`sort`/`reverse`/`unique`/`sum`/`join` |
+| **Lambda** | `λ(x) { x * 2 }` or `function(x) { x * 2 }` |
+| **Module System** | `import("path")`, `export name1 name2`, nested package import |
+| **Line Comments** | `//` (halfwidth), `／／` (fullwidth), `#` — three comment syntaxes |
+
+### Bytecode VM
+
+| Feature | Description |
+|---|---|
+| **52 Opcodes** | Full instruction set: arithmetic/comparison/logic/container/string/dict/control/IO |
+| **Self-Hosting** | `bytecode_compiler.san` compiles itself, VM output byte-identical to Python evaluator |
+| **32-bit Code Size** | Supports >64KB bytecode (old 16-bit limit was 64KB) |
+| **Standalone .bin** | sugar.bin (~10KB) and llvmgen.bin (~72KB) run independently on VM |
+| **C VM** | `csrc/runtime.c` pure C implementation, 52 instructions, no Python dependency |
+| **C VM Tests** | `csrc/test_runtime.c` 61 unit tests covering all instructions |
+| **STM32 Firmware** | `sanyancc.py` cross-compile → `runtime_stm32.c`, Blue Pill hardware verified |
+
+### LLVM Code Generation
+
+| Feature | Description |
+|---|---|
+| **AST → LLVM IR** | `llvmgen/codegen.py` + `llvmgen/compiler.py`, ~1500 lines codegen |
+| **63-bit Integers** | Tagged pointer upgraded to i64, range ±4.6×10^18 |
+| **Float Support** | IEEE 754 double, `fadd`/`fmul`/`fdiv` inline, integer auto-promotion |
+| **Import Static Linking** | Compile-time recursive dependency compilation, `san_{mod}__{fn}` name mangling |
+| **try/catch** | `@g_error` LLVM visible global + manual stack unwinding |
+| **Arena Allocator** | 64KB init, auto-grow, pointer bump替代 malloc |
+| **Self-Hosted LLVM Compiler** | `llvmgen.san` compiled to .bin, V5 with all helpers inlined |
+
+### Standard Library & Tools
+
+| Feature | Description |
+|---|---|
+| **Standard Library** | `json.san` `http.san` `regex.san` `csv.san` `string.san` `list.san` `math.san` etc. |
+| **LSP Language Server** | Formatting/reference/rename/document symbols/folding/semantic completion/hover |
+| **DAP Debug Adapter** | VS Code breakpoint debugging protocol support |
+| **Source Formatter** | `sanfmt.py` — black/prettier style `.san` formatter |
+| **Profiling** | `--profile` flag + `:profile` REPL command |
+| **AST JSON Export** | `--ast-json` exports parsed AST |
+| **Package Manager** | `install("pkg")` / `list_packages()` / `load_package("pkg")` |
+| **IoT Abstraction** | `register_device`/`write`/`read`/`query`/`context` sensor/actuator operations |
+
+See [CHANGELOG.md](CHANGELOG.md) for the full version history.
+
+---
+
+### Agent: Readable Decision DSL (v5)
+
+> See [agent_system/README.md](../agent_system/README.md) — v5 architecture, three-phase design, patch catalog.
+
+| Feature | Description |
+|---|---|
+| **Rule Engine** | 200+ rules, task→tool chain matching, 0 LLM calls |
+| **Template Library** | 11 templates (math/data structures/algorithms/utils), code generation |
+| **Domain Knowledge** | LLM dynamic generation, SQLite caching |
+| **Learning System** | Git batch learning + project style recording + experience store |
+| **Auto Rule Generation** | LLM generates → user approves → saved |
+| **Cross-project Migration** | Export/import rules/templates/learning records |
+| **Multi-Agent** | Task decomposition → parallel execution → result aggregation |
+| **Multi-model** | DeepSeek/Claude/GPT-4/local models |
+| **AST Parsing** | Precise context loading, 4K window handles complex tasks |
+| **UR Detection** | Prevents LLM death loops |
+| **SQLite Built-in** | 10 operations, Sanyan directly operates databases |
+| **Sanyan Runtime** | agent_runtime.san, decision loop in native language |
+| **Ternary Reasoning** | LLM cognitive states → ternary mapping → Kleene propagation → Bayesian confidence → safety gating |
+| **Multi-Hypothesis** | Top-3 candidates explored in parallel, tournament selects best |
+| **Task Decomposition** | Auto-recursive task splitting, bounded context per layer |
+| **Failure Classification** | 6 FailureModes, precise retry |
+| **Safety Sandbox** | Command blacklist/whitelist, filesystem guard, read-only mode, audit log |
+| **Multi-Provider** | DeepSeek / OpenAI / Anthropic / Gemini / Qwen / GLM / Moonshot / SiliconFlow / OpenRouter |
+
+```bash
+# Interactive mode (multi-turn, hot reload)
+python -X utf8 run_agent.py
+
+# Single-shot programming (LLM generates code → executes → returns result)
+python -X utf8 run_agent.py "calculate sum from 1 to 1000"
+
+# Autonomous (read → modify → test → fix → loop)
+python -X utf8 run_agent.py "fix _test_verify.py so tests pass" --auto
+
+# File operations
+python -X utf8 run_agent.py "replace v0.3 with v0.4 in AGENTS.md"
+```
+
+---
+
+## Architecture
+
+```
+Source (.san) → Sugar Parser or S-Expression Parser → AST
+  → Evaluator (interpreted) or Compiler → Bytecode (.bin) → VM
+  → LLVM Codegen → Native Binary (optional)
+```
+
+The evaluator path is the primary execution mode. The bytecode VM (vm.py) can compile and run .bin files — and has achieved full self-hosting: the VM can compile its own compiler source to produce an identical .bin.
+
+The LLVM codegen (llvmgen/) compiles to native binaries via C runtime linkage.
+
+---
+
+## Project Structure
 
 ```
 sanyan/
-├── README.md                    ← this file
-├── README_CN.md                 ← Chinese version
-├── RESULTS.md                   ← all benchmark results
-├── ROADMAP.md                   ← future plans
-│
-├── csrc/                        ← C kernels + inference engines
-│   ├── README.md                ←   csrc documentation
-│   ├── transformer_c.c/dll      ←   C LayerNorm/GELU
-│   ├── softmax_c.c/dll          ←   C Softmax
-│   ├── simd_demo.asm/dll        ←   AVX2 GEMM kernel
-│   ├── gpt2_scale.py            ←   1000-prompt benchmark
-│   └── qwen25_bench.py          ←   Qwen2.5 validation
-│
-├── docs/
-│   ├── research/                ← research reports
-│   │   ├── ternary_gating_report.md
-│   │   ├── agent_benchmark_report.md
-│   │   └── agent_evolution_report.md
-│   ├── architecture.md          ← system architecture (TBD)
-│   └── vm.md                    ← VM design (TBD)
-│
-├── benchmarks/                  ← benchmark result JSONs
-├── agent_system/                ← Agent decision runtime
-├── ops/                         ← Sanyan language builtins
-├── sugar/                       ← Sugar syntax parser
-└── tests/                       ← 1634 passing tests
+├── ARCHITECTURE.md            # Architecture documentation
+├── AGENTS.md                  # AI collaboration rules (self-hosting, tests, conventions)
+├── CHANGELOG.md               # Changelog
+├── CONTRIBUTING.md            # Contribution guide
+├── README.md                  # Project README (Chinese)
+├── README_EN.md               # Project README (English)
+├── build_combined.py          # Build script: expand #include → combined .san
+├── vm.py                      # Bytecode VM (self-hosting capable)
+├── evaluator.py               # Tree-walking interpreter
+├── lexer.py                   # S-expression tokenizer
+├── parser.py                  # S-expression parser
+├── ternary_core.py            # Balanced ternary arithmetic (simulated)
+├── compile_bytecode.py        # .san → .bin compiler (supports #include)
+├── compile_llvmgen.py         # llvmgen.san → llvmgen.bin (V5 self-hosted, no injection)
+├── sanyancc.py                # Cross-compiler for STM32
+├── main.py                    # Entry point / REPL
+├── runtime.py                 # Runtime environment
+├── preprocess.py              # #include preprocessor
+├── sugar/                     # C-like sugar → S-expression converter
+├── llvmgen/                   # LLVM code generator (split)
+│   ├── codegen.py             # AST → LLVM IR
+│   ├── compiler.py            # Compiler entry + source parsing
+│   ├── ir_fixes.py            # IR post-processing (from compiler.py)
+│   ├── ops_gen.py             # Main compilation entry
+│   ├── ops_gen_control.py     # Control flow compilation (from ops_gen.py)
+│   ├── ops_gen_helpers.py     # Arithmetic/container helpers (from ops_gen.py)
+│   ├── ir_builder.py          # CodegenContext builder
+│   ├── helpers.py             # Python helper functions
+│   ├── runtime.c              # C runtime library
+│   └── type_mapping.py        # Type mapping & runtime function specs
+├── ops/                       # Built-in operations (30 modules)
+├── lsp/                       # Language server protocol
+├── csrc/                      # C VM (52 instructions, with #include preprocessing)
+│   ├── runtime.c              # VM implementation
+│   ├── test_runtime.c         # VM unit tests (61 tests)
+│   └── dp.c                   # parse_sanyan native compile test
+├── stdlib/                    # Standard library
+│   ├── _bootstrap.san         # S-expression bootstrap parser
+│   ├── bytecode_compiler.san  # Self-hosted bytecode compiler
+│   ├── sugar.san              # Sugar parser (merged, from build_combined.py)
+│   ├── llvmgen.san            # LLVM codegen (merged, from build_combined.py)
+│   ├── llvmgen_src.san        # llvmgen split source (#include submodules)
+│   ├── llvmgen/               # llvmgen submodules
+│   │   ├── preamble.san       # Global vars + helper functions
+│   │   ├── utils.san          # Utility functions
+│   │   ├── compiler.san       # Main compilation function
+│   │   ├── runtime_ir.san     # Runtime IR generation
+│   │   └── entry.san          # Top-level entry + exports
+│   ├── network.san            # Network library (TCP/UDP/connection pool)
+│   ├── hardware.san           # Hardware abstraction (GPIO/I2C/SPI/sensors)
+│   ├── math.san               # Math library (matrix/vector/statistics)
+│   └── ...                    # More standard library modules
+├── packages/                  # Package manager
+│   ├── index.json             # Package index (6 packages)
+│   ├── sample/                # Example package (greeting tool)
+│   ├── math_extended/         # Extended math (complex/vector)
+│   ├── logging/               # Structured logging
+│   ├── web_utils/             # Web utilities (URL/HTML/Cookie)
+│   ├── data_pipeline/         # Data pipeline (map/filter/aggregate)
+│   └── config/                # Configuration management
+├── examples/                  # Example programs
+│   ├── sensor_fusion.san      # Three-value sensor fusion (Sanyan)
+│   ├── sensor_fusion.py       # Sensor fusion (Python comparison)
+│   ├── sensor_fusion.c        # Sensor fusion (C comparison)
+│   ├── fault_tolerant_control.san # Fault-tolerant control
+│   ├── iot_state_machine.san  # IoT device state machine
+│   ├── greenhouse.san         # Smart greenhouse
+│   └── stm32-blinky/          # STM32 embedded example
+├── tests/                     # Automated tests (629+ tests)
+├── docs/                      # Documentation
+│   ├── manual.md              # User manual
+│   ├── llvm.md                # LLVM documentation
+│   └── package_development.md # Package development guide
+└── benchmark/                 # Performance benchmarks
 ```
 
 ---
 
-## Current Status
+## Roadmap
 
-| Component | Status |
-|-----------|--------|
-| UR=0.30 validation (4 models, 3 architectures) | ✅ |
-| 1000-prompt benchmark per model | ✅ |
-| Human blind evaluation (100 prompts) | ✅ |
-| Ablation: UR-only vs full trajectory | ✅ |
-| Statistical significance (p < 0.05) | ✅ |
-| AVX2 GEMM kernel (66 GFLOPS) | ✅ |
-| C LayerNorm/GELU/Softmax kernels | ✅ |
-| KV Cache inference | ✅ |
-| Sanyan → C FFI demo (.san → reg_op → C DLL) | ✅ |
-| GGUF / quantization | ⬜ |
-| Larger models (TinyLlama, SmolLM) | ⬜ |
-| Paper submission | ⬜ |
+- [x] Balanced ternary arithmetic & three-valued logic
+- [x] Custom functions, lambdas, higher-order functions
+- [x] C-like sugar + S-expression dual syntax
+- [x] Exception handling (try/catch)
+- [x] Internationalizable keywords (skin system)
+- [x] Full-width symbol compatibility
+- [x] LLVM native code generation
+- [x] Bytecode VM + full self-hosting
+- [x] C VM unit tests (61 tests)
+- [x] Auto-generated BUILTIN_OPS from language JSON
+- [x] Core module docstrings
+- [x] Architecture docs + contribution guide
+- [x] llvmgen.san self-hosting V5 (helper functions inlined)
+- [x] Package manager enhanced (uninstall/search/info)
+- [x] Standard library expansion (network/hardware/math matrix)
+- [x] Three-value IoT cases (sensor fusion, fault-tolerant control, state machine)
+- [x] Three-value vs two-value comparison docs
+- [x] Agent subsystem with file tools (read/write/list/replace) and programming capability (31 tests)
+- [x] #include preprocessing full pipeline (Python + C VM)
+- [ ] GPIO hardware control
+- [ ] Web IDE
+- [ ] Community ecosystem
 
 ---
 
-## Documentation
+## Limitations
 
-| Document | Description |
-|----------|-------------|
-| [RESULTS.md](RESULTS.md) | All benchmark results with tables |
-| [ROADMAP.md](ROADMAP.md) | Completed and planned work |
-| [docs/research/ternary_gating_report.md](docs/research/ternary_gating_report.md) | Full research report (Chinese + English abstract) |
-| [docs/research/agent_benchmark_report.md](docs/research/agent_benchmark_report.md) | Agent safety & honesty benchmarks |
-| [docs/research/agent_evolution_report.md](docs/research/agent_evolution_report.md) | Agent evolution runtime experiments |
-| [csrc/README.md](csrc/README.md) | C source and inference engine docs |
-| [CHANGELOG.md](CHANGELOG.md) | Version history |
-| [AGENTS.md](AGENTS.md) | Development conventions |
+- **Performance**: Python tree-walking interpreter. Use `--vm` (bytecode VM) or PyPy for speedups. LLVM backend compiles arithmetic directly to native instructions (`add i64`), achieving near-C performance on hot paths.
+- **No stdin piping**: `input()` only supports interactive input, not pipe redirection.
+- **Ternary is simulated**: The ternary arithmetic runs on Python integers, not hardware ternary logic. The LLVM backend bypasses this by generating native integer IR directly.
+
+---
+
+## Philosophy
+
+Uncertainty is not a bug — it's a legitimate computational state.
+
+---
+
+## License
+
+GNU General Public License v3.0 (GPL-3.0)
