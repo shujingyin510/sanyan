@@ -4,6 +4,8 @@ import threading
 from ternary_core import TritValue, ArrayValue
 from values import SanyanSyntaxError, SanyanRuntimeError
 from ops.registry import register, register_alias
+import concurrent.futures
+from typing import Any
 
 
 class _ConcurrentContext:
@@ -274,3 +276,161 @@ register_alias('delay', '延迟')
 register_alias('lock', '锁')
 register_alias('lock_acquire', '锁住')
 register_alias('lock_release', '开锁')
+
+
+# ── 异步/并发语法扩展 ──
+
+# 线程池（复用，避免频繁创建销毁）
+_thread_pool = None
+
+
+def _get_thread_pool():
+    global _thread_pool
+    if _thread_pool is None:
+        _thread_pool = concurrent.futures.ThreadPoolExecutor(max_workers=8)
+    return _thread_pool
+
+
+class Future:
+    """异步结果包装器。"""
+
+    def __init__(self, future: concurrent.futures.Future):
+        self._future = future
+
+    def is_done(self) -> bool:
+        return self._future.done()
+
+    def result(self, timeout: float | None = None) -> Any:
+        try:
+            return self._future.result(timeout=timeout)
+        except Exception as e:
+            raise SanyanRuntimeError(f'异步执行错误: {e}') from e
+
+    def cancel(self) -> bool:
+        return self._future.cancel()
+
+
+def async_define(evaluator, args):
+    """异步定义(args...) — 创建异步任务，返回 Future 对象。
+
+    用法: (异步定义 (函数调用))
+    """
+    if not args:
+        raise SanyanSyntaxError('异步定义 需要一个表达式参数')
+
+    fn_node = args[0]
+    pool = _get_thread_pool()
+
+    def _run():
+        from evaluator import SanyanEvaluator
+
+        sub = SanyanEvaluator(max_loop_steps=evaluator.max_loop_steps)
+        # 复制作用域
+        for scope in evaluator._scopes:
+            for k, v in scope.items():
+                sub.set_var(k, v)
+        return sub.eval(fn_node)
+
+    future = pool.submit(_run)
+    return Future(future)
+
+
+def async_await(evaluator, args):
+    """等待(future) — 等待异步任务完成，返回结果。
+
+    用法: (等待 future)
+    """
+    if not args:
+        raise SanyanSyntaxError('等待 需要一个 Future 参数')
+
+    future_val = evaluator.eval(args[0])
+    if not isinstance(future_val, Future):
+        # 如果不是 Future，直接返回值
+        return future_val
+
+    try:
+        return future_val.result(timeout=30)
+    except Exception as e:
+        raise SanyanRuntimeError(f'等待异步任务失败: {e}') from e
+
+
+def async_parallel(evaluator, args):
+    """并行块(args...) — 并行执行多个表达式，返回结果列表。
+
+    用法: (并行块 expr1 expr2 expr3)
+    """
+    if not args:
+        return ArrayValue(0, TritValue(0))
+
+    pool = _get_thread_pool()
+    futures = []
+
+    for expr in args:
+
+        def _run(e=expr):
+            from evaluator import SanyanEvaluator
+
+            sub = SanyanEvaluator(max_loop_steps=evaluator.max_loop_steps)
+            # 复制作用域
+            for scope in evaluator._scopes:
+                for k, v in scope.items():
+                    sub.set_var(k, v)
+            return sub.eval(e)
+
+        futures.append(pool.submit(_run))
+
+    results = []
+    for f in futures:
+        try:
+            results.append(f.result(timeout=30))
+        except Exception as e:
+            results.append(SanyanRuntimeError(f'并行执行错误: {e}'))
+
+    arr = ArrayValue(len(results), TritValue(0))
+    for i, r in enumerate(results):
+        arr.set(i, r if r is not None else TritValue(0))
+    return arr
+
+
+def async_is_done(evaluator, args):
+    """异步完成(future) — 检查异步任务是否完成。
+
+    用法: (异步完成 future)
+    """
+    if not args:
+        raise SanyanSyntaxError('异步完成 需要一个 Future 参数')
+
+    future_val = evaluator.eval(args[0])
+    if not isinstance(future_val, Future):
+        return TritValue(1)  # 非 Future 视为已完成
+
+    return TritValue(1 if future_val.is_done() else -1)
+
+
+def async_cancel(evaluator, args):
+    """异步取消(future) — 取消异步任务。
+
+    用法: (异步取消 future)
+    """
+    if not args:
+        raise SanyanSyntaxError('异步取消 需要一个 Future 参数')
+
+    future_val = evaluator.eval(args[0])
+    if not isinstance(future_val, Future):
+        return TritValue(-1)  # 非 Future 无法取消
+
+    return TritValue(1 if future_val.cancel() else -1)
+
+
+# 注册异步操作
+register('异步定义', async_define)
+register('等待', async_await)
+register('并行块', async_parallel)
+register('异步完成', async_is_done)
+register('异步取消', async_cancel)
+
+register_alias('async', '异步定义')
+register_alias('await', '等待')
+register_alias('parallel', '并行块')
+register_alias('async_done', '异步完成')
+register_alias('async_cancel', '异步取消')

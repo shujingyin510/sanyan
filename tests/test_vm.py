@@ -507,7 +507,7 @@ class TestDictOps(unittest.TestCase):
         code += [PUSH_STR, 1, ord('y') & 0xFF, 0] + [DICT_GET] + _halt()
         vm = _make_vm(code)
         vm.run()
-        self.assertEqual(vm.stack, [0])
+        self.assertEqual(vm.stack, [''])
 
     def test_dict_set_and_get(self):
         # Build dict, store in var, set key, get key

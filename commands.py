@@ -68,6 +68,10 @@ class Commands:
             body = args[3:]
         else:
             body = args[2:]
+        # 解包单元素字面量列表：args[3:] 对 [[literal_val]] 产生双重包装
+        # 仅当 body 是单元素且该元素是"非函数调用"列表时才解包
+        if len(body) == 1 and isinstance(body[0], list) and body[0] and not isinstance(body[0][0], str):
+            body = body[0]
         return_type = param_types.pop('__return__', None) if param_types else None
         # 解析参数列表，提取默认值和可变参数
         params, defaults, rest_param = _parse_params(raw_params)

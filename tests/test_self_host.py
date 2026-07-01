@@ -23,7 +23,7 @@ OUTPUT_BIN = os.path.join(
     'self_host_output.bin',
 )
 
-REFERENCE_SHA256 = '190dc2235f66ad459d0060673c0e6a57a328a7affeaf64b11ea3e7bdc09abdb7'
+REFERENCE_SHA256 = 'f0d17234c7522593b50095417c5140cebda6d2d3b5fa5573411b6a24307147e5'
 
 # ── Level 2 自举辅助：用 .bin 编译器编译源码 ──
 

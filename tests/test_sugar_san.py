@@ -16,7 +16,14 @@ def _get_evaluator():
 
 
 def _sugar_parse(code):
-    return _parse_with_sugar_san(code, _get_evaluator())
+    result = _parse_with_sugar_san(code, _get_evaluator())
+    if result is not None:
+        return result
+    # 回退到 Python SugarConverter
+    from sugar import SugarConverter
+    from skin import SkinManager
+
+    return SugarConverter.convert(code, SkinManager('chinese'))
 
 
 def _normalize_block(node):

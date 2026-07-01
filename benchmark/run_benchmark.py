@@ -12,6 +12,11 @@ import os
 import sys
 import time
 
+# Windows 控制台 UTF-8 支持
+if sys.platform == 'win32':
+    sys.stdout.reconfigure(encoding='utf-8', errors='replace')  # type: ignore[union-attr]
+    sys.stderr.reconfigure(encoding='utf-8', errors='replace')  # type: ignore[union-attr]
+
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from evaluator import SanyanEvaluator

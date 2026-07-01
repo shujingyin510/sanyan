@@ -1,6 +1,7 @@
 """文件读取、写出、模块加载与导入"""
 
 import os
+import sys
 from ternary_core import TritValue
 from values import (
     SanyanError,
@@ -97,11 +98,79 @@ def _resolve_path(raw_path, auto_stdlib=True):
     return norm
 
 
+def _load_sugar_from_bin(sugar_bin):
+    """从预编译 sugar.bin 创建 ModuleValue，执行初始化后通过 VM 导出函数代理调用。"""
+    from vm import VM
+    from values import ModuleValue
+
+    try:
+        vm = VM.from_bin(sugar_bin)
+    except Exception:
+        return None
+
+    exports = set(vm.exports.keys())
+    if '解析' not in exports:
+        return None
+
+    commands = {}
+    for name in exports:
+        commands[name] = ([], [])
+    mod = ModuleValue({}, commands, exports)
+
+    # 存储 VM 引用，通过 call 代理到 VM._exec_frame
+    mod.vars['__sugar_vm__'] = vm
+    mod.vars['__sugar_exports__'] = exports
+    return mod
+
+
+# 增强 ModuleValue.call 以支持 sugar VM 回退
+_orig_module_call = ModuleValue.call
+
+
+def _enhanced_module_call(self, evaluator, args):
+    vm = self.vars.get('__sugar_vm__')
+    if vm is None or not args:
+        return _orig_module_call(self, evaluator, args)
+    func_name = args[0]
+    func_args = args[1:]
+    exports = self.vars.get('__sugar_exports__', set())
+    if func_name in exports:
+        addr = vm.exports.get(func_name)
+        if addr is not None:
+            import io
+
+            old_stdout = sys.stdout
+            sys.stdout = io.StringIO()
+            try:
+                vm._exec_frame(vm.code, addr, func_args)
+                result = vm.stack[-1] if vm.stack else None
+            except Exception:
+                result = None
+            finally:
+                sys.stdout = old_stdout
+            if isinstance(result, TritValue) and result.to_int() in (-1, 0):
+                return None
+            return result
+    return _orig_module_call(self, evaluator, args)
+
+
+ModuleValue.call = _enhanced_module_call  # type: ignore[method-assign]
+
+
 def _load_sugar_parser(evaluator):
     """预加载 stdlib/sugar.san 作为 Sanyan 模块（自举引导），缓存备用。"""
     global _sugar_parser_module
     if _sugar_parser_module is not None:
         return _sugar_parser_module
+
+    sugar_bin = os.path.join('stdlib', 'sugar.bin')
+
+    # 优先从预编译 sugar.bin 加载（执行模块初始化后使用 VM 导出函数）
+    if os.path.exists(sugar_bin):
+        mod = _load_sugar_from_bin(sugar_bin)
+        if mod is not None:
+            _sugar_parser_module = mod
+            return mod
 
     sugar_path = os.path.join('stdlib', 'sugar.san')
     bootstrap_path = os.path.join('stdlib', '_bootstrap.san')
@@ -192,6 +261,9 @@ def _parse_with_sugar_san(code, evaluator):
             iv = result.to_int()
             if iv == -1 or iv == 0:
                 return None
+        # 如果解析器返回字符串（非 AST 列表），视为解析失败
+        if not isinstance(result, list):
+            return None
         return result
     except (
         SanyanNameError,
@@ -215,13 +287,24 @@ def _parse_code(code, evaluator):
         from sugar import SugarConverter
 
         ast = SugarConverter.convert(code, evaluator.skin_manager)
-        if ast is not None:
+        if isinstance(ast, list):
             return ast
     except SyntaxError:
         pass
+    # S-表达式检测：以 ( 或 （ 开头的代码直接用 S-表达式解析器，不走 sugar.san 自举路径
+    stripped = code.strip()
+    if (stripped.startswith('(') and stripped.count('(') == stripped.count(')')) or (
+        stripped.startswith('\uff08') and stripped.count('\uff08') == stripped.count('\uff09')
+    ):
+        from lexer import tokenize
+        from parser import parse
+
+        wrapped = '(do\n' + code + '\n)'
+        tokens = tokenize(wrapped)
+        return parse(tokens)
     # 备选：sugar.san 自举解析器（如果可用）
     ast = _parse_with_sugar_san(code, evaluator)
-    if ast is not None:
+    if isinstance(ast, list):
         return ast
     # 最后：S-表达式降级
     from lexer import tokenize

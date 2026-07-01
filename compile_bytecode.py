@@ -75,6 +75,7 @@ def compile_source(source: str, output_path: str, vars_table: dict | None = None
         source.strip().startswith('\uff08') and source.count('\uff08') == source.count('\uff09')
     )
 
+    sugar_error = None
     if not is_sexpr:
         # 1. 尝试 sugar 解析器
         try:
@@ -85,14 +86,17 @@ def compile_source(source: str, output_path: str, vars_table: dict | None = None
                     sugar_ast = sugar_result
                 else:
                     sugar_ast = ['do', sugar_result]
-        except (SyntaxError, Exception):
-            pass
+            elif has_syntax_err:
+                # 保留 sugar 解析器的错误信息（带行号）
+                sugar_error = errors[0] if errors else None
+        except (SyntaxError, Exception) as exc:
+            sugar_error = str(exc)
 
     # 2. 如果 sugar 解析失败或跳过，尝试 S-表达式解析器
     if not sugar_ast:
         try:
             tokens = tokenize(source)
-            s_expr_ast = parse(tokens)
+            s_expr_ast = parse(tokens, source)  # 传递源码用于错误位置定位
             if s_expr_ast is not None:
                 if isinstance(s_expr_ast, list) and len(s_expr_ast) > 0 and s_expr_ast[0] == '做':
                     # S-表达式用 (做 ...) 作为顶层包装
@@ -101,10 +105,14 @@ def compile_source(source: str, output_path: str, vars_table: dict | None = None
                     sugar_ast = ['do', s_expr_ast]
                 else:
                     sugar_ast = ['do', s_expr_ast]
+        except SanyanSyntaxError as exc2:
+            sugar_error = str(exc2)
         except Exception:
             pass
 
     if not sugar_ast:
+        if sugar_error:
+            raise SanyanSyntaxError(sugar_error)
         raise SanyanSyntaxError('解析失败，请检查语法（支持 sugar 和 S-表达式两种语法）')
 
     ast = sugar_ast
@@ -151,7 +159,7 @@ def compile_san(source_path: str, output_path: str | None = None) -> bytes:
     success, size, vars_count = result
     if not success:
         raise SanyanRuntimeError(f'编译 {source_path} 失败')
-    print(f'✓ 编译 {source_path} → {output_path}: {size} 字节, {vars_count} 变量')
+    print(f'[OK] 编译 {source_path} → {output_path}: {size} 字节, {vars_count} 变量')
 
     with open(output_path, 'rb') as f:
         return f.read()

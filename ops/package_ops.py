@@ -1,11 +1,14 @@
-"""包管理器：安装、查询、管理三言包。"""
+"""包管理器：安装、查询、管理三言包。支持版本约束。"""
 
 from __future__ import annotations
 import json
 import os
+import re
 from ternary_core import TritValue
 from values import SanyanSyntaxError, SanyanValueError, SanyanIOError, ModuleValue
 from ops.registry import register
+
+输出 = print
 
 PACKAGES_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'packages')
 PACKAGE_INDEX_URL = 'https://raw.githubusercontent.com/shujingyin510/sanyan-packages/main/index.json'
@@ -23,6 +26,111 @@ _index_cache = None  # (timestamp, index_data)
 DOWNLOAD_TIMEOUT = 30
 INDEX_TIMEOUT = 10
 INDEX_CACHE_TTL = 300  # 5 分钟
+
+
+def _parse_version(version_str: str) -> tuple[int, ...]:
+    """解析版本号字符串为元组。支持 x.y.z 格式。"""
+    parts = version_str.strip().split('.')
+    result = []
+    for p in parts:
+        try:
+            result.append(int(p))
+        except ValueError:
+            result.append(0)
+    return tuple(result)
+
+
+def _compare_versions(v1: tuple[int, ...], v2: tuple[int, ...]) -> int:
+    """比较两个版本号。返回 -1/0/1。"""
+    max_len = max(len(v1), len(v2))
+    for i in range(max_len):
+        a = v1[i] if i < len(v1) else 0
+        b = v2[i] if i < len(v2) else 0
+        if a < b:
+            return -1
+        if a > b:
+            return 1
+    return 0
+
+
+def _check_version_constraint(version: str, constraint: str) -> bool:
+    """检查版本是否满足约束。
+
+    支持格式：
+    - ">=1.0" — 大于等于 1.0
+    - "<2.0" — 小于 2.0
+    - ">=1.0,<2.0" — 大于等于 1.0 且小于 2.0
+    - "==1.0" — 等于 1.0
+    - "!=1.0" — 不等于 1.0
+    - "~1.0" — 兼容 1.0（>=1.0,<2.0）
+    - "^1.0" — 兼容 1.0（>=1.0,<2.0）
+    """
+    if not constraint:
+        return True  # 无约束，通过
+
+    ver = _parse_version(version)
+
+    # 分割多个约束（逗号分隔）
+    constraints = [c.strip() for c in constraint.split(',')]
+
+    for c in constraints:
+        if not c:
+            continue
+
+        # 解析操作符和版本
+        match = re.match(r'^([><=!~^]+)\s*(.+)$', c)
+        if not match:
+            continue
+
+        op = match.group(1)
+        target = _parse_version(match.group(2))
+
+        if op == '>=':
+            if _compare_versions(ver, target) < 0:
+                return False
+        elif op == '<=':
+            if _compare_versions(ver, target) > 0:
+                return False
+        elif op == '>':
+            if _compare_versions(ver, target) <= 0:
+                return False
+        elif op == '<':
+            if _compare_versions(ver, target) >= 0:
+                return False
+        elif op == '==':
+            if _compare_versions(ver, target) != 0:
+                return False
+        elif op == '!=':
+            if _compare_versions(ver, target) == 0:
+                return False
+        elif op in ('~', '^'):
+            # 兼容版本：>=target, <next_major
+            if _compare_versions(ver, target) < 0:
+                return False
+            next_major = (target[0] + 1,) if target else (1,)
+            if _compare_versions(ver, next_major) >= 0:
+                return False
+
+    return True
+
+
+def _parse_package_spec(spec: str) -> tuple[str, str]:
+    """解析包规格：name>=1.0 -> (name, ">=1.0")
+
+    支持格式：
+    - "包名" — 无版本约束
+    - "包名>=1.0" — 带版本约束
+    - "包名>=1.0,<2.0" — 带多个版本约束
+    """
+    # 匹配包名和版本约束
+    match = re.match(r'^([a-zA-Z0-9_\-]+)\s*(.*)', spec)
+    if not match:
+        return spec, ''
+
+    name = match.group(1)
+    constraint = match.group(2).strip()
+
+    return name, constraint
 
 
 def _resolve_package_path(name: str) -> str:
@@ -77,22 +185,39 @@ class PackageOps:
 
     @staticmethod
     def install(evaluator, args):
-        """安装包：安装("包名") 或 安装("包名", "下载URL")
+        """安装包：安装("包名") 或 安装("包名>=1.0") 或 安装("包名", "下载URL")
 
         支持两种模式：
         1. 安装("json") — 从包索引自动下载
-        2. 安装("json", "http://...") — 指定 URL
+        2. 安装("json>=1.0") — 从包索引下载，带版本约束
+        3. 安装("json", "http://...") — 指定 URL
+
+        版本约束格式：
+        - >=1.0 — 大于等于 1.0
+        - <2.0 — 小于 2.0
+        - >=1.0,<2.0 — 大于等于 1.0 且小于 2.0
+        - ~1.0 — 兼容 1.0（>=1.0,<2.0）
+        - ^1.0 — 兼容 1.0（>=1.0,<2.0）
         """
         if len(args) < 1:
             raise SanyanSyntaxError('安装 需要包名')
-        name = evaluator.eval(args[0])
-        if hasattr(name, 'to_int'):
-            name = str(name.to_int())
-        name = str(name)
+        spec = evaluator.eval(args[0])
+        if hasattr(spec, 'to_int'):
+            spec = str(spec.to_int())
+        spec = str(spec)
+
+        # 解析包名和版本约束
+        name, constraint = _parse_package_spec(spec)
 
         # 检查是否已安装
         pkg_path = _resolve_package_path(name)
         if os.path.exists(os.path.dirname(pkg_path)):
+            # 检查已安装版本是否满足约束
+            info = _get_package_info(name)
+            if info and constraint:
+                installed_ver = info.get('version', '0.0.0')
+                if not _check_version_constraint(installed_ver, constraint):
+                    raise SanyanValueError(f"包 '{name}' 已安装版本 {installed_ver} 不满足约束 {constraint}")
             # 已安装，直接加载
             print(f"包 '{name}' 已安装")
             return PackageOps.load(evaluator, [name])
@@ -434,6 +559,114 @@ class PackageOps:
         except Exception:
             return {}
 
+    @staticmethod
+    def check_updates(evaluator, args):
+        """检查更新：检查已安装包是否有新版本。"""
+        base = os.path.abspath(PACKAGES_DIR)
+        if not os.path.isdir(base):
+            输出('没有已安装的包')
+            return TritValue(0)
+
+        # 获取远程索引
+        remote_index = PackageOps._fetch_remote_index()
+        if not remote_index:
+            输出('无法获取远程包索引')
+            return TritValue(0)
+
+        updates = []
+        for name in os.listdir(base):
+            pkg_dir = os.path.join(base, name)
+            if not os.path.isdir(pkg_dir):
+                continue
+
+            # 读取本地版本
+            meta_path = os.path.join(pkg_dir, 'package.json')
+            local_ver = '0.0.0'
+            if os.path.exists(meta_path):
+                try:
+                    with open(meta_path, 'r', encoding='utf-8') as f:
+                        meta = json.load(f)
+                    local_ver = meta.get('version', '0.0.0')
+                except (IOError, OSError, json.JSONDecodeError):
+                    pass
+
+            # 检查远程版本
+            remote_entry = remote_index.get(name)
+            if remote_entry:
+                remote_ver = remote_entry.get('version', '0.0.0')
+                if _compare_versions(_parse_version(remote_ver), _parse_version(local_ver)) > 0:
+                    updates.append((name, local_ver, remote_ver))
+
+        if updates:
+            输出(f'发现 {len(updates)} 个可用更新:')
+            for name, local, remote in updates:
+                输出(f'  {name}: {local} -> {remote}')
+        else:
+            输出('所有包已是最新版本')
+
+        return TritValue(len(updates))
+
+    @staticmethod
+    def update(evaluator, args):
+        """更新包：更新指定包到最新版本。"""
+        if len(args) < 1:
+            raise SanyanSyntaxError('更新 需要包名')
+        name = evaluator.eval(args[0])
+        if hasattr(name, 'to_int'):
+            name = str(name.to_int())
+        name = str(name)
+
+        # 获取远程索引
+        remote_index = PackageOps._fetch_remote_index()
+        if not remote_index:
+            raise SanyanIOError('无法获取远程包索引')
+
+        remote_entry = remote_index.get(name)
+        if not remote_entry:
+            raise SanyanValueError(f"包 '{name}' 在远程索引中不存在")
+
+        url = remote_entry.get('url') or remote_entry.get('download')
+        if not url:
+            raise SanyanValueError(f"包 '{name}' 没有下载地址")
+
+        # 下载并安装
+        PackageOps._download_and_install(name, url)
+        输出(f"包 '{name}' 已更新到最新版本")
+        return PackageOps.load(evaluator, [name])
+
+    @staticmethod
+    def publish_prepare(evaluator, args):
+        """发布准备：打包当前目录为可发布的 zip 文件。"""
+        if len(args) < 1:
+            raise SanyanSyntaxError('发布准备 需要包名')
+        name = evaluator.eval(args[0])
+        if hasattr(name, 'to_int'):
+            name = str(name.to_int())
+        name = str(name)
+
+        import zipfile
+
+        base = os.path.abspath(PACKAGES_DIR)
+        pkg_dir = os.path.join(base, name.replace('.', '_').replace('/', '_'))
+
+        if not os.path.isdir(pkg_dir):
+            raise SanyanValueError(f"包 '{name}' 不存在")
+
+        # 创建 zip 文件
+        zip_path = os.path.join('build', f'{name}.zip')
+        os.makedirs('build', exist_ok=True)
+
+        with zipfile.ZipFile(zip_path, 'w', zipfile.ZIP_DEFLATED) as zf:
+            for root, dirs, files in os.walk(pkg_dir):
+                for file in files:
+                    file_path = os.path.join(root, file)
+                    arcname = os.path.relpath(file_path, pkg_dir)
+                    zf.write(file_path, arcname)
+
+        输出(f"包 '{name}' 已打包到 {zip_path}")
+        输出('上传到 GitHub 后，将下载地址添加到包索引即可')
+        return zip_path
+
 
 # 注册包管理操作
 register('install', PackageOps.install)
@@ -450,3 +683,9 @@ register('index_list', PackageOps.index_list)
 register('包索引', PackageOps.index_list)
 register('load_package', PackageOps.load)
 register('加载包', PackageOps.load)
+register('check_updates', PackageOps.check_updates)
+register('检查更新', PackageOps.check_updates)
+register('update', PackageOps.update)
+register('更新', PackageOps.update)
+register('publish_prepare', PackageOps.publish_prepare)
+register('发布准备', PackageOps.publish_prepare)

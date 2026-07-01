@@ -4,6 +4,7 @@ ops 模块在 SanyanEvaluator 首次实例化时延迟加载，避免模块导�
 """
 
 from __future__ import annotations
+import difflib
 import time
 from typing import Any, Dict, Optional
 from ternary_core import TritValue, ArrayValue
@@ -17,6 +18,76 @@ from eval_utils import (
 
 _ops_initialized = False
 _DEFAULT_RECURSION_LIMIT = 2000
+
+# ── 源码缓存（用于错误信息显示）──
+_source_lines_cache: Dict[str, list[str]] = {}
+
+
+def _get_source_line(source: str, line_num: int) -> str:
+    """从源码中获取指定行的内容。"""
+    if source not in _source_lines_cache:
+        _source_lines_cache[source] = source.split('\n')
+    lines = _source_lines_cache[source]
+    if 1 <= line_num <= len(lines):
+        return lines[line_num - 1]
+    return ''
+
+
+def _format_error_with_context(
+    error: Exception,
+    source: str,
+    line: int,
+    col: int,
+    evaluator: Any = None,
+) -> str:
+    """格式化错误信息，添加源码上下文和变量建议。
+
+    输出格式：
+        错误: 未定义的符号: x
+          --> file.san:15:8
+           |
+        15 | 输出(x + 1)
+           |        ^
+        提示: 你是否想使用 'x_val'？（在第 12 行定义）
+    """
+    parts = []
+    msg = str(error)
+    parts.append(f'错误: {msg}')
+
+    if line > 0:
+        parts.append(f'  --> 第{line}行第{col}列')
+        src_line = _get_source_line(source, line)
+        if src_line:
+            parts.append('   |')
+            parts.append(f'{line:4d} | {src_line}')
+            parts.append(f'   | {" " * (col - 1)}^')
+
+    # 为 SanyanNameError 添加变量名建议
+    if isinstance(error, SanyanNameError) and evaluator is not None:
+        name = msg.split(':')[-1].strip() if ':' in msg else msg.replace('未定义的符号: ', '').strip()
+        suggestions = _suggest_similar_names(name, evaluator)
+        if suggestions:
+            hint = ', '.join(f"'{s}'" for s in suggestions[:3])
+            parts.append(f'  提示: 你是否想使用 {hint}？')
+
+    return '\n'.join(parts)
+
+
+def _suggest_similar_names(name: str, evaluator: Any) -> list[str]:
+    """根据编辑距离建议相似的变量名。"""
+    candidates = set()
+    # 从当前作用域收集变量名
+    for scope in evaluator._scopes:
+        candidates.update(scope.keys())
+    # 从命令收集
+    if hasattr(evaluator, 'commands'):
+        candidates.update(evaluator.commands.keys())
+    # 从全局变量收集
+    if hasattr(evaluator, '_global_vars'):
+        candidates.update(evaluator._global_vars.keys())
+
+    matches = difflib.get_close_matches(name, candidates, n=3, cutoff=0.6)
+    return matches
 
 
 def _debug_before(evaluator: Any, internal: str, op: str, args: list) -> None:  # pragma: no cover
@@ -94,6 +165,9 @@ def _resolve_identifier(evaluator: Any, node: str) -> Any:  # pragma: no cover �
     try:
         return _eval_symbol(evaluator, node)
     except SanyanNameError:
+        # 检查是否为已定义的函数
+        if hasattr(evaluator, 'commands') and node in evaluator.commands:
+            return _make_closure_value(evaluator, node)
         if any('\u4e00' <= c <= '\u9fff' for c in node):
             return node
         raise
@@ -228,12 +302,12 @@ def _init_ops() -> None:
     import ops.iot_ops
     import ops.json_ops
     import ops.package_ops  # noqa: F401
-    import commands  # noqa: F401
     import ops.sandbox_ops  # noqa: F401
     import ops.time_ops  # noqa: F401
     import ops.net_ops  # noqa: F401
     import ops.crypto_ops  # noqa: F401
     import ops.math_extra_ops  # noqa: F401
+    import ops.macro_ops  # noqa: F401
     import ops.concurrent_ops  # noqa: F401
     import ops.random_ops  # noqa: F401
     import ops.regex_ops  # noqa: F401
@@ -275,10 +349,38 @@ class SanyanEvaluator(SanyanRuntime):
         self._module_cache: Dict[str, Any] = {}
         self._import_stack: set = set()
         self._type_warnings: list = []  # 类型检查警告收集
+        self._apply_fn: Any = None  # 缓存 dispatcher.apply
+        self._check_types_fn: Any = None  # 缓存 type_checker.check_types
+        self._source: str = ''  # 当前执行的源码（用于错误信息显示）
+        self._type_env: Any = None  # 类型推断环境（延迟初始化）
+
+    @property
+    def type_env(self) -> Any:
+        """获取类型推断环境（延迟初始化）。"""
+        if self._type_env is None:
+            from type_inference import TypeEnv
+
+            self._type_env = TypeEnv()
+        return self._type_env
+
+    # 数值字符串缓存
+    _NUMERIC_CACHE: dict[str, bool] = {}
 
     @staticmethod
     def _is_numeric_string(s: str) -> bool:
         """判断字符串是否为数值（整数、浮点数、十六进制）。"""
+        cache = SanyanEvaluator._NUMERIC_CACHE
+        if s in cache:
+            return cache[s]
+        result = SanyanEvaluator._is_numeric_string_impl(s)
+        # 缓存常用长度的字符串
+        if len(s) <= 10:
+            cache[s] = result
+        return result
+
+    @staticmethod
+    def _is_numeric_string_impl(s: str) -> bool:
+        """判断字符串是否为数值（实际实现）。"""
         if not s:
             return False
         # 十六进制：0xABC
@@ -294,6 +396,9 @@ class SanyanEvaluator(SanyanRuntime):
             return len(parts) == 2 and parts[0].isdigit() and parts[1].isdigit()
         return t.isdigit()
 
+    # 常用 TritValue 缓存（-100 到 100）
+    _TRIT_CACHE: dict[int, TritValue] = {}
+
     def eval(self, node: Any) -> Any:
         """求值 AST 节点，返回三言值。
 
@@ -304,20 +409,34 @@ class SanyanEvaluator(SanyanRuntime):
         - int/float → 包装为 TritValue
         - str → 符号解析或字面量（保持原始 Python 类型以兼容现有 ops）
         """
-        if isinstance(node, (TritValue, ArrayValue, FunctionValue, ModuleValue)):
-            return node
-        if isinstance(node, dict):
-            return node
+        # SrcNode 和 list 都需要走 _eval_list
         if isinstance(node, list):
-            if len(node) == 0 or not isinstance(node[0], str):
+            if len(node) == 0:
                 return node
-            if isinstance(node[0], str) and self._is_numeric_string(node[0]):
+            first = node[0]
+            if type(first) is not str:
+                return node
+            if self._is_numeric_string(first):
                 return node
             return self._eval_list(node)
-        if isinstance(node, (int, float)):
-            return TritValue(node)
-        if isinstance(node, str):
+        if type(node) is str:
             return self._eval_str(node)
+        if type(node) is int:
+            # 缓存常用整数值
+            cache = SanyanEvaluator._TRIT_CACHE
+            if node in cache:
+                return cache[node]
+            tv = TritValue(node)
+            if -100 <= node <= 100:
+                cache[node] = tv
+            return tv
+        if type(node) is float:
+            return TritValue(node)
+        if type(node) is dict:
+            return node
+        # TritValue/FunctionValue/ModuleValue 等自定义类型
+        if isinstance(node, (TritValue, ArrayValue, FunctionValue, ModuleValue)):
+            return node
         return node
 
     def _eval_list(self, node: list) -> Any:
@@ -341,9 +460,15 @@ class SanyanEvaluator(SanyanRuntime):
             return self._apply(first, node[1:])
         except SanyanError as e:
             if isinstance(node, SrcNode) and (node.line or node.col):  # type: ignore[attr-defined]
-                pos_msg = f'第{node.line}行第{node.col}列: {e}'  # type: ignore[attr-defined]
-                if not e.args or not e.args[0].startswith('第'):
-                    e.args = (pos_msg,)
+                line = node.line  # type: ignore[attr-defined]
+                col = node.col  # type: ignore[attr-defined]
+                if self._source:
+                    enhanced = _format_error_with_context(e, self._source, line, col, self)
+                    e.args = (enhanced,)
+                else:
+                    pos_msg = f'第{line}行第{col}列: {e}'
+                    if not e.args or not e.args[0].startswith('第'):
+                        e.args = (pos_msg,)
             raise
 
     def _parse_string_literal(self, s: str) -> str:
@@ -381,25 +506,41 @@ class SanyanEvaluator(SanyanRuntime):
         return ''
 
     def _apply(self, op: str, args: list) -> Any:
-        """执行操作：分派到注册的处理函数。返回类型由具体操作决定（TritValue/FunctionValue/ModuleValue/str/list 等）。"""
-        from ops.dispatcher import apply
+        """执行操作：分派到注册的处理函数。返回类型由具体操作决定（TritValue/FunctionValue/ModuleValue/str/list 等）。
+
+        优化：当无调试/类型检查/分析需求时，走快速路径直接分派。
+        """
+        # 缓存函数引用，避免每次调用重复 import
+        if self._apply_fn is None:
+            from ops.dispatcher import apply as _apply_fn
+
+            self._apply_fn = _apply_fn
+
+        # 快速路径：无调试、无类型检查、无分析时直接分派
+        if not self.debug_mode and not self._profiling:
+            return self._apply_fn(self, op, args)
+
+        # 慢速路径：需要调试/分析时执行完整检查
+        if self._check_types_fn is None:
+            from type_checker import check_types as _check_types_fn
+
+            self._check_types_fn = _check_types_fn
 
         # 静态类型检查：对字面量参数做类型断言
-        try:
-            from type_checker import check_types
-
-            simpl: list = []
-            for a in args:
-                if isinstance(a, (int, float, str, list, dict)) and not isinstance(a, SrcNode):
-                    simpl.append(a)
-                else:
-                    simpl.append(None)
-            if any(v is not None for v in simpl) and all(v is not None for v in simpl):
-                err = check_types(op, args, simpl)
-                if err:
-                    self._type_warnings.append(err)
-        except Exception:
-            pass  # 类型检查失败不阻塞执行
+        if args:
+            try:
+                simpl: list = []
+                for a in args:
+                    if isinstance(a, (int, float, str, list, dict)) and not isinstance(a, SrcNode):
+                        simpl.append(a)
+                    else:
+                        simpl.append(None)
+                if any(v is not None for v in simpl) and all(v is not None for v in simpl):
+                    err = self._check_types_fn(op, args, simpl)
+                    if err:
+                        self._type_warnings.append(err)
+            except Exception:
+                pass  # 类型检查失败不阻塞执行
 
         # 编译期不确定性检查：拒绝将不确定值传给确定[X] 参数
         try:
@@ -413,7 +554,7 @@ class SanyanEvaluator(SanyanRuntime):
         if self._profiling:
             t0 = time.perf_counter()
         try:
-            return apply(self, op, args)
+            return self._apply_fn(self, op, args)
         finally:
             if self._profiling:
                 dt = time.perf_counter() - t0

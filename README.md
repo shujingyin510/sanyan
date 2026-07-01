@@ -1,42 +1,24 @@
-# 三态认知框架 Sanyan v3.43.0
+# 三态认知框架 Sanyan v3.50.0
 
 [![VS Code Extension](https://img.shields.io/badge/VS%20Code-%E8%AF%AD%E6%B3%95%E9%AB%98%E4%BA%AE-%23007ACC?logo=visualstudiocode)](sanyan-vscode/README.md)
 [![CI](https://github.com/shujingyin510/sanyan/actions/workflows/test.yml/badge.svg)](https://github.com/shujingyin510/sanyan/actions)
 [![PyPI](https://img.shields.io/pypi/v/ternary-engine?label=ternary-engine)](https://pypi.org/project/ternary-engine/)
 
-> **三态认知框架** — 从三进制语言到 Knowledge Runtime 的演进。核心贡献：构建了一个可验证的自改进 Agent 知识系统，证明了 Knowledge → Calibration → Selection → Success 的因果链。
+> **三态认知框架** — 从三进制语言到 Knowledge Runtime 的演进。核心贡献：构建了一个可验证的自改进 Agent 知识系统，并通过合成模拟演示了 Knowledge → Calibration → Selection → Success 的机制链路（机制演示，非真实任务实测）。
 
 [English](README_EN_archive.md)
 
 ---
 
-## v3.43 更新摘要
+## v3.50 更新摘要
 
-### v3.43 (2026-06-20)
-- **Token 用量显示**：面板新增 LLM 调用次数 + API Token 消耗量
-- **三态状态修复**：done 工具不再跳过三态记录，面板正确显示判定状态
-- **动态置信度**：每次执行后根据三态结果反馈更新置信度，同领域跨轮次累积
-- **CI 修复**：mypy method-assign 修复、dry_run 快速路径（0.03s）、CRLF/LF 修复
-
-### v3.42 (2026-06-19)
-- **三态引擎升级**：五态 classify + Kleene 传播 + 保护门控 + 最终判定
-- **多语言 QA**：非代码任务 LLM 直答，不限语言/领域
-- **200 条规则** + **11 个模板** + **领域知识层**
-- **规则引擎**：匹配任务→执行工具链，80% 任务 0 LLM 调用
-- **多 Agent 协作**：任务分解→并行执行→结果汇总
-
-### v3.41 (2026-06-18)
-- **规则引擎**：200+ 规则，匹配任务→执行工具链，0 LLM 调用
-- **模板库**：11 个模板（数学/数据结构/算法/工具），代码生成
-- **领域知识层**：LLM 动态生成领域知识，SQLite 缓存
-- **学习系统**：Git 批量学习 + 项目风格记录
-- **规则自动生成**：LLM 生成→用户审批→入库
-- **跨项目迁移**：规则/模板/学习记录导出导入
-- **多 Agent 协作**：任务分解→并行执行→结果汇总
-- **多模型路由**：DeepSeek/Claude/GPT-4/本地模型
-- **SQLite 内置**：10 个操作，三言直接操作数据库
-- **三言版运行时**：agent_runtime.san，本语言实现决策循环
-- **文件拆分**：agent_runtime.py 从 1659 行降到 1326 行
+### v3.50 (2026-07-01)
+- **闭包实现**：嵌套函数可访问外部变量、计数器闭包、独立实例、lambda 闭包
+- **字节码编译器自举修复**：数字优化、try/catch 索引、PUSH_STR 路径保护、跳出位置隔离
+- **Agent 架构重构**：LazyRegistry 懒加载、paths.py 统一、ToolResult、LLM seam
+- **Lint 全清**：ruff 0 errors、mypy 0 errors
+- **函数引用修复**：函数名可正确作为值传递
+- **已知限制**：闭包作为参数需改写为变量调用
 
 详见 [CHANGELOG](../CHANGELOG.md)
 
@@ -82,18 +64,22 @@ Layer 1: Frozen Core（冰冻核心）
 
 ## 核心实验
 
-### 实验1: 因果链闭环
+> ⚠️ **说明：以下实验 1–4 为合成模拟（synthetic simulation），用于展示机制设计，非真实任务 / 真实 LLM 实测。**
+> 其数值由模拟器的「策略-任务匹配度」公式与随机采样产生，结论受模拟器设计决定，不能作为「成功率」「因果链」「+43.6%」这类实证主张引用。
+> 真实任务实证为加固计划阶段 1 的目标，详见 [`docs/CLAIMS.md`](docs/CLAIMS.md)。
+
+### 实验1: 因果链闭环（合成模拟·机制演示）
 
 ```
-Knowledge → Better Prediction → Better Selection → Higher Success Rate
+机制链路: Knowledge → Better Prediction → Better Selection → Higher Success Rate
 
-Baseline:       40.9% 成功率
-Knowledge:      82.5% 成功率 (+41.6%)
-Knowledge+Conf: 84.5% 成功率 (+2.0%)
-总体提升:       +43.6%
+Baseline:       40.9% 模拟成功率
+Knowledge:      82.5% 模拟成功率 (+41.6%)
+Knowledge+Conf: 84.5% 模拟成功率 (+2.0%)
+模拟提升:       +43.6%（由模拟器设计决定，非实证）
 ```
 
-### 实验2: 知识迁移
+### 实验2: 知识迁移（合成模拟·机制演示）
 
 ```
 直接迁移配置 → 负收益 (-4.6%)  ✗
@@ -102,7 +88,7 @@ Knowledge+Conf: 84.5% 成功率 (+2.0%)
 结论: 迁移的是规律，不是配置。战略比战术更容易迁移。
 ```
 
-### 实验3: 知识置信度
+### 实验3: 知识置信度（合成模拟·机制演示）
 
 ```
 documentation:  151样本  置信度0.92 (高)
@@ -112,7 +98,7 @@ bug_fix:        183样本  置信度0.79 (中)
 refactor:        87样本  置信度0.69 (低，需更多数据)
 ```
 
-### 实验4: Task Taxonomy
+### 实验4: Task Taxonomy（合成模拟·机制演示）
 
 ```
 test:           72.2% → thorough
@@ -662,7 +648,7 @@ sanyan/
 ├── compile_bytecode.py        # .san → .bin 编译器（支持 #include）
 ├── compile_llvmgen.py         # llvmgen.san → llvmgen.bin 编译（V5 自举，无注入）
 ├── dap_server.py              # DAP 调试适配器
-├── doc_sync.py                # 文档同步检查
+├── doc_sync.py                # 文档同步检查（→ scripts/doc_sync.py）
 ├── eval_utils.py              # 求值工具函数（类型转换/边界检查）
 ├── evaluator.py               # 求值器
 ├── gui.py                     # 可视化编译器 GUI
@@ -677,7 +663,7 @@ sanyan/
 ├── ternary_engine.py           # 三态认知引擎（Kleene×贝叶斯×门控）
 ├── disasm.py                   # 字节码反汇编器
 ├── verify.py                   # 字节码验证器
-├── preflight.py                # 发版前预检（lint+test+自举）
+├── scripts/preflight.py        # 发版前预检（lint+test+自举）
 ├── run_agent.py               # Agent 启动器
 ├── run_v2.py                  # v2 演示启动器
 ├── run_v2_demo.py             # v2 演示脚本
@@ -687,7 +673,7 @@ sanyan/
 ├── sandbox.py                 # 沙箱安全机制
 ├── sanfmt.py                  # 源码格式化器
 ├── sanyanc.py                # 编译器（S表达式 + sugar） + 包管理器
-├── setup.py                   # 安装脚本
+├── pyproject.toml             # 项目配置（含 setup 元数据）
 ├── skin.py                    # 皮肤管理器
 ├── tail_call.py               # 尾递归优化
 ├── ternary_core.py            # 平衡三进制算术（模拟）
@@ -721,7 +707,6 @@ sanyan/
 │   ├── agent_benchmark.py     # Layer 4: Real Benchmark（真实基准测试）
 │   ├── agent_dashboard.py     # Layer 4: Evolution Dashboard（进化仪表盘）
 │   ├── agent_test_gen.py      # Layer 4: Test Generator（测试用例生成）
-│   ├── agent_history.py       # Layer 4: PatchHistory（Patch历史数据库+可信度权重）
 │   ├── agent_validation.py    # Layer 4: Evolution Validation（100次随机+收敛+Reviewer）
 │   ├── agent_stress.py        # Layer 4: Evolution Stress Test（长期稳定性+退化测试）
 │   ├── agent_knowledge.py     # Layer 5: Knowledge Layer（TaskClassifier+TaskEmbedding+ClusterLearning）
@@ -850,7 +835,7 @@ sanyan/
 │   ├── repl.san               # REPL
 │   └── pipeline.san           # 编译管线
 ├── packages/                  # 包管理器
-│   ├── index.json             # 包索引（6 个包）
+│   ├── index.json             # 包索引（11 个包）
 │   ├── sample/                # 示例包（问候工具）
 │   ├── math_extended/         # 扩展数学库（复数/向量）
 │   ├── logging/               # 结构化日志库
@@ -875,7 +860,7 @@ sanyan/
 │       ├── runtime_stm32.c    # STM32 VM + 外设驱动
 │       ├── Makefile           # 构建系统
 │       └── stm32_flash.ld     # 链接脚本
-├── tests/                     # 自动测试（629+ 项）
+├── tests/                     # 自动测试（2450+ 项）
 │   ├── test_core.py           # 核心单测（138 项）
 │   ├── test_ops.py            # ops 模块单测（92 项）
 │   ├── test_ops_ext.py        # 扩展 ops 单测（64 项）
@@ -1038,7 +1023,9 @@ Knowledge Layer：可信知识 / 弱知识 / 未知知识
 
 未来方向：如果出现三进制硬件（如三态忆阻器或量子三态），三言的语义层可以直接映射到真实三进制硬件，无需修改语言规范。
 
-## 四层进化架构
+## 进化子系统（上文五层架构的 Layer 1–4）
+
+> 说明：本节是上文「五层架构」中进化相关的 Layer 1–4 的细化视图（自底向上重新编号为 Layer 0–3），最顶层的 Knowledge Validation（Layer 5）见上文。全仓统一以「五层架构」为准。
 
 ```
 Layer 3: Knowledge Layer（知识层）

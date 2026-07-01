@@ -52,6 +52,8 @@ class ControlOps:
             for var, val_str in pairs:
                 val = TritValue.from_string(val_str)
                 evaluator.scope_vars[var] = val
+                # 类型推断
+                evaluator.type_env.infer(var, val)
                 last_val = val
             return last_val
         if len(args) < 2:
@@ -69,6 +71,12 @@ class ControlOps:
             value = TritValue(int(value_node[0]))
         else:
             value = evaluator.eval(value_node)
+        # 类型检查：检测赋值冲突
+        conflict = evaluator.type_env.check_assignment(var_name, value)
+        if conflict:
+            evaluator._type_warnings.append(conflict)
+        # 类型推断
+        evaluator.type_env.infer(var_name, value)
         evaluator.scope_vars[var_name] = value
         return value
 
@@ -435,6 +443,107 @@ class ControlOps:
 
         return TritValue(0)
 
+    @staticmethod
+    def pattern_match(evaluator, args):
+        """匹配(value, pattern1, body1, pattern2, body2, ...) — 结构化模式匹配。
+
+        支持:
+        - 字面量匹配: (匹配 x 1 "一" 2 "二" _ "其他")
+        - 列表解构: (匹配 lst [a, b] (连接 a b) _ "不匹配")
+        - 字典解构: (匹配 d {name: n} n _ "不匹配")
+        - 守卫条件: (匹配 x [n] (大于 n 0) "正数" _ "其他")
+        """
+        if len(args) < 2:
+            raise SanyanSyntaxError('匹配 需要至少一个值和一个分支')
+
+        value = evaluator.eval(args[0])
+        branches = args[1:]
+
+        i = 0
+        while i < len(branches) - 1:
+            pattern = branches[i]
+            body = branches[i + 1]
+            i += 2
+
+            # 尝试匹配模式
+            bindings = {}
+            if _match_pattern(pattern, value, bindings, evaluator):
+                # 绑定变量
+                for name, val in bindings.items():
+                    evaluator.set_var(name, val)
+                return evaluator.eval(body)
+
+        # 检查默认分支
+        if i < len(branches):
+            default = branches[i]
+            if isinstance(default, str) and default in ('_', '默认', 'default'):
+                return TritValue(0)
+
+        return TritValue(0)
+
+
+def _match_pattern(pattern, value, bindings, evaluator):
+    """递归匹配模式和值。返回 True 如果匹配成功。"""
+    # 字面量匹配
+    if isinstance(pattern, str):
+        # 通配符
+        if pattern in ('_', '默认', 'default'):
+            return True
+        # 变量绑定
+        if pattern.startswith('$') or (len(pattern) > 0 and pattern[0].isalpha()):
+            bindings[pattern] = value
+            return True
+        # 字面量比较
+        try:
+            pat_val = evaluator.eval(pattern)
+            if isinstance(pat_val, TritValue) and isinstance(value, TritValue):
+                return pat_val.to_int() == value.to_int()
+            return pat_val == value
+        except Exception:
+            return pattern == str(value)
+
+    # 数值字面量
+    if isinstance(pattern, (int, float)):
+        if isinstance(value, TritValue):
+            return value.to_int() == pattern
+        return value == pattern
+
+    # 列表解构
+    if isinstance(pattern, list):
+        if not isinstance(value, (list, ArrayValue)):
+            return False
+
+        # 转换为列表
+        val_list = list(value) if isinstance(value, list) else [value.get(i) for i in range(value.size)]
+
+        # 检查长度
+        if len(pattern) != len(val_list):
+            return False
+
+        # 递归匹配每个元素
+        for p, v in zip(pattern, val_list):
+            if not _match_pattern(p, v, bindings, evaluator):
+                return False
+        return True
+
+    # 字典解构
+    if isinstance(pattern, dict):
+        if not isinstance(value, dict):
+            return False
+
+        # 检查所有模式键是否存在于值中
+        for key in pattern:
+            if key not in value:
+                return False
+
+        # 递归匹配每个值
+        for key, pat_val in pattern.items():
+            if not _match_pattern(pat_val, value[key], bindings, evaluator):
+                return False
+        return True
+
+    return False
+
 
 # 注册控制流操作
 register('if', ControlOps.if_op)
@@ -458,6 +567,8 @@ register('匹配3', ControlOps.ternary_match)
 register('匹配信度', ControlOps.ternary_match_confidence)
 register('ternary_match', ControlOps.ternary_match)
 register('match_confidence', ControlOps.ternary_match_confidence)
+register('匹配', ControlOps.pattern_match)
+register_alias('match', '匹配')
 
 # 中文别名
 _ra = register_alias

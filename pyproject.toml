@@ -91,6 +91,18 @@ exclude = [
     ".github/",
     "build/",
     "run_v2_demo.py",
+    "_decompile.py",
+    "_decompile2.py",
+    "_decompile3.py",
+    "_test_dispatch.py",
+    "_test_simple.bin",
+    "_trace_vm.py",
+    "_trace_vm2.py",
+    "_trace_vm3.py",
+    "test_tokenizer.py",
+    "trace.py",
+    "trace2.py",
+    "trace_tmp.py",
 ]
 [[tool.mypy.overrides]]
 module = [

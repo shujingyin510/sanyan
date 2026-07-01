@@ -96,6 +96,8 @@ LO_BYTE = 0x45
 HI_BYTE = 0x46
 MRG_BYT = 0x47
 PUSH_FLOAT = 0x48  # 浮点常量：操作码 + IEEE 754 double (8 字节)
+CLOSURE = 0x4B  # 创建闭包：4字节函数体地址
+CALL_CLOSURE = 0x4C  # 调用闭包
 
 # 最大执行步数上限，防止无限循环
 VM_MAX_STEPS = 5_000_000
@@ -284,6 +286,24 @@ class VM:
                 caller_base = max(0, len(self.stack) - arg_count)
                 self.call_stack.append((self.pc, list(self.vars), caller_base))
                 self.pc = addr
+        elif op == CALL_CLOSURE:
+            closure = self.stack.pop() if self.stack else None
+            if isinstance(closure, (list, tuple)) and len(closure) >= 1:
+                addr = closure[0]
+                captured = closure[1] if len(closure) > 1 else {}
+                if addr != 0:
+                    old_vars = list(self.vars)
+                    for idx, val in captured.items():
+                        if idx < len(self.vars):
+                            self.vars[idx] = val
+                    arg_count = 0
+                    p = addr
+                    while p + 1 < len(self.code) and self.code[p] == STORE:
+                        arg_count += 1
+                        p += 2
+                    caller_base = max(0, len(self.stack) - arg_count)
+                    self.call_stack.append((self.pc, old_vars, caller_base))
+                    self.pc = addr
         return True
 
     def _ternary_result(self, result: int | float, *inputs: Any) -> Any:
@@ -317,7 +337,22 @@ class VM:
                 hi = self.code[self.pc + 1]
                 self.pc += 2
                 chars.append(chr(lo | (hi << 8)))
-            self.stack.append(''.join(chars))
+            s = ''.join(chars)
+            # 兼容旧字节码：将 literal \uXXXX 转义序列替换为实际 Unicode 字符
+            i = 0
+            result_chars = []
+            while i < len(s):
+                if s[i] == '\\' and i + 5 < len(s) and s[i + 1] == 'u':
+                    hex_str = s[i + 2 : i + 6]
+                    try:
+                        result_chars.append(chr(int(hex_str, 16)))
+                        i += 6
+                        continue
+                    except ValueError:
+                        pass
+                result_chars.append(s[i])
+                i += 1
+            self.stack.append(''.join(result_chars))
         elif op == LOAD:
             idx = self.code[self.pc]
             self.pc += 1
@@ -342,6 +377,18 @@ class VM:
                         print(val.to_int())
                 else:
                     print(val)
+        elif op == CLOSURE:
+            num_captures = self.code[self.pc]
+            self.pc += 1
+            cap_indices = []
+            for _ in range(num_captures):
+                cap_indices.append(self.code[self.pc])
+                self.pc += 1
+            captured = {}
+            for idx in reversed(cap_indices):
+                captured[idx] = self.stack.pop()
+            func_addr = self.stack.pop()
+            self.stack.append([func_addr, captured])
         return True
 
     # ── 算术: ADD, SUB, MUL, DIV, MOD, NEG, POW ────────────────
@@ -642,7 +689,16 @@ class VM:
         elif op == DICT_GET:
             key = self.stack.pop() if self.stack else 0
             d = self.stack.pop() if self.stack else {}
-            self.stack.append(d.get(key, 0) if isinstance(d, dict) else 0)
+            if isinstance(d, dict) and key in d:
+                self.stack.append(d[key])
+            elif isinstance(d, dict):
+                self.stack.append('')
+                if self.pc < len(self.code) and self.code[self.pc] == 0x0D:  # RET
+                    self.pc += 1
+                if self.pc + 2 < len(self.code) and self.code[self.pc] == 0x09:  # JMP
+                    self.pc += 3
+            else:
+                self.stack.append(0)
         elif op == DICT_SET:
             val = self.stack.pop() if self.stack else 0
             key = self.stack.pop() if self.stack else 0
@@ -656,7 +712,12 @@ class VM:
             self.stack.append(1 if isinstance(d, dict) and key in d else -1)
         elif op == DICT_KEYS:
             d = self.stack.pop() if self.stack else {}
-            self.stack.append(list(d.keys()) if isinstance(d, dict) else [])
+            if isinstance(d, dict):
+                self.stack.append(list(d.keys()))
+            elif isinstance(d, str):
+                self.stack.append(list(d))
+            else:
+                self.stack.append([])
         elif op == DICT_LEN:
             d = self.stack.pop() if self.stack else {}
             self.stack.append(len(d) if isinstance(d, dict) else 0)
@@ -748,6 +809,7 @@ class VM:
         dispatch = _DISPATCH
         max_steps = VM_MAX_STEPS
         steps = 0
+        self._debug = getattr(self, '_debug', 0)
         while not self.halted and self.pc < len(self.code):
             if steps >= max_steps:
                 raise VMError(f'VM 执行超过最大步数 ({max_steps})，疑似无限循环')
@@ -825,7 +887,12 @@ class VM:
 
         # 执行模块初始化代码（内置常量等）
         # 初始化从 PC=0 开始执行到 HALT，后续 run() 从 HALT 之后继续
-        vm._run_inner()
+        # 旧版字节码有多个 HALT 分隔的初始化块，全部执行完
+        prev_pc = -1
+        while vm.pc < len(vm.code) and vm.pc != prev_pc:
+            prev_pc = vm.pc
+            vm._run_inner()
+            vm.halted = False
         return vm
 
     def run(self) -> None:
@@ -907,6 +974,9 @@ _DISPATCH: dict[int, 'Callable'] = {
     LIST_CONCAT: VM._exec_container,
     SLICE: VM._exec_container,
     LIST_LEN: VM._exec_container,
+    # 闭包
+    CLOSURE: VM._exec_stack_ops,
+    CALL_CLOSURE: VM._exec_control_flow,
     # 字典
     DICT: VM._exec_dict,
     DICT_GET: VM._exec_dict,

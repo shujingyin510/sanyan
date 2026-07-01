@@ -52,8 +52,11 @@ _BUILTIN_CONSTS = {
     'maybe': 0,
     'Maybe': 0,
     '空': 0,
-    'nil': 0,
+    '无': 0,
     'null': 0,
+    'None': 0,
+    'none': 0,
+    'nil': 0,
     # IoT 设备状态
     '开': 1,
     '亮': 1,

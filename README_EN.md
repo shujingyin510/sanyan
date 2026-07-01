@@ -1,4 +1,4 @@
-# Tri-State Cognitive Framework Sanyan v3.43.0
+# Tri-State Cognitive Framework Sanyan v3.50.0
 
 [![VS Code Extension](https://img.shields.io/badge/VS%20Code-Syntax%20Highlight-%23007ACC?logo=visualstudiocode)](sanyan-vscode/README.md)
 [![CI](https://github.com/shujingyin510/sanyan/actions/workflows/test.yml/badge.svg)](https://github.com/shujingyin510/sanyan/actions)
@@ -10,33 +10,15 @@
 
 ---
 
-## v3.43 Update Summary
+## v3.50 Update Summary
 
-### v3.43 (2026-06-20)
-- **Token usage display**: Panel shows LLM call count + API token consumption
-- **Ternary state fix**: done tool no longer skipped, panel correctly shows judgment
-- **Dynamic confidence**: Confidence updates after each execution based on ternary results, accumulates across tasks in same domain
-- **CI fixes**: mypy method-assign fix, dry_run fast path (0.03s), CRLF/LF fixes
-
-### v3.42 (2026-06-19)
-- **Ternary engine upgrade**: 5-state classify + Kleene propagation + protection gating + final judgment
-- **Multi-language QA**: Non-code tasks answered directly by LLM, any language/domain
-- **200 rules** + **11 templates** + **domain knowledge layer**
-- **Rule engine**: 80% tasks with 0 LLM calls
-- **Multi-agent collaboration**: Task decomposition → parallel execution → result aggregation
-
-### v3.41 (2026-06-18)
-- **Rule Engine**: 200+ rules, task→tool chain matching, 0 LLM calls
-- **Template Library**: 11 templates (math/data structures/algorithms/utils), code generation
-- **Domain Knowledge Layer**: LLM dynamic generation, SQLite caching
-- **Learning System**: Git batch learning + project style recording
-- **Auto Rule Generation**: LLM generates → user approves → saved
-- **Cross-project Migration**: Export/import rules/templates/learning records
-- **Multi-Agent Collaboration**: Task decomposition → parallel execution → result aggregation
-- **Multi-model Routing**: DeepSeek/Claude/GPT-4/local models
-- **SQLite Built-in**: 10 operations, Sanyan directly operates databases
-- **Sanyan Runtime**: agent_runtime.san, decision loop in native language
-- **File Split**: agent_runtime.py reduced from 1659 to 1326 lines
+### v3.50 (2026-07-01)
+- **Closure Implementation**: Nested functions can access outer variables, counter closures, independent instances, lambda closures
+- **Bytecode Compiler Bootstrap Fixes**: Number optimization, try/catch indexing, PUSH_STR path protection, break/continue isolation
+- **Agent Architecture Refactoring**: LazyRegistry, paths.py unification, ToolResult, LLM seam
+- **Lint Clean**: ruff 0 errors, mypy 0 errors
+- **Function Reference Fix**: Function names can be correctly passed as values
+- **Known Limitations**: Closure as function argument requires rewrite to variable call
 
 See [CHANGELOG](../CHANGELOG.md)
 
@@ -310,7 +292,7 @@ sanyan/
 │   ├── math.san               # Math library (matrix/vector/statistics)
 │   └── ...                    # More standard library modules
 ├── packages/                  # Package manager
-│   ├── index.json             # Package index (6 packages)
+│   ├── index.json             # Package index (11 packages)
 │   ├── sample/                # Example package (greeting tool)
 │   ├── math_extended/         # Extended math (complex/vector)
 │   ├── logging/               # Structured logging
@@ -325,7 +307,7 @@ sanyan/
 │   ├── iot_state_machine.san  # IoT device state machine
 │   ├── greenhouse.san         # Smart greenhouse
 │   └── stm32-blinky/          # STM32 embedded example
-├── tests/                     # Automated tests (629+ tests)
+├── tests/                     # Automated tests (2450+ tests)
 ├── docs/                      # Documentation
 │   ├── manual.md              # User manual
 │   ├── llvm.md                # LLVM documentation

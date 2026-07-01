@@ -2,6 +2,182 @@
 
 ---
 
+
+## [v3.50.0] — 2026-07-01 (闭包实现 + 编译器增强 + Agent 架构重构)
+
+### 闭包与编译器增强
+- **闭包实现**：VM 新增 MAKE_CLOSURE (0x4B) / CALL_CLOSURE (0x4C) 操作码，RET 同步捕获变量
+- **基本闭包捕获**：嵌套函数可访问外部变量，outer(10)(5) → 15
+- **计数器闭包**：闭包可修改外部变量，c() c() c() → 1,2,3
+- **独立闭包实例**：多实例互不影响
+- **无捕获函数/lambda**：自动推入变量表，支持一等值传递
+- **编译循环增强**：多 body 表达式支持，(取 a 1) → (切片 a 1) + 编译做体
+- **编译若增强**：精确判定 (等于 (表长 a) 3)，no-else 分支遍历所有 then 表达式
+- **块体自动解包**：Commands.define 修复 body 双重包装，isp 初始化为 -1
+- **参数/闭包索引冲突修复**：参数分配后同步 c[变量计数]
+- **VM 增强**：SLICE 类型启发式、sanyancc.py header 格式修复、from_bin 后显式 run()
+- **LIST_GET → GET**：遍历处理器使用正确操作码
+
+### 字节码编译器自举修复
+- **数字优化修复**：移除单字符数字长度限制，`(全部数字 n)` 直接替代 `(大于 (取长 n) 1)`，修复 `i = 0` 被误编译为 PUSH_STR "0" 导致循环条件失效
+- **try/catch 索引修复**：sugar 解析器产物为 `['捕获', err_var, body]`，编译器错误使用 `catch_spec[0]`（关键词`'捕获'`）作为错误变量名，修正为跳过关键词取正确索引
+- **PUSH_STR 转义修复**：仅处理 `\uXXXX` Unicode 转义，不再处理 `\\` `\"` `\n` `\t` `\r` 简单转义（避免破坏 Windows 文件路径如 `C:\...\Temp\tmp...`）
+- **S-表达式解析优先**：`_parse_code` 增加 S-表达式早期检测，`_parse_with_sugar_san` 拒绝非列表结果
+- **LLVM 内置常量**：添加 `无`/`null`/`None` → 0 映射
+- **Lint 全清**：ruff 52→0 errors，mypy 28→0 errors
+- **自举 fixpoint**：bytecode_compiler.bin 自编译 B==C==7894 bytes 通过
+
+### Agent 架构重构（阶段 1–4）
+- **阶段 1**：LazyRegistry 懒加载 13 个非热路径子系统，__getattr__ 路由，净删 71 行
+- **阶段 2**：paths.py 统一 12 个模块 DB 路径，store.py adopt_legacy 非破坏迁移；ExperienceStore + DomainKnowledgeLayer 并入 agent.db
+- **阶段 3**：工具返回 ToolResult（status/ok/meta），消灭 string sniff 假阳性；loop_policy.py 停止条件抽出；LearningHandler 修复接线（删 224 行内联）；loop.py 抽出主循环
+- **阶段 4**：LLM seam 单漏斗 llm_provider.complete
+- **测试密封**：conftest.py autouse 夹具隔离 AGENT_DATA_DIR
+
+### 测试
+- 核心测试 **2457 passed**，0 fail，0 regression
+- 自举 fixpoint B==C 通过
+- ruff **0 errors**，mypy **0 errors**
+
+---
+
+## [v3.49.0] — 2026-06-29 (REPL 增强 + Web IDE + 测试覆盖率)
+
+### REPL 增强
+- :help 命令显示所有可用命令和快捷键
+- :types 命令补全
+
+### 测试覆盖率
+- 新功能测试 12 项：模式匹配、异步语法、宏系统、类型推断
+- 宏定义修复
+
+### Web IDE 增强
+- 文件管理：保存/加载 .san/.txt
+- 更多示例和工具栏完善
+
+### 文档
+- 快速入门指南 docs/quickstart.md
+
+### 测试
+- 397 项测试全部通过
+
+---
+
+
+## [v3.47.0] — 2026-06-28 (字节码编译器增强)
+
+### 字节码编译器增强
+- **编译错误信息带源码位置**：S-表达式解析错误现在显示 `第X行第Y列`，修复 sugar_error 传递和 parse 源码参数
+- **闭包捕获**：已识别需要 VM 和编译器双层修改，后续版本处理
+- **字节码优化**：Fibonacci 字节码已优化（22条指令），无明显冗余
+
+### 测试
+- 230 项核心测试全部通过
+
+---
+
+## [v3.46.0] — 2026-06-28 (包管理器生态 + 标准库加固 + 求值器优化)
+
+### 包管理器生态
+- **新增 5 个包**：template（包模板）、http_client（HTTP客户端）、json_utils（JSON工具）、datetime_utils（日期时间工具）、string_utils（字符串工具）
+- **包总数**：从 6 个增加到 11 个
+- **包开发指南**：创建 `docs/package_development.md`，包含快速开始、包结构、导出、依赖管理、测试、发布、最佳实践
+
+### 标准库加固
+- **数学库完善**：添加矩阵行列式（通用）、伴随矩阵、矩阵求逆、向量叉积、向量距离
+- **测试框架增强**：添加设置前置/后置（setUp/tearDown）、跳过测试、异常捕获
+- **文件系统增强**：添加路径处理（目录/文件名/扩展名/合并/绝对化）和文件信息（行数/首行/末行/搜索/替换）
+
+### 求值器优化
+- **TritValue 缓存**：常用整数（-100 到 100）缓存，避免重复创建对象
+- **数值解析缓存**：`parse_numeric_literal` 和 `_is_numeric_string` 结果缓存
+- **类型检查优化**：`type()` 替代 `isinstance()`（对原生类型）
+- **fibonacci(25) Python**：10.8s → 6.46s（提升 40%）
+
+### 边界情况修复
+- **中文函数名引用**：`_resolve_identifier` 添加 commands 检查，中文函数名可正确作为变量引用
+- **嵌套闭包**：`外部(10)` 返回的 `内部` 函数可正确调用
+- **递归闭包**：`计数器()` 返回的 `递增` 函数状态正确累加
+- **中文操作别名**：添加 `转数字`/`转字符串` 别名
+
+### 测试
+- 294 项核心测试全部通过
+
+---
+
+## [v3.45.0] — 2026-06-27 (VM内联优化 + 字节码编译器修复 + 求值器性能 + 边界修复)
+
+### VM 性能优化
+- **热操作码内联**：`vm.py` 内联 ADD/SUB/MUL/MOD/DIV/LT/GT/EQ/NE/LTE/GTE/AND/OR/NOT/PRINT/PUSH_STR/CONCAT/LIST_LEN/STRLEN 到主循环，减少函数调用开销
+- **栈操作缓存**：`stack.append`/`stack.pop` 缓存为局部变量，减少属性查找
+- **代码长度预计算**：`code_len = len(code)` 避免每次循环调用 `len()`
+- **fibonacci(25) VM**：0.9s → 0.78s（提升 13%）
+- **fizzbuzz(100) VM**：0.0012s（175x 加速）
+
+### 字节码编译器修复
+- **HALT 指令缺失**：字节码末尾缺少 HALT，导致 `from_bin()` 执行整个程序 → 添加 HALT 到函数定义后和主代码后
+- **双遍编译架构**：`编译字节码` 分两遍编译（函数定义→HALT→主代码→HALT），`from_bin()` 初始化到第一个 HALT 停止
+- **AST 分割**：新增 `过滤函数定义`/`过滤非定义` helper，正确处理非列表节点
+- **LIST_GET 符号**：遍历处理器使用未定义的 `LIST_GET` → 修正为 `GET`
+- **fibonacci(25) VM**：从返回 -575 修正为正确返回 75025
+
+### 求值器性能优化
+- **TritValue 缓存**：常用整数（-100 到 100）缓存，避免重复创建对象
+- **数值解析缓存**：`parse_numeric_literal` 和 `_is_numeric_string` 结果缓存
+- **类型检查优化**：`type()` 替代 `isinstance()`（对原生类型）
+- **fibonacci(25) Python**：10.8s → 6.7s（提升 38%）
+
+### 边界情况修复
+- **中文函数名引用**：`_resolve_identifier` 遇到中文字符时直接返回字符串，未检查 `commands` → 添加 commands 检查，中文函数名可正确作为变量引用
+- **嵌套闭包**：`外部(10)` 返回的 `内部` 函数可正确调用
+- **递归闭包**：`计数器()` 返回的 `递增` 函数状态正确累加
+- **中文操作别名**：添加 `转数字`/`转字符串` 别名
+
+### 包管理器增强
+- **检查更新**：`检查更新` 命令，对比本地与远程版本
+- **更新包**：`更新("包名")` 命令，自动下载最新版本
+- **发布准备**：`发布准备("包名")` 命令，打包为 zip 文件
+
+### 测试
+- 294 项核心测试 + 91 项 VM 测试全部通过
+
+---
+
+## [v3.44.0] — 2026-06-26 (性能优化 + 类型系统 + 包管理 + 异步语法 + 模式匹配 + Web IDE + 宏系统)
+
+### 性能优化（v3.44）
+- **VM 指令分派优化**：`vm.py` 分派表从 `dict.get()` 改为 `list[opcode]` O(1) 索引，内联 PUSH_I/LOAD/STORE/HALT 四个热操作码
+- **求值器热路径优化**：`evaluator.py` 缓存 `dispatcher.apply` 和 `type_checker.check_types` 函数引用，避免每次调用重复 import
+- **错误信息增强**：添加 `_format_error_with_context` 函数，显示源码行+列指针+变量名建议（基于 difflib）
+- **测试碎片化整理**：创建 `tests/test_edge_cases.py` 统一入口，合并 8 个 test_coverage_boost 文件
+
+### 类型系统增强（v3.45）
+- **类型推断**：创建 `type_inference.py`，自动推断变量类型（int/float/str/list/dict/trit），集成到 evaluator 和 control_ops
+- **泛型容器**：`type_checker.py` 支持 `列表<T>`、`字典<K,V>` 类型匹配，支持嵌套泛型
+- **接口/协议**：创建 `protocols.py`，支持定义协议（可序列化/可迭代/可调用等），运行时检查对象是否满足协议
+- **REPL 命令**：添加 `:types` 命令查看当前作用域变量类型
+
+### 包管理器升级与标准库扩充（v3.46）
+- **版本约束**：`package_ops.py` 支持语义化版本约束（`>=1.0`, `<2.0`, `~1.0`, `^1.0`），解析和检查函数已实现
+- **日志库**：创建 `stdlib/logging.san`，支持级别过滤（调试/信息/警告/错误）、文件输出、控制台开关
+- **模板库**：创建 `stdlib/template.san`，支持变量替换（`{{name}}`）、条件渲染、循环、截断、填充
+- **数据库库**：创建 `stdlib/database.san`，SQLite 封装，支持 CRUD、事务、备份、表管理
+
+### 异步语法与模式匹配（v3.47）
+- **异步操作**：`concurrent_ops.py` 添加异步定义、等待、并行块、异步完成、异步取消，使用线程池复用
+- **模式匹配**：`control_ops.py` 添加 `匹配` 操作，支持字面量匹配、列表解构、字典解构、通配符、变量绑定
+- **Sugar 解析器**：添加 `_parse_match` 方法，`匹配` 关键字加入 PREFIXABLE_OPS 和 chinese.json
+
+### Web IDE 与宏系统
+- **Web IDE 原型**：创建 `web_ide.py`，浏览器内代码编辑器+REPL，支持示例加载、快捷键（Ctrl+Enter）、深色主题
+- **宏系统**：创建 `macro.py` 和 `ops/macro_ops.py`，支持定义宏、展开宏、宏列表、取消宏
+- **内置宏**：守护（条件执行）、除非（条件不满足时执行）、当（循环）、重复（N次执行）、管道（链式调用）
+
+### 测试
+- 955 项测试全部通过（test_vm 91 + test_core 138 + test_ops 92 + test_ops_ext 64 + test_edge_cases 570）
+
+---
+
 ## [v3.43.0] — 2026-06-24 (项目重构：UR实验独立 + 目录整理 + Tokenizer研究)
 
 ### 项目架构

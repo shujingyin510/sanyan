@@ -129,43 +129,29 @@ API 密钥通过环境变量 `SANYAN_API_KEY` 注入，`agent_policy.san` 中配
 
 ### 文件结构
 
+核心 Agent 文件位于 `agent_system/`：
+
 | 文件 | 用途 |
 |------|------|
-| `ternary_agent/agent.san` | Agent 核心逻辑 |
-| `ternary_agent/agent_policy.san` | 纯数据策略（配置、阈值、规则） |
-| `ternary_agent/decision.san` | 决策核心（信任感知规则匹配） |
-| `agent_tools.py` | 工具层：analyze、find_symbol、spawn_sub_agent 等 |
-| `agent_tool_graph.py` | 工具依赖图 + 能力注册表 + 工具元数据 + 自发现 |
-| `agent_decompose.py` | Phase 0: 任务分解引擎 |
-| `agent_hypothesis.py` | Phase 1: 多假设 + 锦标赛 + 失败分类 |
-| `agent_resource.py` | Phase 2: 资源统一管控 |
-| `agent_runtime.py` | V5 引擎: SymbolTable、MemoryStore、ProjectGraph |
-| `agent_project.py` | 项目引擎: 分解→执行→验证→重试→报告+经验库 |
-| `agent_context.py` | 智能上下文压缩（分层摘要+滑动窗口+重要性评分） |
-| `agent_experience.py` | 经验库: 跨任务 pattern 匹配 + AVOID 提示 |
-| `agent_parallel.py` | 并行执行引擎（工具链并行+假设并行验证） |
-| `agent_sandbox.py` | 安全沙箱（命令过滤+文件系统守卫+审计日志） |
-| `agent_learning.py` | 跨会话学习（SQLite持久化+失败模式库+自适应选择） |
-| `agent_obs.py` | 可观测性（决策追踪+性能分析+仪表盘） |
-| `agent_streaming.py` | 流式响应（LLM边生成边显示+可中断） |
-| `agent_composition.py` | 高阶工具组合（管道+复合工具+条件链） |
-| `agent_shared.py` | 多Agent共享上下文（共享空间+符号表+协调器） |
-| `agent_strategy.py` | Layer 1: 策略自优化（Prompt进化+Tool学习+策略切换+A/B） |
-| `agent_loop.py` | Layer 2: 自主循环（文件监控+连续循环+健康监控） |
-| `agent_loop_monitor.py` | Layer 2: 循环监控（日志+统计+健康+回滚验证） |
-| `agent_evolution.py` | Layer 3: 约束进化（接口不变+差分验证+多目标评估） |
-| `agent_evolution_v2.py` | Layer 3: LLM补丁生成+行号校准+集成验证管道 |
-| `truth_calibration.py` | 规则层: Truth Calibration Engine (三态门控+事实校验) |
-| `logic_audit.py` | 规则层: 逻辑审计引擎 (CFG+状态追踪+7种检测器) |
-| `myth_shield.py` | 规则层: 误解盾 (50条误解字典+模式检测) |
-| `auto_verify.py` | Layer 2: 自动验证脚本（测试→修复→提交/回退） |
-| `run_agent.py` | 启动器（默认走 V5 引擎） |
-| `sanyan/cli.py` | 统一 CLI 入口（git/cargo 风格） |
-| `sanyan/dashboard_tui.py` | TUI 实时仪表盘 |
-| `sanyan/chat_tui.py` | 多轮对话 |
-| `benchmarks/agent_bench.py` | 安全基准（49种bug注入+五层检测） |
-| `benchmarks/honesty_bench.py` | 诚实度基准（100题×5类+三维评分） |
-| `docs/research/` | 实验报告和评测文档 |
+| `agent_system/agent_runtime.py` | V5 引擎: SymbolTable、MemoryStore、ProjectGraph |
+| `agent_system/agent_core.py` | Agent 核心控制流 |
+| `agent_system/agent_llm.py` | LLM 连接层 |
+| `agent_system/agent_tools.py` | 工具定义与注册 |
+| `agent_system/agent_decompose.py` | 任务分解引擎 |
+| `agent_system/agent_strategy.py` | 策略自优化 |
+| `agent_system/agent_evolution.py` | 约束进化 |
+| `agent_system/agent_sandbox.py` | 安全沙箱 |
+| `agent_system/agent_loop.py` | 自主循环 |
+| `agent_system/loop.py` | 主循环（阶段4重构） |
+| `agent_system/loop_policy.py` | 停止条件 |
+| `agent_system/registry.py` | 懒加载注册表 |
+| `agent_system/store.py` | 统一存储 |
+| `agent_system/paths.py` | 路径管理 |
+| `agent_system/truth_calibration.py` | Truth Calibration Engine |
+| `agent_system/logic_audit.py` | 逻辑审计引擎 |
+| `agent_system/myth_shield.py` | 误解盾 |
+| `agent_system/auto_verify.py` | 自动验证 |
+| `run_agent.py` | 启动器 |
 
 ### 运行方式
 
@@ -195,7 +181,9 @@ python -X utf8 agent_loop.py --status                  # 查看统计（第2层�
 - **概率三态**: `TritValue.confidence` 字段，贝叶斯置信度传播（`传播置信度 = 上游 × 当前`）
 - **`#include` 预处理**: `agent.san` 通过 `#include "ternary_agent/agent_policy.san"` 内联策略
 
-### 四层进化架构
+### 进化子系统（五层架构的 Layer 1–4）
+
+> 全仓统一以「五层架构」为准（顶层 Layer 5 = Knowledge Validation）。本节为其中进化相关的 Layer 1–4 的细化视图，自底向上重编号为 Layer 0–3。
 
 ```
 Layer 3: Knowledge Layer
@@ -286,7 +274,8 @@ nasm -f bin -o sanyan_vm csrc/sanyan_vm_l4.asm
 | STORE16 | 0x3C | 2 字节变量索引 |
 | CALL32 | 0x3D | 4 字节函数地址 |
 | PUSH_STR16 | 0x3E | 2 字节字符串长度 |
-| CLOSURE | 0x3F | 创建堆闭包对象 |
+| CLOSURE | 0x4B | 创建闭包：4字节函数体地址 |
+| CALL_CLOSURE | 0x4C | 调用闭包 |
 
 ## 工具
 
@@ -339,12 +328,11 @@ preflight 绿了 → `git push`。红了 → 修完再推。
 ```bash
 python -X utf8 scripts/preflight.py          # 包含全部测试
 # 或单独：
-python -X utf8 tests/test_core.py -v      # 138 项
-python -X utf8 tests/test_self_host.py -v # 自举 8 项(含 Level 2+3)
-python -X utf8 tests/test_vm.py -v        # VM 91 项
-python -X utf8 tests/test_diff_fuzz.py -v # 差分模糊 12 项
-python -X utf8 tests/test_effect_types.py -v # 效应类型 30 项
-python -X utf8 tests/run_all.py           # 集成 46 项
+python -X utf8 -m pytest tests/ -q          # 全量 ~2457 项
+python -X utf8 tests/test_self_host.py -v   # 自举 3 项(含 Level 2+3)
+python -X utf8 tests/test_vm.py -v          # VM 测试
+python -X utf8 tests/test_sugar_san.py -v   # Sugar 语法测试
+python -X utf8 tests/run_all.py             # 集成测试
 ```
 
 ## 代码约定
