@@ -86,7 +86,7 @@ class LspClient:
 class TestLspServer(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
-        script = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'lsp_server.py')
+        script = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'lsp', 'lsp_server.py')
         cls.client = LspClient(script)
         req_id = cls.client.send_request(
             'initialize',

@@ -130,14 +130,14 @@ analysis:       42.5% → direct
 ```bash
 git clone https://github.com/shujingyin510/sanyan.git
 cd sanyan
-python main.py
+python repl/main.py
 ```
 
 > **性能提示**：实测数据（`python benchmark/run_benchmark.py --quick`）：
 > - Python 求值器：fib(25) ≈ 9.0 秒，fizzbuzz(100) ≈ 0.06 秒
-> - 字节码 VM：`python -X utf8 main.py --vm examples/fizzbuzz.san`
-> - [PyPy](https://pypy.org)：`pypy main.py` — 即时 5-10 倍加速
-> - **LLVM 原生编译**：[安装 llvmlite](https://pypi.org/project/llvmlite/) 后 `python compile_llvmgen.py`
+> - 字节码 VM：`python -X utf8 repl/main.py --vm examples/fizzbuzz.san`
+> - [PyPy](https://pypy.org)：`pypy repl/main.py` — 即时 5-10 倍加速
+> - **LLVM 原生编译**：[安装 llvmlite](https://pypi.org/project/llvmlite/) 后 `python compiler/compile_llvmgen.py`
 > - **C VM**：`gcc csrc/runtime.c -o vm && ./vm program.bin` — 无 Python 依赖
 
 进入 REPL 后尝试：
@@ -155,8 +155,8 @@ python main.py
 运行示例文件：
 
 ```bash
-python main.py examples/greenhouse.san
-python main.py examples/sensor_pipeline_simple.san
+python repl/main.py examples/greenhouse.san
+python repl/main.py examples/sensor_pipeline_simple.san
 ```
 
 ### 模块化安装
@@ -435,7 +435,7 @@ tests/
 | **独立 .bin** | sugar.bin（~10KB）和 llvmgen.bin（~72KB）可在 VM 上独立运行 |
 | **C VM** | `csrc/runtime.c` 纯 C 实现，52 指令，不依赖 Python |
 | **C VM 测试** | `csrc/test_runtime.c` 61 项单元测试，覆盖全部指令集 |
-| **STM32 固件** | `sanyancc.py` 交叉编译 → `runtime_stm32.c`，Blue Pill 硬件验证 |
+| **STM32 固件** | `compiler/sanyancc.py` 交叉编译 → `runtime_stm32.c`，Blue Pill 硬件验证 |
 
 ### LLVM 代码生成
 
@@ -447,7 +447,7 @@ tests/
 | **import 静态链接** | 编译期递归编译依赖，`san_{mod}__{fn}` 名字修饰 |
 | **try/catch** | `@g_error` LLVM 可见全局 + 手动栈展开 |
 | **Arena 分配器** | 64KB 初始化，auto-grow，搬指针替代 malloc |
-| **自举 LLVM 编译器** | `llvmgen.san`（V5）辅助函数已内联，`compile_llvmgen.py` 无注入直接编译 |
+| **自举 LLVM 编译器** | `llvmgen.san`（V5）辅助函数已内联，`compiler/compile_llvmgen.py` 无注入直接编译 |
 
 ### 并发与分布式
 
@@ -530,49 +530,49 @@ tests/
 
 ```bash
 # 交互模式（多轮对话，支持热重载）
-python -X utf8 run_agent.py
+python -X utf8 agent_system/run_agent.py
 
 # 单次编程（LLM 自动生成代码→执行→返回结果）
-python -X utf8 run_agent.py "写程序：1加到1000"
+python -X utf8 agent_system/run_agent.py "写程序：1加到1000"
 
 # 直接执行三言代码（不走 LLM）
-python -X utf8 run_agent.py "(设 x 10)(输出(加 x 5))"
+python -X utf8 agent_system/run_agent.py "(设 x 10)(输出(加 x 5))"
 
 # 文件操作
-python -X utf8 run_agent.py "把AGENTS.md里的v0.3改成v0.4"
+python -X utf8 agent_system/run_agent.py "把AGENTS.md里的v0.3改成v0.4"
 
 # 安全沙箱（只读模式，禁止文件修改）
-python -X utf8 run_agent.py "分析代码结构" --sandbox
+python -X utf8 agent_system/run_agent.py "分析代码结构" --sandbox
 
 # 性能报告（显示Token用量、工具耗时）
-python -X utf8 run_agent.py "任务" --report
+python -X utf8 agent_system/run_agent.py "任务" --report
 
 # 实时仪表盘
-python -X utf8 run_agent.py "任务" --dashboard
+python -X utf8 agent_system/run_agent.py "任务" --dashboard
 
 # 决策追踪
-python -X utf8 run_agent.py "任务" --trace
+python -X utf8 agent_system/run_agent.py "任务" --trace
 
 # 流式输出
-python -X utf8 run_agent.py "任务" --stream
+python -X utf8 agent_system/run_agent.py "任务" --stream
 
 # 执行工具管道
-python -X utf8 run_agent.py "任务" --pipeline read_and_analyze
+python -X utf8 agent_system/run_agent.py "任务" --pipeline read_and_analyze
 
 # 自举验证（第3层）
-python -X utf8 run_agent.py --self-host
+python -X utf8 agent_system/run_agent.py --self-host
 
 # 约束进化验证（第3层）
-python -X utf8 run_agent.py --evolve
+python -X utf8 agent_system/run_agent.py --evolve
 
 # 自动化进化闭环（第3层）
-python -X utf8 run_agent.py --auto-evolve --max-cycles 3
+python -X utf8 agent_system/run_agent.py --auto-evolve --max-cycles 3
 
 # Agent自主改代码闭环（第3层）
-python -X utf8 run_agent.py --code-evolve --max-cycles 3
+python -X utf8 agent_system/run_agent.py --code-evolve --max-cycles 3
 
 # 带审查的进化闭环（第3层）
-python -X utf8 run_agent.py --review-evolve
+python -X utf8 agent_system/run_agent.py --review-evolve
 ```
 
 自主循环（第2层）：
@@ -604,7 +604,7 @@ python -X utf8 agent_loop.py --status
 
 ## 三进制算术（模拟实现）
 
-当前版本的三进制基于 Python 整数模拟。`ternary_core.py` 使用 `TritValue` 类包装整数值（+1 / 0 / -1）：
+当前版本的三进制基于 Python 整数模拟。`core/ternary_core.py` 使用 `TritValue` 类包装整数值（+1 / 0 / -1）：
 
 - **BT 类**: `from_int(n)` → 三进制 trits 列表，`to_int(trits)` → Python 整数
 - **算术运算**: 三态值 → `BT.to_int()` → Python 整数计算 → `BT.from_int()` → 三态值
@@ -644,45 +644,45 @@ sanyan/
 ├── build_exe.py               # PyInstaller 打包脚本
 ├── sanyan/                    # 包命名空间（模块化入口）
 │   └── __init__.py
-├── commands.py                # 自定义命令调用
-├── compile_bytecode.py        # .san → .bin 编译器（支持 #include）
-├── compile_llvmgen.py         # llvmgen.san → llvmgen.bin 编译（V5 自举，无注入）
-├── dap_server.py              # DAP 调试适配器
+├── core/commands.py                # 自定义命令调用
+├── compiler/compile_bytecode.py        # .san → .bin 编译器（支持 #include）
+├── compiler/compile_llvmgen.py         # llvmgen.san → llvmgen.bin 编译（V5 自举，无注入）
+├── lsp/dap_server.py              # DAP 调试适配器
 ├── doc_sync.py                # 文档同步检查（→ scripts/doc_sync.py）
-├── eval_utils.py              # 求值工具函数（类型转换/边界检查）
-├── evaluator.py               # 求值器
-├── gui.py                     # 可视化编译器 GUI
-├── lexer.py                   # S 表达式词法
-├── lsp_server.py              # LSP 服务器
-├── main.py                    # 入口（支持 --vm 字节码缓存）
-├── parser.py                  # S 表达式语法
-├── param_matcher.py           # 参数匹配与类型检查
-├── preprocess.py              # #include 预处理器
+├── core/eval_utils.py              # 求值工具函数（类型转换/边界检查）
+├── core/evaluator.py               # 求值器
+├── repl/gui.py                     # 可视化编译器 GUI
+├── core/lexer.py                   # S 表达式词法
+├── lsp/lsp_server.py              # LSP 服务器
+├── repl/main.py                    # 入口（支持 --vm 字节码缓存）
+├── core/parser.py                  # S 表达式语法
+├── core/param_matcher.py           # 参数匹配与类型检查
+├── core/preprocess.py              # #include 预处理器
 ├── pyproject.toml             # 项目配置
-├── repl.py                    # REPL 交互环境
-├── ternary_engine.py           # 三态认知引擎（Kleene×贝叶斯×门控）
-├── disasm.py                   # 字节码反汇编器
+├── repl/repl.py                    # REPL 交互环境
+├── core/ternary_engine.py           # 三态认知引擎（Kleene×贝叶斯×门控）
+├── compiler/discompiler/asm.py                   # 字节码反汇编器
 ├── verify.py                   # 字节码验证器
 ├── scripts/preflight.py        # 发版前预检（lint+test+自举）
-├── run_agent.py               # Agent 启动器
-├── run_v2.py                  # v2 演示启动器
-├── run_v2_demo.py             # v2 演示脚本
-├── run_village_demo.py        # 村庄演示脚本
-├── run_village_observe.py     # 村庄观察器（NPC 自主生活模拟）
-├── runtime.py                 # 运行环境（作用域/IoT/调试/性能）
-├── sandbox.py                 # 沙箱安全机制
+├── agent_system/run_agent.py               # Agent 启动器
+├── examples/run_v2.py                  # v2 演示启动器
+├── examples/run_v2_demo.py             # v2 演示脚本
+├── examples/run_village_demo.py        # 村庄演示脚本
+├── examples/run_village_observe.py     # 村庄观察器（NPC 自主生活模拟）
+├── core/runtime.py                 # 运行环境（作用域/IoT/调试/性能）
+├── core/sandbox.py                 # 沙箱安全机制
 ├── sanfmt.py                  # 源码格式化器
-├── sanyanc.py                # 编译器（S表达式 + sugar） + 包管理器
+├── compiler/sanyanc.py                # 编译器（S表达式 + sugar） + 包管理器
 ├── pyproject.toml             # 项目配置（含 setup 元数据）
-├── skin.py                    # 皮肤管理器
-├── tail_call.py               # 尾递归优化
-├── ternary_core.py            # 平衡三进制算术（模拟）
-├── values.py                  # 值类型 + 异常体系
-├── vm.py                      # 字节码 VM（自举能力）
+├── core/skin.py                    # 皮肤管理器
+├── core/tail_call.py               # 尾递归优化
+├── core/ternary_core.py            # 平衡三进制算术（模拟）
+├── core/values.py                  # 值类型 + 异常体系
+├── vm/__init__.py                      # 字节码 VM（自举能力）
 ├── agent_system/              # Agent 系统（Python 运行时 + Sanyan DSL）
 │   ├── __init__.py
 │   ├── README.md              # Agent 文档
-│   ├── agent_runtime.py       # Agent V5 引擎
+│   ├── agent_core/runtime.py       # Agent V5 引擎
 │   ├── agent_tools.py         # Agent V5 工具层
 │   ├── agent_tool_graph.py    # 工具依赖图 + 能力注册 + 工具元数据 + 自发现
 │   ├── agent_decompose.py     # Phase 0: 任务分解
@@ -692,7 +692,7 @@ sanyan/
 │   ├── agent_context.py       # 智能上下文压缩（分层摘要+滑动窗口+重要性评分）
 │   ├── agent_experience.py    # 经验库: 跨任务 pattern 匹配 + AVOID 提示
 │   ├── agent_parallel.py      # 并行执行引擎（工具链并行+假设并行验证）
-│   ├── agent_sandbox.py       # 安全沙箱（命令过滤+文件系统守卫+审计日志）
+│   ├── agent_core/sandbox.py       # 安全沙箱（命令过滤+文件系统守卫+审计日志）
 │   ├── agent_learning.py      # 跨会话学习（SQLite持久化+失败模式库+自适应选择）
 │   ├── agent_obs.py           # 可观测性（决策追踪+性能分析+仪表盘）
 │   ├── agent_streaming.py     # 流式响应（LLM边生成边显示+可中断）
@@ -730,8 +730,8 @@ sanyan/
 ├── sugar/                     # 糖语法转换器
 │   ├── __init__.py
 │   ├── errors.py
-│   ├── lexer.py
-│   └── parser.py
+│   ├── core/lexer.py
+│   └── core/parser.py
 ├── llvmgen/                   # LLVM 代码生成器（已拆分）
 │   ├── __init__.py
 │   ├── build.py               # 完整编译管线
@@ -864,17 +864,17 @@ sanyan/
 │   ├── test_core.py           # 核心单测（138 项）
 │   ├── test_ops.py            # ops 模块单测（92 项）
 │   ├── test_ops_ext.py        # 扩展 ops 单测（64 项）
-│   ├── test_parser.py         # 解析器 AST 校验（28 项）
-│   ├── test_commands.py       # 命令模块单测（18 项）
+│   ├── test_core/parser.py         # 解析器 AST 校验（28 项）
+│   ├── test_core/commands.py       # 命令模块单测（18 项）
 │   ├── test_sugar_san.py      # sugar.san 测试（45 项）
 │   ├── test_llvmgen.py        # LLVM 代码生成测试（53 项）
 │   ├── test_self_host.py      # 字节码编译器自举验证（8 项，含 Level 2 + Level 3）
 │   ├── test_sugar_self_host.py # sugar.bin 自举验证（3 项）
 │   ├── test_effect_types.py    # 效应类型测试（30 项，确定/不确定）
 │   ├── test_diff_fuzz.py       # 差分模糊测试（12 项，四后端一致）
-│   ├── test_disasm.py          # 反汇编器测试（6 项）
-│   ├── test_vm.py             # VM 字节码测试（91 项）
-│   ├── test_c_vm.py           # C VM 测试（14 项，需 gcc）
+│   ├── test_compiler/discompiler/asm.py          # 反汇编器测试（6 项）
+│   ├── test_vm/__init__.py             # VM 字节码测试（91 项）
+│   ├── test_c_vm/__init__.py           # C VM 测试（14 项，需 gcc）
 │   ├── test_agent.py          # Agent 测试（31 项）
 │   ├── test_llvm_native.py    # LLVM 原生编译测试
 │   └── run_all.py             # 集成测试（46 项）
@@ -888,7 +888,7 @@ sanyan/
 │   ├── agent.san              # Agent 核心逻辑（决策函数、记忆、追踪）
 │   ├── agent_policy.san       # 纯数据策略（配置、阈值、映射规则）
 │   └── memory.json            # Agent 记忆持久化
-├── run_agent.py               # Agent 启动器（单次/交互/热重载）
+├── agent_system/run_agent.py               # Agent 启动器（单次/交互/热重载）
 └── csrc/dp.c                  # parse_sanyan 原生编译验证
 ```
 

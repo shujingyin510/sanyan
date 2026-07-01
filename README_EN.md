@@ -42,12 +42,12 @@ See [Why Ternary](docs/ternary-logic.md) for the full comparison.
 ```bash
 git clone https://github.com/shujingyin510/sanyan.git
 cd sanyan
-python main.py
+python repl/main.py
 ```
 
 > **Performance tip**: For performance-sensitive programs, choose from easy to advanced:
-> - [PyPy](https://pypy.org) — drop-in, 5-10x faster: `pypy main.py`
-> - **LLVM native compilation** — machine code, orders of magnitude faster: `pip install llvmlite && python compile_llvmgen.py`
+> - [PyPy](https://pypy.org) — drop-in, 5-10x faster: `pypy repl/main.py`
+> - **LLVM native compilation** — machine code, orders of magnitude faster: `pip install llvmlite && python compiler/compile_llvmgen.py`
 > - **C VM** — pure C bytecode interpreter, zero Python dependency: `gcc csrc/runtime.c -o vm && ./vm program.bin`
 
 Once in the REPL, try:
@@ -65,12 +65,12 @@ sanyan> print(state)
 Run example files:
 
 ```bash
-python main.py examples/greenhouse.san
-python main.py examples/sensor_pipeline_simple.san
-python main.py examples/circuit_sim.san     # Ternary truth tables
-python main.py examples/data_cleaning.san   # NULL propagation safety
-python main.py examples/health_check.san    # Timeout ≠ down
-python main.py examples/npc_decision.san    # NPC hesitation behavior
+python repl/main.py examples/greenhouse.san
+python repl/main.py examples/sensor_pipeline_simple.san
+python repl/main.py examples/circuit_sim.san     # Ternary truth tables
+python repl/main.py examples/data_cleaning.san   # NULL propagation safety
+python repl/main.py examples/health_check.san    # Timeout ≠ down
+python repl/main.py examples/npc_decision.san    # NPC hesitation behavior
 ```
 
 ---
@@ -149,7 +149,7 @@ Register virtual devices, read/write sensors with ternary values. Perfect for sm
 | **Standalone .bin** | sugar.bin (~10KB) and llvmgen.bin (~72KB) run independently on VM |
 | **C VM** | `csrc/runtime.c` pure C implementation, 52 instructions, no Python dependency |
 | **C VM Tests** | `csrc/test_runtime.c` 61 unit tests covering all instructions |
-| **STM32 Firmware** | `sanyancc.py` cross-compile → `runtime_stm32.c`, Blue Pill hardware verified |
+| **STM32 Firmware** | `compiler/sanyancc.py` cross-compile → `runtime_stm32.c`, Blue Pill hardware verified |
 
 ### LLVM Code Generation
 
@@ -207,16 +207,16 @@ See [CHANGELOG.md](CHANGELOG.md) for the full version history.
 
 ```bash
 # Interactive mode (multi-turn, hot reload)
-python -X utf8 run_agent.py
+python -X utf8 agent_system/run_agent.py
 
 # Single-shot programming (LLM generates code → executes → returns result)
-python -X utf8 run_agent.py "calculate sum from 1 to 1000"
+python -X utf8 agent_system/run_agent.py "calculate sum from 1 to 1000"
 
 # Autonomous (read → modify → test → fix → loop)
-python -X utf8 run_agent.py "fix _test_verify.py so tests pass" --auto
+python -X utf8 agent_system/run_agent.py "fix _test_verify.py so tests pass" --auto
 
 # File operations
-python -X utf8 run_agent.py "replace v0.3 with v0.4 in AGENTS.md"
+python -X utf8 agent_system/run_agent.py "replace v0.3 with v0.4 in AGENTS.md"
 ```
 
 ---
@@ -229,7 +229,7 @@ Source (.san) → Sugar Parser or S-Expression Parser → AST
   → LLVM Codegen → Native Binary (optional)
 ```
 
-The evaluator path is the primary execution mode. The bytecode VM (vm.py) can compile and run .bin files — and has achieved full self-hosting: the VM can compile its own compiler source to produce an identical .bin.
+The evaluator path is the primary execution mode. The bytecode VM (vm/__init__.py) can compile and run .bin files — and has achieved full self-hosting: the VM can compile its own compiler source to produce an identical .bin.
 
 The LLVM codegen (llvmgen/) compiles to native binaries via C runtime linkage.
 
@@ -246,17 +246,17 @@ sanyan/
 ├── README.md                  # Project README (Chinese)
 ├── README_EN.md               # Project README (English)
 ├── build_combined.py          # Build script: expand #include → combined .san
-├── vm.py                      # Bytecode VM (self-hosting capable)
-├── evaluator.py               # Tree-walking interpreter
-├── lexer.py                   # S-expression tokenizer
-├── parser.py                  # S-expression parser
-├── ternary_core.py            # Balanced ternary arithmetic (simulated)
-├── compile_bytecode.py        # .san → .bin compiler (supports #include)
-├── compile_llvmgen.py         # llvmgen.san → llvmgen.bin (V5 self-hosted, no injection)
-├── sanyancc.py                # Cross-compiler for STM32
-├── main.py                    # Entry point / REPL
-├── runtime.py                 # Runtime environment
-├── preprocess.py              # #include preprocessor
+├── vm/__init__.py                      # Bytecode VM (self-hosting capable)
+├── core/evaluator.py               # Tree-walking interpreter
+├── core/lexer.py                   # S-expression tokenizer
+├── core/parser.py                  # S-expression parser
+├── core/ternary_core.py            # Balanced ternary arithmetic (simulated)
+├── compiler/compile_bytecode.py        # .san → .bin compiler (supports #include)
+├── compiler/compile_llvmgen.py         # llvmgen.san → llvmgen.bin (V5 self-hosted, no injection)
+├── compiler/sanyancc.py                # Cross-compiler for STM32
+├── repl/main.py                    # Entry point / REPL
+├── core/runtime.py                 # Runtime environment
+├── core/preprocess.py              # #include preprocessor
 ├── sugar/                     # C-like sugar → S-expression converter
 ├── llvmgen/                   # LLVM code generator (split)
 │   ├── codegen.py             # AST → LLVM IR
