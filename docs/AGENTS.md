@@ -20,6 +20,7 @@ ruff check . && ruff format --check . && mypy . && python -X utf8 scripts/prefli
 | 🚨 P0 | 用户直接指令 | 立即执行，其他事暂停 |
 | 🚨 P0 | git commit / push | **必须用户明确要求**，禁止自行决定 |
 | 🚨 P0 | CI 红灯 / bug 报错 | 立即修，修完跑 preflight 绿了再继续 |
+| 🚨 P0 | 发现预存问题/技术债 | 及时修复，不跳过不延后，不让 CI 持续红灯 |
 | 🚨 P0 | 不确定需求 | 先问，不要猜 |
 | 🚨 P0 | 不确定文件用途 | 先搜索引用关系 |
 | 🚨 P0 | 不确定修改影响 | 先分析再修改 |

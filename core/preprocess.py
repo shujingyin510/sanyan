@@ -68,7 +68,7 @@ def preprocess_includes(
     if _seen is None:
         _seen = set()
     if _base_dir is None:
-        _base_dir = os.path.dirname(os.path.abspath(__file__))
+        _base_dir = os.getcwd()
     lines = code.split('\n')
     processed = []
     for line in lines:
