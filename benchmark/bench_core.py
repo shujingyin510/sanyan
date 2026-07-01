@@ -9,7 +9,7 @@ import os
 import time
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from evaluator import SanyanEvaluator
+from core.evaluator import SanyanEvaluator
 
 ITERS = 10000
 

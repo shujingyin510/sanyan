@@ -14,8 +14,8 @@ import os
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
 
-from ternary_core import TritValue
-from values import SanyanTypeError, check_type
+from core.ternary_core import TritValue
+from core.values import SanyanTypeError, check_type
 
 
 class TestCheckTypeEffect(unittest.TestCase):
@@ -143,31 +143,31 @@ class TestSubtypeRelation(unittest.TestCase):
 
     def test_certain_to_uncertain_allowed(self):
         """确定[X] 可以流向 不确定[X]（放宽）"""
-        from type_checker import _matches
+        from core.type_checker import _matches
 
         self.assertTrue(_matches('确定[int]', '不确定[int]'))
 
     def test_uncertain_to_certain_rejected(self):
         """不确定[X] 不能流向 确定[X]（收紧）"""
-        from type_checker import _matches
+        from core.type_checker import _matches
 
         self.assertFalse(_matches('不确定[int]', '确定[int]'))
 
     def test_certain_to_certain_allowed(self):
         """确定[X] 匹配 确定[X]"""
-        from type_checker import _matches
+        from core.type_checker import _matches
 
         self.assertTrue(_matches('确定[int]', '确定[int]'))
 
     def test_uncertain_to_uncertain_allowed(self):
         """不确定[X] 匹配 不确定[X]"""
-        from type_checker import _matches
+        from core.type_checker import _matches
 
         self.assertTrue(_matches('不确定[int]', '不确定[int]'))
 
     def test_certain_str_to_uncertain_str(self):
         """确定[str] → 不确定[str] 允许"""
-        from type_checker import _matches
+        from core.type_checker import _matches
 
         self.assertTrue(_matches('确定[str]', '不确定[str]'))
 
@@ -177,7 +177,7 @@ class TestCompileTimeUncertainty(unittest.TestCase):
 
     def test_literal_is_certain(self):
         """字面量视为确定"""
-        from evaluator import SanyanEvaluator
+        from core.evaluator import SanyanEvaluator
 
         ev = SanyanEvaluator()
         self.assertFalse(ev._is_uncertain_expr(42))
@@ -186,7 +186,7 @@ class TestCompileTimeUncertainty(unittest.TestCase):
 
     def test_high_confidence_trit_is_certain(self):
         """高信度 TritValue 视为确定"""
-        from evaluator import SanyanEvaluator
+        from core.evaluator import SanyanEvaluator
 
         ev = SanyanEvaluator()
         self.assertFalse(ev._is_uncertain_expr(TritValue(42, confidence=1.0)))
@@ -194,7 +194,7 @@ class TestCompileTimeUncertainty(unittest.TestCase):
 
     def test_low_confidence_trit_is_uncertain(self):
         """低信度 TritValue 视为不确定"""
-        from evaluator import SanyanEvaluator
+        from core.evaluator import SanyanEvaluator
 
         ev = SanyanEvaluator()
         self.assertTrue(ev._is_uncertain_expr(TritValue(42, confidence=0.5)))
@@ -202,7 +202,7 @@ class TestCompileTimeUncertainty(unittest.TestCase):
 
     def test_uncertain_function_return_is_uncertain(self):
         """返回类型标注 不确定[X] 的函数调用视为不确定"""
-        from evaluator import SanyanEvaluator
+        from core.evaluator import SanyanEvaluator
 
         ev = SanyanEvaluator()
         # 定义一个返回不确定值的函数
@@ -211,7 +211,7 @@ class TestCompileTimeUncertainty(unittest.TestCase):
 
     def test_certain_function_return_is_certain(self):
         """返回类型标注 确定[X] 的函数调用视为确定"""
-        from evaluator import SanyanEvaluator
+        from core.evaluator import SanyanEvaluator
 
         ev = SanyanEvaluator()
         ev.eval(['fn', 'safe_src', [], {'__return__': '确定[int]'}, [42]])
@@ -219,7 +219,7 @@ class TestCompileTimeUncertainty(unittest.TestCase):
 
     def test_arithmetic_propagates_uncertainty(self):
         """算术运算传播不确定性：确定 + 不确定 → 不确定"""
-        from evaluator import SanyanEvaluator
+        from core.evaluator import SanyanEvaluator
 
         ev = SanyanEvaluator()
         # 加 确定 不确定 → 不确定
@@ -228,7 +228,7 @@ class TestCompileTimeUncertainty(unittest.TestCase):
 
     def test_arithmetic_certain_both(self):
         """算术运算：确定 + 确定 → 确定"""
-        from evaluator import SanyanEvaluator
+        from core.evaluator import SanyanEvaluator
 
         ev = SanyanEvaluator()
         expr = ['add', 1, 2]
@@ -240,7 +240,7 @@ class TestEndToEndEffectType(unittest.TestCase):
 
     def test_certain_param_accepts_certain_value(self):
         """确定参数接受确定值"""
-        from evaluator import SanyanEvaluator
+        from core.evaluator import SanyanEvaluator
 
         ev = SanyanEvaluator()
         # 定义要求确定参数的函数
@@ -251,8 +251,8 @@ class TestEndToEndEffectType(unittest.TestCase):
 
     def test_certain_param_rejects_uncertain_value_compile_time(self):
         """确定参数拒绝不确定值（编译期）"""
-        from evaluator import SanyanEvaluator
-        from values import SanyanTypeError
+        from core.evaluator import SanyanEvaluator
+        from core.values import SanyanTypeError
 
         ev = SanyanEvaluator()
         # 定义返回不确定值的函数
@@ -266,7 +266,7 @@ class TestEndToEndEffectType(unittest.TestCase):
 
     def test_uncertain_param_accepts_any_value(self):
         """不确定参数接受任意值"""
-        from evaluator import SanyanEvaluator
+        from core.evaluator import SanyanEvaluator
 
         ev = SanyanEvaluator()
         ev.eval(['fn', 'flex_op', ['x'], {'x': '不确定[int]'}, ['add', 'x', 1]])
@@ -279,8 +279,8 @@ class TestEndToEndEffectType(unittest.TestCase):
 
     def test_certain_return_check(self):
         """确定返回值校验：函数标注 确定[int] 但返回低信度值"""
-        from evaluator import SanyanEvaluator
-        from values import SanyanTypeError
+        from core.evaluator import SanyanEvaluator
+        from core.values import SanyanTypeError
 
         ev = SanyanEvaluator()
         # 定义标注 确定[int] 返回但实际返回低信度值的函数

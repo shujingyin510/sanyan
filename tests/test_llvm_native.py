@@ -207,7 +207,7 @@ class TestLlvmNativeCompile(unittest.TestCase):
     def _make_test_bin(cls, src: str, bin_path: str):
         """创建一个测试 .bin 文件（直接在当前进程内编译）"""
         try:
-            from compile_bytecode import compile_source as _bc_compile
+            from compiler.compile_bytecode import compile_source as _bc_compile
 
             _bc_compile(src, bin_path)
             if not os.path.exists(bin_path):

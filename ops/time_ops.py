@@ -2,7 +2,7 @@
 
 import time
 from datetime import datetime
-from ternary_core import TritValue
+from core.ternary_core import TritValue
 from ops.registry import register, register_alias
 
 

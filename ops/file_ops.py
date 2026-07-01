@@ -2,8 +2,8 @@
 
 import os
 import sys
-from ternary_core import TritValue
-from values import (
+from core.ternary_core import TritValue
+from core.values import (
     SanyanError,
     SanyanSyntaxError,
     SanyanValueError,
@@ -13,7 +13,7 @@ from values import (
     SanyanIOError,
     ModuleValue,
 )
-from skin import SkinManager
+from core.skin import SkinManager
 from ops.registry import register, register_alias
 
 
@@ -101,7 +101,7 @@ def _resolve_path(raw_path, auto_stdlib=True):
 def _load_sugar_from_bin(sugar_bin):
     """从预编译 sugar.bin 创建 ModuleValue，执行初始化后通过 VM 导出函数代理调用。"""
     from vm import VM
-    from values import ModuleValue
+    from core.values import ModuleValue
 
     try:
         vm = VM.from_bin(sugar_bin)
@@ -185,10 +185,10 @@ def _load_sugar_parser(evaluator):
     if not sugar_code.strip():
         return None
 
-    from values import ReturnException
-    from lexer import tokenize
-    from parser import parse
-    from evaluator import SanyanEvaluator
+    from core.values import ReturnException
+    from core.lexer import tokenize
+    from core.parser import parse
+    from core.evaluator import SanyanEvaluator
 
     skin_mgr = evaluator.skin_manager if evaluator and evaluator.skin_manager else SkinManager('chinese')
 
@@ -266,7 +266,7 @@ def _parse_with_sugar_san(code, evaluator):
     if parser is None:
         return None
     try:
-        from evaluator import SanyanEvaluator
+        from core.evaluator import SanyanEvaluator
 
         temp_env = SanyanEvaluator(skin_manager=evaluator.skin_manager, max_loop_steps=TEMP_ENV_MAX_LOOP)
         result = parser.call(temp_env, ['解析', code])
@@ -292,7 +292,7 @@ def _parse_with_sugar_san(code, evaluator):
 
 def _parse_code(code, evaluator):
     """解析代码：#include 预处理 → SugarConverter → sugar.san 自举解析 → S-表达式降级。"""
-    from preprocess import preprocess_includes
+    from core.preprocess import preprocess_includes
 
     code = preprocess_includes(code)
     # 优先 Python 原生 SugarConverter（跨平台一致性最优）
@@ -309,8 +309,8 @@ def _parse_code(code, evaluator):
     if (stripped.startswith('(') and stripped.count('(') == stripped.count(')')) or (
         stripped.startswith('\uff08') and stripped.count('\uff08') == stripped.count('\uff09')
     ):
-        from lexer import tokenize
-        from parser import parse
+        from core.lexer import tokenize
+        from core.parser import parse
 
         wrapped = '(do\n' + code + '\n)'
         tokens = tokenize(wrapped)
@@ -320,8 +320,8 @@ def _parse_code(code, evaluator):
     if isinstance(ast, list):
         return ast
     # 最后：S-表达式降级
-    from lexer import tokenize
-    from parser import parse
+    from core.lexer import tokenize
+    from core.parser import parse
 
     wrapped = '(do\n' + code + '\n)'
     tokens = tokenize(wrapped)
@@ -447,7 +447,7 @@ class FileOps:
                 evaluator.scope_vars[alias] = module
             return module
 
-        from evaluator import SanyanEvaluator
+        from core.evaluator import SanyanEvaluator
 
         module_env = SanyanEvaluator(skin_manager=evaluator.skin_manager)
         ast = _parse_code(code, module_env)

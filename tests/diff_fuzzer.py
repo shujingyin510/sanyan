@@ -187,9 +187,9 @@ class BackendRunner:
         使用 S 表达式解析器（非 sugar parser）解析源码。
         """
         try:
-            from evaluator import SanyanEvaluator
-            from lexer import tokenize
-            from parser import parse
+            from core.evaluator import SanyanEvaluator
+            from core.lexer import tokenize
+            from core.parser import parse
 
             ev = SanyanEvaluator()
             old_stdout = sys.stdout
@@ -209,7 +209,7 @@ class BackendRunner:
     def run_python_vm(source: str, timeout: float = 5.0) -> tuple[str, str]:
         """Python VM：编译 → 运行"""
         try:
-            from compile_bytecode import compile_source
+            from compiler.compile_bytecode import compile_source
             from vm import VM
 
             with tempfile.TemporaryDirectory() as tmpdir:
@@ -252,7 +252,7 @@ class BackendRunner:
     def run_c_vm(source: str, timeout: float = 5.0) -> tuple[str, str]:
         """C VM：编译 → C VM 运行（编译结果缓存）"""
         try:
-            from compile_bytecode import compile_source
+            from compiler.compile_bytecode import compile_source
             from utils.compiler_tools import find_cc, run_in_shell, win_to_posix
 
             cc = find_cc()
@@ -484,7 +484,7 @@ def run_diff_test(
     programs = [(i, gen.generate()) for i in range(count)]
 
     # 预编译所有程序到 .bin 文件（复用同一个编译器实例）
-    from compile_bytecode import compile_source
+    from compiler.compile_bytecode import compile_source
 
     bin_dir = tempfile.mkdtemp(prefix='sanyan_fuzz_')
     bin_paths: dict[int, str] = {}

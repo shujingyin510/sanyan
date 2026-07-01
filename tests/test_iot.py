@@ -9,9 +9,9 @@ import tempfile
 
 
 import unittest
-from ternary_core import TritValue
-from evaluator import SanyanEvaluator
-from values import SanyanNameError, SanyanSyntaxError
+from core.ternary_core import TritValue
+from core.evaluator import SanyanEvaluator
+from core.values import SanyanNameError, SanyanSyntaxError
 from ops.device_registry import DeviceRegistry, MockDevice, FileDevice
 
 

@@ -3,8 +3,8 @@
 import os
 import sys
 import subprocess
-from ternary_core import TritValue
-from values import SanyanRuntimeError, SanyanSyntaxError
+from core.ternary_core import TritValue
+from core.values import SanyanRuntimeError, SanyanSyntaxError
 from ops.registry import register, register_alias
 
 EXEC_TIMEOUT = 30

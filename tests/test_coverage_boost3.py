@@ -6,8 +6,8 @@ import unittest
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from evaluator import SanyanEvaluator
-from ternary_core import TritValue, BT, TernaryALU
+from core.evaluator import SanyanEvaluator
+from core.ternary_core import TritValue, BT, TernaryALU
 
 
 def ev(expr):
@@ -139,25 +139,25 @@ class TestEvaluatorEdgeCases(unittest.TestCase):
 
 class TestValuesEdgeCases(unittest.TestCase):
     def test_function_value_params(self):
-        from values import FunctionValue
+        from core.values import FunctionValue
 
         fv = FunctionValue(['x', 'y'], ['add', 'x', 'y'], None, {}, {})
         self.assertEqual(fv.params, ['x', 'y'])
 
     def test_function_value_closure(self):
-        from values import FunctionValue
+        from core.values import FunctionValue
 
         fv = FunctionValue(['x'], ['add', 'x', 1], None, {'y': 10}, {})
         self.assertEqual(fv.closure_vars['y'], 10)
 
     def test_function_value_param_types(self):
-        from values import FunctionValue
+        from core.values import FunctionValue
 
         fv = FunctionValue(['x'], ['add', 'x', 1], None, {}, {'x': 'int'})
         self.assertEqual(fv.param_types['x'], 'int')
 
     def test_module_value_exports(self):
-        from values import ModuleValue
+        from core.values import ModuleValue
 
         mv = ModuleValue({}, {}, set(['a', 'b', 'c']))
         self.assertTrue(mv.is_exported('a'))
@@ -165,70 +165,70 @@ class TestValuesEdgeCases(unittest.TestCase):
         self.assertFalse(mv.is_exported('d'))
 
     def test_src_node_list(self):
-        from values import SrcNode
+        from core.values import SrcNode
 
         sn = SrcNode(['do', 1, 2, 3], line=10, col=5)
         self.assertEqual(len(sn), 4)
         self.assertEqual(sn[1], 1)
 
     def test_to_num_tritvalue_float(self):
-        from values import to_num
+        from core.values import to_num
 
         v = TritValue(3.14)
         self.assertAlmostEqual(to_num(v), 3.14, delta=0.01)
 
     def test_to_num_list(self):
-        from values import to_num
+        from core.values import to_num
 
         self.assertEqual(to_num([1, 2, 3]), [1, 2, 3])
 
     def test_to_num_dict(self):
-        from values import to_num
+        from core.values import to_num
 
         self.assertEqual(to_num({'a': 1}), {'a': 1})
 
     def test_to_num_none(self):
-        from values import to_num
+        from core.values import to_num
 
         self.assertIsNone(to_num(None))
 
     def test_check_type_int(self):
-        from values import check_type
+        from core.values import check_type
 
         self.assertIsNone(check_type(42, 'int'))
         with self.assertRaises(Exception):
             check_type('hello', 'int')
 
     def test_check_type_float(self):
-        from values import check_type
+        from core.values import check_type
 
         self.assertIsNone(check_type(3.14, 'float'))
         with self.assertRaises(Exception):
             check_type('hello', 'float')
 
     def test_check_type_str(self):
-        from values import check_type
+        from core.values import check_type
 
         self.assertIsNone(check_type('hello', 'str'))
         with self.assertRaises(Exception):
             check_type(42, 'str')
 
     def test_check_type_list(self):
-        from values import check_type
+        from core.values import check_type
 
         self.assertIsNone(check_type([1, 2], 'list'))
         with self.assertRaises(Exception):
             check_type(42, 'list')
 
     def test_check_type_dict(self):
-        from values import check_type
+        from core.values import check_type
 
         self.assertIsNone(check_type({'a': 1}, 'dict'))
         with self.assertRaises(Exception):
             check_type(42, 'dict')
 
     def test_check_type_any(self):
-        from values import check_type
+        from core.values import check_type
 
         self.assertIsNone(check_type(42, 'any'))
         self.assertIsNone(check_type('hello', 'any'))
@@ -241,7 +241,7 @@ class TestValuesEdgeCases(unittest.TestCase):
 
 class TestRuntimeEdgeCases(unittest.TestCase):
     def test_scope_nested(self):
-        from runtime import ScopeManager
+        from core.runtime import ScopeManager
 
         sm = ScopeManager()
         sm.set_var('x', 1)
@@ -256,7 +256,7 @@ class TestRuntimeEdgeCases(unittest.TestCase):
         self.assertEqual(sm.get_var('x'), 1)
 
     def test_scope_shadow(self):
-        from runtime import ScopeManager
+        from core.runtime import ScopeManager
 
         sm = ScopeManager()
         sm.set_var('x', 1)
@@ -267,7 +267,7 @@ class TestRuntimeEdgeCases(unittest.TestCase):
         self.assertEqual(sm.get_var('x'), 1)
 
     def test_scope_has_var_nested(self):
-        from runtime import ScopeManager
+        from core.runtime import ScopeManager
 
         sm = ScopeManager()
         sm.set_var('x', 1)
@@ -276,7 +276,7 @@ class TestRuntimeEdgeCases(unittest.TestCase):
         self.assertFalse(sm.has_var('y'))
 
     def test_scope_all_vars_nested(self):
-        from runtime import ScopeManager
+        from core.runtime import ScopeManager
 
         sm = ScopeManager()
         sm.set_var('x', 1)
@@ -288,7 +288,7 @@ class TestRuntimeEdgeCases(unittest.TestCase):
         self.assertEqual(len(vars), 3)
 
     def test_scope_pop_preserves_global(self):
-        from runtime import ScopeManager
+        from core.runtime import ScopeManager
 
         sm = ScopeManager()
         sm.set_var('x', 1)
@@ -426,7 +426,7 @@ class TestTernaryCoreEdgeCases(unittest.TestCase):
         self.assertEqual(v.to_int(), 0)
 
     def test_array_value_get_set(self):
-        from ternary_core import ArrayValue
+        from core.ternary_core import ArrayValue
 
         arr = ArrayValue(5, TritValue(0))
         arr.set(0, TritValue(10))

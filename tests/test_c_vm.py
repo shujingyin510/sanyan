@@ -113,7 +113,7 @@ class TestCVMCrossValidation(unittest.TestCase):
 
     def _compile_and_compare(self, source: str, expected_output: str):
         """编译源码并在 C VM 和 Python VM 上运行，比较输出"""
-        from compile_bytecode import compile_source
+        from compiler.compile_bytecode import compile_source
         from vm import VM
 
         with tempfile.TemporaryDirectory() as tmpdir:

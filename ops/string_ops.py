@@ -1,9 +1,9 @@
 """字符串相关操作（兼容三态 TritValue 字符串）"""
 
-from ternary_core import TritValue, ArrayValue
-from values import SanyanSyntaxError, SanyanTypeError
+from core.ternary_core import TritValue, ArrayValue
+from core.values import SanyanSyntaxError, SanyanTypeError
 from ops.registry import register, register_alias
-from eval_utils import unwrap_trit
+from core.eval_utils import unwrap_trit
 
 
 def _unwrap_str(val):

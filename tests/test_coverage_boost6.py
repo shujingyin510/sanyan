@@ -6,7 +6,7 @@ import unittest
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from evaluator import SanyanEvaluator
+from core.evaluator import SanyanEvaluator
 
 
 def ev(expr):
@@ -77,7 +77,7 @@ class TestEvalListBranches(unittest.TestCase):
         self.assertEqual(r, ['3.14'])
 
     def test_eval_list_function_value(self):
-        from values import FunctionValue
+        from core.values import FunctionValue
 
         fv = FunctionValue(['x'], ['set', 'y', ['add', 'x', 1]], None, {}, {})
         self.e.set_var('f', fv)
@@ -85,7 +85,7 @@ class TestEvalListBranches(unittest.TestCase):
         self.assertEqual(r.to_int(), 6)
 
     def test_eval_list_module_value(self):
-        from values import ModuleValue
+        from core.values import ModuleValue
 
         mv = ModuleValue({}, {'func': (['x'], ['set', 'y', ['add', 'x', 1]], None, {}, {})}, set(['func']))
         self.e.set_var('m', mv)
@@ -108,7 +108,7 @@ class TestEvalListBranches(unittest.TestCase):
 
 class TestPosMethod(unittest.TestCase):
     def test_pos_with_line_col(self):
-        from values import SrcNode
+        from core.values import SrcNode
 
         e = SanyanEvaluator()
         node = SrcNode(['add', 1, 2], line=10, col=5)
@@ -117,7 +117,7 @@ class TestPosMethod(unittest.TestCase):
         self.assertIn('5', r)
 
     def test_pos_without_line(self):
-        from values import SrcNode
+        from core.values import SrcNode
 
         e = SanyanEvaluator()
         node = SrcNode(['add', 1, 2])
@@ -176,78 +176,78 @@ class TestIsValidIdentifier(unittest.TestCase):
 
 class TestCheckTypeEdgeCases(unittest.TestCase):
     def test_check_type_int_pass(self):
-        from values import check_type
+        from core.values import check_type
 
         self.assertIsNone(check_type(42, 'int'))
 
     def test_check_type_int_fail(self):
-        from values import check_type
-        from values import SanyanTypeError
+        from core.values import check_type
+        from core.values import SanyanTypeError
 
         with self.assertRaises(SanyanTypeError):
             check_type('hello', 'int')
 
     def test_check_type_float_pass(self):
-        from values import check_type
+        from core.values import check_type
 
         self.assertIsNone(check_type(3.14, 'float'))
 
     def test_check_type_float_fail(self):
-        from values import check_type
-        from values import SanyanTypeError
+        from core.values import check_type
+        from core.values import SanyanTypeError
 
         with self.assertRaises(SanyanTypeError):
             check_type('hello', 'float')
 
     def test_check_type_str_pass(self):
-        from values import check_type
+        from core.values import check_type
 
         self.assertIsNone(check_type('hello', 'str'))
 
     def test_check_type_str_fail(self):
-        from values import check_type
-        from values import SanyanTypeError
+        from core.values import check_type
+        from core.values import SanyanTypeError
 
         with self.assertRaises(SanyanTypeError):
             check_type(42, 'str')
 
     def test_check_type_list_pass(self):
-        from values import check_type
+        from core.values import check_type
 
         self.assertIsNone(check_type([1, 2], 'list'))
 
     def test_check_type_list_fail(self):
-        from values import check_type
-        from values import SanyanTypeError
+        from core.values import check_type
+        from core.values import SanyanTypeError
 
         with self.assertRaises(SanyanTypeError):
             check_type(42, 'list')
 
     def test_check_type_dict_pass(self):
-        from values import check_type
+        from core.values import check_type
 
         self.assertIsNone(check_type({'a': 1}, 'dict'))
 
     def test_check_type_dict_fail(self):
-        from values import check_type
-        from values import SanyanTypeError
+        from core.values import check_type
+        from core.values import SanyanTypeError
 
         with self.assertRaises(SanyanTypeError):
             check_type(42, 'dict')
 
     def test_check_type_num(self):
-        from values import check_type
+        from core.values import check_type
 
         self.assertIsNone(check_type(42, 'num'))
 
     def test_check_type_any(self):
-        from values import check_type
+        from core.values import check_type
 
         self.assertIsNone(check_type(42, 'any'))
         self.assertIsNone(check_type('hello', 'any'))
 
     def test_check_type_none(self):
-        from values import check_type
+        from core.values import check_type
 
         self.assertIsNone(check_type(None, 'any'))
 

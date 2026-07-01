@@ -6,8 +6,8 @@ import unittest
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from evaluator import SanyanEvaluator
-from ternary_core import TritValue, BT, TernaryALU
+from core.evaluator import SanyanEvaluator
+from core.ternary_core import TritValue, BT, TernaryALU
 
 
 def ev(expr):
@@ -363,7 +363,7 @@ class TestConfidenceGuard(unittest.TestCase):
 
 class TestTernaryEngine(unittest.TestCase):
     def setUp(self):
-        from ternary_engine import TernaryEngine
+        from core.ternary_engine import TernaryEngine
 
         self.engine = TernaryEngine()
 
@@ -462,7 +462,7 @@ class TestTernaryEngine(unittest.TestCase):
 
 class TestScopeManager(unittest.TestCase):
     def setUp(self):
-        from runtime import ScopeManager
+        from core.runtime import ScopeManager
 
         self.sm = ScopeManager()
 
@@ -516,7 +516,7 @@ class TestScopeManager(unittest.TestCase):
 
 class TestExceptions(unittest.TestCase):
     def test_hierarchy(self):
-        from values import (
+        from core.values import (
             SanyanError,
             SanyanSyntaxError,
             SanyanTypeError,
@@ -540,14 +540,14 @@ class TestExceptions(unittest.TestCase):
 
 class TestFunctionValue(unittest.TestCase):
     def test_create(self):
-        from values import FunctionValue
+        from core.values import FunctionValue
 
         fv = FunctionValue(['x'], ['add', 'x', 1], None, {}, {})
         self.assertEqual(fv.params, ['x'])
         self.assertEqual(fv.body, ['add', 'x', 1])
 
     def test_repr(self):
-        from values import FunctionValue
+        from core.values import FunctionValue
 
         fv = FunctionValue(['x'], ['add', 'x', 1], None, {}, {})
         self.assertIn('x', repr(fv))
@@ -555,7 +555,7 @@ class TestFunctionValue(unittest.TestCase):
 
 class TestModuleValue(unittest.TestCase):
     def test_create(self):
-        from values import ModuleValue
+        from core.values import ModuleValue
 
         mv = ModuleValue({}, {}, set(['func1']))
         self.assertTrue(mv.is_exported('func1'))
@@ -564,7 +564,7 @@ class TestModuleValue(unittest.TestCase):
 
 class TestSrcNode(unittest.TestCase):
     def test_create(self):
-        from values import SrcNode
+        from core.values import SrcNode
 
         sn = SrcNode(['do', 1, 2], line=10, col=5)
         self.assertEqual(sn.line, 10)
@@ -573,27 +573,27 @@ class TestSrcNode(unittest.TestCase):
 
 class TestToNum(unittest.TestCase):
     def test_to_num_tritvalue(self):
-        from values import to_num
+        from core.values import to_num
 
         self.assertEqual(to_num(TritValue(42)), 42)
 
     def test_to_num_int(self):
-        from values import to_num
+        from core.values import to_num
 
         self.assertEqual(to_num(42), 42)
 
     def test_to_num_float(self):
-        from values import to_num
+        from core.values import to_num
 
         self.assertEqual(to_num(3.14), 3.14)
 
     def test_to_num_string(self):
-        from values import to_num
+        from core.values import to_num
 
         self.assertEqual(to_num('42'), 42)
 
     def test_to_num_invalid(self):
-        from values import to_num
+        from core.values import to_num
 
         self.assertEqual(to_num('abc'), 'abc')
 
@@ -710,7 +710,7 @@ class TestTritValueExtended(unittest.TestCase):
         self.assertEqual(v.to_payload(), 'hello')
 
     def test_array_value(self):
-        from ternary_core import ArrayValue
+        from core.ternary_core import ArrayValue
 
         arr = ArrayValue(3, TritValue(0))
         self.assertEqual(arr.length, 3)
@@ -718,7 +718,7 @@ class TestTritValueExtended(unittest.TestCase):
         self.assertEqual(arr.get(1).to_int(), 5)
 
     def test_array_value_out_of_bounds(self):
-        from ternary_core import ArrayValue
+        from core.ternary_core import ArrayValue
 
         arr = ArrayValue(3, TritValue(0))
         with self.assertRaises(Exception):
@@ -759,19 +759,19 @@ class TestEvaluatorExtended(unittest.TestCase):
         self.assertEqual(self.e.get_var('y').to_int(), 2)
 
     def test_eval_list_return(self):
-        from values import ReturnException
+        from core.values import ReturnException
 
         with self.assertRaises(ReturnException):
             self.e.eval(['return', 42])
 
     def test_eval_list_break(self):
-        from values import BreakException
+        from core.values import BreakException
 
         with self.assertRaises(BreakException):
             self.e.eval(['break'])
 
     def test_eval_list_continue(self):
-        from values import ContinueException
+        from core.values import ContinueException
 
         with self.assertRaises(ContinueException):
             self.e.eval(['continue'])

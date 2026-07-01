@@ -8,8 +8,8 @@ import sys
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import unittest
-from ternary_core import BT, TernaryALU, TritValue, ternary_sin, ternary_sqrt, ternary_exp, ternary_log
-from values import (
+from core.ternary_core import BT, TernaryALU, TritValue, ternary_sin, ternary_sqrt, ternary_exp, ternary_log
+from core.values import (
     SanyanError,
     SanyanNameError,
     SanyanSyntaxError,
@@ -24,9 +24,9 @@ from values import (
     FunctionValue,
     ModuleValue,
 )
-from runtime import SanyanRuntime
-from skin import SkinManager
-from preprocess import preprocess_includes, _safe_include_path
+from core.runtime import SanyanRuntime
+from core.skin import SkinManager
+from core.preprocess import preprocess_includes, _safe_include_path
 
 
 class TestTernaryCore(unittest.TestCase):
@@ -166,7 +166,7 @@ class TestFunctionValue(unittest.TestCase):
     """函数值和闭包"""
 
     def test_call_args_mismatch(self):
-        from evaluator import SanyanEvaluator
+        from core.evaluator import SanyanEvaluator
 
         fn = FunctionValue(['x'], [['print', 'x']])
         rt = SanyanEvaluator()
@@ -174,7 +174,7 @@ class TestFunctionValue(unittest.TestCase):
             fn.call(rt, [])
 
     def test_closure_capture(self):
-        from evaluator import SanyanEvaluator
+        from core.evaluator import SanyanEvaluator
 
         rt = SanyanEvaluator()
         rt.set_var('captured', TritValue(100))
@@ -294,19 +294,19 @@ class TestTernaryEdge(unittest.TestCase):
         self.assertAlmostEqual(BT.to_float(log_e, 16), 1.0, places=1)
 
     def test_ternary_cos_zero(self):
-        from ternary_core import ternary_cos
+        from core.ternary_core import ternary_cos
 
         c = ternary_cos(BT.from_float(0.0, 16), 16)
         self.assertAlmostEqual(BT.to_float(c, 16), 1.0, places=1)
 
     def test_ternary_tan_zero(self):
-        from ternary_core import ternary_tan
+        from core.ternary_core import ternary_tan
 
         t = ternary_tan(BT.from_float(0.0, 16), 16)
         self.assertAlmostEqual(BT.to_float(t, 16), 0.0, places=1)
 
     def test_ternary_log10_100(self):
-        from ternary_core import ternary_log10
+        from core.ternary_core import ternary_log10
 
         l10 = ternary_log10(BT.from_float(100.0, 16), 16)
         self.assertAlmostEqual(BT.to_float(l10, 16), 2.0, places=1)
@@ -369,20 +369,20 @@ class TestEvaluatorEdge(unittest.TestCase):
     """求值器边缘用例 — 覆盖当前覆盖率缺口"""
 
     def test_eval_simple_add(self):
-        from evaluator import SanyanEvaluator
+        from core.evaluator import SanyanEvaluator
 
         e = SanyanEvaluator()
         self.assertEqual(e.eval(['add', 1, 2]).to_int(), 3)
 
     def test_eval_var_set_get(self):
-        from evaluator import SanyanEvaluator
+        from core.evaluator import SanyanEvaluator
 
         e = SanyanEvaluator()
         e.eval(['set', 'x', 42])
         self.assertEqual(e.eval('x').to_int(), 42)
 
     def test_eval_function_call(self):
-        from evaluator import SanyanEvaluator
+        from core.evaluator import SanyanEvaluator
 
         e = SanyanEvaluator()
         e.eval(['fn', 'double', ['n'], ['do', ['return', ['mul', 'n', 2]]]])
@@ -390,8 +390,8 @@ class TestEvaluatorEdge(unittest.TestCase):
         self.assertEqual(result.to_int(), 10)
 
     def test_eval_nested_scope(self):
-        from evaluator import SanyanEvaluator
-        from ternary_core import TritValue
+        from core.evaluator import SanyanEvaluator
+        from core.ternary_core import TritValue
 
         e = SanyanEvaluator()
         e.push_scope()
@@ -400,7 +400,7 @@ class TestEvaluatorEdge(unittest.TestCase):
         e.pop_scope()
 
     def test_eval_if_expression(self):
-        from evaluator import SanyanEvaluator
+        from core.evaluator import SanyanEvaluator
 
         e = SanyanEvaluator()
         e.eval(['set', 'x', 0])
@@ -408,20 +408,20 @@ class TestEvaluatorEdge(unittest.TestCase):
         self.assertEqual(e.get_var('x').to_int(), 1)
 
     def test_eval_simple_expression(self):
-        from evaluator import SanyanEvaluator
+        from core.evaluator import SanyanEvaluator
 
         e = SanyanEvaluator()
         result = e.eval(['add', 10, 20])
         self.assertEqual(result.to_int(), 30)
 
     def test_has_var_undefined(self):
-        from evaluator import SanyanEvaluator
+        from core.evaluator import SanyanEvaluator
 
         e = SanyanEvaluator()
         self.assertFalse(e.has_var('undefined_xyz'))
 
     def test_all_scoped_vars(self):
-        from evaluator import SanyanEvaluator
+        from core.evaluator import SanyanEvaluator
 
         e = SanyanEvaluator()
         e.set_var('a', 1)
@@ -431,13 +431,13 @@ class TestEvaluatorEdge(unittest.TestCase):
         self.assertIn('b', vars_)
 
     def test_module_cache(self):
-        from evaluator import SanyanEvaluator
+        from core.evaluator import SanyanEvaluator
 
         e = SanyanEvaluator()
         self.assertIsInstance(e._module_cache, dict)
 
     def test_max_loop_steps_default(self):
-        from evaluator import SanyanEvaluator
+        from core.evaluator import SanyanEvaluator
 
         e = SanyanEvaluator()
         self.assertGreater(e.max_loop_steps, 0)
@@ -447,68 +447,68 @@ class TestValuesExtended(unittest.TestCase):
     """值系统扩展测试 — 覆盖 Sanyan* 异常、Return/Break 异常"""
 
     def test_sanyan_error_base(self):
-        from values import SanyanError
+        from core.values import SanyanError
 
         e = SanyanError('通用错误')
         self.assertEqual(str(e), '通用错误')
 
     def test_sanyan_syntax_error(self):
-        from values import SanyanSyntaxError
+        from core.values import SanyanSyntaxError
 
         e = SanyanSyntaxError('语法错误')
         self.assertEqual(str(e), '语法错误')
 
     def test_sanyan_type_error(self):
-        from values import SanyanTypeError
+        from core.values import SanyanTypeError
 
         e = SanyanTypeError('类型错误')
         self.assertEqual(str(e), '类型错误')
 
     def test_sanyan_value_error(self):
-        from values import SanyanValueError
+        from core.values import SanyanValueError
 
         e = SanyanValueError('值错误')
         self.assertEqual(str(e), '值错误')
 
     def test_sanyan_runtime_error(self):
-        from values import SanyanRuntimeError
+        from core.values import SanyanRuntimeError
 
         e = SanyanRuntimeError('运行时错误')
         self.assertEqual(str(e), '运行时错误')
 
     def test_sanyan_name_error(self):
-        from values import SanyanNameError
+        from core.values import SanyanNameError
 
         e = SanyanNameError('名称错误')
         self.assertEqual(str(e), '名称错误')
 
     def test_sanyan_key_error(self):
-        from values import SanyanKeyError
+        from core.values import SanyanKeyError
 
         e = SanyanKeyError('键错误')
         self.assertIn('键错误', str(e))
 
     def test_sanyan_attribute_error(self):
-        from values import SanyanAttributeError
+        from core.values import SanyanAttributeError
 
         e = SanyanAttributeError('属性错误')
         self.assertEqual(str(e), '属性错误')
 
     def test_sanyan_io_error(self):
-        from values import SanyanIOError
+        from core.values import SanyanIOError
 
         e = SanyanIOError('IO错误')
         self.assertEqual(str(e), 'IO错误')
 
     def test_return_exception(self):
-        from values import ReturnException
-        from ternary_core import TritValue
+        from core.values import ReturnException
+        from core.ternary_core import TritValue
 
         ret = ReturnException(TritValue(42))
         self.assertEqual(ret.value.to_int(), 42)
 
     def test_break_exception(self):
-        from values import BreakException
+        from core.values import BreakException
 
         b = BreakException()
         self.assertIsNotNone(b)
@@ -519,7 +519,7 @@ class TestClosure(unittest.TestCase):
 
     def test_function_return_as_value(self):
         """函数名作为独立表达式求值时返回 FunctionValue"""
-        from evaluator import SanyanEvaluator
+        from core.evaluator import SanyanEvaluator
 
         e = SanyanEvaluator(max_loop_steps=500)
         e.eval(['fn', 'add10', ['x'], ['do', ['return', ['add', 'x', 10]]]])
@@ -529,7 +529,7 @@ class TestClosure(unittest.TestCase):
 
     def test_closure_basic(self):
         """基本闭包：内部函数捕获外部变量"""
-        from evaluator import SanyanEvaluator
+        from core.evaluator import SanyanEvaluator
 
         e = SanyanEvaluator(max_loop_steps=500)
         # 定义 outer 函数
@@ -549,7 +549,7 @@ class TestClosure(unittest.TestCase):
 
     def test_closure_counter(self):
         """计数器闭包：多次调用共享可变状态"""
-        from evaluator import SanyanEvaluator
+        from core.evaluator import SanyanEvaluator
 
         e = SanyanEvaluator(max_loop_steps=500)
         # 定义 mkcounter 函数
@@ -575,7 +575,7 @@ class TestClosure(unittest.TestCase):
 
     def test_closure_preserves_outer_scope(self):
         """闭包不污染外部作用域"""
-        from evaluator import SanyanEvaluator
+        from core.evaluator import SanyanEvaluator
 
         e = SanyanEvaluator(max_loop_steps=500)
         e.eval(['set', 'x', 100])
@@ -587,7 +587,7 @@ class TestClosure(unittest.TestCase):
 
     def test_import_as_alias(self):
         """import as 别名功能"""
-        from evaluator import SanyanEvaluator
+        from core.evaluator import SanyanEvaluator
 
         e = SanyanEvaluator(max_loop_steps=500)
         e.eval(['import', '"stdlib/math.san"', '为', 'm'])
@@ -601,7 +601,7 @@ class TestTernaryDeep(unittest.TestCase):
 
     def test_tritvalue_string(self):
         """TritValue 可以承载字符串"""
-        from ternary_core import TritValue
+        from core.ternary_core import TritValue
 
         tv = TritValue('hello')
         self.assertTrue(tv.is_string())
@@ -610,7 +610,7 @@ class TestTernaryDeep(unittest.TestCase):
 
     def test_tritvalue_string_confidence(self):
         """三态字符串带置信度"""
-        from ternary_core import TritValue
+        from core.ternary_core import TritValue
 
         tv = TritValue('unknown', confidence=0.5)
         self.assertTrue(tv.is_string())
@@ -618,7 +618,7 @@ class TestTernaryDeep(unittest.TestCase):
 
     def test_ternary_value_op(self):
         """三态值() 构造函数"""
-        from evaluator import SanyanEvaluator
+        from core.evaluator import SanyanEvaluator
 
         e = SanyanEvaluator()
         # 三态值("hello", 0.8) → TritValue 字符串
@@ -630,7 +630,7 @@ class TestTernaryDeep(unittest.TestCase):
 
     def test_ternary_propagate(self):
         """传递() 贝叶斯置信度传播"""
-        from evaluator import SanyanEvaluator
+        from core.evaluator import SanyanEvaluator
 
         e = SanyanEvaluator()
         # 上游 0.9 × 当前 0.8 = 0.72
@@ -641,7 +641,7 @@ class TestTernaryDeep(unittest.TestCase):
 
     def test_concat_unwrap_trit(self):
         """连接() 自动解包三态字符串"""
-        from evaluator import SanyanEvaluator
+        from core.evaluator import SanyanEvaluator
 
         e = SanyanEvaluator()
         a = e.eval(['ternary_value', '"hello"', 0.9])
@@ -651,7 +651,7 @@ class TestTernaryDeep(unittest.TestCase):
 
     def test_detect_conflict(self):
         """检测冲突: 两个高信度矛盾值 → 标记冲突"""
-        from evaluator import SanyanEvaluator
+        from core.evaluator import SanyanEvaluator
 
         e = SanyanEvaluator()
         a = e.eval(['ternary_value', 1, 0.9, '"传感器A"'])
@@ -661,7 +661,7 @@ class TestTernaryDeep(unittest.TestCase):
 
     def test_detect_conflict_no_conflict(self):
         """检测冲突: 两个一致值 → 无冲突"""
-        from evaluator import SanyanEvaluator
+        from core.evaluator import SanyanEvaluator
 
         e = SanyanEvaluator()
         a = e.eval(['ternary_value', 1, 0.9])
@@ -671,7 +671,7 @@ class TestTernaryDeep(unittest.TestCase):
 
     def test_decide_passes_threshold(self):
         """判定: 信度 ≥ 阈值 → 通过"""
-        from evaluator import SanyanEvaluator
+        from core.evaluator import SanyanEvaluator
 
         e = SanyanEvaluator()
         v = e.eval(['ternary_value', 1, 0.95])
@@ -680,7 +680,7 @@ class TestTernaryDeep(unittest.TestCase):
 
     def test_decide_below_threshold(self):
         """判定: 信度 < 阈值 → 降为可能态"""
-        from evaluator import SanyanEvaluator
+        from core.evaluator import SanyanEvaluator
 
         e = SanyanEvaluator()
         v = e.eval(['ternary_value', 1, 0.3])
@@ -689,7 +689,7 @@ class TestTernaryDeep(unittest.TestCase):
 
     def test_fuse_weighted(self):
         """融合: 多源加权平均"""
-        from evaluator import SanyanEvaluator
+        from core.evaluator import SanyanEvaluator
 
         e = SanyanEvaluator()
         s1 = e.eval(['ternary_value', 1, 0.9])
@@ -700,7 +700,7 @@ class TestTernaryDeep(unittest.TestCase):
 
     def test_consensus_two_sensors(self):
         """共识: 两个传感器融合"""
-        from evaluator import SanyanEvaluator
+        from core.evaluator import SanyanEvaluator
 
         e = SanyanEvaluator()
         s1 = e.eval(['ternary_value', 1, 0.9, '"红外"'])
@@ -711,7 +711,7 @@ class TestTernaryDeep(unittest.TestCase):
 
     def test_bayes_update_confirm(self):
         """贝叶斯更新: 证据一致→信度上升"""
-        from evaluator import SanyanEvaluator
+        from core.evaluator import SanyanEvaluator
 
         e = SanyanEvaluator()
         prior = e.eval(['ternary_value', 1, 0.6])
@@ -722,7 +722,7 @@ class TestTernaryDeep(unittest.TestCase):
 
     def test_bayes_update_contradict(self):
         """贝叶斯更新: 证据矛盾→信度下降"""
-        from evaluator import SanyanEvaluator
+        from core.evaluator import SanyanEvaluator
 
         e = SanyanEvaluator()
         prior = e.eval(['ternary_value', 1, 0.5])
@@ -733,7 +733,7 @@ class TestTernaryDeep(unittest.TestCase):
 
     def test_trit_list_ops(self):
         """三态列: 创建/取/置/列长"""
-        from evaluator import SanyanEvaluator
+        from core.evaluator import SanyanEvaluator
 
         e = SanyanEvaluator()
         s1 = e.eval(['ternary_value', 1, 0.9])
@@ -754,7 +754,7 @@ class TestTernaryDeep(unittest.TestCase):
 
     def test_trit_dict_ops(self):
         """三态字典: 创建/取键/置键"""
-        from evaluator import SanyanEvaluator
+        from core.evaluator import SanyanEvaluator
 
         e = SanyanEvaluator()
         v1 = e.eval(['ternary_value', 1, 0.9, '"传感器A"'])
@@ -768,7 +768,7 @@ class TestTernaryDeep(unittest.TestCase):
 
     def test_assert_confidence_passes(self):
         """断言信度: 信度≥阈值→通过"""
-        from evaluator import SanyanEvaluator
+        from core.evaluator import SanyanEvaluator
 
         e = SanyanEvaluator()
         v = e.eval(['ternary_value', 1, 0.95])
@@ -777,8 +777,8 @@ class TestTernaryDeep(unittest.TestCase):
 
     def test_assert_confidence_fails(self):
         """断言信度: 信度<阈值→抛异常"""
-        from evaluator import SanyanEvaluator
-        from values import SanyanValueError
+        from core.evaluator import SanyanEvaluator
+        from core.values import SanyanValueError
 
         e = SanyanEvaluator()
         v = e.eval(['ternary_value', 1, 0.3])
@@ -787,7 +787,7 @@ class TestTernaryDeep(unittest.TestCase):
 
     def test_quantize_roundtrip(self):
         """量化/反量化: 字节往返保持值不变"""
-        from evaluator import SanyanEvaluator
+        from core.evaluator import SanyanEvaluator
 
         e = SanyanEvaluator()
         v = e.eval(['ternary_value', 1, 0.9])
@@ -798,7 +798,7 @@ class TestTernaryDeep(unittest.TestCase):
 
     def test_trit_dist(self):
         """三态分布: 完整概率三元组"""
-        from evaluator import SanyanEvaluator
+        from core.evaluator import SanyanEvaluator
 
         e = SanyanEvaluator()
         r = e.eval(['trit_dist', 0.8, 0.1, 0.1])
@@ -806,7 +806,7 @@ class TestTernaryDeep(unittest.TestCase):
 
     def test_entropy(self):
         """熵: 完全确定→0, 完全不确定→1"""
-        from evaluator import SanyanEvaluator
+        from core.evaluator import SanyanEvaluator
 
         e = SanyanEvaluator()
         v1 = e.eval(['ternary_value', 1, 1.0])
@@ -819,7 +819,7 @@ class TestTernaryDeep(unittest.TestCase):
 
     def test_observe_correct(self):
         """观察: 预测正确→信度上升"""
-        from evaluator import SanyanEvaluator
+        from core.evaluator import SanyanEvaluator
 
         e = SanyanEvaluator()
         pred = e.eval(['ternary_value', 1, 0.8])
@@ -828,7 +828,7 @@ class TestTernaryDeep(unittest.TestCase):
 
     def test_observe_wrong(self):
         """观察: 预测错误→信度下降"""
-        from evaluator import SanyanEvaluator
+        from core.evaluator import SanyanEvaluator
 
         e = SanyanEvaluator()
         pred = e.eval(['ternary_value', 1, 0.8])
@@ -840,39 +840,39 @@ class TestTypeChecker(unittest.TestCase):
     """type_checker.py 类型检查"""
 
     def test_type_of_int(self):
-        from type_checker import _type_of
+        from core.type_checker import _type_of
 
         self.assertEqual(_type_of(42), 'int')
         self.assertEqual(_type_of(0), 'int')
 
     def test_type_of_str(self):
-        from type_checker import _type_of
+        from core.type_checker import _type_of
 
         self.assertEqual(_type_of('hello'), 'str')
 
     def test_type_of_float(self):
-        from type_checker import _type_of
+        from core.type_checker import _type_of
 
         self.assertEqual(_type_of(3.14), 'float')
 
     def test_type_of_list(self):
-        from type_checker import _type_of
+        from core.type_checker import _type_of
 
         self.assertEqual(_type_of([1, 2]), 'list')
 
     def test_type_of_dict(self):
-        from type_checker import _type_of
+        from core.type_checker import _type_of
 
         self.assertEqual(_type_of({'a': 1}), 'dict')
 
     def test_type_of_trit(self):
-        from ternary_core import TritValue
-        from type_checker import _type_of
+        from core.ternary_core import TritValue
+        from core.type_checker import _type_of
 
         self.assertEqual(_type_of(TritValue(1)), 'trit')
 
     def test_matches_num(self):
-        from type_checker import _matches
+        from core.type_checker import _matches
 
         self.assertTrue(_matches('int', 'num'))
         self.assertTrue(_matches('float', 'num'))
@@ -880,32 +880,32 @@ class TestTypeChecker(unittest.TestCase):
         self.assertFalse(_matches('str', 'num'))
 
     def test_matches_any(self):
-        from type_checker import _matches
+        from core.type_checker import _matches
 
         self.assertTrue(_matches('str', 'any'))
         self.assertTrue(_matches('int', 'any'))
 
     def test_check_add_valid(self):
-        from type_checker import check_types
+        from core.type_checker import check_types
 
         self.assertIsNone(check_types('add', [3, 4], [3, 4]))
 
     def test_check_add_invalid(self):
-        from type_checker import check_types
+        from core.type_checker import check_types
 
         err = check_types('add', ['x', 4], ['hello', 4])
         self.assertIsNotNone(err)
         self.assertIn('类型错误', err)
 
     def test_check_concat(self):
-        from type_checker import check_types
+        from core.type_checker import check_types
 
         self.assertIsNone(check_types('concat', ['a', 'b'], ['a', 'b']))
         err = check_types('concat', [1, 'b'], [1, 'b'])
         self.assertIsNotNone(err)
 
     def test_check_list_ops(self):
-        from type_checker import check_types
+        from core.type_checker import check_types
 
         self.assertIsNone(check_types('get', [[1, 2], 0], [[1, 2], 0]))
         self.assertIsNone(check_types('list_len', [[1]], [[1]]))
@@ -913,14 +913,14 @@ class TestTypeChecker(unittest.TestCase):
         self.assertIsNotNone(err)
 
     def test_check_dict_ops(self):
-        from type_checker import check_types
+        from core.type_checker import check_types
 
         self.assertIsNone(check_types('get_key', [{'a': 1}, 'a'], [{'a': 1}, 'a']))
         err = check_types('get_key', ['not_dict', 'a'], ['not_dict', 'a'])
         self.assertIsNotNone(err)
 
     def test_check_unknown_op(self):
-        from type_checker import check_types
+        from core.type_checker import check_types
 
         self.assertIsNone(check_types('my_custom_op', [1, 2], [1, 2]))
 
@@ -929,46 +929,46 @@ class TestEvalUtils(unittest.TestCase):
     """eval_utils.py 工具函数"""
 
     def test_ensure_trit_int(self):
-        from eval_utils import ensure_trit
-        from ternary_core import TritValue
+        from core.eval_utils import ensure_trit
+        from core.ternary_core import TritValue
 
         r = ensure_trit(42)
         self.assertIsInstance(r, TritValue)
         self.assertEqual(r.to_int(), 42)
 
     def test_ensure_trit_str(self):
-        from eval_utils import ensure_trit
-        from ternary_core import TritValue
+        from core.eval_utils import ensure_trit
+        from core.ternary_core import TritValue
 
         r = ensure_trit('hello')
         self.assertIsInstance(r, TritValue)
 
     def test_ensure_trit_already(self):
-        from eval_utils import ensure_trit
-        from ternary_core import TritValue
+        from core.eval_utils import ensure_trit
+        from core.ternary_core import TritValue
 
         t = TritValue(1)
         r = ensure_trit(t)
         self.assertIs(r, t)  # 相同对象
 
     def test_ensure_trit_list(self):
-        from eval_utils import ensure_trit
+        from core.eval_utils import ensure_trit
 
         lst = [1, 2, 3]
         r = ensure_trit(lst)
         self.assertIs(r, lst)  # 列表保持原样
 
     def test_parse_numeric_int(self):
-        from eval_utils import parse_numeric_literal
-        from ternary_core import TritValue
+        from core.eval_utils import parse_numeric_literal
+        from core.ternary_core import TritValue
 
         r = parse_numeric_literal('42')
         self.assertIsInstance(r, TritValue)
         self.assertEqual(r.to_int(), 42)
 
     def test_parse_numeric_hex(self):
-        from eval_utils import parse_numeric_literal
-        from ternary_core import TritValue
+        from core.eval_utils import parse_numeric_literal
+        from core.ternary_core import TritValue
 
         r = parse_numeric_literal('0xFF')
         self.assertIsInstance(r, TritValue)
@@ -979,87 +979,87 @@ class TestConstantFolding(unittest.TestCase):
     """compile_bytecode.py 常量折叠"""
 
     def test_fold_add(self):
-        from compile_bytecode import _fold_constants
+        from compiler.compile_bytecode import _fold_constants
 
         r = _fold_constants(['add', 1, 2])
         self.assertEqual(r, 3)
 
     def test_fold_sub(self):
-        from compile_bytecode import _fold_constants
+        from compiler.compile_bytecode import _fold_constants
 
         r = _fold_constants(['sub', 10, 3])
         self.assertEqual(r, 7)
 
     def test_fold_mul(self):
-        from compile_bytecode import _fold_constants
+        from compiler.compile_bytecode import _fold_constants
 
         r = _fold_constants(['mul', 4, 5])
         self.assertEqual(r, 20)
 
     def test_fold_div(self):
-        from compile_bytecode import _fold_constants
+        from compiler.compile_bytecode import _fold_constants
 
         r = _fold_constants(['div', 10, 3])
         self.assertEqual(r, 3)  # 整数除法
 
     def test_fold_chinese_op(self):
-        from compile_bytecode import _fold_constants
+        from compiler.compile_bytecode import _fold_constants
 
         r = _fold_constants(['加', 1, 2])
         self.assertEqual(r, 3)
 
     def test_fold_nested(self):
-        from compile_bytecode import _fold_constants
+        from compiler.compile_bytecode import _fold_constants
 
         r = _fold_constants(['add', ['mul', 2, 3], 4])
         self.assertEqual(r, 10)  # (2*3) + 4
 
     def test_fold_skip_nonconst(self):
-        from compile_bytecode import _fold_constants
+        from compiler.compile_bytecode import _fold_constants
 
         r = _fold_constants(['add', 'x', 2])
         self.assertEqual(r, ['add', 'x', 2])  # 变量不能折叠
 
     def test_fold_div_zero(self):
-        from compile_bytecode import _fold_constants
+        from compiler.compile_bytecode import _fold_constants
 
         r = _fold_constants(['div', 5, 0])
         self.assertEqual(r, 0)  # 除零返回 0
 
     def test_type_of_unknown(self):
         """_type_of 对未知类型返回 'any'"""
-        from type_checker import _type_of
+        from core.type_checker import _type_of
 
         self.assertEqual(_type_of(object()), 'any')
 
     def test_check_to_string(self):
-        from type_checker import check_types
+        from core.type_checker import check_types
 
         self.assertIsNone(check_types('to_string', [42], [42]))
         self.assertIsNone(check_types('转字符串', ['x'], ['x']))
 
     def test_check_io_ops(self):
-        from type_checker import check_types
+        from core.type_checker import check_types
 
         self.assertIsNone(check_types('read_file', ['f.txt'], ['f.txt']))
         self.assertIsNone(check_types('write_file', ['f.txt', 'data'], ['f.txt', 'data']))
 
     def test_check_type_ops(self):
-        from type_checker import check_types
+        from core.type_checker import check_types
 
         self.assertIsNone(check_types('is_dict', [{}], [{}]))
         self.assertIsNone(check_types('is_list', [[]], [[]]))
 
     def test_matches_exact(self):
-        from type_checker import _matches
+        from core.type_checker import _matches
 
         self.assertTrue(_matches('str', 'str'))
         self.assertTrue(_matches('int', 'int'))
         self.assertFalse(_matches('str', 'int'))
 
     def test_propagated_confidence_mixed(self):
-        from eval_utils import propagated_confidence
-        from ternary_core import TritValue
+        from core.eval_utils import propagated_confidence
+        from core.ternary_core import TritValue
 
         t = TritValue(1)
         t.confidence = 0.5
@@ -1067,14 +1067,14 @@ class TestConstantFolding(unittest.TestCase):
         self.assertEqual(propagated_confidence(42, 42), 1.0)  # 全 raw
 
     def test_unwrap_trit_raw(self):
-        from eval_utils import unwrap_trit
+        from core.eval_utils import unwrap_trit
 
         self.assertEqual(unwrap_trit(42), 42)
         self.assertEqual(unwrap_trit('hello'), 'hello')
 
     def test_unwrap_trit_list(self):
-        from eval_utils import unwrap_trit
-        from ternary_core import TritValue
+        from core.eval_utils import unwrap_trit
+        from core.ternary_core import TritValue
 
         tv = TritValue(0)  # 基础三态值
         self.assertEqual(unwrap_trit(tv), 0)
@@ -1082,14 +1082,14 @@ class TestConstantFolding(unittest.TestCase):
         self.assertEqual(unwrap_trit(td), 1)
 
     def test_parse_numeric_float(self):
-        from eval_utils import parse_numeric_literal
+        from core.eval_utils import parse_numeric_literal
 
         r = parse_numeric_literal('3.14')
         self.assertIsNotNone(r)
 
     def test_ensure_trit_float(self):
-        from eval_utils import ensure_trit
-        from ternary_core import TritValue
+        from core.eval_utils import ensure_trit
+        from core.ternary_core import TritValue
 
         r = ensure_trit(3.14)
         self.assertIsInstance(r, TritValue)

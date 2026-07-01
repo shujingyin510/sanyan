@@ -43,7 +43,7 @@ class RuleExecutor:
         }
 
         # 三态引擎：驱动决策
-        from ternary_engine import TernaryEngine
+        from core.ternary_engine import TernaryEngine
 
         ternary = TernaryEngine()
         results = []

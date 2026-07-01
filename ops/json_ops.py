@@ -1,8 +1,8 @@
 """JSON 解析与生成支持"""
 
 import json
-from ternary_core import TritValue
-from values import SanyanValueError, SanyanTypeError
+from core.ternary_core import TritValue
+from core.values import SanyanValueError, SanyanTypeError
 from ops.registry import register
 
 

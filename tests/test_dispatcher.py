@@ -5,9 +5,9 @@ import sys
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import unittest
-from evaluator import SanyanEvaluator
-from ternary_core import TritValue, ArrayValue
-from values import (
+from core.evaluator import SanyanEvaluator
+from core.ternary_core import TritValue, ArrayValue
+from core.values import (
     FunctionValue,
     ModuleValue,
     SanyanNameError,
@@ -16,7 +16,7 @@ from values import (
     SanyanKeyError,
     SanyanAttributeError,
 )
-from skin import SkinManager
+from core.skin import SkinManager
 from ops.dispatcher import (
     resolve_op_name,
     dispatch_op,
@@ -254,7 +254,7 @@ class TestApply(unittest.TestCase):
 
     def test_apply_sandbox_blocked(self):
         """测试沙箱限制：沙箱激活后受保护操作被拦截"""
-        from sandbox import restrict, unblock, is_active
+        from core.sandbox import restrict, unblock, is_active
 
         restrict(ops=['debug'])
         self.assertTrue(is_active())

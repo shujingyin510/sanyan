@@ -8,10 +8,10 @@ import contextlib
 
 
 import unittest
-from ternary_core import TritValue
-from values import SanyanSyntaxError, SanyanNameError, SanyanTypeError, SanyanRuntimeError
-from evaluator import SanyanEvaluator
-from skin import SkinManager
+from core.ternary_core import TritValue
+from core.values import SanyanSyntaxError, SanyanNameError, SanyanTypeError, SanyanRuntimeError
+from core.evaluator import SanyanEvaluator
+from core.skin import SkinManager
 
 
 class TestCommandsDefine(unittest.TestCase):
@@ -39,12 +39,12 @@ class TestCommandsDefine(unittest.TestCase):
 
 class TestCheckType(unittest.TestCase):
     def test_type_check_passes(self):
-        from values import check_type
+        from core.values import check_type
 
         check_type(TritValue(42), '数字', 'x')
 
     def test_type_check_fails(self):
-        from values import check_type
+        from core.values import check_type
 
         with self.assertRaises(SanyanTypeError):
             check_type('hello', '数字', 'x')
@@ -52,25 +52,25 @@ class TestCheckType(unittest.TestCase):
 
 class TestMatchParams(unittest.TestCase):
     def test_normal_match(self):
-        from commands import Commands
+        from core.commands import Commands
 
         result = Commands._match_params(['a', 'b'], 'f', [1, 2])
         self.assertEqual(result, [1, 2])
 
     def test_dot_split(self):
-        from commands import Commands
+        from core.commands import Commands
 
         result = Commands._match_params(['obj', 'val'], 'f', ['灯.亮'])
         self.assertEqual(result, ['灯', '亮'])
 
     def test_colon_split(self):
-        from commands import Commands
+        from core.commands import Commands
 
         result = Commands._match_params(['obj', 'val'], 'f', ['灯：亮'])
         self.assertEqual(result, ['灯', '亮'])
 
     def test_arg_count_mismatch(self):
-        from commands import Commands
+        from core.commands import Commands
 
         with self.assertRaises(SanyanSyntaxError):
             Commands._match_params(['a', 'b', 'c'], 'f', [1])
@@ -78,17 +78,17 @@ class TestMatchParams(unittest.TestCase):
 
 class TestTailCall(unittest.TestCase):
     def test_is_tail_call_direct(self):
-        from commands import Commands
+        from core.commands import Commands
 
         self.assertTrue(Commands._is_tail_call(['f', 1], 'f'))
 
     def test_is_tail_call_via_return(self):
-        from commands import Commands
+        from core.commands import Commands
 
         self.assertTrue(Commands._is_tail_call(['return', ['f', 1]], 'f'))
 
     def test_is_not_tail_call(self):
-        from commands import Commands
+        from core.commands import Commands
 
         self.assertFalse(Commands._is_tail_call(['g', 1], 'f'))
 
@@ -116,19 +116,19 @@ class TestTailCall(unittest.TestCase):
 
 class TestFormatArgs(unittest.TestCase):
     def test_format_trit(self):
-        from commands import Commands
+        from core.commands import Commands
 
         result = Commands._format_args([TritValue(5)])
         self.assertEqual(result, '5')
 
     def test_format_string_truncated(self):
-        from commands import Commands
+        from core.commands import Commands
 
         result = Commands._format_args(['a' * 30])
         self.assertEqual(result, 'a' * 20 + '...')
 
     def test_format_list(self):
-        from commands import Commands
+        from core.commands import Commands
 
         result = Commands._format_args([[1, 2, 3]])
         self.assertEqual(result, '[...]')

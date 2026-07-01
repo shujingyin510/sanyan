@@ -9,7 +9,7 @@ import os
 import time as _time
 from typing import Optional
 
-from ternary_engine import TernaryEngine
+from core.ternary_engine import TernaryEngine
 from agent_system.agent_hypothesis import (
     HypothesisGenerator,
     Tournament,

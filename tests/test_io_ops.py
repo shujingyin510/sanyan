@@ -5,8 +5,8 @@ import sys
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import unittest
-from evaluator import SanyanEvaluator
-from ternary_core import TritValue, ArrayValue
+from core.evaluator import SanyanEvaluator
+from core.ternary_core import TritValue, ArrayValue
 from ops.io_ops import IOOps
 
 

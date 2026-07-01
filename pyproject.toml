@@ -52,14 +52,9 @@ dev = [
 sanyan = "sanyan.cli:main"
 
 [tool.setuptools]
-packages = ["sanyan", "ops", "sugar", "lsp", "llvmgen", "utils"]
+packages = ["sanyan", "ops", "sugar", "lsp", "llvmgen", "core", "compiler", "vm", "repl"]
 py-modules = [
-    "ternary_core", "evaluator", "values", "runtime", "eval_utils",
-    "commands", "param_matcher", "tail_call", "lexer", "parser", "preprocess",
-    "skin", "sandbox", "compile_bytecode", "compile_llvmgen", "vm",
-     "type_checker", "repl", "main", "lsp_server", "dap_server",
-    "sanfmt", "sanyancc", "doc_sync",
-    "type_inference", "macro",
+    "sanfmt", "doc_sync",
 ]
 
 [tool.ruff]

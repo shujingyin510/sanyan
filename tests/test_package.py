@@ -8,7 +8,7 @@ import os
 
 
 import unittest
-from evaluator import SanyanEvaluator
+from core.evaluator import SanyanEvaluator
 from ops.package_ops import _resolve_package_path
 
 
@@ -22,25 +22,25 @@ class TestPackageManager(unittest.TestCase):
         self.assertIsNotNone(result)
 
     def test_load_nonexistent(self):
-        from values import SanyanValueError
+        from core.values import SanyanValueError
 
         with self.assertRaises(SanyanValueError):
             self.env.eval(['load_package', '"nonexistent_pkg_xyz"'])
 
     def test_install_no_url(self):
-        from values import SanyanValueError
+        from core.values import SanyanValueError
 
         with self.assertRaises(SanyanValueError):
             self.env.eval(['install', '"nonexistent_pkg_xyz"'])
 
     def test_install_rejects_http(self):
-        from values import SanyanValueError
+        from core.values import SanyanValueError
 
         with self.assertRaises(SanyanValueError):
             self.env.eval(['install', '"test_pkg"', '"http://example.com/pkg.zip"'])
 
     def test_install_rejects_ftp(self):
-        from values import SanyanValueError
+        from core.values import SanyanValueError
 
         with self.assertRaises(SanyanValueError):
             self.env.eval(['install', '"test_pkg"', '"ftp://example.com/pkg.zip"'])

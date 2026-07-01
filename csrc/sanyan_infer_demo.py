@@ -185,9 +185,9 @@ print('  三言语言调度推理引擎 — 验证 Demo')
 print('  链路: .san → reg_op → C DLL (LayerNorm/GELU) → NP → GPT-2')
 print('=' * 55)
 
-from evaluator import SanyanEvaluator  # noqa: E402
-from parser import parse  # noqa: E402
-from lexer import tokenize  # noqa: E402
+from core.evaluator import SanyanEvaluator  # noqa: E402
+from core.parser import parse  # noqa: E402
+from core.lexer import tokenize  # noqa: E402
 
 san_code = """
 (输出 "三言 三态门控推理引擎 Demo")

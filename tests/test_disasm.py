@@ -3,8 +3,8 @@
 import tempfile
 import os
 
-from compile_bytecode import compile_source
-from disasm import disasm
+from compiler.compile_bytecode import compile_source
+from compiler.disasm import disasm
 
 
 def test_basic():

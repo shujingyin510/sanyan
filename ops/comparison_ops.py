@@ -3,10 +3,10 @@
 每个比较操作独立注册。比较结果自动传播 TritValue 置信度。
 """
 
-from ternary_core import TritValue
-from values import SanyanSyntaxError, SanyanTypeError
+from core.ternary_core import TritValue
+from core.values import SanyanSyntaxError, SanyanTypeError
 from ops.registry import register
-from eval_utils import propagated_confidence
+from core.eval_utils import propagated_confidence
 
 
 def _to_num(v, skin_manager=None):

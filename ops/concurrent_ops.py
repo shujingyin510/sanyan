@@ -1,8 +1,8 @@
 """并发操作：并发执行、锁、延迟、并发融合"""
 
 import threading
-from ternary_core import TritValue, ArrayValue
-from values import SanyanSyntaxError, SanyanRuntimeError
+from core.ternary_core import TritValue, ArrayValue
+from core.values import SanyanSyntaxError, SanyanRuntimeError
 from ops.registry import register, register_alias
 import concurrent.futures
 from typing import Any
@@ -26,7 +26,7 @@ def concurrent_run(evaluator, args):
     """并发(args...) — 并发执行多个函数调用，返回结果列表"""
     if not args:
         return TritValue(0)
-    from evaluator import SanyanEvaluator
+    from core.evaluator import SanyanEvaluator
 
     threads = []
     results = [None] * len(args)
@@ -154,7 +154,7 @@ def concurrent_fusion(evaluator, args):
     """
     if not args:
         return TritValue(0)
-    from evaluator import SanyanEvaluator
+    from core.evaluator import SanyanEvaluator
 
     threads = []
     results = [None] * len(args)
@@ -322,7 +322,7 @@ def async_define(evaluator, args):
     pool = _get_thread_pool()
 
     def _run():
-        from evaluator import SanyanEvaluator
+        from core.evaluator import SanyanEvaluator
 
         sub = SanyanEvaluator(max_loop_steps=evaluator.max_loop_steps)
         # 复制作用域
@@ -368,7 +368,7 @@ def async_parallel(evaluator, args):
     for expr in args:
 
         def _run(e=expr):
-            from evaluator import SanyanEvaluator
+            from core.evaluator import SanyanEvaluator
 
             sub = SanyanEvaluator(max_loop_steps=evaluator.max_loop_steps)
             # 复制作用域

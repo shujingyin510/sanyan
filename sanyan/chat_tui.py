@@ -14,7 +14,7 @@ def _agent_ask(question: str, history: list) -> dict:
     """调用 AgentRuntime 单轮执行"""
     try:
         from agent_system.agent_runtime import AgentRuntime
-        from evaluator import SanyanEvaluator
+        from core.evaluator import SanyanEvaluator
 
         e = SanyanEvaluator()
         rt = AgentRuntime(e, None)

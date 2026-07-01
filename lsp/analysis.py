@@ -1,7 +1,7 @@
 from __future__ import annotations
 import re
 from typing import Any, Optional
-from ternary_core import TritValue
+from core.ternary_core import TritValue
 
 from lsp.keywords import _ALL_KEYWORDS, _FUNC_SIGS, _TYPED_HOVER, _MATH_FUNCS
 
@@ -330,7 +330,7 @@ def _do_diagnostics(uri: str, text: str) -> list[dict]:
 
     try:
         from sugar import SugarConverter
-        from skin import SkinManager
+        from core.skin import SkinManager
 
         skin_mgr = SkinManager('chinese')
         ast = SugarConverter.convert(text, skin_mgr)
@@ -481,9 +481,9 @@ def _check_unused_vars(ast: list, text: str, diagnostics: list):
 def _do_formatting(text: str) -> Optional[list[dict]]:
     from sanfmt import format_code
     from sugar import SugarConverter
-    from skin import SkinManager
-    from lexer import tokenize
-    from parser import parse
+    from core.skin import SkinManager
+    from core.lexer import tokenize
+    from core.parser import parse
 
     skin_mgr = SkinManager('chinese')
     ast = None

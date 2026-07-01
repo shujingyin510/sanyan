@@ -247,7 +247,7 @@ def encoding_check():
 
 def bin_consistency():
     """验证 bytecode_compiler.bin 与源码一致"""
-    from compile_bytecode import compile_source
+    from compiler.compile_bytecode import compile_source
     import tempfile
     import hashlib
 

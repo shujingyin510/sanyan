@@ -1,8 +1,8 @@
 """三态集：带置信度的集合"""
 
 from typing import Dict
-from ternary_core import TritValue
-from values import SanyanSyntaxError, SanyanTypeError
+from core.ternary_core import TritValue
+from core.values import SanyanSyntaxError, SanyanTypeError
 from ops.registry import register
 
 

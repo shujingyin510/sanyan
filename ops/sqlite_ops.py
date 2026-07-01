@@ -13,8 +13,8 @@ import os
 import sqlite3
 from typing import Any, Dict
 from ops.registry import register, register_alias
-from ternary_core import TritValue
-from values import SanyanValueError, SanyanTypeError, SanyanRuntimeError
+from core.ternary_core import TritValue
+from core.values import SanyanValueError, SanyanTypeError, SanyanRuntimeError
 
 # 连接缓存
 _connections: Dict[str, sqlite3.Connection] = {}

@@ -6,7 +6,7 @@ import sys
 
 
 import unittest
-from compile_bytecode import compile_source
+from compiler.compile_bytecode import compile_source
 
 REFERENCE_BIN = os.path.join(
     os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
@@ -78,8 +78,8 @@ def _compile_with_bin(bin_path: str, source: str, output_bin: str, parse_ast_fn)
 
 def _parse_s_expr(source: str):
     """S-表达式解析器"""
-    from lexer import tokenize
-    from parser import parse
+    from core.lexer import tokenize
+    from core.parser import parse
 
     return parse(tokenize(source))
 
@@ -227,7 +227,7 @@ class TestBootstrapLevel3(unittest.TestCase):
             if not compiled:
                 self.skipTest(f'无法编译种子 VM (gcc/tcc 均失败)\nstderr: {err_msg[:300]}')
             # 用 C VM 执行简单字节码程序
-            from compile_bytecode import compile_source
+            from compiler.compile_bytecode import compile_source
             from vm import VM as PyVM
 
             src = '(输出 42)'
@@ -310,8 +310,8 @@ class TestCompileBytecode(unittest.TestCase):
 
     def test_compile_source_sexpr(self):
         """compile_source: S-表达式输入"""
-        from compile_bytecode import compile_source
-        from ternary_core import TritValue
+        from compiler.compile_bytecode import compile_source
+        from core.ternary_core import TritValue
 
         path = os.path.join(os.path.dirname(__file__), '..', 'build', '_test_sexpr.bin')
         os.makedirs(os.path.dirname(path), exist_ok=True)
@@ -325,7 +325,7 @@ class TestCompileBytecode(unittest.TestCase):
 
     def test_compile_source_single_expr(self):
         """compile_source: 单个表达式（非列表）"""
-        from compile_bytecode import compile_source
+        from compiler.compile_bytecode import compile_source
 
         path = os.path.join(os.path.dirname(__file__), '..', 'build', '_test_single.bin')
         os.makedirs(os.path.dirname(path), exist_ok=True)
@@ -339,7 +339,7 @@ class TestCompileBytecode(unittest.TestCase):
 
     def test_compile_san_from_file(self):
         """compile_san: 从文件编译"""
-        from compile_bytecode import compile_san
+        from compiler.compile_bytecode import compile_san
 
         src_path = os.path.join(os.path.dirname(__file__), '..', 'build', '_test_compile.san')
         out_path = os.path.join(os.path.dirname(__file__), '..', 'build', '_test_compile.bin')
@@ -357,7 +357,7 @@ class TestCompileBytecode(unittest.TestCase):
 
     def test_run_bin(self):
         """run_bin: 执行编译后的 bin"""
-        from compile_bytecode import compile_source, run_bin
+        from compiler.compile_bytecode import compile_source, run_bin
         import io
         import sys
 

@@ -395,11 +395,11 @@ def format_code(ast, source=None):
 
 def format_file(filepath: str, in_place: bool = False) -> str:
     """格式化 .san 文件。"""
-    from preprocess import preprocess_includes
-    from skin import SkinManager
+    from core.preprocess import preprocess_includes
+    from core.skin import SkinManager
     from sugar import SugarConverter
-    from lexer import tokenize
-    from parser import parse
+    from core.lexer import tokenize
+    from core.parser import parse
 
     with open(filepath, 'r', encoding='utf-8') as f:
         code = f.read()
@@ -441,9 +441,9 @@ def main():
         # REPL 模式：从 stdin 读取
         code = sys.stdin.read()
         from sugar import SugarConverter
-        from skin import SkinManager
-        from lexer import tokenize
-        from parser import parse
+        from core.skin import SkinManager
+        from core.lexer import tokenize
+        from core.parser import parse
 
         skin_mgr = SkinManager('chinese')
         ast = None

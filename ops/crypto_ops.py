@@ -2,7 +2,7 @@
 
 import hashlib
 import base64
-from values import SanyanRuntimeError
+from core.values import SanyanRuntimeError
 from ops.registry import register, register_alias
 
 

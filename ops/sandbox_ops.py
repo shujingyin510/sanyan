@@ -1,8 +1,8 @@
 """沙箱操作：沙箱、沙箱开"""
 
 from ops.registry import register, register_alias
-from sandbox import restrict, unblock
-from values import SanyanSyntaxError, TritValue
+from core.sandbox import restrict, unblock
+from core.values import SanyanSyntaxError, TritValue
 
 
 def _sandbox_restrict(evaluator, args):

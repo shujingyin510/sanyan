@@ -44,7 +44,7 @@ def _run_py(script, *args, timeout=300, label=''):
 
 
 def cmd_agent_run(args):
-    from run_agent import main as agent_main
+    from agent_system.run_agent import main as agent_main
 
     sys.argv = ['run_agent.py', args.task]
     agent_main()

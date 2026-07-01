@@ -4,8 +4,8 @@ import unittest
 import random
 import string
 
-from lexer import tokenize
-from parser import parse
+from core.lexer import tokenize
+from core.parser import parse
 
 
 class TestFuzzParser(unittest.TestCase):

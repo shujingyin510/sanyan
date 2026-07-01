@@ -1,7 +1,7 @@
 """三态容器操作: 列表、字典，每个元素带独立置信度、链式信度传播"""
 
-from ternary_core import TritValue
-from values import SanyanSyntaxError, SanyanTypeError, SanyanValueError, SanyanRuntimeError
+from core.ternary_core import TritValue
+from core.values import SanyanSyntaxError, SanyanTypeError, SanyanValueError, SanyanRuntimeError
 from ops.registry import register, register_alias
 
 

@@ -12,7 +12,7 @@
 from __future__ import annotations
 
 from llvmlite import ir
-from ternary_core import TritValue
+from core.ternary_core import TritValue
 
 from llvmgen.ir_builder import CodegenContext, _unwrap_block
 from llvmgen.type_mapping import (

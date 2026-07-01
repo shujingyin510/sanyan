@@ -19,8 +19,8 @@ if sys.platform == 'win32':
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from evaluator import SanyanEvaluator
-from skin import SkinManager
+from core.evaluator import SanyanEvaluator
+from core.skin import SkinManager
 from sugar import SugarConverter
 
 

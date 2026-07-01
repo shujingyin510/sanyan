@@ -3,8 +3,8 @@
 from __future__ import annotations
 from abc import ABC, abstractmethod
 from typing import Optional
-from ternary_core import BT, TritValue
-from values import SanyanNameError, SanyanValueError, SanyanIOError
+from core.ternary_core import BT, TritValue
+from core.values import SanyanNameError, SanyanValueError, SanyanIOError
 
 
 class Device(ABC):

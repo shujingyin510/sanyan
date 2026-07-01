@@ -8,7 +8,7 @@ from __future__ import annotations
 from typing import Any
 
 from ops.registry import register as _register
-from ternary_core import TritValue
+from core.ternary_core import TritValue
 
 
 # ── opcode 分派表（用于 tag_op 命令，避免自举 IR 中的字符串比较） ──

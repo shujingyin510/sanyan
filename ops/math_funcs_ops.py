@@ -1,7 +1,7 @@
 """数学函数：绝对值、最大值、平方根、三角函数、对数、随机数、取整、三进制解析"""
 
 import random
-from ternary_core import (
+from core.ternary_core import (
     BT,
     TernaryALU,
     TritValue,
@@ -12,10 +12,10 @@ from ternary_core import (
     ternary_log,
     ternary_log10,
 )
-from ternary_core import _int_at_precision
-from values import SanyanSyntaxError, SanyanTypeError, SanyanValueError
+from core.ternary_core import _int_at_precision
+from core.values import SanyanSyntaxError, SanyanTypeError, SanyanValueError
 from ops.registry import register
-from eval_utils import propagated_confidence
+from core.eval_utils import propagated_confidence
 
 _DEFAULT_PRECISION = 32
 

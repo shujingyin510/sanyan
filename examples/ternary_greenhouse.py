@@ -9,7 +9,7 @@ import os
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import random
 
-from ternary_engine import TernaryEngine
+from core.ternary_engine import TernaryEngine
 
 print('=== 三态温室决策 ===\n')
 print('TernaryEngine: Kleene 传播 × 贝叶斯置信度 × 保护门控\n')

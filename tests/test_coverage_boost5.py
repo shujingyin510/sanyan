@@ -6,8 +6,8 @@ import unittest
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from evaluator import SanyanEvaluator
-from ternary_core import TritValue
+from core.evaluator import SanyanEvaluator
+from core.ternary_core import TritValue
 
 
 # ═══════════════════════════════════════════════════════════
@@ -17,7 +17,7 @@ from ternary_core import TritValue
 
 class TestDebugManager(unittest.TestCase):
     def test_break_add(self):
-        from runtime import DebugManager
+        from core.runtime import DebugManager
 
         dm = DebugManager()
         dm.break_add('add')
@@ -25,7 +25,7 @@ class TestDebugManager(unittest.TestCase):
         self.assertIn('add', dm._break_ops)
 
     def test_break_remove(self):
-        from runtime import DebugManager
+        from core.runtime import DebugManager
 
         dm = DebugManager()
         dm.break_add('add')
@@ -33,14 +33,14 @@ class TestDebugManager(unittest.TestCase):
         self.assertNotIn('add', dm._break_ops)
 
     def test_watch_add(self):
-        from runtime import DebugManager
+        from core.runtime import DebugManager
 
         dm = DebugManager()
         dm.watch_add('x')
         self.assertIn('x', dm._watched_vars)
 
     def test_watch_remove(self):
-        from runtime import DebugManager
+        from core.runtime import DebugManager
 
         dm = DebugManager()
         dm.watch_add('x')
@@ -48,7 +48,7 @@ class TestDebugManager(unittest.TestCase):
         self.assertNotIn('x', dm._watched_vars)
 
     def test_should_break(self):
-        from runtime import DebugManager
+        from core.runtime import DebugManager
 
         dm = DebugManager()
         dm.break_add('add')
@@ -56,7 +56,7 @@ class TestDebugManager(unittest.TestCase):
         self.assertFalse(dm.should_break('sub', 'sub'))
 
     def test_should_break_all(self):
-        from runtime import DebugManager
+        from core.runtime import DebugManager
 
         dm = DebugManager()
         dm.debug_mode = True
@@ -66,7 +66,7 @@ class TestDebugManager(unittest.TestCase):
 
 class TestProfileManager(unittest.TestCase):
     def test_start_stop(self):
-        from runtime import ProfileManager
+        from core.runtime import ProfileManager
 
         pm = ProfileManager()
         pm.start()
@@ -76,7 +76,7 @@ class TestProfileManager(unittest.TestCase):
         self.assertIsInstance(result, dict)
 
     def test_record(self):
-        from runtime import ProfileManager
+        from core.runtime import ProfileManager
 
         pm = ProfileManager()
         pm.start()
@@ -86,7 +86,7 @@ class TestProfileManager(unittest.TestCase):
         self.assertAlmostEqual(pm._profile['add']['time'], 0.003, delta=0.001)
 
     def test_report(self):
-        from runtime import ProfileManager
+        from core.runtime import ProfileManager
 
         pm = ProfileManager()
         pm.start()
@@ -95,7 +95,7 @@ class TestProfileManager(unittest.TestCase):
         self.assertIn('add', report)
 
     def test_report_empty(self):
-        from runtime import ProfileManager
+        from core.runtime import ProfileManager
 
         pm = ProfileManager()
         report = pm.report()
@@ -104,7 +104,7 @@ class TestProfileManager(unittest.TestCase):
 
 class TestIoTManager(unittest.TestCase):
     def test_create(self):
-        from runtime import IoTManager
+        from core.runtime import IoTManager
 
         iot = IoTManager()
         self.assertIn('人体', iot.sensors)
@@ -113,7 +113,7 @@ class TestIoTManager(unittest.TestCase):
 
 class TestSanyanRuntime(unittest.TestCase):
     def test_create(self):
-        from runtime import SanyanRuntime
+        from core.runtime import SanyanRuntime
 
         sr = SanyanRuntime()
         self.assertIsNotNone(sr._scope_mgr)
@@ -122,14 +122,14 @@ class TestSanyanRuntime(unittest.TestCase):
         self.assertIsNotNone(sr._profile_mgr)
 
     def test_scope_access(self):
-        from runtime import SanyanRuntime
+        from core.runtime import SanyanRuntime
 
         sr = SanyanRuntime()
         sr.set_var('x', 42)
         self.assertEqual(sr.get_var('x'), 42)
 
     def test_iot_access(self):
-        from runtime import SanyanRuntime
+        from core.runtime import SanyanRuntime
 
         sr = SanyanRuntime()
         self.assertIn('人体', sr.sensors)
@@ -143,30 +143,30 @@ class TestSanyanRuntime(unittest.TestCase):
 
 class TestValuesFinal2(unittest.TestCase):
     def test_function_value_repr(self):
-        from values import FunctionValue
+        from core.values import FunctionValue
 
         fv = FunctionValue(['x'], ['add', 'x', 1], None, {}, {})
         self.assertIn('λ', repr(fv))
 
     def test_module_value_repr(self):
-        from values import ModuleValue
+        from core.values import ModuleValue
 
         mv = ModuleValue({}, {}, set())
         self.assertIn('ModuleValue', repr(mv))
 
     def test_src_node_repr(self):
-        from values import SrcNode
+        from core.values import SrcNode
 
         sn = SrcNode(['do', 1, 2], line=10, col=5)
         self.assertIn('do', repr(sn))
 
     def test_to_num_none(self):
-        from values import to_num
+        from core.values import to_num
 
         self.assertIsNone(to_num(None))
 
     def test_to_num_complex(self):
-        from values import to_num
+        from core.values import to_num
 
         self.assertEqual(to_num(42j), 42j)
 
@@ -227,21 +227,21 @@ class TestEvaluatorFinal2(unittest.TestCase):
         self.assertEqual(r.to_int(), 42)
 
     def test_eval_function_value(self):
-        from values import FunctionValue
+        from core.values import FunctionValue
 
         fv = FunctionValue(['x'], ['set', 'y', ['add', 'x', 1]], None, {}, {})
         r = self.e.eval(fv)
         self.assertEqual(r, fv)
 
     def test_eval_module_value(self):
-        from values import ModuleValue
+        from core.values import ModuleValue
 
         mv = ModuleValue({}, {}, set())
         r = self.e.eval(mv)
         self.assertEqual(r, mv)
 
     def test_eval_array_value(self):
-        from ternary_core import ArrayValue
+        from core.ternary_core import ArrayValue
 
         arr = ArrayValue(3, TritValue(0))
         r = self.e.eval(arr)

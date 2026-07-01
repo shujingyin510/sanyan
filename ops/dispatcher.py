@@ -6,7 +6,7 @@
 
 from typing import Any
 from ops.registry import get_op
-from values import (
+from core.values import (
     FunctionValue,
     ModuleValue,
     SanyanNameError,
@@ -15,8 +15,8 @@ from values import (
     SanyanTypeError,
     SanyanAttributeError,
 )
-from ternary_core import TritValue, ArrayValue
-from sandbox import check_op as _check_op, check_func as _check_func
+from core.ternary_core import TritValue, ArrayValue
+from core.sandbox import check_op as _check_op, check_func as _check_func
 
 # 哨兵：dispatch_op 用此值区分"未找到 op"和"op 返回了 None"
 _DISPATCH_NOT_FOUND = object()
@@ -124,7 +124,7 @@ def apply(evaluator: Any, op: str, args: list) -> Any:
     dispatch_op 返回 _DISPATCH_NOT_FOUND 时才回退后续路径，
     避免操作体返回 None 时误判为分派失败。
     """
-    from commands import Commands
+    from core.commands import Commands
 
     internal = resolve_op_name(evaluator, op)
 

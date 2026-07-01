@@ -3,11 +3,11 @@
 所有运算自动传播 TritValue 置信度（贝叶斯累积）。
 """
 
-from ternary_core import BT, TernaryALU, TritValue
-from ternary_core import _int_at_precision, ternary_log, ternary_exp
-from values import SanyanSyntaxError, SanyanValueError, SanyanTypeError
+from core.ternary_core import BT, TernaryALU, TritValue
+from core.ternary_core import _int_at_precision, ternary_log, ternary_exp
+from core.values import SanyanSyntaxError, SanyanValueError, SanyanTypeError
 from ops.registry import register, register_alias
-from eval_utils import propagated_confidence
+from core.eval_utils import propagated_confidence
 
 _DEFAULT_PRECISION = 16
 

@@ -1,8 +1,8 @@
 """三态高级数学: 分布、熵、校准"""
 
 import math
-from ternary_core import TritValue
-from values import SanyanSyntaxError, SanyanTypeError
+from core.ternary_core import TritValue
+from core.values import SanyanSyntaxError, SanyanTypeError
 from ops.registry import register
 
 

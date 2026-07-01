@@ -148,13 +148,13 @@ def _resolve_imports(nodes: list, cg: CodegenContext) -> tuple[list, list]:
                     with open(found, 'r', encoding='utf-8') as f:
                         imported_code = f.read()
                     from ops.file_ops import _parse_with_sugar_san
-                    from evaluator import SanyanEvaluator
+                    from core.evaluator import SanyanEvaluator
 
                     tmp_eval = SanyanEvaluator()
                     imported_ast = _parse_with_sugar_san(imported_code, tmp_eval)
                     if imported_ast is None:
                         from sugar import SugarConverter
-                        from skin import SkinManager
+                        from core.skin import SkinManager
 
                         imported_ast = SugarConverter.convert(imported_code, SkinManager('chinese'))
                     if isinstance(imported_ast, list) and len(imported_ast) > 0 and imported_ast[0] in ('做', 'do'):

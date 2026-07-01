@@ -269,7 +269,7 @@ def _run_assembly(params):
         return '缺少 source= 参数'
     os.makedirs(os.path.dirname(output) or '.', exist_ok=True)
     try:
-        from asm import Assembler
+        from compiler.asm import Assembler
 
         a = Assembler()
         data = a.build(source)
@@ -414,10 +414,10 @@ def _spawn_sub_agent(params):
         return 'Agent ' + name + ' running'
     _agent_registry[name] = {'status': 'running', 'task': task, 'result': None, 'start_time': _time.time()}
     try:
-        from evaluator import SanyanEvaluator
+        from core.evaluator import SanyanEvaluator
         from ops.file_ops import clear_cache
-        from lexer import tokenize
-        from parser import parse
+        from core.lexer import tokenize
+        from core.parser import parse
         import io
         import sys
 

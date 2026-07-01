@@ -1,7 +1,7 @@
 """字典操作：创建、查询、设置、删除、键列表。"""
 
-from ternary_core import TritValue
-from values import SanyanSyntaxError, SanyanTypeError, SanyanKeyError
+from core.ternary_core import TritValue
+from core.values import SanyanSyntaxError, SanyanTypeError, SanyanKeyError
 from ops.registry import register
 
 

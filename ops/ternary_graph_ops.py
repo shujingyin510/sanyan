@@ -1,8 +1,8 @@
 """三态图：带置信度的图结构"""
 
 from typing import Dict, List, Tuple
-from ternary_core import TritValue
-from values import SanyanSyntaxError, SanyanTypeError
+from core.ternary_core import TritValue
+from core.values import SanyanSyntaxError, SanyanTypeError
 from ops.registry import register
 
 

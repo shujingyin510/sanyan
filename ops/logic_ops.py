@@ -4,8 +4,8 @@
 非 = 保持输入置信度        — 只翻值，不改信度
 """
 
-from ternary_core import BT, TernaryALU, TritValue
-from values import SanyanValueError
+from core.ternary_core import BT, TernaryALU, TritValue
+from core.values import SanyanValueError
 from ops.registry import register
 
 

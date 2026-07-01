@@ -6,8 +6,8 @@ import unittest
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from evaluator import SanyanEvaluator
-from ternary_core import TritValue, BT, TernaryALU
+from core.evaluator import SanyanEvaluator
+from core.ternary_core import TritValue, BT, TernaryALU
 
 
 def ev(expr):
@@ -52,21 +52,21 @@ class TestEvaluatorFinal(unittest.TestCase):
         self.assertEqual(r, d)
 
     def test_eval_function_value(self):
-        from values import FunctionValue
+        from core.values import FunctionValue
 
         fv = FunctionValue(['x'], ['set', 'y', ['add', 'x', 1]], None, {}, {})
         r = self.e.eval(fv)
         self.assertEqual(r, fv)
 
     def test_eval_module_value(self):
-        from values import ModuleValue
+        from core.values import ModuleValue
 
         mv = ModuleValue({}, {}, set())
         r = self.e.eval(mv)
         self.assertEqual(r, mv)
 
     def test_eval_array_value(self):
-        from ternary_core import ArrayValue
+        from core.ternary_core import ArrayValue
 
         arr = ArrayValue(3, TritValue(0))
         r = self.e.eval(arr)
@@ -94,7 +94,7 @@ class TestEvaluatorFinal(unittest.TestCase):
         self.assertEqual(r.to_int(), 3)
 
     def test_eval_list_module_call(self):
-        from values import ModuleValue
+        from core.values import ModuleValue
 
         mv = ModuleValue({}, {'func': (['x'], ['set', 'y', ['add', 'x', 1]], None, {}, {})}, set(['func']))
         self.e.set_var('m', mv)
@@ -122,7 +122,7 @@ class TestEvaluatorFinal(unittest.TestCase):
 
 class TestRuntimeFinal(unittest.TestCase):
     def test_scope_set_var_existing(self):
-        from runtime import ScopeManager
+        from core.runtime import ScopeManager
 
         sm = ScopeManager()
         sm.set_var('x', 1)
@@ -130,7 +130,7 @@ class TestRuntimeFinal(unittest.TestCase):
         self.assertEqual(sm.get_var('x'), 2)
 
     def test_scope_push_pop_multiple(self):
-        from runtime import ScopeManager
+        from core.runtime import ScopeManager
 
         sm = ScopeManager()
         sm.set_var('a', 1)
@@ -146,7 +146,7 @@ class TestRuntimeFinal(unittest.TestCase):
         self.assertEqual(sm.get_var('a'), 1)
 
     def test_scope_has_var_after_pop(self):
-        from runtime import ScopeManager
+        from core.runtime import ScopeManager
 
         sm = ScopeManager()
         sm.set_var('x', 1)
@@ -157,7 +157,7 @@ class TestRuntimeFinal(unittest.TestCase):
         self.assertFalse(sm.has_var('y'))
 
     def test_scope_all_vars_multiple(self):
-        from runtime import ScopeManager
+        from core.runtime import ScopeManager
 
         sm = ScopeManager()
         sm.set_var('a', 1)
@@ -169,7 +169,7 @@ class TestRuntimeFinal(unittest.TestCase):
         self.assertEqual(len(vars), 3)
 
     def test_scope_depth_multiple(self):
-        from runtime import ScopeManager
+        from core.runtime import ScopeManager
 
         sm = ScopeManager()
         self.assertEqual(sm.depth(), 1)
@@ -190,50 +190,50 @@ class TestRuntimeFinal(unittest.TestCase):
 
 class TestValuesFinal(unittest.TestCase):
     def test_function_value_str(self):
-        from values import FunctionValue
+        from core.values import FunctionValue
 
         fv = FunctionValue(['x'], ['add', 'x', 1], None, {}, {})
         self.assertIn('λ', str(fv))
 
     def test_module_value_get_attr(self):
-        from values import ModuleValue
+        from core.values import ModuleValue
 
         mv = ModuleValue({}, {'func': (['x'], ['add', 'x', 1], None, {}, {})}, set(['func']))
         self.assertTrue(mv.is_exported('func'))
         self.assertFalse(mv.is_exported('missing'))
 
     def test_module_value_get_attr_missing(self):
-        from values import ModuleValue
+        from core.values import ModuleValue
 
         mv = ModuleValue({}, {}, set())
         with self.assertRaises(Exception):
             mv.get_attr('missing')
 
     def test_src_node_str(self):
-        from values import SrcNode
+        from core.values import SrcNode
 
         sn = SrcNode(['do', 1, 2], line=10, col=5)
         self.assertIn('do', str(sn))
 
     def test_to_num_empty_string(self):
-        from values import to_num
+        from core.values import to_num
 
         self.assertEqual(to_num(''), '')
 
     def test_to_num_bool(self):
-        from values import to_num
+        from core.values import to_num
 
         self.assertEqual(to_num(True), True)
         self.assertEqual(to_num(False), False)
 
     def test_check_type_num(self):
-        from values import check_type
+        from core.values import check_type
 
         self.assertIsNone(check_type(42, 'num'))
         self.assertIsNone(check_type(3.14, 'num'))
 
     def test_check_type_none(self):
-        from values import check_type
+        from core.values import check_type
 
         self.assertIsNone(check_type(None, 'any'))
 

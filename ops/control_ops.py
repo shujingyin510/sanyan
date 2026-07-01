@@ -1,7 +1,7 @@
 """控制流操作：若、做、循环、遍历、返回、跳出、异常处理、三态匹配"""
 
-from ternary_core import BT, TritValue, ArrayValue
-from values import ReturnException, BreakException, ContinueException, SanyanError, SanyanSyntaxError, SanyanValueError
+from core.ternary_core import BT, TritValue, ArrayValue
+from core.values import ReturnException, BreakException, ContinueException, SanyanError, SanyanSyntaxError, SanyanValueError
 from ops.list_ops import _as_list
 from ops.registry import register, register_alias
 

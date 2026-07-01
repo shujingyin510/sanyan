@@ -1,7 +1,7 @@
 """扩展数学操作：统计"""
 
-from ternary_core import TritValue, ArrayValue
-from values import SanyanSyntaxError
+from core.ternary_core import TritValue, ArrayValue
+from core.values import SanyanSyntaxError
 from ops.registry import register, register_alias
 
 

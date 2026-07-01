@@ -7,10 +7,10 @@ import unittest
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from ternary_core import BT, TernaryALU, ternary_sin, ternary_cos, ternary_tan
-from ternary_core import ternary_sqrt, ternary_exp, ternary_log, ternary_log10
-from ternary_core import _ternary_range_reduce, _int_at_precision, _half_at_precision
-from ternary_core import _get_pi, _get_two_pi, _get_half_pi, TritValue
+from core.ternary_core import BT, TernaryALU, ternary_sin, ternary_cos, ternary_tan
+from core.ternary_core import ternary_sqrt, ternary_exp, ternary_log, ternary_log10
+from core.ternary_core import _ternary_range_reduce, _int_at_precision, _half_at_precision
+from core.ternary_core import _get_pi, _get_two_pi, _get_half_pi, TritValue
 
 
 # ═══════════════════════════════════════════════════════════

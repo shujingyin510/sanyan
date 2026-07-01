@@ -6,8 +6,8 @@ import unittest
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from evaluator import SanyanEvaluator
-from ternary_core import TritValue, BT
+from core.evaluator import SanyanEvaluator
+from core.ternary_core import TritValue, BT
 
 
 def ev(expr):
@@ -22,41 +22,41 @@ def ev(expr):
 
 class TestValuesFinal3(unittest.TestCase):
     def test_src_node_repr_with_items(self):
-        from values import SrcNode
+        from core.values import SrcNode
 
         sn = SrcNode(['do', 1, 2, 3], line=10, col=5)
         r = repr(sn)
         self.assertIn('SrcNode', r)
 
     def test_check_type_int(self):
-        from values import check_type
+        from core.values import check_type
 
         self.assertIsNone(check_type(42, 'int'))
         self.assertIsNone(check_type(TritValue(42), 'int'))
 
     def test_check_type_float(self):
-        from values import check_type
+        from core.values import check_type
 
         self.assertIsNone(check_type(3.14, 'float'))
         self.assertIsNone(check_type(TritValue(3.14), 'float'))
 
     def test_check_type_str(self):
-        from values import check_type
+        from core.values import check_type
 
         self.assertIsNone(check_type('hello', 'str'))
 
     def test_check_type_list(self):
-        from values import check_type
+        from core.values import check_type
 
         self.assertIsNone(check_type([1, 2], 'list'))
 
     def test_check_type_dict(self):
-        from values import check_type
+        from core.values import check_type
 
         self.assertIsNone(check_type({'a': 1}, 'dict'))
 
     def test_function_value_call_with_type_check(self):
-        from values import FunctionValue
+        from core.values import FunctionValue
 
         fv = FunctionValue(['x'], ['set', 'y', ['add', 'x', 1]], None, {}, {'x': 'int'})
         e = SanyanEvaluator()
@@ -64,7 +64,7 @@ class TestValuesFinal3(unittest.TestCase):
         self.assertEqual(result.to_int(), 6)
 
     def test_function_value_call_return_type(self):
-        from values import FunctionValue
+        from core.values import FunctionValue
 
         fv = FunctionValue(['x'], ['set', 'y', ['add', 'x', 1]], None, {}, {'x': 'int', '__return__': 'int'})
         e = SanyanEvaluator()
@@ -72,7 +72,7 @@ class TestValuesFinal3(unittest.TestCase):
         self.assertEqual(result.to_int(), 6)
 
     def test_function_value_call_with_closure(self):
-        from values import FunctionValue
+        from core.values import FunctionValue
 
         fv = FunctionValue(['x'], ['set', 'y', ['add', 'x', 1]], None, {'y': 10}, {})
         e = SanyanEvaluator()
@@ -80,19 +80,19 @@ class TestValuesFinal3(unittest.TestCase):
         self.assertEqual(result.to_int(), 6)
 
     def test_module_value_init_with_vars(self):
-        from values import ModuleValue
+        from core.values import ModuleValue
 
         mv = ModuleValue({'x': 42}, {}, set())
         self.assertEqual(mv.vars['x'], 42)
 
     def test_module_value_is_exported_true(self):
-        from values import ModuleValue
+        from core.values import ModuleValue
 
         mv = ModuleValue({}, {}, set(['func']))
         self.assertTrue(mv.is_exported('func'))
 
     def test_module_value_is_exported_false(self):
-        from values import ModuleValue
+        from core.values import ModuleValue
 
         mv = ModuleValue({}, {}, set(['func']))
         self.assertFalse(mv.is_exported('missing'))
@@ -240,7 +240,7 @@ class TestTernaryCoreFinal(unittest.TestCase):
         self.assertEqual(v.to_int(), 0)
 
     def test_array_value_get_set(self):
-        from ternary_core import ArrayValue
+        from core.ternary_core import ArrayValue
 
         arr = ArrayValue(5, TritValue(0))
         arr.set(0, TritValue(10))
@@ -249,13 +249,13 @@ class TestTernaryCoreFinal(unittest.TestCase):
         self.assertEqual(arr.get(4).to_int(), 50)
 
     def test_array_value_repr(self):
-        from ternary_core import ArrayValue
+        from core.ternary_core import ArrayValue
 
         arr = ArrayValue(3, TritValue(5))
         self.assertIn('5', repr(arr))
 
     def test_array_value_iter(self):
-        from ternary_core import ArrayValue
+        from core.ternary_core import ArrayValue
 
         arr = ArrayValue(3, TritValue(5))
         items = list(arr)

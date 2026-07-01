@@ -1,7 +1,7 @@
 """三态工具操作：移位、翻转、压缩、解压、解析、枚举、结构体、信念"""
 
-from ternary_core import TritValue
-from values import SanyanSyntaxError
+from core.ternary_core import TritValue
+from core.values import SanyanSyntaxError
 from ops.registry import register
 import time
 

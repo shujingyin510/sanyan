@@ -1069,7 +1069,7 @@ class TestResourceManager(unittest.TestCase):
 class TestAgentRuntimeV5Integration(unittest.TestCase):
     def setUp(self):
         from agent_system.agent_runtime import AgentRuntime
-        from evaluator import SanyanEvaluator
+        from core.evaluator import SanyanEvaluator
 
         ev = SanyanEvaluator()
         self.runtime = AgentRuntime(ev, None)

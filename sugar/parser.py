@@ -8,7 +8,7 @@ Pratt 解析用「前缀/中缀」统一处理所有表达式：
 
 from __future__ import annotations
 from typing import Optional, Any
-from values import SanyanSyntaxError
+from core.values import SanyanSyntaxError
 from sugar.tokenizer import Token, tokenize
 from sugar.errors import SugarErrorReporter
 from sugar.ast_nodes import (
@@ -40,7 +40,7 @@ class _Parser:
         self._comments: list[str] = []
 
     def _node(self, items: list, tok: Optional[Token] = None):
-        from values import SrcNode
+        from core.values import SrcNode
 
         if tok is None:
             tok = self.tokens[max(0, min(self.pos - 1, len(self.tokens) - 1))] if self.tokens else Token('', '', 0, 0)
@@ -48,7 +48,7 @@ class _Parser:
 
     def _wrap(self, items):
         """Wrap list returns with SrcNode when they are plain lists."""
-        from values import SrcNode
+        from core.values import SrcNode
 
         if isinstance(items, list) and not isinstance(items, SrcNode):
             tok = self.peek() or (self.tokens[-1] if self.tokens else Token('', '', 0, 0))
@@ -623,7 +623,7 @@ def parse_tokens(tokens: list[Token], reporter: SugarErrorReporter, source: str 
 
 def parse_code(code: str, skin_mgr=None) -> tuple[Any, list[str]]:
     # 自动展开 #include 指令（预处理层，所有 sugar 解析入口统一处理）
-    from preprocess import preprocess_includes
+    from core.preprocess import preprocess_includes
 
     code = preprocess_includes(code)
 

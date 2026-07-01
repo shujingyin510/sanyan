@@ -42,7 +42,7 @@ def _parse_all_sexprs(source: str) -> list | None:
     单表达式时直接返回（兼容旧版 _parse_source 行为）；
     多表达式时返回 [expr1, expr2, ...]。
     """
-    from lexer import tokenize
+    from core.lexer import tokenize
 
     tokens = tokenize(source)
     if not tokens:
@@ -96,7 +96,7 @@ def _parse_all_sexprs(source: str) -> list | None:
 
 def _parse_source(source: str) -> list:
     from ops.file_ops import _parse_with_sugar_san, clear_cache
-    from evaluator import SanyanEvaluator
+    from core.evaluator import SanyanEvaluator
 
     clear_cache()
     evaluator = SanyanEvaluator()
@@ -192,8 +192,8 @@ def self_hosted_compile(source: str, module_name: str = 'main') -> str:
     V5: 辅助函数已内联到 llvmgen.san，无需 Python 注入。
     直接加载 .san 文件，用 Python evaluator 运行即可。
     """
-    from evaluator import SanyanEvaluator
-    from skin import SkinManager
+    from core.evaluator import SanyanEvaluator
+    from core.skin import SkinManager
     from ops.file_ops import clear_cache
 
     clear_cache()
@@ -242,8 +242,8 @@ def compile_module_test(module_name: str) -> str:
 
     V5: 辅助函数已内联到 llvmgen.san，无需 Python 注入。
     """
-    from evaluator import SanyanEvaluator
-    from skin import SkinManager
+    from core.evaluator import SanyanEvaluator
+    from core.skin import SkinManager
     from ops.file_ops import clear_cache
 
     clear_cache()

@@ -5,7 +5,7 @@ evaluator.py 通过 get_op() 查询此表，不再维护自有的 _OP_DISPATCH�
 
 from __future__ import annotations
 from typing import Callable, Any
-from values import SanyanKeyError
+from core.values import SanyanKeyError
 
 _OP_DISPATCH: dict[str, tuple[Callable, Any]] = {}
 

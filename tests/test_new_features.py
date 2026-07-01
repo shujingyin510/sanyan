@@ -6,8 +6,8 @@ import os
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from evaluator import SanyanEvaluator
-from skin import SkinManager
+from core.evaluator import SanyanEvaluator
+from core.skin import SkinManager
 from sugar import SugarConverter
 
 
@@ -57,8 +57,8 @@ class TestAsyncSyntax(unittest.TestCase):
 
     def _eval_sexpr(self, code):
         """使用 S-表达式解析器求值"""
-        from lexer import tokenize
-        from parser import parse
+        from core.lexer import tokenize
+        from core.parser import parse
 
         skin_mgr = SkinManager('chinese')
         env = SanyanEvaluator(skin_manager=skin_mgr)
@@ -86,8 +86,8 @@ class TestMacroSystem(unittest.TestCase):
 
     def _eval_sexpr(self, code):
         """使用 S-表达式解析器求值"""
-        from lexer import tokenize
-        from parser import parse
+        from core.lexer import tokenize
+        from core.parser import parse
 
         skin_mgr = SkinManager('chinese')
         env = SanyanEvaluator(skin_manager=skin_mgr)

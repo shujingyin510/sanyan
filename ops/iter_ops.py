@@ -1,8 +1,8 @@
 """函数式操作：Lambda、映射、过滤、归并、应用、模块调用。"""
 
-from ternary_core import TritValue, ArrayValue
-from values import FunctionValue, ModuleValue, call_function
-from values import SanyanSyntaxError, SanyanTypeError, SanyanValueError
+from core.ternary_core import TritValue, ArrayValue
+from core.values import FunctionValue, ModuleValue, call_function
+from core.values import SanyanSyntaxError, SanyanTypeError, SanyanValueError
 from ops.registry import register
 
 

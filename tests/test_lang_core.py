@@ -6,8 +6,8 @@ import unittest
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from evaluator import SanyanEvaluator
-from ternary_core import TritValue
+from core.evaluator import SanyanEvaluator
+from core.ternary_core import TritValue
 
 
 def ev(expr):

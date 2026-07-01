@@ -52,10 +52,10 @@ def main():
     diff1 = np.max(np.abs(C_ref - C_asm))
 
     # ── 步骤2: 三言求值器调度 ──
-    from evaluator import SanyanEvaluator
+    from core.evaluator import SanyanEvaluator
     from ops.registry import register as reg_op
-    from lexer import tokenize
-    from parser import parse
+    from core.lexer import tokenize
+    from core.parser import parse
 
     C_sanyan = np.zeros((N, N), dtype=np.float32)
 

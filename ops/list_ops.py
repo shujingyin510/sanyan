@@ -2,8 +2,8 @@
 
 from typing import Any
 
-from ternary_core import TritValue, ArrayValue
-from values import SanyanSyntaxError, SanyanTypeError, SanyanValueError, SanyanKeyError, to_num
+from core.ternary_core import TritValue, ArrayValue
+from core.values import SanyanSyntaxError, SanyanTypeError, SanyanValueError, SanyanKeyError, to_num
 from ops.registry import register
 
 

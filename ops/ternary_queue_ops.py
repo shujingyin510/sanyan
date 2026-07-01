@@ -1,8 +1,8 @@
 """三态队列与三态栈"""
 
 from typing import Any, List, Tuple
-from ternary_core import TritValue
-from values import SanyanSyntaxError, SanyanTypeError
+from core.ternary_core import TritValue
+from core.values import SanyanSyntaxError, SanyanTypeError
 from ops.registry import register
 
 

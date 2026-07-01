@@ -1,8 +1,8 @@
 """随机操作"""
 
 import random as _random
-from ternary_core import TritValue, ArrayValue
-from values import SanyanSyntaxError
+from core.ternary_core import TritValue, ArrayValue
+from core.values import SanyanSyntaxError
 from ops.registry import register, register_alias
 
 

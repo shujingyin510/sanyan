@@ -5,10 +5,10 @@ import sys
 import unittest
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from evaluator import SanyanEvaluator
-from eval_utils import unwrap_trit
-from lexer import tokenize
-from parser import parse
+from core.evaluator import SanyanEvaluator
+from core.eval_utils import unwrap_trit
+from core.lexer import tokenize
+from core.parser import parse
 
 
 def run(code):
@@ -24,14 +24,14 @@ def run(code):
 
 class TestValues(unittest.TestCase):
     def test_src_node_repr(self):
-        from values import SrcNode
+        from core.values import SrcNode
 
         sn = SrcNode(['do', 1, 2], line=10, col=5)
         self.assertIn('SrcNode', repr(sn))
 
     def test_check_type_trit(self):
-        from values import check_type
-        from ternary_core import TritValue
+        from core.values import check_type
+        from core.ternary_core import TritValue
 
         self.assertIsNone(check_type(TritValue(42), 'int'))
         self.assertIsNone(check_type(TritValue(3.14), 'float'))
@@ -41,7 +41,7 @@ class TestValues(unittest.TestCase):
         self.assertIsNotNone(r)
 
     def test_ternary_ops(self):
-        from ternary_core import TritValue
+        from core.ternary_core import TritValue
 
         t = TritValue(1)
         self.assertEqual(t.symbol, '+')
@@ -51,16 +51,16 @@ class TestValues(unittest.TestCase):
         self.assertEqual(t3.symbol, '0')
 
     def test_ternary_confidence(self):
-        from ternary_core import TritValue
+        from core.ternary_core import TritValue
 
         t = TritValue(1, confidence=0.8)
         self.assertEqual(t.confidence, 0.8)
         self.assertEqual(t.symbol, '+')
 
     def test_exception_classes(self):
-        from values import SanyanSyntaxError, SanyanTypeError, SanyanValueError
-        from values import SanyanRuntimeError, SanyanNameError, SanyanKeyError
-        from values import SanyanAttributeError, SanyanIOError
+        from core.values import SanyanSyntaxError, SanyanTypeError, SanyanValueError
+        from core.values import SanyanRuntimeError, SanyanNameError, SanyanKeyError
+        from core.values import SanyanAttributeError, SanyanIOError
 
         for c in [
             SanyanSyntaxError,
@@ -77,7 +77,7 @@ class TestValues(unittest.TestCase):
 
 class TestTernaryCore(unittest.TestCase):
     def test_trit_value(self):
-        from ternary_core import TritValue
+        from core.ternary_core import TritValue
 
         a = TritValue(3)
         self.assertEqual(a.value, [1, 0])
@@ -85,7 +85,7 @@ class TestTernaryCore(unittest.TestCase):
         self.assertEqual(b.value, [1, -1])
 
     def test_trit_compare(self):
-        from ternary_core import TritValue
+        from core.ternary_core import TritValue
 
         a = TritValue(3)
         b = TritValue(3)
@@ -251,7 +251,7 @@ class TestOps(unittest.TestCase):
 
 class TestPreprocess(unittest.TestCase):
     def test_include(self):
-        from preprocess import preprocess_includes
+        from core.preprocess import preprocess_includes
 
         code = '(include "nonexistent.san")\n(print "test")'
         result = preprocess_includes(code)

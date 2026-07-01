@@ -11,7 +11,7 @@ try:
 except ImportError:
     _HAS_NET = False
 
-from values import SanyanRuntimeError
+from core.values import SanyanRuntimeError
 from ops.registry import register, register_alias
 
 HTTP_TIMEOUT = 60

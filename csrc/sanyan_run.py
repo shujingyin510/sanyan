@@ -12,9 +12,9 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import csrc.sanyan_ops  # noqa: F401
 
 # 2. 解析并执行 .san 文件
-from evaluator import SanyanEvaluator
-from lexer import tokenize
-from parser import parse
+from core.evaluator import SanyanEvaluator
+from core.lexer import tokenize
+from core.parser import parse
 
 if len(sys.argv) < 2:
     print('用法: python -X utf8 csrc/sanyan_run.py <file.san>')

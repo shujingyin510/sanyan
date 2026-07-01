@@ -16,10 +16,10 @@ import hashlib
 
 
 import unittest
-from compile_bytecode import compile_source
+from compiler.compile_bytecode import compile_source
 from ops.file_ops import _load_sugar_parser, _parse_with_sugar_san, clear_cache
-from evaluator import SanyanEvaluator
-from skin import SkinManager
+from core.evaluator import SanyanEvaluator
+from core.skin import SkinManager
 
 REFERENCE_BIN = os.path.join(
     os.path.dirname(os.path.dirname(os.path.abspath(__file__))),

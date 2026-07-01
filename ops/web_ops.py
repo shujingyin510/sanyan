@@ -3,8 +3,8 @@
 import json
 import time
 from typing import Any, Callable, Dict, List, Optional, Tuple
-from ternary_core import TritValue
-from values import SanyanSyntaxError, SanyanTypeError
+from core.ternary_core import TritValue
+from core.values import SanyanSyntaxError, SanyanTypeError
 from ops.registry import register, register_alias
 
 

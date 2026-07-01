@@ -9,9 +9,9 @@ import contextlib
 
 
 import unittest
-from ternary_core import TritValue, ArrayValue
-from evaluator import SanyanEvaluator
-from values import SanyanValueError, SanyanTypeError, SanyanSyntaxError, SanyanNameError
+from core.ternary_core import TritValue, ArrayValue
+from core.evaluator import SanyanEvaluator
+from core.values import SanyanValueError, SanyanTypeError, SanyanSyntaxError, SanyanNameError
 
 
 class TestArithmetic(unittest.TestCase):

@@ -1,8 +1,8 @@
 """正则表达式操作"""
 
 import re
-from ternary_core import TritValue
-from values import SanyanSyntaxError
+from core.ternary_core import TritValue
+from core.values import SanyanSyntaxError
 from ops.registry import register, register_alias
 
 

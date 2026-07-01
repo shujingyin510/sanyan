@@ -1,7 +1,7 @@
 """三态来源/证据链、冲突模型、置信度操作"""
 
-from ternary_core import TritValue
-from values import SanyanSyntaxError, SanyanTypeError, SanyanValueError
+from core.ternary_core import TritValue
+from core.values import SanyanSyntaxError, SanyanTypeError, SanyanValueError
 from ops.registry import register
 
 

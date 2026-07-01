@@ -17,10 +17,10 @@ import os
 import re
 import time
 
-from run_agent import load_api_key, _register_aliases
-from evaluator import SanyanEvaluator
+from agent_system.run_agent import load_api_key, _register_aliases
+from core.evaluator import SanyanEvaluator
 from ops.file_ops import clear_cache
-from preprocess import preprocess_includes
+from core.preprocess import preprocess_includes
 from sugar.parser import parse_code
 
 QUICK = '--quick' in sys.argv

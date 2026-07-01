@@ -4,8 +4,8 @@ from __future__ import annotations
 import json
 import os
 import re
-from ternary_core import TritValue
-from values import SanyanSyntaxError, SanyanValueError, SanyanIOError, ModuleValue
+from core.ternary_core import TritValue
+from core.values import SanyanSyntaxError, SanyanValueError, SanyanIOError, ModuleValue
 from ops.registry import register
 
 输出 = print
@@ -399,7 +399,7 @@ class PackageOps:
                 raise SanyanValueError(f"包 '{name}' 中没有找到 .san 文件")
             pkg_path = os.path.join(pkg_dir, san_files[0])
 
-        from evaluator import SanyanEvaluator
+        from core.evaluator import SanyanEvaluator
 
         module_env = SanyanEvaluator(skin_manager=evaluator.skin_manager)
         from ops.file_ops import _parse_code

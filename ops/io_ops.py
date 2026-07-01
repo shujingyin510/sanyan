@@ -1,8 +1,8 @@
 """输入/输出、调试、值格式化、等待"""
 
 import time
-from ternary_core import TritValue
-from values import FunctionValue, ModuleValue, SanyanValueError, SanyanSyntaxError, SanyanTypeError
+from core.ternary_core import TritValue
+from core.values import FunctionValue, ModuleValue, SanyanValueError, SanyanSyntaxError, SanyanTypeError
 from ops.registry import register
 
 
@@ -12,7 +12,7 @@ class IOOps:
     @staticmethod
     def format_value(val):
         """将三言值格式化为美观字符串，容器附三进制注释"""
-        from ternary_core import TritValue, ArrayValue
+        from core.ternary_core import TritValue, ArrayValue
 
         if isinstance(val, list):
             items_int = []

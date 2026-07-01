@@ -6,9 +6,9 @@ import sys
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import unittest
 import threading
-from evaluator import SanyanEvaluator
-from ternary_core import TritValue, ArrayValue
-from values import SanyanSyntaxError, SanyanRuntimeError
+from core.evaluator import SanyanEvaluator
+from core.ternary_core import TritValue, ArrayValue
+from core.values import SanyanSyntaxError, SanyanRuntimeError
 
 
 class TestConcurrentRun(unittest.TestCase):

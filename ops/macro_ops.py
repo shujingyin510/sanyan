@@ -1,9 +1,9 @@
 """宏操作：定义和使用宏"""
 
 from __future__ import annotations
-from values import SanyanSyntaxError
+from core.values import SanyanSyntaxError
 from ops.registry import register, register_alias
-from macro import get_global_macro_env
+from core.macro import get_global_macro_env
 
 
 def macro_define(evaluator, args):

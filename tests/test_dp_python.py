@@ -9,8 +9,8 @@ dp.c 使用 LLVM 编译的 parse_sanyan() C 入口，
 """
 
 import unittest
-from lexer import tokenize
-from parser import parse
+from core.lexer import tokenize
+from core.parser import parse
 
 
 def parse_sanyan(source: str):

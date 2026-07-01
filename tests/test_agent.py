@@ -6,10 +6,10 @@ import os
 import json
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from evaluator import SanyanEvaluator
-from skin import SkinManager
-from ternary_core import TritValue
-from values import ReturnException
+from core.evaluator import SanyanEvaluator
+from core.skin import SkinManager
+from core.ternary_core import TritValue
+from core.values import ReturnException
 
 
 def _tv(val):
@@ -44,7 +44,7 @@ def _agent_call(e, name, *args):
 def _load_agent():
     """加载 agent.san 并注册函数，返回 evaluator"""
     import ops.registry as reg
-    from preprocess import preprocess_includes
+    from core.preprocess import preprocess_includes
     from sugar.parser import parse_code
 
     e = SanyanEvaluator(skin_manager=SkinManager('chinese'), max_loop_steps=5000)
@@ -98,8 +98,8 @@ def _load_agent():
         try:
             code_stripped = code.strip()
             if code_stripped.startswith('('):
-                from lexer import tokenize
-                from parser import parse
+                from core.lexer import tokenize
+                from core.parser import parse
 
                 tokens = tokenize(code)
                 # 多个顶层表达式（如 (设 x 1)(输出 x)）需要包 (做 ...)
@@ -490,9 +490,9 @@ class TestVillageE2E(unittest.TestCase):
 
     def test_load_observer(self):
         """加载 village_game + village_observe 不崩溃"""
-        from evaluator import SanyanEvaluator
+        from core.evaluator import SanyanEvaluator
         from sugar.parser import parse_code
-        from values import ReturnException
+        from core.values import ReturnException
         import ops.file_ops
 
         ops.file_ops.clear_cache()
@@ -527,9 +527,9 @@ class TestVillageE2E(unittest.TestCase):
 
     def test_run_one_day(self):
         """运行 1 天不崩溃（无 LLM，只用模板对话）"""
-        from evaluator import SanyanEvaluator
+        from core.evaluator import SanyanEvaluator
         from sugar.parser import parse_code
-        from values import ReturnException, TritValue
+        from core.values import ReturnException, TritValue
         import io
         import sys
         import ops.file_ops

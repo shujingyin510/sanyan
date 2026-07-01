@@ -130,7 +130,7 @@ class SanyanTUI(App):
             import sys
 
             sys.path.insert(0, str(ROOT))
-            from run_agent import load_api_key, init_evaluator
+            from agent_system.run_agent import load_api_key, init_evaluator
             from agent_system.agent_runtime import AgentRuntime
 
             api_key = load_api_key()

@@ -1,6 +1,6 @@
 """三元引擎 5 行示例 — pip install ternary-engine 后直接运行"""
 
-from ternary_engine import TernaryEngine
+from core.ternary_engine import TernaryEngine
 
 engine = TernaryEngine()
 

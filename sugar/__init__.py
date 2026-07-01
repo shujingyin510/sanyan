@@ -15,7 +15,7 @@ class SugarConverter:
     def convert(code: str, skin_mgr=None) -> list:
         global _last_comments
         if skin_mgr is None:
-            from skin import SkinManager
+            from core.skin import SkinManager
 
             skin_mgr = SkinManager('chinese')
         ast, _last_comments = parse_code(code, skin_mgr)
