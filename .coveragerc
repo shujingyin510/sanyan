@@ -46,6 +46,16 @@ omit =
     llvmgen/build.py
     llvmgen/ir_fixes.py
     llvmgen/compiler.py
+    # 调试/临时脚本
+    _decompile*.py
+    _test_dispatch.py
+    _trace_vm*.py
+    test_tokenizer.py
+    trace.py
+    trace2.py
+    trace_tmp.py
+    web_ide.py
+    verify.py
 
 [report]
 fail_under = 75
