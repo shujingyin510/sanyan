@@ -120,7 +120,7 @@ jobs:
       - name: Run agent benchmark
         run: |
           python -c "
-          from evaluator import SanyanEvaluator
+          from core.evaluator import SanyanEvaluator
           from agent_system.agent_runtime import AgentRuntime
           import time
           e = SanyanEvaluator()
