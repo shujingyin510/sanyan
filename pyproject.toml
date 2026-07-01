@@ -59,6 +59,7 @@ py-modules = [
     "skin", "sandbox", "compile_bytecode", "compile_llvmgen", "vm",
      "type_checker", "repl", "main", "lsp_server", "dap_server",
     "sanfmt", "sanyancc", "doc_sync",
+    "type_inference", "macro",
 ]
 
 [tool.ruff]
