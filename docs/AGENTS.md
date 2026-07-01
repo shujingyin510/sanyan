@@ -25,7 +25,7 @@ ruff check . && ruff format --check . && mypy . && python -X utf8 scripts/prefli
 | 🚨 P0 | 不确定文件用途 | 先搜索引用关系 |
 | 🚨 P0 | 不确定修改影响 | 先分析再修改 |
 | 🔴 P1 | 写完任何代码 | 先跑 `ruff check . && ruff format --check . && mypy .` |
-| 🔴 P1 | 推送到 GitHub 前 | 必跑 `python -X utf8 scripts/preflight.py --quick`，绿了才能 push |
+| 🚨 P0 | 准备提交/推送前 | **必须先跑全量 CI 测试**（ruff + mypy + pytest 全量），本地全绿才能推。不许依赖 CI 远程验证 |
 | 🔴 P1 | 推送前 | 检查 CHANGELOG 是否更新、版本号是否一致（README/manual/llvm 等） |
 | 🔴 P1 | CHANGELOG | 记录原因，不只记录结果；功能写完就写，同日合并为一个版本号 |
 | 🔴 P1 | 修改代码 | 优先最小变更 |
