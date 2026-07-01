@@ -16,8 +16,18 @@ class LazyRegistry:
     def has(self, name: str) -> bool:
         return name in self._factories
 
+    def get(self, name: str):
+        if name in self._instances:
+            return self._instances[name]
+        factory = self._factories.get(name)
+        if factory is None:
+            return None
+        inst = factory()
+        self._instances[name] = inst
+        return inst
+
     def __getattr__(self, name: str):
-        if name.startswith('_'):
+        if name.startswith('_') or name in ('get', 'items', 'keys', 'values'):
             raise AttributeError(name)
         if name in self._instances:
             return self._instances[name]
