@@ -69,10 +69,10 @@ class TaskGenerator:
     }
 
     FILES = [
-        'vm.py',
-        'evaluator.py',
-        'parser.py',
-        'runtime.py',
+        'vm/__init__.py',
+        'core/evaluator.py',
+        'core/parser.py',
+        'core/runtime.py',
         'compiler.py',
         'optimizer.py',
         'tester.py',

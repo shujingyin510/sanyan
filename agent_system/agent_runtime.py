@@ -423,7 +423,7 @@ class AgentRuntime:
         if has_file and is_modify:
             return None  # 让LLM选择正确工具
         if any(w in task for w in ['函数', '结构', '多少行', 'def', 'class']):
-            return ('analyze', 'run_agent.py')
+            return ('analyze', 'agent_system/run_agent.py')
         if any(w in task for w in ['哪里', '引用', '定义', '谁调', '被调', '在哪', '调用']):
             import re as _re
 
@@ -433,7 +433,7 @@ class AgentRuntime:
                 sym = 'main'
             return ('find_symbol', sym)
         if any(w in task for w in ['多少', '个', '统计', '数一数']):
-            return ('analyze', 'run_agent.py')
+            return ('analyze', 'agent_system/run_agent.py')
         return None
 
     def _detect_verify_loop(self, task):

@@ -1416,7 +1416,7 @@ def main():
     if args.evolve:
         evo = ConstrainedEvolutionSystem()
         print('运行约束进化验证...')
-        result = evo.propose_and_verify('vm.py', 'VM._dispatch', '优化分派逻辑')
+        result = evo.propose_and_verify('vm/__init__.py', 'VM._dispatch', '优化分派逻辑')
         print(f'\n状态: {result["status"]}')
         if result['status'] == 'accepted':
             print(f'一致性: {result["verification"]["consistency_rate"]:.1%}')
@@ -1458,7 +1458,7 @@ def main():
         # 测试补丁
         test_patches = [
             {
-                'target': 'vm.py',
+                'target': 'vm/__init__.py',
                 'action': 'replace',
                 'before': 'old code',
                 'after': 'new code',
@@ -1466,7 +1466,7 @@ def main():
                 'expected': '提升5-10%',
             },
             {
-                'target': 'ternary_core.py',
+                'target': 'core/ternary_core.py',
                 'action': 'replace',
                 'before': 'old code',
                 'after': 'new code',

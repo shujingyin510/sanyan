@@ -38,7 +38,7 @@ class TestMemoryStore(unittest.TestCase):
         self.ms = MemoryStore()
 
     def test_add_and_context(self):
-        self.ms.add('analyze', 'run_agent.py', '37函数, ⚠ >50行: main')
+        self.ms.add('analyze', 'agent_system/run_agent.py', '37函数, ⚠ >50行: main')
         ctx = self.ms.context('分析')
         self.assertIn('analyze', ctx)
         self.assertIn('⚠', ctx)
@@ -61,7 +61,7 @@ class TestProjectGraph(unittest.TestCase):
     def test_build(self):
         pg = ProjectGraph()
         pg.build()
-        deps = pg.depends_on('run_agent.py')
+        deps = pg.depends_on('agent_system/run_agent.py')
         self.assertIsInstance(deps, list)
 
     def test_idempotent_build(self):
@@ -129,7 +129,7 @@ class TestAgentRuntime(unittest.TestCase):
     def test_parse_tool(self):
         tool, params = self.rt._parse_tool('analyze|run_agent.py')
         self.assertEqual(tool, 'analyze')
-        self.assertEqual(params, 'run_agent.py')
+        self.assertEqual(params, 'agent_system/run_agent.py')
 
     def test_parse_tool_done(self):
         tool, params = self.rt._parse_tool('done|任务完成')
@@ -156,7 +156,7 @@ class TestAgentRuntime(unittest.TestCase):
         self.assertIn('任务:', ctx)
 
     def test_build_context_result(self):
-        self.rt.mem.add('analyze', 'run_agent.py', '37函数')
+        self.rt.mem.add('analyze', 'agent_system/run_agent.py', '37函数')
         ctx = self.rt._build_context('分析', 'analyze', '37函数')
         self.assertIn('analyze', ctx)
 
@@ -208,7 +208,7 @@ class TestAgentTools(unittest.TestCase):
     def test_resolve_path_exists(self):
         from agent_system.agent_tools import _resolve_path_simple
 
-        self.assertEqual(_resolve_path_simple('run_agent.py'), 'run_agent.py')
+        self.assertEqual(_resolve_path_simple('agent_system/run_agent.py'), 'agent_system/run_agent.py')
 
     def test_resolve_path_search(self):
         from agent_system.agent_tools import _resolve_path_simple
@@ -219,7 +219,7 @@ class TestAgentTools(unittest.TestCase):
     def test_analyze_file(self):
         from agent_system.agent_tools import _analyze_file_direct
 
-        r = _analyze_file_direct('run_agent.py')
+        r = _analyze_file_direct('agent_system/run_agent.py')
         self.assertIn('⚠ >50行:', r)
         self.assertIn('main()', r)
 
@@ -238,14 +238,14 @@ class TestAgentTools(unittest.TestCase):
     def test_read_file_no_range(self):
         from agent_system.agent_tools import _read_file_direct_simple
 
-        r = _read_file_direct_simple('run_agent.py')
+        r = _read_file_direct_simple('agent_system/run_agent.py')
         self.assertTrue(len(r) > 100)
 
     def test_search_code(self):
         from agent_system.agent_tools import _search_code_direct
 
         r = _search_code_direct('def main')
-        self.assertIn('run_agent.py', r)
+        self.assertIn('agent_system/run_agent.py', r)
 
     def test_replace_in_file_dry(self):
         from agent_system.agent_tools import _replace_in_file_direct

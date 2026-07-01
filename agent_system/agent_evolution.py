@@ -29,15 +29,15 @@ class ConstraintEvolver:
 
     # 不可改变的区域（接口层）
     IMMUTABLE = {
-        'vm.py': {
+        'vm/__init__.py': {
             'ISA opcodes': '操作码定义不能改（会破坏二进制兼容）',
             'VM.run()': '主循环接口不能改',
         },
-        'ternary_core.py': {
+        'core/ternary_core.py': {
             'TritValue': '三态值类型不能改',
             'Kleene logic': 'Kleene真值表不能改',
         },
-        'evaluator.py': {
+        'core/evaluator.py': {
             'eval()': '求值器主接口不能改',
         },
         'ops/registry.py': {
@@ -47,15 +47,15 @@ class ConstraintEvolver:
 
     # 可改变的区域（实现层）
     MUTABLE = {
-        'vm.py': {
+        'vm/__init__.py': {
             'VM._exec_*': '操作码实现可以优化',
             'VM._dispatch': '分派逻辑可以优化',
         },
-        'ternary_core.py': {
+        'core/ternary_core.py': {
             'BT.add': '加法实现可以优化',
             'BT.mul': '乘法实现可以优化',
         },
-        'evaluator.py': {
+        'core/evaluator.py': {
             'eval._eval_*': '求值函数内部可以优化',
         },
         'ops/': {
@@ -68,9 +68,9 @@ class ConstraintEvolver:
 
     # 性能关键路径
     PERFORMANCE_CRITICAL = {
-        'vm.py': ['run', '_dispatch'],
-        'ternary_core.py': ['add', 'sub', 'mul', 'div'],
-        'evaluator.py': ['eval'],
+        'vm/__init__.py': ['run', '_dispatch'],
+        'core/ternary_core.py': ['add', 'sub', 'mul', 'div'],
+        'core/evaluator.py': ['eval'],
     }
 
     def __init__(self):
@@ -157,11 +157,11 @@ class DifferentialVerifier:
     BACKENDS = {
         'python': {
             'name': 'Python 求值器',
-            'cmd': [sys.executable, '-X', 'utf8', 'main.py'],
+            'cmd': [sys.executable, '-X', 'utf8', 'repl/main.py'],
         },
         'vm': {
             'name': '字节码 VM',
-            'cmd': [sys.executable, '-X', 'utf8', 'main.py', '--vm'],
+            'cmd': [sys.executable, '-X', 'utf8', 'repl/main.py', '--vm'],
         },
     }
 
@@ -441,7 +441,7 @@ vm.run()
         for test in test_cases:
             # Python 求值器
             r_py = sp.run(
-                [sys.executable, '-X', 'utf8', 'main.py', test],
+                [sys.executable, '-X', 'utf8', 'repl/main.py', test],
                 capture_output=True,
                 text=True,
                 encoding='utf-8',
@@ -452,7 +452,7 @@ vm.run()
 
             # 字节码 VM
             r_vm = sp.run(
-                [sys.executable, '-X', 'utf8', 'main.py', '--vm', test],
+                [sys.executable, '-X', 'utf8', 'repl/main.py', '--vm', test],
                 capture_output=True,
                 text=True,
                 encoding='utf-8',

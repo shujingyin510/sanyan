@@ -182,7 +182,7 @@ class ReviewerDegradationTest:
                 bad_type = random.choice(['cache', 'inline', 'loop'])
                 if bad_type == 'cache':
                     patch = {
-                        'target': 'vm.py',
+                        'target': 'vm/__init__.py',
                         'action': 'replace',
                         'before': '    x = compute(a, b)',
                         'after': '    _cache_x = compute(a, b)\n    x = _cache_x',
@@ -191,7 +191,7 @@ class ReviewerDegradationTest:
                     }
                 elif bad_type == 'inline':
                     patch = {
-                        'target': 'ternary_core.py',
+                        'target': 'core/ternary_core.py',
                         'action': 'replace',
                         'before': 'def add(a, b): return a + b',
                         'after': 'def add(a, b):\n    result = 0\n    result = result + a\n    result = result + b\n    return result',
@@ -200,7 +200,7 @@ class ReviewerDegradationTest:
                     }
                 else:
                     patch = {
-                        'target': 'vm.py',
+                        'target': 'vm/__init__.py',
                         'action': 'replace',
                         'before': 'for i in range(10): process(i)',
                         'after': 'for i in range(10): process(i)\n' * 4,

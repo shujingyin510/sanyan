@@ -587,15 +587,15 @@ class EvolutionSystemV2:
 
         # 为每个可改变区域生成具体优化候选（每个区域不同优化方向）
         OPTIMIZATION_MAP = {
-            'vm.py': [
+            'vm/__init__.py': [
                 ('缓存优化', '缓存重复的字节码查找结果', '减少重复计算，提升5-10%', 3),
                 ('循环优化', '优化主循环结构', '循环效率提升，减少10-20%耗时', 5),
             ],
-            'ternary_core.py': [
+            'core/ternary_core.py': [
                 ('位运算优化', '用位运算替代算术运算', '运算速度提升15-25%', 2),
                 ('内存优化', '减少临时对象创建', '内存分配减少30%', 4),
             ],
-            'evaluator.py': [
+            'core/evaluator.py': [
                 ('缓存优化', '缓存求值结果', '重复表达式求值加速20%', 3),
                 ('短路优化', '提前退出无需计算的分支', '无效计算减少40%', 6),
             ],
@@ -670,7 +670,7 @@ class EvolutionSystemV2:
 
         # 传入上下文（性能关键路径）
         context = {
-            'critical_files': ['vm.py', 'ternary_core.py', 'evaluator.py'],
+            'critical_files': ['vm/__init__.py', 'core/ternary_core.py', 'core/evaluator.py'],
         }
 
         # 锦标赛
@@ -1137,7 +1137,7 @@ class AgentCodeModifier:
         try:
             from agent_system.logic_audit import audit_code
 
-            with open(os.path.join(ROOT, 'vm.py'), encoding='utf-8') as f:
+            with open(os.path.join(ROOT, 'vm/__init__.py'), encoding='utf-8') as f:
                 lr = audit_code(f.read())
             if lr.get('by_severity', {}).get('high', 0) > 0:
                 all_passed = False
@@ -1152,7 +1152,7 @@ class AgentCodeModifier:
             import difflib
 
             backup_dir = os.path.join(ROOT, 'benchmarks', 'backups')
-            for target in ['vm.py', 'ternary_core.py', 'evaluator.py']:
+            for target in ['vm/__init__.py', 'core/ternary_core.py', 'core/evaluator.py']:
                 bak = os.path.join(backup_dir, os.path.basename(target) + '.bak')
                 if not os.path.exists(bak):
                     continue
@@ -1189,7 +1189,7 @@ class AgentCodeModifier:
             print(f'\n═══ 循环 #{cycle + 1} ═══')
 
             # 1. 读取目标文件
-            target_files = ['vm.py', 'ternary_core.py', 'evaluator.py']
+            target_files = ['vm/__init__.py', 'core/ternary_core.py', 'core/evaluator.py']
             target = target_files[cycle % len(target_files)]
             code = self.read_code(target)
             if code.startswith('读取失败'):

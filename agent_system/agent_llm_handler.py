@@ -300,7 +300,7 @@ class LLMHandler:
 
         # 3: keyword heuristic
         if 'def' in raw or '函数' in raw or '结构' in raw:
-            return 'analyze', 'run_agent.py'
+            return 'analyze', 'agent_system/run_agent.py'
 
         return raw, ''
 

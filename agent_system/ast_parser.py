@@ -8,7 +8,7 @@
 
 用法：
   parser = ASTParser()
-  info = parser.parse_file('evaluator.py')
+  info = parser.parse_file('core/evaluator.py')
   related = parser.find_related_files('修复 evaluator 的类型错误')
 """
 

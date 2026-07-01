@@ -109,7 +109,7 @@ def _run_verify(target_file: str, baseline_hash: str = '') -> dict:
     # 2. self-host
     try:
         r2 = sp.run(
-            [PYTHON, UTF8, 'run_agent.py', '--self-host'],
+            [PYTHON, UTF8, 'agent_system/run_agent.py', '--self-host'],
             capture_output=True,
             text=True,
             encoding='utf-8',
@@ -364,7 +364,7 @@ BUGS = [
 
 
 def run_benchmark(quick=False):
-    targets = ['vm.py', 'evaluator.py']
+    targets = ['vm/__init__.py', 'core/evaluator.py']
     bugs = BUGS[:10] if quick else BUGS
 
     print(f'\n{"=" * 60}\n  三言 Agent 安全基准\n  目标: {", ".join(targets)}\n  注入: {len(bugs)} 种\n{"=" * 60}\n')

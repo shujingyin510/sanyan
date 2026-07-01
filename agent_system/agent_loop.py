@@ -70,7 +70,7 @@ def agent_fix(failure_output):
             sys.executable,
             '-X',
             'utf8',
-            'run_agent.py',
+            'agent_system/run_agent.py',
             '--auto',
             '测试失败：' + failure_output[:500] + '。分析失败原因并修复代码。',
         ],

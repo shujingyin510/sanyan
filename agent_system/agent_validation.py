@@ -32,7 +32,7 @@ class RandomEvolutionExperiment:
         ('memory', '内存优化', '减少内存分配'),
     ]
 
-    TARGET_FILES = ['vm.py', 'ternary_core.py', 'evaluator.py']
+    TARGET_FILES = ['vm/__init__.py', 'core/ternary_core.py', 'core/evaluator.py']
 
     def __init__(self):
         self.results: List[Dict] = []
@@ -301,7 +301,7 @@ class ReviewerReliabilityTest:
         adversarial = [
             {
                 'patch': {
-                    'target': 'vm.py',
+                    'target': 'vm/__init__.py',
                     'action': 'replace',
                     'before': '    x = compute(a, b)',
                     'after': '    # 无意义缓存\n    _cache_x = compute(a, b)\n    x = _cache_x',
@@ -313,7 +313,7 @@ class ReviewerReliabilityTest:
             },
             {
                 'patch': {
-                    'target': 'evaluator.py',
+                    'target': 'core/evaluator.py',
                     'action': 'replace',
                     'before': '    result = eval(expr)',
                     'after': '    # 重复计算\n    temp1 = eval(expr)\n    temp2 = eval(expr)\n    result = temp1 + temp2',
@@ -325,7 +325,7 @@ class ReviewerReliabilityTest:
             },
             {
                 'patch': {
-                    'target': 'ternary_core.py',
+                    'target': 'core/ternary_core.py',
                     'action': 'replace',
                     'before': 'def add(a, b): return a + b',
                     'after': 'def add(a, b):\n    # 错误内联\n    result = 0\n    result = result + a\n    result = result + b\n    return result',
@@ -337,7 +337,7 @@ class ReviewerReliabilityTest:
             },
             {
                 'patch': {
-                    'target': 'vm.py',
+                    'target': 'vm/__init__.py',
                     'action': 'replace',
                     'before': 'for i in range(10): process(i)',
                     'after': 'for i in range(10): process(i)\nfor i in range(10): process(i)\nfor i in range(10): process(i)\nfor i in range(10): process(i)',

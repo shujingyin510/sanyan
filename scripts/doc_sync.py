@@ -107,8 +107,8 @@ def fix_version_consistency() -> None:
 
 
 def sync_builtin_ops_table():
-    """从 runtime.py:BUILTIN_OPS 同步命令速查表到 docs/commands.md。"""
-    runtime = _read('runtime.py')
+    """从 core/runtime.py:BUILTIN_OPS 同步命令速查表到 docs/commands.md。"""
+    runtime = _read('core/runtime.py')
     ops_match = re.search(r'BUILTIN_OPS\s*=\s*\{(.*?)\}', runtime, re.DOTALL)
     if not ops_match:
         return
@@ -192,8 +192,8 @@ def sync_version():
 
 
 def sync_error_table():
-    """从 values.py 同步异常类到 docs/errors.md。"""
-    values = _read('values.py')
+    """从 core/values.py 同步异常类到 docs/errors.md。"""
+    values = _read('core/values.py')
     errors = re.findall(r'class (Sanyan\w+Error)', values)
 
     doc = _read(ERRORS_PATH)

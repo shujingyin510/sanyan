@@ -38,7 +38,7 @@ for tid, task, category in tests:
     t0 = time.perf_counter()
     try:
         r = subprocess.run(
-            ['python', '-X', 'utf8', 'run_agent.py', task, '--rounds', '5'],
+            ['python', '-X', 'utf8', 'agent_system/run_agent.py', task, '--rounds', '5'],
             capture_output=True,
             text=True,
             timeout=60,

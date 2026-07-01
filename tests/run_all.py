@@ -23,7 +23,7 @@ def run_san(filepath: str) -> tuple[bool, str]:
     """运行一个 .san 文件，返回 (成功, 输出)"""
     try:
         result = subprocess.run(
-            [sys.executable, '-X', 'utf8', 'main.py', '--vm', filepath],
+            [sys.executable, '-X', 'utf8', 'repl/main.py', '--vm', filepath],
             capture_output=True,
             text=True,
             timeout=60,

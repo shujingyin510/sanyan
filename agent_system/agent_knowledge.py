@@ -445,7 +445,7 @@ class KnowledgeValidationSystem:
             ('更新{file}文档', 'documentation'),
         ]
 
-        files = ['vm.py', 'evaluator.py', 'parser.py', 'runtime.py']
+        files = ['vm/__init__.py', 'core/evaluator.py', 'core/parser.py', 'core/runtime.py']
         features = ['日志', '缓存', '并行', '流式']
 
         tasks = []

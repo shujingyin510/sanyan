@@ -29,7 +29,7 @@ for i, (task, category) in enumerate(tests):
     t0 = time.perf_counter()
     try:
         r = subprocess.run(
-            ['python', '-X', 'utf8', 'run_agent.py', task, '--rounds', '3'],
+            ['python', '-X', 'utf8', 'agent_system/run_agent.py', task, '--rounds', '3'],
             capture_output=True,
             text=True,
             timeout=45,

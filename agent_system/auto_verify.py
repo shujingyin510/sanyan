@@ -33,7 +33,7 @@ def main():
                 sys.executable,
                 '-X',
                 'utf8',
-                'run_agent.py',
+                'agent_system/run_agent.py',
                 '--auto',
                 '测试失败：' + r.stdout[-500:].strip() + '。分析失败原因并修复代码。',
             ],

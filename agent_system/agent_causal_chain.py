@@ -40,13 +40,13 @@ class RealisticTaskGenerator:
         task_contexts = {
             'bug_fix': {
                 'files': [
-                    'vm.py',
-                    'evaluator.py',
-                    'parser.py',
-                    'runtime.py',
+                    'vm/__init__.py',
+                    'core/evaluator.py',
+                    'core/parser.py',
+                    'core/runtime.py',
                     'compiler.py',
                     'optimizer.py',
-                    'lexer.py',
+                    'core/lexer.py',
                     'backend.py',
                     'frontend.py',
                     'core.py',
@@ -158,7 +158,7 @@ class RealisticTaskGenerator:
             },
             'analysis': {
                 'files': [
-                    'main.py',
+                    'repl/main.py',
                     'config.py',
                     'settings.py',
                     'constants.py',

@@ -46,14 +46,14 @@ def _run_py(script, *args, timeout=300, label=''):
 def cmd_agent_run(args):
     from agent_system.run_agent import main as agent_main
 
-    sys.argv = ['run_agent.py', args.task]
+    sys.argv = ['agent_system/run_agent.py', args.task]
     agent_main()
 
 
 def cmd_agent_evolve(args):
     c = _console()
     c.print('\n[bold cyan]═══ Agent 自主改代码闭环 ═══[/]\n')
-    rc = _run_py('run_agent.py', '--code-evolve')
+    rc = _run_py('agent_system/run_agent.py', '--code-evolve')
     c.print(f'\n  {SYMBOL_OK if rc == 0 else SYMBOL_FAIL} 退出码: {rc}')
     return rc
 
@@ -61,13 +61,13 @@ def cmd_agent_evolve(args):
 def cmd_agent_auto_evolve(args):
     c = _console()
     c.print('\n[bold cyan]═══ 自动化进化闭环 ═══[/]\n')
-    return _run_py('run_agent.py', '--auto-evolve')
+    return _run_py('agent_system/run_agent.py', '--auto-evolve')
 
 
 def cmd_agent_validate(args):
     c = _console()
     c.print('\n[bold cyan]═══ 进化仿真验证 ═══[/]\n')
-    return _run_py('run_agent.py', '--validate')
+    return _run_py('agent_system/run_agent.py', '--validate')
 
 
 def cmd_agent_dashboard(args):
@@ -121,13 +121,13 @@ def cmd_bench(args):
 def cmd_agent_self_host(args):
     c = _console()
     c.print('\n[bold cyan]═══ 自举验证 ═══[/]\n')
-    return _run_py('run_agent.py', '--self-host')
+    return _run_py('agent_system/run_agent.py', '--self-host')
 
 
 def cmd_agent_review_evolve(args):
     c = _console()
     c.print('\n[bold cyan]═══ 带审查进化闭环 ═══[/]\n')
-    return _run_py('run_agent.py', '--review-evolve')
+    return _run_py('agent_system/run_agent.py', '--review-evolve')
 
 
 # ── 编译/运行 ──
@@ -148,14 +148,14 @@ def cmd_run(args):
     c = _console()
     c.print(f'  run [cyan]{args.file}[/]')
     if args.file.endswith('.bin'):
-        return _run_py('main.py', '--vm', args.file)
-    return _run_py('main.py', args.file)
+        return _run_py('repl/main.py', '--vm', args.file)
+    return _run_py('repl/main.py', args.file)
 
 
 def cmd_repl(args):
     c = _console()
     c.print(f'\n[bold]三言 REPL[/]  [dim]{VERSION}[/]\n')
-    return _run_py('main.py')
+    return _run_py('repl/main.py')
 
 
 # ── 版本 ──
