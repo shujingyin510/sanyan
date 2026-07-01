@@ -94,7 +94,7 @@ class TestLlvmNativeCompile(unittest.TestCase):
         bp_path = os.path.join(os.path.dirname(__file__), '..', 'stdlib', '_bootstrap.san')
         if not os.path.exists(bp_path):
             self.skipTest('_bootstrap.san 不存在')
-        with open(bp_path, 'r') as f:
+        with open(bp_path, 'r', encoding='utf-8') as f:
             source = f.read()
         ir_text, cg = compile_source(source, 'bootstrap')
 

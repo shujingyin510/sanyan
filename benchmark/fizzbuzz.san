@@ -1,23 +1,21 @@
 定义 fizzbuzz(n) {
   设 i = 1
   循环 (i <= n) {
-    设 msg = 0
+    设 msg = ""
     若 (i % 15 == 0) {
-      msg = 1
+      msg = "FizzBuzz"
+    } 再若 (i % 3 == 0) {
+      msg = "Fizz"
+    } 再若 (i % 5 == 0) {
+      msg = "Buzz"
     }
-    若 (i % 3 == 0 且 msg == 0) {
-      msg = 1
-    }
-    若 (i % 5 == 0 且 msg == 0) {
-      msg = 1
-    }
-    若 (msg == 0) {
+    若 (msg == "") {
       输出(i)
-    } 其余 {
+    } 否则 {
       输出(msg)
     }
     i = i + 1
   }
 }
 
-fizzbuzz(100)
+fizzbuzz(30)

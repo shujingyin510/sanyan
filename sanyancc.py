@@ -91,9 +91,9 @@ class BytecodeWriter:
 
     def write(self, path: str, var_count: int) -> None:
         cs = len(self.data)
-        if cs > 0xFFFF:
+        if cs > 0xFFFFFFFF:
             raise ValueError(f'字节码过大: {cs}')
-        header = struct.pack('<4sBBH', b'SAN0', 1, var_count & 0xFF, cs)
+        header = struct.pack('<4sBBI', b'SAN0', 1, var_count & 0xFF, cs)
         with open(path, 'wb') as f:
             f.write(header)
             f.write(self.data)

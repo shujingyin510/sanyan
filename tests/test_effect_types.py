@@ -262,7 +262,7 @@ class TestEndToEndEffectType(unittest.TestCase):
         # 调用：传入不确定值 → 应抛 SanyanTypeError
         with self.assertRaises(SanyanTypeError) as ctx:
             ev.eval(['safe_op', ['sensor']])
-        self.assertIn('编译期拒绝', str(ctx.exception))
+        self.assertIn('确定[int]', str(ctx.exception))
 
     def test_uncertain_param_accepts_any_value(self):
         """不确定参数接受任意值"""

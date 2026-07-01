@@ -34,5 +34,35 @@
     "version": "0.1.0",
     "author": "三言团队",
     "url": "https://github.com/shujingyin510/sanyan-packages/raw/main/packages/config.zip"
+  },
+  "template": {
+    "description": "三言包模板 — 快速创建新包",
+    "version": "1.0.0",
+    "author": "三言团队",
+    "keywords": ["template", "starter"]
+  },
+  "http_client": {
+    "description": "HTTP 客户端 — GET/POST 请求、JSON 解析",
+    "version": "1.0.0",
+    "author": "三言团队",
+    "keywords": ["http", "api", "json", "web"]
+  },
+  "json_utils": {
+    "description": "JSON 工具 — 解析、序列化、路径查询、格式化",
+    "version": "1.0.0",
+    "author": "三言团队",
+    "keywords": ["json", "parse", "format", "query"]
+  },
+  "datetime_utils": {
+    "description": "日期时间工具 — 格式化、解析、计算、时区",
+    "version": "1.0.0",
+    "author": "三言团队",
+    "keywords": ["datetime", "time", "date", "format"]
+  },
+  "string_utils": {
+    "description": "字符串工具 — 填充、截断、转换、格式化",
+    "version": "1.0.0",
+    "author": "三言团队",
+    "keywords": ["string", "text", "format", "utils"]
   }
 }

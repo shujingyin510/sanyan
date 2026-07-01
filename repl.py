@@ -229,8 +229,11 @@ def _make_completer(env):
             ':watch',
             ':unwatch',
             ':profile',
+            ':types',
+            ':help',
             'exit',
             '退出',
+            '帮助',
         ]:
             if cmd.startswith(text):
                 matches.append(cmd)
@@ -254,7 +257,7 @@ def repl() -> None:
     print(f'三言 v{VERSION} REPL (母语可定制)')
     print('输入 :lang english 切换英文，:lang chinese 切换中文')
     print('输入 :step 单步调试  :break <函数名> 添加断点  :watch <变量> 监视变量')
-    print('输入 :profile 查看性能  exit/退出 离开，Tab 键自动补全')
+    print('输入 :profile 查看性能 :types 查看类型  exit/退出 离开，Tab 键自动补全')
     _load_state(env)  # 恢复上次会话的变量
     while True:
         try:
@@ -337,6 +340,37 @@ def repl() -> None:
                     env.profile_start()
                     print('性能追踪已开启')
                 continue
+            if code == ':types':
+                type_env = env.type_env
+                if type_env._scopes:
+                    current_scope = type_env._scopes[-1]
+                    if current_scope:
+                        print('当前作用域类型:')
+                        for name, type_name in current_scope.items():
+                            print(f'  {name}: {type_env.format_type(type_name)}')
+                    else:
+                        print('当前作用域无变量')
+                continue
+            if code in (':help', '帮助'):
+                print('可用命令:')
+                print('  :lang <语言>      切换语言 (chinese/english)')
+                print('  :maxloop <次数>   设置最大循环步数')
+                print('  :step             切换单步调试模式')
+                print('  :continue         继续执行')
+                print('  :break <函数名>   添加断点')
+                print('  :unbreak <函数名> 移除断点')
+                print('  :watch <变量>     监视变量')
+                print('  :unwatch <变量>   移除监视')
+                print('  :profile          查看性能报告')
+                print('  :types            查看当前作用域类型')
+                print('  :help             显示此帮助')
+                print('  exit/退出         退出 REPL')
+                print()
+                print('快捷键:')
+                print('  Tab               自动补全')
+                print('  Ctrl+C            中断当前操作')
+                print('  Ctrl+D            退出 REPL')
+                continue
 
             # 多行输入支持
             while True:
@@ -376,6 +410,7 @@ def repl() -> None:
             if ast is None:
                 continue
 
+            env._source = code  # 设置源码用于错误信息显示
             result = env.eval(ast)
 
             if result is not None:

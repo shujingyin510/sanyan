@@ -50,8 +50,24 @@ def parse_string_literal(s: str) -> str:
     return ''.join(result)
 
 
+# 数值解析缓存
+_NUMERIC_LITERAL_CACHE: dict[str, Optional[TritValue]] = {}
+
+
 def parse_numeric_literal(node: str) -> Optional[TritValue]:
     """解析数值字面量字符串（支持十进制和十六进制）"""
+    cache = _NUMERIC_LITERAL_CACHE
+    if node in cache:
+        return cache[node]
+    result = _parse_numeric_literal_impl(node)
+    # 缓存常用长度的字符串
+    if len(node) <= 10:
+        cache[node] = result
+    return result
+
+
+def _parse_numeric_literal_impl(node: str) -> Optional[TritValue]:
+    """解析数值字面量字符串（实际实现）"""
     try:
         if node.startswith('0x') or node.startswith('0X'):
             return TritValue(int(node, 16))

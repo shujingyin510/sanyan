@@ -17,8 +17,8 @@ Full research report on UR ≈ 0.30 degeneration detection:
 ### 2. Agent Evolution Report
 **[agent_evolution_report.md](agent_evolution_report.md)**
 
-Agent evolution runtime experiments:
-- 4-layer architecture (Knowledge → Evolution → Policy → Frozen Core)
+Agent evolution runtime experiments（⚠️ 合成模拟 / synthetic simulation，机制演示，非真实任务实测）:
+- 5-layer architecture (Validation → Knowledge → Evolution → Policy → Frozen Core)
 - Meta-learning database
 - Task taxonomy and conditional optimization
 - Knowledge validation and confidence
@@ -27,7 +27,7 @@ Agent evolution runtime experiments:
 **[agent_benchmark_report.md](agent_benchmark_report.md)**
 
 Agent safety and honesty evaluation:
-- 49 bug injection patterns, 98% detection rate
+- 49 bug injection patterns, 100% detection rate (49/49)
 - 100 questions × 5 categories, 3-dimensional scoring
 - Truth Calibration Engine
 - Logic Audit Engine
@@ -41,4 +41,4 @@ Agent safety and honesty evaluation:
 |------|-------------|
 | ternary_gating_report.md | UR ≈ 0.30 across 4 models, 3 architectures |
 | agent_evolution_report.md | Knowledge → Calibration → Selection → Success chain |
-| agent_benchmark_report.md | 98% bug detection, -11.5% cognitive overreach |
+| agent_benchmark_report.md | 100% bug detection (49/49), -16.7% cognitive overreach (50.0%→33.3%) |

@@ -146,6 +146,7 @@ PREFIXABLE_OPS = {
     'load',
     'print',
     'query',
+    'match',
 }
 # 单参数前缀操作符（不需要括号包裹参数）
 PREFIXABLE_SINGLE_ARG = {'read', 'not', 'digit', 'import', 'load', 'print', 'query'}

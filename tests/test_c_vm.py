@@ -126,7 +126,8 @@ class TestCVMCrossValidation(unittest.TestCase):
 
             old_stdout = sys.stdout
             sys.stdout = io.StringIO()
-            VM.from_bin(bin_path)
+            vm = VM.from_bin(bin_path)
+            vm.run()
             py_output = sys.stdout.getvalue().strip()
             sys.stdout = old_stdout
 

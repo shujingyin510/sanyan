@@ -112,6 +112,7 @@ def _run_evaluator(code, profiling):
 
     skin_mgr = SkinManager('chinese')
     env = SanyanEvaluator(skin_manager=skin_mgr)
+    env._source = code  # 设置源码用于错误信息显示
     if profiling:
         env.profile_start()
 

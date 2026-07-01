@@ -7,20 +7,14 @@
 | **C VM (ISA v2)** | 16-bit LOAD/STORE, 32-bit CALL, CLOSURE, PUSH_STR16 |
 | **Level 3 Bootstrap** | 318-line C seed VM → TCC-compiled binary |
 | **Level 4 Bootstrap** | 617-line x86_64 NASM assembly VM |
-| **AVX2 GEMM Kernel** | FMA instructions, 256×256, 66 GFLOPS, zero error vs NumPy |
-| **C Operator Library** | LayerNorm (err e-07), Softmax (err e-09), GELU (err e-08) |
-| **TinyStories 3.6M** | GPT-Neo inference, KV Cache, 4ms/token |
-| **TinyStories 28M** | GPT-Neo inference, 1000-prompt benchmark |
-| **GPT-2 124M** | GPT-2 inference (Conv1D + pre-norm), KV Cache, 1000-prompt benchmark |
-| **UR Threshold Calibration** | Auto-calibrated to 0.30 across 3.6M and 28M |
-| **Qwen2.5-0.5B Validation** | 1000-prompt false positive check (0.4%) |
-| **Human Blind Evaluation** | 100 prompts × 3 dimensions, ternary 79.7% preferred |
-| **Ablation Study** | UR-only = full trajectory (all other signals redundant) |
-| **Statistical Significance** | p = 0.0287, 95% CI [0.01%, 0.79%] |
 | **Sanyan → C FFI Demo** | .san → reg_op → C DLL → GPT-2 end-to-end |
-| **Agent Safety Benchmarks** | 49 bug injections, 98% detection rate |
-| **Agent Honesty Benchmarks** | 100 questions × 5 categories, Truth Calibration -11.5% overreach |
-| **Agent Evolution Runtime** | 4-layer architecture, knowledge→calibration→selection→success chain |
+| **Agent Safety Benchmarks** | 49 bug injections, 100% detection rate (49/49) |
+| **Agent Honesty Benchmarks** | 100 questions × 5 categories, Truth Calibration -16.7% overreach (50.0%→33.3%) |
+| **Agent Evolution Runtime** | 5-layer architecture, knowledge→calibration→selection→success chain（合成模拟·机制演示，见 README 核心实验说明） |
+
+> **三态门控 / 神经推理工作已迁移到独立 UR 仓库。**
+> AVX2 GEMM（66 GFLOPS）、C 算子库、TinyStories/GPT-2 推理、UR 阈值校准（0.30）、Qwen 误报率（0.4%）、人类盲评（ternary 79.7% preferred）、消融实验、统计显著性（p = 0.0287）等成果不再在本仓 ROADMAP 维护。
+> 详见 [`docs/research/ternary_gating_report.md`](research/ternary_gating_report.md) 及独立 UR 仓库 <https://github.com/shujingyin510/UR>。
 
 ---
 

@@ -4,6 +4,7 @@
 仅对内置操作检查，用户自定义函数跳过。
 
 类型: int, float, str, list, dict, trit, num(int|float), any
+泛型: 列表<T>, 字典<K, V>
 效应类型: 确定[X]（信度≥0.99）、不确定[X]（任意信度）
 格式: (预期参数类型元组, 返回类型)
 """
@@ -35,6 +36,7 @@ def _type_of(v: Any) -> str:
 def _matches(actual: str, expected: str) -> bool:
     """检查实际类型是否匹配预期类型。num 可匹配 int 或 float。
     效应类型：确定[X] 严格匹配，不确定[X] 兼容确定[X]。
+    泛型：列表<T> 匹配 列表<任意>，字典<K,V> 匹配 字典<任意,任意>。
     """
     if expected == 'any':
         return True
@@ -49,6 +51,26 @@ def _matches(actual: str, expected: str) -> bool:
     if expected.startswith('不确定[') and expected.endswith(']'):
         inner = expected[len('不确定[') : -1]
         return actual in (expected, f'确定[{inner}]')
+
+    # 泛型容器匹配
+    if expected.startswith('列表<') and expected.endswith('>'):
+        if actual == 'list':
+            return True  # 普通 list 匹配任何泛型 list
+        if actual.startswith('列表<') and actual.endswith('>'):
+            inner_expected = expected[3:-1]
+            inner_actual = actual[3:-1]
+            return _matches(inner_actual, inner_expected)
+        return False
+
+    if expected.startswith('字典<') and expected.endswith('>'):
+        if actual == 'dict':
+            return True  # 普通 dict 匹配任何泛型 dict
+        if actual.startswith('字典<') and actual.endswith('>'):
+            parts_expected = expected[3:-1].split(', ', 1)
+            parts_actual = actual[3:-1].split(', ', 1)
+            if len(parts_expected) == 2 and len(parts_actual) == 2:
+                return _matches(parts_actual[0], parts_expected[0]) and _matches(parts_actual[1], parts_expected[1])
+        return False
 
     if expected == actual:
         return True
@@ -161,6 +183,7 @@ def check_types(op: str, args: list, evaluated: list) -> str | None:
     """检查操作的类型签名。返回 None 表示通过，返回错误消息表示类型不匹配。
 
     仅检查已知操作，用户自定义函数返回 None（跳过检查）。
+    支持协议类型检查。
     """
     sig = _TYPE_SIGS.get(op)
     if sig is None:
@@ -175,6 +198,15 @@ def check_types(op: str, args: list, evaluated: list) -> str | None:
     for i, (expected, actual_val) in enumerate(zip(param_types, evaluated)):
         actual = _type_of(actual_val)
         if not _matches(actual, expected):
+            # 检查是否为协议类型
+            try:
+                from protocols import check_type_protocol
+
+                protocol_err = check_type_protocol(actual_val, expected)
+                if protocol_err:
+                    return f"操作 '{op}' 的第 {i + 1} 个参数不满足协议: {protocol_err}"
+            except ImportError:
+                pass
             return f"操作 '{op}' 的第 {i + 1} 个参数类型错误：预期 {expected}，实际 {actual}"
 
     return None

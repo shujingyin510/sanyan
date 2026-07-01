@@ -226,6 +226,7 @@ agent_*.db
 agent_system/*.db
 agent_system/agent_decision.json
 agent_system/.agent_experience.json
+agent_system/REFACTOR_PLAN.md
 !stdlib/io.bin
 !stdlib/logic.bin
 !stdlib/stat.bin
@@ -262,3 +263,6 @@ publish/ternary_engine/dist/
 coverage*.json
 coverage*.xml
 .coverage
+agent_evolution_memory.db
+csrc/gpt2/pytorch_model.bin
+csrc/gpt_neo_125m/pytorch_model.bin

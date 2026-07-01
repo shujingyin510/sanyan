@@ -28,9 +28,9 @@ print('-' * 45)
 all_data = []
 for cat, words in keywords.items():
     for w in words:
-        costs = {n: len(enc.encode(w)) for n, enc in encoders.items()}
-        all_data.append((cat, w, costs))
-        g, q, o, p = costs['GPT-2'], costs['Qwen'], costs['OPT'], costs['Pythia']
+        cost_map = {n: len(enc.encode(w)) for n, enc in encoders.items()}
+        all_data.append((cat, w, cost_map))
+        g, q, o, p = cost_map['GPT-2'], cost_map['Qwen'], cost_map['OPT'], cost_map['Pythia']
         print(f'{cat:<10} {w:<8} {g:>5} {q:>5} {o:>5} {p:>5}')
     print()
 
@@ -47,7 +47,7 @@ for n, enc in encoders.items():
 print('\n\n### Token Cost Distribution（每个关键词的 token 数分布）\n')
 for name in ['GPT-2', 'Qwen', 'OPT', 'Pythia']:
     costs = sorted([d[2][name] for d in all_data])
-    dist = {}
+    dist: dict[int, int] = {}
     for c in costs:
         dist[c] = dist.get(c, 0) + 1
     max_count = max(dist.values())

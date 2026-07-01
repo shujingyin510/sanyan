@@ -177,6 +177,8 @@ class _Parser:
             return self._parse_judge()
         if kw == 'register_device':
             return self._parse_register_device()
+        if kw == 'match':
+            return self._parse_match()
 
         # 表达式语句
         expr = self.parse_expression()
@@ -386,6 +388,32 @@ class _Parser:
             self._expect(')')
         return ['register_device', name, device_type] + params
 
+    def _parse_match(self):
+        """解析匹配表达式: 匹配 value pattern1 body1 pattern2 body2 ..."""
+        self.advance()  # consume 'match' keyword
+        value = self.parse_expression()
+
+        # 检查是否有花括号块
+        if self.peek() and self.peek().value == '{':
+            self.advance()  # consume '{'
+            branches = []
+            while self.peek() and self.peek().value != '}':
+                pattern = self.parse_expression()
+                body = self.parse_block()
+                branches.append(pattern)
+                branches.append(body)
+            self._expect('}')
+        else:
+            # 无花括号：直接解析模式和体
+            branches = []
+            while self.peek() and self.peek().value not in (';', ')', '}', None):
+                pattern = self.parse_expression()
+                body = self.parse_block()
+                branches.append(pattern)
+                branches.append(body)
+
+        return ['匹配', value] + branches
+
     def parse_if(self, advance_kw: bool = True) -> Any:
         if advance_kw:
             self.advance()  # consume 'if'/'elif' keyword
@@ -510,6 +538,26 @@ class _Parser:
                 pass  # fall through to identifier
             elif kw in PREFIXABLE_SINGLE_ARG:
                 return [kw, self.parse_expression(10)]
+            elif kw == 'match':
+                # match 语句: 匹配 value pattern body ...
+                # 但如果后跟 ( 则是函数调用，走下面通用前缀路径
+                if self.peek() and self.peek().value == '(':
+                    self._expect('(')
+                    args = []
+                    while self.peek() and self.peek().value != ')':
+                        args.append(self.parse_expression())
+                        if self.peek() and self.peek().value == ',':
+                            self.advance()
+                    self._expect(')')
+                    return [kw] + args
+                value = self.parse_expression()
+                branches = []
+                while self.peek() and self.peek().value not in (')', ']', '}', ';', None):
+                    pattern = self.parse_expression()
+                    body = self.parse_block()
+                    branches.append(pattern)
+                    branches.append(body)
+                return ['匹配', value] + branches
             elif self.peek() and self.peek().value == '(':
                 self._expect('(')
                 args = []

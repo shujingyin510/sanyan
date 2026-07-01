@@ -26,6 +26,7 @@
     "map": "映射",
     "filter": "过滤",
     "reduce": "归并",
+    "match": "匹配",
     "debug": "调试",
     "sleep": "等待",
     "wait": "等待",

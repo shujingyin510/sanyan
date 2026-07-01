@@ -3,13 +3,14 @@
 import tiktoken
 from transformers import AutoTokenizer
 import os
+from typing import Any
 
 os.environ['HF_ENDPOINT'] = 'https://hf-mirror.com'
 os.environ['HF_HUB_DISABLE_SYMLINKS_WARNING'] = '1'
 
 tokenizers = [
     ('Qwen2.5-0.5B', lambda: AutoTokenizer.from_pretrained('Qwen/Qwen2.5-0.5B', local_files_only=True)),
-    ('GPT-2 124M', tiktoken.get_encoding, 'gpt2'),
+    ('GPT-2 124M', lambda: tiktoken.get_encoding('gpt2')),
     ('OPT-125M', lambda: AutoTokenizer.from_pretrained('facebook/opt-125m')),
     ('Pythia-160M', lambda: AutoTokenizer.from_pretrained('EleutherAI/pythia-160m')),
     ('SmolLM2-135M', lambda: AutoTokenizer.from_pretrained('HuggingFaceTB/SmolLM2-135M')),
@@ -55,13 +56,10 @@ tests = [
 ]
 
 # Load all tokenizers
-encoders = {}
-for name, fn, *args in tokenizers:
+encoders: dict[str, Any] = {}
+for name, fn in tokenizers:
     try:
-        if args:
-            encoders[name] = fn(args[0])
-        else:
-            encoders[name] = fn()
+        encoders[name] = fn()
     except Exception as e:
         print(f'SKIP {name}: {e}')
 

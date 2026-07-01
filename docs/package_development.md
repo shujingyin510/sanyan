@@ -1,242 +1,240 @@
 # 三言包开发指南
 
-## 概述
+## 快速开始
 
-三言包是可复用的代码模块，可以通过包管理器安装和分享。本文档介绍如何开发、发布和使用三言包。
+### 1. 创建包目录
 
-## 包结构
-
-```
-packages/
-  my_package/
-    package.san      # 包入口文件（必需）
-    package.json     # 包元信息（可选）
-    README.md        # 包文档（可选）
-    lib/
-      helper.san     # 辅助模块（可选）
+```bash
+mkdir packages/my_package
+cd packages/my_package
 ```
 
-### 入口文件
-
-`package.san` 是包的入口文件，当用户执行 `安装("my_package")` 或 `加载包("my_package")` 时会被加载。
-
-```sanyan
-// packages/my_package/package.san
-
-定义 问候(名称) {
-    返回(连接("你好，", 名称, "！"))
-}
-
-导出 问候
-```
-
-### 元信息文件
-
-`package.json` 包含包的元信息：
+### 2. 创建 package.json
 
 ```json
 {
   "name": "my_package",
   "version": "1.0.0",
-  "description": "我的三言包",
-  "author": "开发者名称",
-  "license": "MIT",
-  "dependencies": {}
+  "description": "我的包描述",
+  "author": "你的名字",
+  "license": "GPL-3.0",
+  "keywords": ["keyword1", "keyword2"],
+  "main": "package.san"
 }
 ```
 
-## 开发流程
+### 3. 编写 package.san
 
-### 1. 创建包目录
+```san
+// 我的包主入口
 
-```bash
-mkdir -p packages/my_package
-```
-
-### 2. 编写入口文件
-
-创建 `packages/my_package/package.san`：
-
-```sanyan
-// 示例：数学工具包
-
-// 计算两点距离
-定义 两点距离(x1, y1, x2, y2) {
-    设 dx = 减(x2, x1)
-    设 dy = 减(y2, y1)
-    返回(平方根(加(乘(dx, dx), 乘(dy, dy))))
+定义 我的函数(x) {
+    返回(加(x, 1))
 }
 
-// 计算中点
-定义 中点(x1, y1, x2, y2) {
-    返回(列表(除(加(x1, x2), 2), 除(加(y1, y2), 2)))
+定义 另一个函数(x, y) {
+    返回(加(x, y))
 }
 
-导出 两点距离 中点
+导出 我的函数 另一个函数
 ```
 
-### 3. 测试包
+### 4. 测试包
 
-```sanyan
-// 测试脚本
-设 my = 加载包("my_package")
-输出(调用(my, "两点距离", 0, 0, 3, 4))  // 输出: 5
+```san
+// test_my_package.san
+导入("packages/my_package")
+
+输出(我的函数(5))  // => 6
+输出(另一个函数(3, 4))  // => 7
 ```
 
-### 4. 发布包
+## 包结构
 
-将包目录打包为 zip 文件：
-
-```bash
-cd packages
-zip -r my_package.zip my_package/
+```
+my_package/
+├── package.json    # 包元信息（必需）
+├── package.san     # 主入口文件（必需）
+├── README.md       # 包文档（推荐）
+├── test.san        # 测试文件（推荐）
+└── lib/            # 辅助模块（可选）
+    ├── utils.san
+    └── helpers.san
 ```
 
-上传到 GitHub Releases 或其他可访问的 HTTPS 地址。
+## package.json 字段
 
-### 5. 注册到包索引
+| 字段 | 类型 | 必需 | 说明 |
+|------|------|------|------|
+| name | string | ✓ | 包名（小写，可用连字符） |
+| version | string | ✓ | 语义化版本号 |
+| description | string | ✓ | 包描述 |
+| author | string | ✓ | 作者 |
+| license | string | | 许可证（默认 GPL-3.0） |
+| keywords | string[] | | 关键词标签 |
+| main | string | | 入口文件（默认 package.san） |
+| dependencies | object | | 依赖包列表 |
 
-在 `packages/index.json` 中添加条目：
+## 导出函数
 
-```json
-{
-  "my_package": {
-    "description": "我的三言包",
-    "version": "1.0.0",
-    "author": "开发者名称",
-    "url": "https://github.com/user/sanyan-packages/releases/download/v1.0.0/my_package.zip"
-  }
-}
+使用 `导出` 命令导出包的公共 API：
+
+```san
+定义 公共函数() { ... }
+定义 内部函数() { ... }  // 不导出
+
+导出 公共函数
 ```
 
-## 包管理命令
+## 依赖管理
 
-### 安装包
-
-```sanyan
-// 从索引安装
-安装("my_package")
-
-// 从 URL 安装
-安装("my_package", "https://github.com/user/packages/releases/download/v1.0.0/my_package.zip")
-```
-
-### 加载包
-
-```sanyan
-设 my = 加载包("my_package")
-输出(调用(my, "两点距离", 0, 0, 3, 4))
-```
-
-### 列出已安装包
-
-```sanyan
-包列表()
-```
-
-### 搜索包
-
-```sanyan
-搜索("数学")
-```
-
-### 查看包信息
-
-```sanyan
-包信息("my_package")
-```
-
-### 卸载包
-
-```sanyan
-卸载("my_package")
-```
-
-## 最佳实践
-
-### 1. 命名规范
-
-- 包名使用小写字母和下划线
-- 函数名使用中文或英文，保持一致性
-- 导出所有公共函数
-
-### 2. 错误处理
-
-```sanyan
-定义 安全除法(a, b) {
-    若 (等于(b, 0)) {
-        返回(列表(假, "除数不能为零"))
-    }
-    返回(列表(真, 除(a, b)))
-}
-```
-
-### 3. 文档注释
-
-```sanyan
-// 计算阶乘
-// 参数：n - 非负整数
-// 返回：n 的阶乘值
-定义 阶乘(n) {
-    若 (小于等于(n, 1)) { 返回(1) }
-    返回(乘(n, 阶乘(减(n, 1))))
-}
-```
-
-### 4. 依赖管理
-
-如果包依赖其他包，在 `package.json` 中声明：
+在 package.json 中声明依赖：
 
 ```json
 {
   "dependencies": {
-    "math_extended": ">=0.1.0"
+    "math_utils": ">=1.0.0",
+    "string_utils": "^2.0.0"
   }
 }
 ```
 
-### 5. 版本号
+版本约束格式：
+- `>=1.0.0` — 大于等于
+- `<2.0.0` — 小于
+- `^1.0.0` — 兼容版本（>=1.0.0, <2.0.0）
+- `~1.0.0` — 补丁版本（>=1.0.0, <1.1.0）
 
-使用语义化版本号：`主版本.次版本.修订版本`
+## 测试
 
-- 主版本：不兼容的 API 变更
-- 次版本：向下兼容的功能新增
-- 修订版本：向下兼容的问题修正
+创建 `test.san` 文件：
+
+```san
+导入("packages/my_package")
+导入("stdlib/test")
+
+测试套件("我的包测试")
+
+测试("我的函数测试", 函数() {
+    返回(断言相等(我的函数(5), 6))
+})
+
+测试("另一个函数测试", 函数() {
+    返回(断言相等(另一个函数(3, 4), 7))
+})
+
+测试报告()
+```
+
+运行测试：
+
+```bash
+python -X utf8 main.py test_my_package.san
+```
+
+## 发布
+
+### 1. 准备发布
+
+```san
+发布准备("my_package")
+```
+
+这会创建 `build/my_package.zip` 文件。
+
+### 2. 上传到 GitHub
+
+1. Fork [sanyan-packages](https://github.com/shujingyin510/sanyan-packages) 仓库
+2. 将 zip 文件上传到 `packages/` 目录
+3. 更新 `index.json` 添加你的包信息
+4. 提交 Pull Request
+
+### 3. 本地安装
+
+```san
+安装("my_package", "path/to/my_package.zip")
+```
+
+## 最佳实践
+
+### 命名规范
+
+- 包名：小写，用连字符分隔（`my-package`）
+- 函数名：中文或英文均可，保持一致性
+- 常量：大写（`MAX_SIZE`）
+
+### 错误处理
+
+```san
+定义 安全除法(a, b) {
+    若 (等于(b, 0)) {
+        返回(无)  // 或抛出异常
+    }
+    返回(除(a, b))
+}
+```
+
+### 文档注释
+
+```san
+// 计算两个数的和
+// 参数:
+//   a - 第一个数
+//   b - 第二个数
+// 返回: 两数之和
+定义 加法(a, b) {
+    返回(加(a, b))
+}
+```
+
+### 性能优化
+
+- 避免不必要的循环
+- 使用缓存减少重复计算
+- 避免深层递归（使用尾递归优化）
 
 ## 示例包
 
-参考 `packages/` 目录下的示例包：
+参考现有包：
 
-| 包名 | 描述 |
-|------|------|
-| `sample` | 问候工具示例 |
-| `math_extended` | 扩展数学库（复数、向量、统计） |
-| `logging` | 结构化日志库 |
-| `web_utils` | Web 工具库 |
-| `data_pipeline` | 数据处理管道 |
-| `config` | 配置管理库 |
-
-## 安全注意事项
-
-- 包下载仅支持 HTTPS 地址
-- 域名白名单限制（github.com, gitlab.com, gitee.com）
-- zip-slip 防护（防止路径穿越攻击）
-- 包代码在隔离环境中执行
+- `packages/sample` — 简单示例
+- `packages/math_extended` — 数学扩展
+- `packages/logging` — 日志库
+- `packages/json_utils` — JSON 工具
+- `packages/string_utils` — 字符串工具
 
 ## 常见问题
 
-### Q: 包安装失败怎么办？
+### Q: 如何导入其他包？
 
-A: 检查网络连接，确认 URL 可访问，查看错误信息。
+```san
+导入("packages/other_package")
+```
 
-### Q: 如何更新包？
+### Q: 如何使用标准库？
 
-A: 卸载后重新安装：`卸载("my_package")` 然后 `安装("my_package")`
+```san
+导入("stdlib/math")
+导入("stdlib/string")
+```
 
-### Q: 包之间如何共享数据？
+### Q: 如何处理版本冲突？
 
-A: 通过函数参数和返回值传递，避免全局状态。
+使用版本约束确保兼容性：
+
+```json
+{
+  "dependencies": {
+    "math_utils": ">=1.0.0,<2.0.0"
+  }
+}
+```
 
 ### Q: 如何调试包？
 
-A: 使用 `输出()` 打印调试信息，或使用 `logging` 包的日志功能。
+使用 `输出` 命令或调试器：
+
+```san
+输出("调试信息: ", 变量)
+调试(变量)
+```

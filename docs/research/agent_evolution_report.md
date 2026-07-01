@@ -1,5 +1,10 @@
 # 三言 Agent 进化运行时 — 实验报告
 
+> ⚠️ **重要说明（合成模拟）**：本报告的成功率 / 因果链 / 知识迁移 / 任务分类 / 参数影响力 / 知识置信度等数值
+> 均由合成模拟器产生（`run_experiment()` 不调用真实 LLM、不执行真实任务，成功率由「策略-任务匹配度」公式加随机采样决定）。
+> 这些数字属于**机制演示**，结论受模拟器设计决定，**不能作为「成功率」「因果链」「+43.6%」这类实证主张引用**。
+> 真实任务实证为加固计划阶段 1 的目标，详见 [`../CLAIMS.md`](../CLAIMS.md)。
+
 > 合并自: 01-evolution-validation.md, 02-task-taxonomy.md, 03-knowledge-validation.md, 04-conditional-policy.md, 05-experiment-report.md, architecture.md
 > 日期: 2026-06-16 ~ 06-17
 
@@ -7,7 +12,7 @@
 
 # Evolution Runtime Architecture
 
-## 四层架构
+## 五层架构（顶层 Layer 5 = Knowledge Validation；以下为 Layer 1–4 进化子系统视图）
 
 ```
 Layer 3: Knowledge Layer（知识层）
@@ -798,8 +803,8 @@ Agent知识库解决"在这个项目里什么真的有效"
 
 本项目构建了一个五层进化架构，实现了从任务分类到知识迁移的完整闭环。关键贡献：
 
-1. **因果链闭环**：证明 Knowledge → Calibration → Selection → Success
-2. **知识分层**：证明配置不可迁移，但任务规律可迁移
+1. **因果链闭环**：演示（合成模拟）Knowledge → Calibration → Selection → Success 的机制链路
+2. **知识分层**：演示（合成模拟）配置不可迁移，但任务规律可迁移
 3. **三态逻辑贯穿**：从语言层到知识层的统一认知哲学
 4. **可验证的自改进**：通过 Confidence 防止把偶然当规律
 

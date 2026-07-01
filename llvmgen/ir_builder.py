@@ -41,11 +41,13 @@ class CodegenContext:
         self._env: dict[str, RawValue | BoxedValue] = {}  # SSA 值追踪（raw i64 优先）
         self._funcs: dict[str, ir.Function] = {}  # 已定义的函数
         self._current_func: ir.Function | None = None
+        self._current_func_name: str = ''  # 当前函数名（用于 tail call 检测）
         self._globals: dict[str, ir.GlobalVariable] = {}  # 模块级全局变量
         self._global_inits: list[tuple[str, ir.Value | int | str]] = []  # 全局变量初始化
         self._loop_stack: list[tuple[ir.Block, ir.Block]] = []  # (header, exit) 循环上下文
         self._rt_funcs: dict[str, ir.Function] = {}  # 已声明的运行时函数
         self._try_depth: int = 0  # 当前嵌套 try 深度
+        self._tail_call_target: str | None = None  # 尾调用目标函数名
         # 声明异常全局（所有函数都可访问）
         g_error = ir.GlobalVariable(self.module, _PTR, name='g_error')
         g_error.initializer = _NULL
@@ -95,6 +97,7 @@ class CodegenContext:
         if name in self._funcs:
             func = self._funcs[name]
             self._current_func = func
+            self._current_func_name = name
             self._scope = {}
             self._env = {}
             self._allocas = {}
@@ -115,6 +118,7 @@ class CodegenContext:
             func.args[i].name = pname
         self._funcs[name] = func
         self._current_func = func
+        self._current_func_name = name
         self._scope = {}
         self._env = {}
         self._allocas = {}
@@ -302,13 +306,35 @@ class CodegenContext:
             self._global_inits.append((name, init_value))
 
     def compile_fn_body(self, name: str, param_names: list[str], body: list):
-        """编译函数体（处理 定义 AST）。最后表达式若非返回则隐式返回。"""
+        """编译函数体（处理 定义 AST）。最后表达式若非返回则隐式返回。
+
+        支持尾调用优化：当最后一条语句是递归调用当前函数时，
+        生成 musttail 标记，避免栈溢出。
+        """
         from llvmgen.ops_gen import compile_node  # 延迟导入避免循环依赖
 
         self.begin_function(name, param_names)
         result = None
         for i, stmt in enumerate(body):
+            # 尾调用检测：最后一条语句是递归调用
+            is_tail_position = i == len(body) - 1
+            if is_tail_position and isinstance(stmt, list) and len(stmt) > 0:
+                call_op = stmt[0]
+                # 检查是否是当前函数的递归调用
+                resolved_name = name
+                if self.module_prefix and name != 'main':
+                    resolved_name = f'san_{self.module_prefix}__{name}'
+                if call_op == name or call_op == resolved_name:
+                    # 标记为尾调用
+                    self._tail_call_target = name
+                else:
+                    self._tail_call_target = None
+            else:
+                self._tail_call_target = None
+
             result = compile_node(stmt, self)
+            self._tail_call_target = None  # 重置
+
             # 隐式返回：最后一条语句非返回时，将其值作为返回值
             if i == len(body) - 1 and not self.builder.block.is_terminated:
                 if isinstance(stmt, list) and stmt[0] in ('返回', 'return'):
