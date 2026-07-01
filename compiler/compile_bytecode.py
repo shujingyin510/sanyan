@@ -4,8 +4,8 @@
 用法:
     python compile_bytecode.py input.san [-o output.bin] [--run]
 """
-
-import sys
+import os, sys
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import os
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))

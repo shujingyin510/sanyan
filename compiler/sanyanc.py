@@ -11,13 +11,15 @@
     python sanyanc.py info <包名>                    # 包详情
     python sanyanc.py uninstall <包名>               # 卸载包
 """
+import os, sys
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import os
 import sys
 import tempfile
 from pathlib import Path
 
-ROOT = Path(__file__).parent.resolve()
+ROOT = Path(__file__).parent.parent.resolve()
 STDLIB = ROOT / 'stdlib'
 SUGAR_BIN = STDLIB / 'sugar.bin'
 COMPILER_BIN = STDLIB / 'bytecode_compiler.bin'

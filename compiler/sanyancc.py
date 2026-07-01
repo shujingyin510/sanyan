@@ -1,8 +1,9 @@
 """三言交叉编译器：.san → 平坦字节码 → STM32 C runtime"""
 
 from __future__ import annotations
+import os, sys
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import struct
-import sys
 
 # ── 字节码指令集 ──────────────────────────────────────────
 # 所有指令定长：1 字节 opcode + 0~4 字节立即数
@@ -74,6 +75,8 @@ OP_TO_INSTR = {
 
 class BytecodeWriter:
     """字节码缓冲区：emit 指令 + 写入二进制。"""
+import os, sys
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
     def __init__(self):
         self.data = bytearray()

@@ -1,7 +1,9 @@
 """三言 —— 中文三进制编程语言（主入口）"""
 
-import sys
 import os
+import sys
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
 import subprocess
 
 from core.evaluator import SanyanEvaluator

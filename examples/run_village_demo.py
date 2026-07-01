@@ -5,6 +5,8 @@
     python -X utf8 run_village_demo.py --manual   # 手动 LLM 对话
     set LLM_KEY=你的key                          # LLM 模式需要
 """
+import os, sys
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import os
 import sys
