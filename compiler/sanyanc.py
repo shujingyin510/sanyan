@@ -11,7 +11,10 @@
     python sanyanc.py info <包名>                    # 包详情
     python sanyanc.py uninstall <包名>               # 卸载包
 """
-import os, sys
+
+import os
+import sys
+
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import os

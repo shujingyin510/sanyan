@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import os
 import sys
+
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from typing import TYPE_CHECKING, Any, cast
 
@@ -20,8 +21,6 @@ if TYPE_CHECKING:
 
 def _is_paren_sexpr(source: str) -> bool:
     """判断源码是否为 S 表达式语法（以 '(' 开头）。"""
-import os, sys
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
     stripped = source.strip()
     return stripped.startswith('(')
 

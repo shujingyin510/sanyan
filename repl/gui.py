@@ -4,6 +4,7 @@ import io
 import os
 import re
 import sys
+
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import tkinter as tk
 from tkinter import filedialog, messagebox, ttk, scrolledtext
@@ -26,8 +27,6 @@ _KW_PAT = '|'.join(re.escape(k) for k in _KW)
 
 class HighlightText(tk.Frame):
     """带行号 + 语法高亮的代码编辑器"""
-import os, sys
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
     def __init__(self, master, **kwargs):
         super().__init__(master)
