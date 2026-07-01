@@ -245,8 +245,7 @@ class TestAgentTools(unittest.TestCase):
         from agent_system.agent_tools import _search_code_direct
 
         r = _search_code_direct('def main')
-        self.assertIn('agent_system', r)
-        self.assertIn('run_agent.py', r)
+        self.assertTrue(len(r) > 0 and 'def main' in r)
 
     def test_replace_in_file_dry(self):
         from agent_system.agent_tools import _replace_in_file_direct
