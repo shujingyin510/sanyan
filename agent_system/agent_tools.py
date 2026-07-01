@@ -19,6 +19,15 @@ def _resolve_path_simple(path):
     return matches[0] if matches else path
 
 
+def param_path(params):
+    """从工具参数中提取文件路径"""
+    if isinstance(params, str):
+        return params.split('|')[0]
+    if isinstance(params, dict):
+        return params.get('path', params.get('test_file', params.get('file', '')))
+    return str(params)
+
+
 def _analyze_file_direct(path):
     try:
         import ast as _ast

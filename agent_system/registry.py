@@ -13,6 +13,9 @@ class LazyRegistry:
     def register(self, name: str, factory):
         self._factories[name] = factory
 
+    def has(self, name: str) -> bool:
+        return name in self._factories
+
     def __getattr__(self, name: str):
         if name.startswith('_'):
             raise AttributeError(name)
