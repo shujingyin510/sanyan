@@ -250,7 +250,6 @@ def _load_sugar_parser(evaluator):
 def _parse_with_python_converter(code, evaluator):
     """使用 Python SugarConverter 解析糖语法代码（VM 解析器的可靠回退）。"""
     from sugar import SugarConverter
-    from skin import SkinManager
 
     try:
         ast = SugarConverter.convert(code, evaluator.skin_manager)
