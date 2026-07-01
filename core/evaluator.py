@@ -9,7 +9,15 @@ import time
 from typing import Any, Dict, Optional
 from core.ternary_core import TritValue, ArrayValue
 from core.runtime import SanyanRuntime
-from core.values import FunctionValue, ModuleValue, SrcNode, SanyanError, SanyanNameError, SanyanSyntaxError, SanyanTypeError
+from core.values import (
+    FunctionValue,
+    ModuleValue,
+    SrcNode,
+    SanyanError,
+    SanyanNameError,
+    SanyanSyntaxError,
+    SanyanTypeError,
+)
 from core.eval_utils import (
     parse_string_literal,
     parse_numeric_literal,
