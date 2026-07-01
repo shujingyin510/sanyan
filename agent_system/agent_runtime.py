@@ -132,6 +132,7 @@ class AgentRuntime:
             experience_store=self.experience_store,
             git_batch_learner=self.git_batch_learner,
             llm_call=self._llm_call,
+            memory=self.memory,
         )
 
         # P6: Prompt 缓存 — 稳定化 system_prompt

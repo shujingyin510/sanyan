@@ -8,10 +8,10 @@ from typing import Any, Protocol
 class ToolStatus(Enum):
     """工具执行状态"""
 
-    OK = "ok"
-    ERROR = "error"
-    TIMEOUT = "timeout"
-    NOT_FOUND = "not_found"
+    OK = 'ok'
+    ERROR = 'error'
+    TIMEOUT = 'timeout'
+    NOT_FOUND = 'not_found'
 
 
 @dataclass
@@ -21,8 +21,8 @@ class ToolResult:
     status: ToolStatus = ToolStatus.OK
     ok: bool = True
     failed: bool = False
-    output: str = ""
-    error: str = ""
+    output: str = ''
+    error: str = ''
     data: Any = None
     meta: dict[str, Any] = field(default_factory=dict)
 

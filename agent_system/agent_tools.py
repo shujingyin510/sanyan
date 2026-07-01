@@ -180,6 +180,7 @@ def _run_test_direct(test_path, dry_run=False):
         test_path = test_path.get('test_file', test_path.get('path', ''))
     if not test_path:
         from agent_system.contracts import ToolResult, ToolStatus
+
         return ToolResult(ToolStatus.ERROR, error='缺少 test_file 参数', meta={'passed': False})
 
     if dry_run:
