@@ -2,7 +2,7 @@
 
 ## 🚨 最高优先级：提交前强制自查
 
-**每次 `git commit` 前，必须先跑本地测试，绿了才能提交：**
+**每次 `git commit` 前，必须先跑本地全量测试和CI测试，绿了才能提交：**
 
 ```bash
 ruff check . && ruff format --check . && mypy . && python -X utf8 scripts/preflight.py --quick

@@ -1,0 +1,9 @@
+{
+  "name": "json_utils",
+  "version": "1.0.0",
+  "description": "JSON 工具 — 解析、序列化、路径查询、格式化",
+  "author": "三言团队",
+  "license": "GPL-3.0",
+  "keywords": ["json", "parse", "format", "query"],
+  "main": "package.san"
+}

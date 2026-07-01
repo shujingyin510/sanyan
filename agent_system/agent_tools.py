@@ -176,6 +176,12 @@ def _list_files_direct_simple(pattern):
 
 def _run_test_direct(test_path, dry_run=False):
 
+    if isinstance(test_path, dict):
+        test_path = test_path.get('test_file', test_path.get('path', ''))
+    if not test_path:
+        from agent_system.contracts import ToolResult, ToolStatus
+        return ToolResult(ToolStatus.ERROR, error='缺少 test_file 参数', meta={'passed': False})
+
     if dry_run:
         return f'[干跑] 将运行测试: {test_path}'
 
@@ -188,11 +194,16 @@ def _run_test_direct(test_path, dry_run=False):
             cwd=os.path.dirname(os.path.abspath(__file__)) or '.',
         )
         output = r.stdout[-500:] + r.stderr[-300:]
-        if 'FAILED' in output or 'ERROR' in output:
-            return f'FAIL rc={r.returncode}\n{output[:800]}'
-        return f'通过 rc={r.returncode}'
+        from agent_system.contracts import ToolResult, ToolStatus
+
+        passed = 'FAILED' not in output and 'ERROR' not in output and r.returncode == 0
+        if passed:
+            return ToolResult(ToolStatus.OK, data=f'通过 rc={r.returncode}', meta={'passed': True})
+        return ToolResult(ToolStatus.ERROR, error=f'FAIL rc={r.returncode}\n{output[:800]}', meta={'passed': False})
     except Exception as e:
-        return f'测试错误: {e}'
+        from agent_system.contracts import ToolResult, ToolStatus
+
+        return ToolResult(ToolStatus.ERROR, error=f'测试错误: {e}', meta={'passed': False})
 
 
 def _run_shell_direct(cmd, dry_run=False):

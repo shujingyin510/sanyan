@@ -1,0 +1,9 @@
+{
+  "name": "datetime_utils",
+  "version": "1.0.0",
+  "description": "日期时间工具 — 格式化、解析、计算、时区",
+  "author": "三言团队",
+  "license": "GPL-3.0",
+  "keywords": ["datetime", "time", "date", "format"],
+  "main": "package.san"
+}

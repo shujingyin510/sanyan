@@ -20,8 +20,22 @@ class ToolResult:
 
     status: ToolStatus = ToolStatus.OK
     ok: bool = True
+    failed: bool = False
     output: str = ""
+    error: str = ""
+    data: Any = None
     meta: dict[str, Any] = field(default_factory=dict)
+
+    def __post_init__(self):
+        """从 status 自动推导 ok/failed"""
+        if self.status == ToolStatus.ERROR:
+            self.ok = False
+            self.failed = True
+            if not self.error and isinstance(self.data, str):
+                self.error = self.data
+        elif self.status == ToolStatus.OK:
+            self.ok = True
+            self.failed = False
 
 
 class LLMProvider(Protocol):

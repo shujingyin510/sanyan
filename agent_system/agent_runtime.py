@@ -898,6 +898,9 @@ def test_basic():
         if isinstance(meta, dict) and 'passed' in meta:
             return not meta['passed']
         status = getattr(result, 'status', None)
+        if status is not None and not isinstance(status, str):
+            # ToolStatus enum / 结构化 status
+            return hasattr(status, 'value') and status.value != 'ok'
         if isinstance(status, str) and hasattr(result, 'data'):
             return status in ('error', 'blocked')
         s = str(result)

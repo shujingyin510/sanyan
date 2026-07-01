@@ -14,8 +14,26 @@ def context_too_large(text: str, limit: int = 7000) -> bool:
 
 
 def llm_output_ur(outputs: list[str]) -> float | None:
-    """LLM 输出 UR 退化检测：< 4 条不判定，否则返回 UR 得分"""
+    """LLM 输出 UR 退化检测：按 10-字符 token 切分，计算 unique_ratio。
+    返回 None 表示不判定（输出 < 4 条 或 tokens < 8 或过于 diverse）。
+    """
     if len(outputs) < 4:
         return None
-    unique = len(set(outputs))
-    return 1.0 - (unique / len(outputs))
+
+    tokens: list[str] = []
+    for text in outputs:
+        # 按 10 字符切分为 token
+        for i in range(0, len(text), 10):
+            tokens.append(text[i : i + 10])
+
+    if len(tokens) < 8:
+        return None
+
+    unique = len(set(tokens))
+    ur = unique / len(tokens)
+
+    # 过于 diverse → 不退化
+    if ur >= 0.85:
+        return None
+
+    return ur

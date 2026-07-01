@@ -247,6 +247,20 @@ def _load_sugar_parser(evaluator):
     return _sugar_parser_module
 
 
+def _parse_with_python_converter(code, evaluator):
+    """使用 Python SugarConverter 解析糖语法代码（VM 解析器的可靠回退）。"""
+    from sugar import SugarConverter
+    from skin import SkinManager
+
+    try:
+        ast = SugarConverter.convert(code, evaluator.skin_manager)
+        if isinstance(ast, list):
+            return ast
+    except SyntaxError:
+        pass
+    return None
+
+
 def _parse_with_sugar_san(code, evaluator):
     """使用 stdlib/sugar.san 的 解析 函数解析糖语法代码。"""
     parser = _load_sugar_parser(evaluator)
@@ -261,9 +275,9 @@ def _parse_with_sugar_san(code, evaluator):
             iv = result.to_int()
             if iv == -1 or iv == 0:
                 return None
-        # 如果解析器返回字符串（非 AST 列表），视为解析失败
+        # VM 解析器返回非列表结果时，回退到 Python SugarConverter
         if not isinstance(result, list):
-            return None
+            result = _parse_with_python_converter(code, evaluator)
         return result
     except (
         SanyanNameError,

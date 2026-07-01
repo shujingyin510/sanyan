@@ -103,10 +103,8 @@ class TestSugarSelfHost(unittest.TestCase):
         parser = _load_sugar_parser(e)
         self.assertIsNotNone(parser)
 
-        # 解析简单表达式 — VM 解析器可能返回非列表结果，此时回退到 Python SugarConverter
+        # 解析简单表达式
         result = _parse_with_sugar_san('设 x = 42', e)
-        if not isinstance(result, list):
-            self.skipTest('sugar.bin VM 解析器未就绪，回退到 Python SugarConverter')
         self.assertIsNotNone(result, 'sugar.san 解析失败')
 
     def tearDown(self):

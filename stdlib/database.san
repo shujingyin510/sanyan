@@ -1,0 +1,83 @@
+;; 数据库库 — SQLite 数据库连接
+;;
+;; 用法:
+;;   导入("stdlib/database")
+;;   设 db (数据库_打开 "mydb.db")
+;;   (数据库_执行 db "CREATE TABLE users (id INTEGER, name TEXT)")
+;;   (数据库_执行 db "INSERT INTO users VALUES (1, 'Alice')")
+;;   设 结果 (数据库_查询 db "SELECT * FROM users")
+;;   (数据库_关闭 db)
+
+(定义 数据库_打开 (文件路径)
+  (做
+    (设 db (sqlite_打开 文件路径))
+    (输出 (连接 "已打开数据库: " 文件路径))
+    db))
+
+(定义 数据库_执行 (db sql)
+  (sqlite_执行 db sql))
+
+(定义 数据库_查询 (db sql)
+  (sqlite_查询 db sql))
+
+(定义 数据库_查询一行 (db sql)
+  (sqlite_查询一行 db sql))
+
+(定义 数据库_查询一列 (db sql)
+  (sqlite_查询一列 db sql))
+
+(定义 数据库_关闭 (db)
+  (sqlite_关闭 db))
+
+(定义 数据库_表列表 (db)
+  (数据库_查询 db "SELECT name FROM sqlite_master WHERE type='table'"))
+
+(定义 数据库_表结构 (db 表名)
+  (数据库_查询 db (连接 "PRAGMA table_info(" 表名 ")")))
+
+(定义 数据库_表存在 (db 表名)
+  (做
+    (设 结果 (数据库_查询 db (连接 "SELECT name FROM sqlite_master WHERE type='table' AND name='" 表名 "'")))
+    (大于 (取长 结果) 0)))
+
+(定义 数据库_创建表 (db 表名 字段定义)
+  (数据库_执行 db (连接 "CREATE TABLE IF NOT EXISTS " 表名 " (" 字段定义 ")")))
+
+(定义 数据库_插入 (db 表名 值)
+  (数据库_执行 db (连接 "INSERT INTO " 表名 " VALUES (" 值 ")")))
+
+(定义 数据库_更新 (db 表名 设置 条件)
+  (数据库_执行 db (连接 "UPDATE " 表名 " SET " 设置 " WHERE " 条件)))
+
+(定义 数据库_删除 (db 表名 条件)
+  (数据库_执行 db (连接 "DELETE FROM " 表名 " WHERE " 条件)))
+
+(定义 数据库_选择 (db 表名 条件)
+  (若 (等于 条件 "")
+    (数据库_查询 db (连接 "SELECT * FROM " 表名))
+    (数据库_查询 db (连接 "SELECT * FROM " 表名 " WHERE " 条件))))
+
+(定义 数据库_计数 (db 表名 条件)
+  (做
+    (设 结果 (若 (等于 条件 "")
+      (数据库_查询 db (连接 "SELECT COUNT(*) FROM " 表名))
+      (数据库_查询 db (连接 "SELECT COUNT(*) FROM " 表名 " WHERE " 条件))))
+    (若 (大于 (取长 结果) 0)
+      (取键 (取 结果 0) "COUNT(*)")
+      0)))
+
+(定义 数据库_开始事务 (db)
+  (数据库_执行 db "BEGIN TRANSACTION"))
+
+(定义 数据库_提交事务 (db)
+  (数据库_执行 db "COMMIT"))
+
+(定义 数据库_回滚事务 (db)
+  (数据库_执行 db "ROLLBACK"))
+
+(定义 数据库_备份 (db 目标文件)
+  (做
+    (设 目标db (数据库_打开 目标文件))
+    (sqlite_备份 db 目标db)
+    (数据库_关闭 目标db)
+    (输出 (连接 "数据库已备份到: " 目标文件))))

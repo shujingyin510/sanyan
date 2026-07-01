@@ -1,0 +1,9 @@
+{
+  "name": "string_utils",
+  "version": "1.0.0",
+  "description": "字符串工具 — 填充、截断、转换、格式化",
+  "author": "三言团队",
+  "license": "GPL-3.0",
+  "keywords": ["string", "text", "format", "utils"],
+  "main": "package.san"
+}

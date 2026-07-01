@@ -1,0 +1,134 @@
+"""P1：单任务安全自更新闭环 —— 隔离/回滚/fail-closed 的核心安全属性。
+
+用一次性 tmp git 仓库驱动真实 worktree 机制；oracle 判定逻辑用注入的假 runner 测（不跑真 pytest）。
+关键安全属性：过则留分支、败则**整体回滚**、主工作树全程不动、oracle 异常一律拒绝。
+"""
+
+import os
+import subprocess
+
+from agent_system.self_update import (
+    OracleVerdict,
+    SelfUpdateLoop,
+    make_pytest_oracle,
+    parse_pytest_summary,
+)
+
+
+def _git(repo, *a):
+    return subprocess.run(
+        ['git', *a], cwd=str(repo), capture_output=True, text=True, encoding='utf-8', errors='replace'
+    )
+
+
+def _init_repo(repo):
+    repo.mkdir()
+    _git(repo, 'init', '-b', 'main')
+    _git(repo, 'config', 'user.email', 't@t')
+    _git(repo, 'config', 'user.name', 't')
+    _git(repo, 'config', 'commit.gpgsign', 'false')
+    (repo / 'code.py').write_text('x = 1\n', encoding='utf-8')
+    _git(repo, 'add', '-A')
+    _git(repo, 'commit', '-m', 'init')
+    return repo
+
+
+def _branches(repo):
+    return _git(repo, 'branch', '--list').stdout
+
+
+def _worktree_count(repo):
+    out = _git(repo, 'worktree', 'list').stdout
+    return len([ln for ln in out.splitlines() if ln.strip()])
+
+
+def _write_edit(name, content):
+    def edit(wt):
+        with open(os.path.join(wt, name), 'w', encoding='utf-8') as f:
+            f.write(content)
+
+    return edit
+
+
+def test_accept_keeps_branch_removes_worktree(tmp_path):
+    repo = _init_repo(tmp_path / 'repo')
+    loop = SelfUpdateLoop(str(repo), oracle=lambda wt: OracleVerdict(True, 'fake-ok'))
+    res = loop.run('demo', _write_edit('code.py', 'x = 2\n'))
+
+    assert res.accepted and res.branch.startswith('self-update/demo-')
+    assert res.branch in _branches(repo)  # 分支保留供人工合并
+    assert (repo / 'code.py').read_text(encoding='utf-8') == 'x = 1\n'  # 主工作树未动
+    assert _worktree_count(repo) == 1  # worktree 已清理（只剩主）
+
+
+def test_reject_rolls_back_everything(tmp_path):
+    repo = _init_repo(tmp_path / 'repo')
+    loop = SelfUpdateLoop(str(repo), oracle=lambda wt: OracleVerdict(False, 'nope'))
+    res = loop.run('demo', _write_edit('code.py', 'x = 999\n'))
+
+    assert not res.accepted and res.branch is None
+    assert 'self-update/demo' not in _branches(repo)  # 分支已删（整体回滚）
+    assert (repo / 'code.py').read_text(encoding='utf-8') == 'x = 1\n'
+    assert _worktree_count(repo) == 1
+
+
+def test_no_change_rejected(tmp_path):
+    repo = _init_repo(tmp_path / 'repo')
+    loop = SelfUpdateLoop(str(repo), oracle=lambda wt: OracleVerdict(True))
+    res = loop.run('noop', lambda wt: None)  # edit_fn 什么都不改
+    assert not res.accepted and '无改动' in res.reason
+    assert _worktree_count(repo) == 1
+
+
+def test_oracle_exception_is_fail_closed(tmp_path):
+    repo = _init_repo(tmp_path / 'repo')
+
+    def boom(wt):
+        raise RuntimeError('oracle 崩了')
+
+    loop = SelfUpdateLoop(str(repo), oracle=boom)
+    res = loop.run('demo', _write_edit('code.py', 'x = 2\n'))
+    assert not res.accepted and 'fail-closed' in res.reason
+    assert 'self-update/demo' not in _branches(repo)  # 异常也回滚
+
+
+def test_oracle_sees_worktree_content(tmp_path):
+    repo = _init_repo(tmp_path / 'repo')
+
+    def oracle(wt):
+        content = open(os.path.join(wt, 'code.py'), encoding='utf-8').read()
+        return OracleVerdict('BROKEN' not in content, 'contains BROKEN' if 'BROKEN' in content else 'clean')
+
+    loop = SelfUpdateLoop(str(repo), oracle=oracle)
+    assert not loop.run('bad', _write_edit('code.py', 'BROKEN\n')).accepted
+    assert loop.run('good', _write_edit('code.py', 'x = 42\n')).accepted
+
+
+# ── oracle 判定逻辑（注入假 runner，不跑真 pytest）──
+
+
+class _Fake:
+    def __init__(self, stdout):
+        self.stdout = stdout
+        self.stderr = ''
+
+
+def test_parse_pytest_summary():
+    assert parse_pytest_summary('41 failed, 2330 passed, 2 skipped in 61.51s') == {
+        'passed': 2330,
+        'failed': 41,
+        'errors': 0,
+        'parsed': True,
+    }
+    b = parse_pytest_summary('290 passed in 44.84s')
+    assert b['passed'] == 290 and b['failed'] == 0 and b['parsed']
+    c = parse_pytest_summary('3 failed, 5 passed, 1 error in 2s')
+    assert c['failed'] == 3 and c['errors'] == 1
+    assert parse_pytest_summary('INTERNALERROR 崩溃，无摘要')['parsed'] is False  # 不可解析 → fail-closed
+
+
+def test_pytest_oracle_baseline_gate():
+    assert make_pytest_oracle(41, runner=lambda *a, **k: _Fake('41 failed, 2400 passed in 60s'))('.').ok
+    assert not make_pytest_oracle(41, runner=lambda *a, **k: _Fake('42 failed, 2399 passed in 60s'))('.').ok
+    assert not make_pytest_oracle(41, runner=lambda *a, **k: _Fake('1 error in 2s'))('.').ok
+    assert not make_pytest_oracle(41, runner=lambda *a, **k: _Fake('乱七八糟无摘要'))('.').ok  # 不可解析 → 拒绝

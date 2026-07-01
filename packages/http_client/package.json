@@ -1,0 +1,9 @@
+{
+  "name": "http_client",
+  "version": "1.0.0",
+  "description": "HTTP 客户端 — GET/POST 请求、JSON 解析",
+  "author": "三言团队",
+  "license": "GPL-3.0",
+  "keywords": ["http", "api", "json", "web"],
+  "main": "package.san"
+}

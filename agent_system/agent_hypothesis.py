@@ -69,7 +69,13 @@ class FailureClassifier:
         return FailureMode.SUCCESS
 
     def _looks_logically_wrong(self, tool: str, result: Any) -> bool:
-        """检测逻辑错误：工具成功但结果不合理"""
+        """检测逻辑错误：优先读 meta['passed'] / 结构化 status，旧式裸字符串回退文本嗅探"""
+        meta = getattr(result, 'meta', None)
+        if isinstance(meta, dict) and 'passed' in meta:
+            return not meta['passed']
+        status = getattr(result, 'status', None)
+        if status is not None and not isinstance(status, str) and hasattr(status, 'value'):
+            return status.value != 'ok'
         result_str = str(result)
         if tool == 'run_test' and ('FAIL' in result_str or '失败' in result_str):
             return True
