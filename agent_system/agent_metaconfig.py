@@ -17,6 +17,8 @@ import statistics
 import time
 from typing import Any, Callable, Dict, List
 
+from agent_system.paths import db_path
+
 ROOT = os.path.dirname(os.path.abspath(__file__))
 
 
@@ -86,7 +88,7 @@ class ConfigSchema:
         },
     }
 
-    DB_PATH = os.path.join(ROOT, 'agent_config_history.db')
+    DB_PATH = db_path('agent_config_history.db')
 
     def __init__(self):
         self._config = {k: v['value'] for k, v in self.DEFAULT_CONFIG.items()}
@@ -206,7 +208,7 @@ class ConfigPatch:
 class TaskReplay:
     """历史任务回放验证"""
 
-    DB_PATH = os.path.join(ROOT, 'agent_task_replay.db')
+    DB_PATH = db_path('agent_task_replay.db')
 
     def __init__(self):
         self._init_db()

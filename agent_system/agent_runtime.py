@@ -132,7 +132,6 @@ class AgentRuntime:
             experience_store=self.experience_store,
             git_batch_learner=self.git_batch_learner,
             llm_call=self._llm_call,
-            memory=self.memory,
         )
 
         # P6: Prompt 缓存 — 稳定化 system_prompt
@@ -285,7 +284,7 @@ class AgentRuntime:
             self.strategy_switcher.record_outcome(task, strategy['name'], success, duration)
 
             # 保存经验（单一写入路径：委托 LearningHandler，按次传入当前 memory）
-            self.learning_handler.save_experience(task, perf_report)
+            self.learning_handler.save_experience(task, self.memory, perf_report)
 
             # 学习：从这次任务中提取项目风格
             if success and self.memory.get('modified'):

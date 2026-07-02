@@ -11,6 +11,8 @@ import statistics
 import time
 from typing import Any, Dict, List
 
+from agent_system.paths import db_path
+
 ROOT = os.path.dirname(os.path.abspath(__file__))
 
 
@@ -20,7 +22,7 @@ ROOT = os.path.dirname(os.path.abspath(__file__))
 class ParameterRanker:
     """自动计算参数影响力，形成进化优先级"""
 
-    DB_PATH = os.path.join(ROOT, 'agent_param_ranking.db')
+    DB_PATH = db_path('agent_param_ranking.db')
 
     def __init__(self):
         self._init_db()
@@ -199,7 +201,7 @@ class StrategySchema:
         },
     }
 
-    DB_PATH = os.path.join(ROOT, 'agent_strategy_config.db')
+    DB_PATH = db_path('agent_strategy_config.db')
 
     def __init__(self):
         self._config = {k: v['value'] for k, v in self.DEFAULT_CONFIG.items()}

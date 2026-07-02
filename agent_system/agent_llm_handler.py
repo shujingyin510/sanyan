@@ -14,6 +14,8 @@ import urllib.error as _err
 import urllib.request as _req
 from typing import Optional, Tuple
 
+from agent_system.config import AgentConfig
+
 
 class LLMHandler:
     """LLM 调用和工具解析"""
@@ -29,6 +31,8 @@ class LLMHandler:
         self.profiler = profiler
         self.ur_monitor = ur_monitor
         self._system_prompt = system_prompt
+        # 单一 typed 配置（环境，一次加载）：作为 _get_config 的环境回退 + 默认来源
+        self._config = AgentConfig.from_env()
 
     def llm_call(self, prompt: str, override_system_prompt: Optional[str] = None) -> str:
         """LLM 调用：多提供商 + 重试 + 超时 + UR 检测"""
@@ -124,8 +128,16 @@ class LLMHandler:
         except Exception as e:
             return f'error|本地模型调用失败: {e}'
 
+    # .san 配置键 → AgentConfig 字段（环境回退用）
+    _CONFIG_FIELD = {
+        'API密钥': 'api_key',
+        '模型名': 'model',
+        '模型URL': 'model_url',
+        '模型提供商': 'provider',
+    }
+
     def _get_config(self, key: str, default: str) -> str:
-        """安全获取配置（优先 evaluator，其次环境变量）"""
+        """安全获取配置：优先 evaluator（.san 可动态改），其次单一 typed 配置（环境）。"""
         try:
             value = getattr(self.ev, 'get_var', lambda x: '')(key)
             if value:
@@ -133,18 +145,12 @@ class LLMHandler:
         except Exception:
             pass
 
-        # 环境变量回退
-        env_map = {
-            'API密钥': 'SANYAN_API_KEY',
-            '模型名': 'LLM_MODEL',
-            '模型URL': 'LLM_URL',
-            '模型提供商': 'LLM_PROVIDER',
-        }
-        env_key = env_map.get(key)
-        if env_key:
-            env_value = os.environ.get(env_key, '')
-            if env_value:
-                return env_value.strip()
+        # 环境回退：统一走 self._config（一次加载的 AgentConfig）
+        field = self._CONFIG_FIELD.get(key)
+        if field:
+            cfg_value = getattr(self._config, field, '')
+            if cfg_value:
+                return cfg_value
 
         return default
 

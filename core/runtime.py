@@ -170,7 +170,9 @@ def _build_builtin_ops() -> set:
     import json as _json
 
     ops: set = set()
-    base = os.path.dirname(os.path.abspath(__file__))
+    base = os.path.dirname(
+        os.path.dirname(os.path.abspath(__file__))
+    )  # 仓库根：language/ 在根下（runtime.py 已迁入 core/）
     for lang_file in ('language/chinese.json', 'language/english.json'):
         path = os.path.join(base, lang_file)
         if not os.path.exists(path):

@@ -6,10 +6,13 @@
 
 import os
 import subprocess
+from types import SimpleNamespace
 
 from agent_system.self_update import (
     OracleVerdict,
     SelfUpdateLoop,
+    make_agent_edit_fn,
+    make_differential_oracle,
     make_pytest_oracle,
     parse_pytest_summary,
 )
@@ -132,3 +135,57 @@ def test_pytest_oracle_baseline_gate():
     assert not make_pytest_oracle(41, runner=lambda *a, **k: _Fake('42 failed, 2399 passed in 60s'))('.').ok
     assert not make_pytest_oracle(41, runner=lambda *a, **k: _Fake('1 error in 2s'))('.').ok
     assert not make_pytest_oracle(41, runner=lambda *a, **k: _Fake('乱七八糟无摘要'))('.').ok  # 不可解析 → 拒绝
+
+
+# ── P2：agent edit_fn + 差分 oracle（注入假件，不跑真 agent/真引擎）──
+
+
+def test_agent_edit_fn_runs_agent_in_worktree(tmp_path):
+    repo = _init_repo(tmp_path / 'repo')
+    calls = {}
+
+    def fake_agent(cmd, **kw):
+        calls['cmd'], calls['cwd'] = cmd, kw.get('cwd')
+        # agent 在副本里改文件（真 agent 也是这样产生 diff 的）
+        with open(os.path.join(kw['cwd'], 'code.py'), 'w', encoding='utf-8') as f:
+            f.write('x = 7\n')
+        return SimpleNamespace(returncode=0, stdout='ok', stderr='')
+
+    loop = SelfUpdateLoop(str(repo), oracle=lambda wt: OracleVerdict(True))
+    res = loop.run('agent-task', make_agent_edit_fn('修复某测试', runner=fake_agent))
+    assert res.accepted
+    assert calls['cwd'] != str(repo) and '修复某测试' in calls['cmd']  # cwd=worktree 而非主仓库（红线②）
+    assert (repo / 'code.py').read_text(encoding='utf-8') == 'x = 1\n'  # 主工作树未动
+
+
+def test_agent_edit_fn_failure_rolls_back(tmp_path):
+    repo = _init_repo(tmp_path / 'repo')
+
+    def failing_agent(cmd, **kw):
+        return SimpleNamespace(returncode=1, stdout='', stderr='agent 崩了')
+
+    loop = SelfUpdateLoop(str(repo), oracle=lambda wt: OracleVerdict(True))
+    res = loop.run('agent-task', make_agent_edit_fn('任务', runner=failing_agent))
+    assert not res.accepted and 'edit_fn 异常' in res.reason
+    assert 'self-update/agent-task' not in _branches(repo)  # 整体回滚
+
+
+def _fake_verifier(report):
+    def factory(workdir):
+        return SimpleNamespace(verify_consistency=lambda cases=None: report)
+
+    return factory
+
+
+def test_differential_oracle_gates_and_fail_closed():
+    assert make_differential_oracle(verifier_factory=_fake_verifier({'total': 4, 'consistent': 4}))('.').ok
+    assert not make_differential_oracle(verifier_factory=_fake_verifier({'total': 4, 'consistent': 3}))('.').ok
+    assert not make_differential_oracle(verifier_factory=_fake_verifier({'total': 0, 'consistent': 0}))(
+        '.'
+    ).ok  # 零用例拒
+
+    def boom(workdir):
+        raise RuntimeError('验证器起不来')
+
+    v = make_differential_oracle(verifier_factory=boom)('.')
+    assert not v.ok and 'fail-closed' in v.reason

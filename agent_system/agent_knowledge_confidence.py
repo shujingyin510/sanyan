@@ -18,6 +18,8 @@ import statistics
 import time
 from typing import Dict, List
 
+from agent_system.paths import db_path
+
 ROOT = os.path.dirname(os.path.abspath(__file__))
 
 
@@ -169,7 +171,7 @@ class SubClusterDiscovery:
 class ConfidenceAwareKnowledge:
     """带置信度的知识库"""
 
-    DB_PATH = os.path.join(ROOT, 'agent_knowledge_confidence.db')
+    DB_PATH = db_path('agent_knowledge_confidence.db')
 
     def __init__(self):
         self.confidence_calc = KnowledgeConfidence()

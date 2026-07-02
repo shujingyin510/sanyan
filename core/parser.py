@@ -102,9 +102,26 @@ def _find_position(source: str, token_index: int, tokens: list) -> tuple[int, in
 
 
 def parse(tokens: list, source: str = '') -> Optional[Union[list, str]]:
-    """将 token 列表解析为 AST。可选 source 参数用于错误位置定位。"""
+    """将 token 列表解析为 AST（只取**第一个**顶层形式，REPL 单表达式语义）。
+
+    注意：第一个形式之后的 token 会被静默忽略；解析整个文件请用 parse_program。
+    """
+    forms = _parse_forms(tokens, source, first_only=True)
+    return forms[0] if forms else None
+
+
+def parse_program(tokens: list, source: str = '') -> list:
+    """解析 token 流的**全部**顶层形式，返回形式列表（文件级入口应当用这个）。
+
+    历史教训：编译/求值两条文件入口曾用 parse()，多顶层表达式的 .san 文件第一条之后
+    的语句被静默丢弃，且两引擎丢法不同——差分验证器抓到的首个真分歧（2026-07-02）。
+    """
+    return _parse_forms(tokens, source, first_only=False)
+
+
+def _parse_forms(tokens: list, source: str, first_only: bool) -> list:
     if not tokens:
-        return None
+        return []
 
     pos = 0  # 当前 token 索引（替代 pop(0)）
 
@@ -149,7 +166,15 @@ def parse(tokens: list, source: str = '') -> Optional[Union[list, str]]:
             return token
 
     try:
-        return _parse_inner()
+        forms: list = []
+        while _peek() is not None:
+            form = _parse_inner()
+            if form is None:
+                break
+            forms.append(form)
+            if first_only:
+                break
+        return forms
     except SanyanSyntaxError:
         raise
     except Exception as e:

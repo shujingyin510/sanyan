@@ -26,6 +26,8 @@ import urllib.request as _urllib
 from enum import Enum
 from typing import Dict, List, Tuple, Optional
 
+from agent_system.paths import db_path
+
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 
@@ -412,7 +414,7 @@ class CandidateTournament:
 class EvolutionMemory:
     """进化历史库：记录所有进化尝试"""
 
-    DB_PATH = os.path.join(ROOT, 'agent_evolution_memory.db')
+    DB_PATH = db_path('agent_evolution_memory.db')
 
     def __init__(self):
         self._init_db()

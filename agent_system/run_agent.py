@@ -20,7 +20,8 @@ import sqlite3
 import json
 import time as _time
 
-PROJECT_ROOT = os.path.dirname(os.path.abspath(__file__)) or '.'
+# 仓库根（run_agent.py 已迁入 agent_system/）：本文件内相对路径均以仓库根为基准
+PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 os.chdir(PROJECT_ROOT)
 
 from sugar.parser import parse_code
@@ -97,11 +98,12 @@ def _register_aliases():
 
 def load_api_key():
     """从环境变量或配置文件读取 API 密钥。"""
-    # 优先级: SANYAN_API_KEY > LLM_KEY > agent_policy.san > village_config.san
-    for var in ['SANYAN_API_KEY', 'LLM_KEY']:
-        key = os.environ.get(var, '')
-        if key and '你的' not in key:
-            return key
+    # 优先级: 环境（单一 typed 配置，占位符视为空）> agent_policy.san > village_config.san
+    from agent_system.config import api_key_from_env
+
+    key = api_key_from_env()
+    if key:
+        return key
     # 在 agent.san（含 #include 展开）中查找 API密钥
     agent_path = os.path.join('agent_system', 'sanyan', 'agent.san')
     with open(agent_path, encoding='utf-8') as f:
@@ -266,7 +268,6 @@ def init_evaluator(api_key):
             clear_cache()
             sub_ev = SanyanEvaluator(max_loop_steps=300000)
             _os.environ['SANYAN_API_KEY'] = api_key
-            sub_api_key = api_key
 
             # 加载 agent.san + 最小工具集到子求值器
             # 注册中文别名（Agent需要）
@@ -321,8 +322,6 @@ def init_evaluator(api_key):
             agent_path = _os.path.join('agent_system', 'sanyan', 'agent.san')
             src = open(agent_path, encoding='utf-8').read()
             src = preprocess_includes(src)
-            if sub_api_key:
-                src = src.replace('sk-你的key', sub_api_key)
             ast, _ = parse_code(src)
             fixed = [s for s in ast[1:] if not (isinstance(s, list) and s[0] == 'export')]
             sub_ev.eval(['do'] + fixed)
@@ -911,11 +910,7 @@ def init_evaluator(api_key):
     # 预处理 #include 展开
     src = preprocess_includes(src)
     # 新提示词已内置完整语法，不再注入 markdown 文档
-    if api_key:
-        src = src.replace('sk-你的key', api_key)
-        print(f'[调试] API密钥已注入 (长度={len(api_key)})')
-    else:
-        print('[调试] 警告: API密钥为空，LLM调用将失败')
+    # 密钥不入源码文本（泄露面）：本函数开头已 setenv，.san 侧经 环境变量("SANYAN_API_KEY") 读取
     ast, _ = parse_code(src)
     fixed = [s for s in ast[1:] if not (isinstance(s, list) and s[0] == 'export')]
     evaluator.eval(['do'] + fixed)

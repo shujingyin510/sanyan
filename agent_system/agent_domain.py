@@ -16,6 +16,8 @@ import sqlite3
 import time
 from typing import Callable, Dict, List, Optional, Tuple
 
+from agent_system import paths, store
+
 
 # ── 最小化分类规则（只做分类，不定义知识）──
 
@@ -56,12 +58,13 @@ class DomainKnowledgeLayer:
 
     def __init__(self, llm_fn: Optional[Callable] = None, db_path: Optional[str] = None):
         self.llm_fn = llm_fn
-        self.db_path = db_path or os.path.join(os.path.dirname(os.path.abspath(__file__)), 'domain_knowledge.db')
+        # 阶段 2：默认并入单一 agent.db（旧 domain_knowledge.db 缓存首次自动搬入、旧库保留可回滚）
+        self.db_path = db_path or paths.db_path(store.AGENT_DB)
         self._init_db()
         self._confidence_cache: Dict[str, float] = {}  # 会话级置信度缓存
 
     def _init_db(self):
-        """初始化缓存数据库"""
+        """初始化缓存数据库（若并入 agent.db，则从旧独立库非破坏迁移历史缓存）"""
         conn = sqlite3.connect(self.db_path)
         conn.execute("""
             CREATE TABLE IF NOT EXISTS domain_cache (
@@ -72,6 +75,9 @@ class DomainKnowledgeLayer:
             )
         """)
         conn.commit()
+        if os.path.basename(self.db_path) == store.AGENT_DB:
+            store.adopt_legacy(conn, 'domain_knowledge.db', ('domain_cache',))
+            store.set_version(conn, 'domain', 1)
         conn.close()
 
     # ── 分类（规则，毫秒级）──

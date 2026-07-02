@@ -19,13 +19,14 @@ ruff check . && ruff format --check . && mypy . && python -X utf8 scripts/prefli
 |------|------|------|
 | 🚨 P0 | 用户直接指令 | 立即执行，其他事暂停 |
 | 🚨 P0 | git commit / push | **必须用户明确要求**，禁止自行决定 |
+| 🚨 P0 | 准备提交/推送前 | **必须先跑全量 CI 测试**（ruff + mypy + pytest 全量），本地全绿才能推。不许依赖 CI 远程验证 |
 | 🚨 P0 | CI 红灯 / bug 报错 | 立即修，修完跑 preflight 绿了再继续 |
 | 🚨 P0 | 发现预存问题/技术债 | 及时修复，不跳过不延后，不让 CI 持续红灯 |
 | 🚨 P0 | 不确定需求 | 先问，不要猜 |
 | 🚨 P0 | 不确定文件用途 | 先搜索引用关系 |
 | 🚨 P0 | 不确定修改影响 | 先分析再修改 |
+| 🚨 P0 | CHANGELOG 格式 | 按模板写：Summary → Highlights(3-4条) → Language/Compiler/VM/Agent/Build/Project Layout/Toolchain/CI → Bug Fixes → Metrics |
 | 🔴 P1 | 写完任何代码 | 先跑 `ruff check . && ruff format --check . && mypy .` |
-| 🚨 P0 | 准备提交/推送前 | **必须先跑全量 CI 测试**（ruff + mypy + pytest 全量），本地全绿才能推。不许依赖 CI 远程验证 |
 | 🔴 P1 | 推送前 | 检查 CHANGELOG 是否更新、版本号是否一致（README/manual/llvm 等） |
 | 🔴 P1 | CHANGELOG | 记录原因，不只记录结果；功能写完就写，同日合并为一个版本号 |
 | 🔴 P1 | 修改代码 | 优先最小变更 |
@@ -323,6 +324,7 @@ preflight 绿了 → `git push`。红了 → 修完再推。
 **版本号一致性**：推送前检查 `README.md`、`README_EN.md`、`docs/manual.md`、`docs/llvm.md`、`CHANGELOG.md` 中的版本号是否一致。
 
 **CHANGELOG 约定**：功能写完就写条目，不要攒到一天结束。同一天的多次改动合并为一个版本号。
+**CHANGELOG 模板**：每个版本必须包含 Summary 一行概括 + Highlights(3-4条) + 分类段落(Language/Compiler/VM/Agent/Build/Project Layout/Toolchain/CI) + Bug Fixes + Metrics 表格。
 
 ## 测试
 

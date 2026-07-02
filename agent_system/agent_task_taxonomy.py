@@ -15,6 +15,8 @@ import sqlite3
 import time
 from typing import Dict, List, Optional
 
+from agent_system.paths import db_path
+
 ROOT = os.path.dirname(os.path.abspath(__file__))
 
 
@@ -207,7 +209,7 @@ class TaskProfile:
 class MetaLearningDB:
     """Meta-Learning数据库：记录 参数→效果→场景"""
 
-    DB_PATH = os.path.join(ROOT, 'agent_meta_learning.db')
+    DB_PATH = db_path('agent_meta_learning.db')
 
     def __init__(self):
         self._init_db()

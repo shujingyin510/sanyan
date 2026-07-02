@@ -5,18 +5,19 @@ P39: StrategySwitcher — 策略切换（任务复杂度→策略选择）
 P40: ABRollout — A/B测试（多策略并行+赢家选择）
 """
 
-import os
 import random
 import sqlite3
 import time
 from collections import defaultdict
 from typing import Dict, List, Optional
 
+from agent_system.paths import db_path
+
 
 class PromptEvolver:
     """Prompt自进化：变体生成 + 成功率追踪 + 自动选择"""
 
-    DB_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'agent_prompt_evolution.db')
+    DB_PATH = db_path('agent_prompt_evolution.db')
 
     def __init__(self):
         self._init_db()
@@ -171,7 +172,7 @@ class PromptEvolver:
 class ToolSelectionLearner:
     """工具选择学习：任务类型→工具映射 + 成功率追踪"""
 
-    DB_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'agent_tool_learning.db')
+    DB_PATH = db_path('agent_tool_learning.db')
 
     def __init__(self):
         self._init_db()

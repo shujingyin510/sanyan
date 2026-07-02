@@ -373,3 +373,74 @@ python -X utf8 -m pytest tests/test_contracts.py tests/test_agent_v5.py -q
   `self-update/…`、主工作树未动、worktree 自清理。全绿、真仓库零残留。
 - 下一步：P2（从仓库挖 concrete 任务）把 `edit_fn` 接上真 agent（`AgentRuntime`/`run_agent`），
   oracle 升级为 `combine_oracles([pytest 全量基线, 修好的差分一致性, 自举验证])`。
+
+**进度（2026-07-02）—— 目录重构（0a4099a）后的断裂修复与文件找回：**
+- 重构把根目录 .py 分类进 `core/` 等，但一批**未提交**的 seam 文件被清掉：`paths.py`、`config.py`、
+  `tests/conftest.py`、`test_paths/test_store/test_config`。`paths.py`+conftest+两个测试已从会话
+  记录**逐字恢复**（此前 `store.py:22` 的 `from agent_system.paths import db_path` 一直是断的）；
+  `config.py`/`test_config.py` 经分类**不予恢复**——main 上无消费者、env 读密钥与 `load_api_key`
+  前段重复，阶段 5 接线时按其测试合同（env-only、占位符"你的"视为空、typed 字段）重建。
+  教训：**产出即提交**。
+- **合并进 main 的是 seam 分支的中期快照**：store/contracts/registry/loop_policy/loop/self_update
+  都在，但 `ExperienceStore`/`DomainKnowledgeLayer` 等 20+ 处 `paths.db_path` 接线被回退为硬编码
+  `dirname(__file__)`（不认 AGENT_DATA_DIR → conftest 隔离对它们暂不生效）。重做阶段 2 合库接线时，
+  以 test_store.py 当时的第 4 测（ExperienceStore 默认进 agent.db + adopt_legacy）为验收标准。
+- 重构引出的两个路径雷已修：`core/runtime.py` 的 BUILTIN_OPS 迁入 core/ 后按 `core/language/`
+  找词表 → **静默空集**（lexer 关键字识别全丢），改锚仓库根后恢复 259 词；`core/skin.py` 皮肤
+  路径由 CWD 相对改锚仓库根。`tests/test_deadloop.py`（手动 LLM 探针，import 即真跑死循环任务）
+  加 `collect_ignore` 退出 pytest 收集。
+
+**进度（2026-07-02 续）—— P2 落地：自造任务 + 真 agent 接线 + 差分 oracle 修复：**
+- **DifferentialVerifier 假绿修复**（agent_evolution.py）：① 代码经临时 .san 文件传入（main.py
+  只吃文件路径）；② fail-closed——任一后端失败该用例即判不一致，全崩=0% 而非 100%；③ 真差分——
+  `--eval` 求值器 vs 默认字节码 VM（旧版两个"后端"都是默认 VM）；④ 输出归一化（去 `[OK] 编译`
+  噪音行、把求值器回显 `=> v（三进制:…）`/`结果: v` 还原成裸值）；⑤ cwd/runner 可注入（cwd 指
+  worktree = 验证**副本**里的引擎）。tests/test_differential.py 7 测（含真后端 E2E 4/4 一致）。
+- **修好的差分当天就抓到真分歧（多语句 .san 文件）**：VM 路径只编译**第一个**顶层表达式
+  （`(设 x 10)␊(输出 (加 x 5))` 编译出 7 字节只含 设、输出全丢）；eval 路径行为不稳
+  （`(输出 1)␊(输出 2)` 两条都执行，`(输出 "你好")␊(输出 …)` 只执行第一条）。**→ 当天闭环修复**
+  （见下一条），差分用例已解除单顶层表达式约束。
+- **多语句分歧当天闭环（core/parser.py + 两个文件级入口）**：根因是 `parse()` 只取**第一个**
+  顶层形式（REPL 单表达式语义），文件级入口误用它——VM 路径直接丢后续语句；eval 路径"不稳"
+  实为 sugar 解析成败决定是否走 S-表达式回退。修法：新增 `parse_program()` 返回全部顶层形式
+  （`parse()` 既有语义不动，`--ast-json` 调试口未动），compile_bytecode.py 与 repl/main.py
+  的 S-表达式回退改用它。探针复核三组多语句用例两引擎一致（VM bin 7→16 字节）；差分内置用例
+  增至 5/5（含多语句回归守护），tests/test_parse_program.py 5 测；mypy/ruff/全量 pytest 全绿。
+- **task_mining.py（P2 自造任务）**：三类来源按可验证性排序——failing_test（解析 pytest 输出）
+  > todo（TODO/FIXME/HACK/XXX 扫描）> long_function（AST 超长函数降序）。任务书 `prompt()`
+  内嵌红线①文案（**不得删/跳/弱化测试**）。真仓库冒烟：11 todo + 30 超长函数（榜首
+  run_agent.init_evaluator 794 行）。tests/test_task_mining.py 5 测。
+- **self_update.py 新增两工厂**：`make_agent_edit_fn(prompt)`——agent 以子进程跑在 worktree
+  （cwd=副本，红线②；用**副本里的** run_agent，P4 元循环时 agent 改自身也自动落在验证范围内；
+  失败/超时抛异常→整体回滚）；`make_differential_oracle()`——零用例/异常/不一致均拒（fail-closed）。
+  test_self_update.py 增至 12 测。
+- **run_self_update.py（CLI 入口）**：`--list` 看挖到的任务 / 默认取第一任务跑闭环 / `--task`
+  自定义任务书 / `--pytest-log` 喂失败测试。oracle = pytest 基线（默认 0）AND 差分一致性。
+- **顺手修的重构雷（重要）**：run_agent.py 在 import 时 `os.chdir(dirname(__file__))`——重构前
+  它在仓库根所以没事，迁入 agent_system/ 后 CWD 被切到 `agent_system/`，其文内所有仓库根相对
+  路径（`agent_system/sanyan/agent.san` 等）失效、agent CLI 完全起不来；这也是 test_deadloop
+  「皮肤文件不存在」报错的直接原因（import 它的进程 CWD 被劫持）→ chdir 目标改为仓库根。
+- 分类处置：昨日恢复的 `config.py`/`test_config.py` 复删（main 无消费者，见上一条进度注）。
+- **阶段 5 欠账核查（安全红线）**：合并中间快照把 config.py 连同「密钥不入源码」的修复一起
+  回退——run_agent.py 两处 `src.replace('sk-你的key', …)` 注入复活 → 复删（主/子 Agent 路径
+  均已 setenv，agent_policy.san 经 `环境变量("SANYAN_API_KEY")` 优先读取，删注入零行为变化）。
+  typed `AgentConfig` 仍待按 test_config 合同重建（欠账单列）。
+- **遗留问题清扫（用户指示"都修一下"）**：以 agent-refactor-seams 分支为源，批量复原被合并
+  中间快照回退的四项——阶段 2 并库（ExperienceStore/DomainKnowledgeLayer→agent.db）、
+  LearningHandler 捕获陷阱（save_experience 读过期空 memory、经验保存**静默失效**；
+  learn_from_task 单参签名 vs runtime 双参调用 = 潜伏 TypeError）、record_outcome 双计数、
+  typed config 接线（load_api_key / _get_config → AgentConfig.from_env）。测试守护
+  test_store(5)/test_learning_store(7)/test_config(8) 一并复原；conftest 密封注记更新。
+  外加阶段 2 路径统一复原：10 模块 14 处硬编码 DB_PATH 复归 paths.db_path（照抄分支样式，
+  但**不**整文件照搬——分支上混有重构前旧路径如根目录 run_agent.py，main 在那些点更新）。
+  另修 httpbin 外网测试守卫（非 503 异常曾打红全量 CI 一次）。仓根陈旧
+  agent_evolution_memory.db 已不存在，无需处置。
+- **仍未合回的 seam 工作（单列，别当已完成）**：main 与分支在 agent_runtime(±191 行)/
+  agent_tools(±227)/contracts(±114)/registry(±64)/agent_llm_handler(parse_tool 结构化参数、
+  complete() 协议) 仍深度分叉，分支侧 test_contracts/test_registry/test_fallback/test_tool_args
+  四个守护文件因此**未**复原（实现不在，先复测会直接红）。建议专门一轮对账，或喂给 P2 闭环、
+  以这四个测试文件为人工钉死的 oracle 逐项收回；动手前先核对 stash@{0}（分支 tip 之上的
+  WIP 快照，可能比 a6301c6 更新）。
+- 下一步（P2 收尾 → P3）：真 LLM 首跑 `python -X utf8 agent_system/run_self_update.py`（需
+  SANYAN_API_KEY、烧 token、人工触发）；oracle 可再并入自举验证；P3 = 一任务 N 候选淘汰赛
+  （CandidateTournament 复用前先照 DifferentialVerifier 的教训验真）。

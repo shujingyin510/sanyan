@@ -17,7 +17,9 @@ import sys
 
 
 import os
+import re
 import subprocess as sp
+import tempfile
 import time
 from typing import Dict, List, Tuple, Optional
 
@@ -151,18 +153,21 @@ class ConstraintEvolver:
 
 
 class DifferentialVerifier:
-    """差分验证器：多后端一致性 + 性能测试"""
+    """差分验证器：多后端一致性 + 性能测试。
 
-    # 后端列表
+    fail-closed：任一后端失败（非零退出/超时）→ 该用例判**不一致**，绝不默认通过。
+    代码经临时 .san 文件传给后端（repl/main.py 只接受文件路径，当参数传会被当成不存在的文件）。
+    cwd 可指向 git worktree —— 自更新闭环里验证的是**副本**里的引擎（见 self_update.py）。
+
+    输出经 `_normalize` 归一后再比：去编译噪音行、把求值器的值回显（`=> v（三进制: …）`/
+    `结果: v`）还原成裸值。多顶层表达式文件曾两引擎分歧（VM 只编译第一个、eval 不稳），
+    2026-07-02 已修（core/parser.parse_program）——第 5 用例即其回归守护。
+    """
+
+    # 真差分：Python 求值器（--eval） vs 字节码编译 + VM（默认模式，无标志）
     BACKENDS = {
-        'python': {
-            'name': 'Python 求值器',
-            'cmd': [sys.executable, '-X', 'utf8', 'repl/main.py'],
-        },
-        'vm': {
-            'name': '字节码 VM',
-            'cmd': [sys.executable, '-X', 'utf8', 'repl/main.py', '--vm'],
-        },
+        'python': {'name': 'Python 求值器', 'args': ['--eval']},
+        'vm': {'name': '字节码 VM', 'args': []},
     }
 
     # 测试用例
@@ -170,14 +175,25 @@ class DifferentialVerifier:
         {'input': '(输出 (加 1 2))', 'expected': '3'},
         {'input': '(输出 (乘 3 4))', 'expected': '12'},
         {'input': '(输出 (若 (大于 5 3) "是" "否"))', 'expected': '是'},
-        {'input': '(设 x 10)(输出 (加 x 5))', 'expected': '15'},
+        {'input': '(输出 (加 (乘 2 5) 5))', 'expected': '15'},
+        # 多顶层表达式：曾经 VM 只编译第一条、eval 不稳（parse 只取首形式），2026-07-02 修复的回归守护
+        {'input': '(设 x 10)\n(输出 (加 x 5))', 'expected': '15'},
     ]
 
-    def __init__(self):
+    _NOISE_RE = re.compile(r'^\[OK\] 编译 .*$')
+    _ECHO_RES = (
+        re.compile(r'^\s*=>\s*(.*?)（三进制:.*）\s*$'),
+        re.compile(r'^\s*=>\s*(.*)$'),
+        re.compile(r'^结果:\s*(.*)$'),
+    )
+
+    def __init__(self, cwd: Optional[str] = None, runner=sp.run):
         self._results: List[Dict] = []
+        self.cwd = cwd or ROOT
+        self._runner = runner  # 可注入假 runner（测试）
 
     def verify_consistency(self, test_cases: List[Dict] = None) -> Dict:
-        """验证多后端一致性"""
+        """验证多后端一致性。用例一致 = 全部后端成功 且 输出完全相同（fail-closed）。"""
         if test_cases is None:
             test_cases = self.TEST_CASES
 
@@ -185,80 +201,107 @@ class DifferentialVerifier:
         for test in test_cases:
             test_result = {
                 'input': test['input'],
-                'expected': test['expected'],
+                'expected': test.get('expected'),
                 'backends': {},
-                'consistent': True,
+                'consistent': False,
             }
+            outputs = []
+            all_ok = True
+            san_path = self._write_case(test['input'])
+            try:
+                for backend_name, backend in self.BACKENDS.items():
+                    try:
+                        output = self._normalize(self._run_backend(backend, san_path))
+                        test_result['backends'][backend_name] = {'output': output, 'success': True}
+                        outputs.append(output)
+                    except Exception as e:
+                        test_result['backends'][backend_name] = {'output': str(e), 'success': False}
+                        all_ok = False  # 后端失败 → 本例不一致（旧版这里会"全崩算一致"）
+            finally:
+                self._cleanup_case(san_path)
 
-            # 测试每个后端
-            for backend_name, backend in self.BACKENDS.items():
-                try:
-                    output = self._run_backend(backend, test['input'])
-                    test_result['backends'][backend_name] = {
-                        'output': output.strip(),
-                        'success': True,
-                    }
-                except Exception as e:
-                    test_result['backends'][backend_name] = {
-                        'output': str(e),
-                        'success': False,
-                    }
-
-            # 检查一致性
-            outputs = [r['output'] for r in test_result['backends'].values() if r['success']]
-            if len(outputs) > 1:
-                test_result['consistent'] = len(set(outputs)) == 1
-
+            test_result['consistent'] = all_ok and bool(outputs) and len(set(outputs)) == 1
             results.append(test_result)
 
-        # 汇总
         total = len(results)
         consistent = sum(1 for r in results if r['consistent'])
-        success_rate = consistent / total if total > 0 else 0
-
         return {
             'total': total,
             'consistent': consistent,
-            'success_rate': success_rate,
+            'success_rate': (consistent / total) if total else 0.0,
             'results': results,
         }
 
-    def _run_backend(self, backend: Dict, input_code: str) -> str:
-        """运行单个后端"""
-        cmd = backend['cmd'] + [input_code] if '{input}' not in str(backend['cmd']) else backend['cmd']
-        r = sp.run(
+    @classmethod
+    def _normalize(cls, stdout: str) -> str:
+        """归一两种后端的 stdout：去编译噪音行，把求值器的值回显还原成裸值。"""
+        lines = []
+        for ln in stdout.splitlines():
+            if not ln.strip() or cls._NOISE_RE.match(ln):
+                continue
+            for pat in cls._ECHO_RES:
+                m = pat.match(ln)
+                if m:
+                    ln = m.group(1)
+                    break
+            lines.append(ln.strip())
+        return '\n'.join(lines)
+
+    def _write_case(self, input_code: str) -> str:
+        fd, path = tempfile.mkstemp(suffix='.san', prefix='diffv-')
+        with os.fdopen(fd, 'w', encoding='utf-8') as f:
+            f.write(input_code)
+        return path
+
+    def _cleanup_case(self, san_path: str) -> None:
+        # 临时源文件 + main.py 在 cwd/build 下留的字节码缓存
+        bin_path = os.path.join(self.cwd, 'build', os.path.basename(san_path).replace('.san', '.bin'))
+        for p in (san_path, bin_path):
+            try:
+                os.remove(p)
+            except OSError:
+                pass
+
+    def _run_backend(self, backend: Dict, san_path: str) -> str:
+        """运行单个后端（代码须以文件路径传入）"""
+        cmd = [sys.executable, '-X', 'utf8', os.path.join('repl', 'main.py'), *backend['args'], san_path]
+        r = self._runner(
             cmd,
             capture_output=True,
             text=True,
             encoding='utf-8',
             errors='replace',
             timeout=30,
-            cwd=ROOT,
+            cwd=self.cwd,
         )
         if r.returncode != 0:
-            raise RuntimeError(f'Backend failed: {r.stderr[:200]}')
+            raise RuntimeError(f'Backend failed: {(r.stderr or r.stdout)[:200]}')
         return r.stdout
 
     def benchmark_performance(self, iterations: int = 10) -> Dict:
         """基准测试性能"""
         results = {}
-        for backend_name, backend in self.BACKENDS.items():
-            times = []
-            for _ in range(iterations):
-                start = time.time()
-                try:
-                    self._run_backend(backend, '(输出 (加 1 2))')
-                    times.append(time.time() - start)
-                except Exception:
-                    pass
+        san_path = self._write_case('(输出 (加 1 2))')
+        try:
+            for backend_name, backend in self.BACKENDS.items():
+                times = []
+                for _ in range(iterations):
+                    start = time.time()
+                    try:
+                        self._run_backend(backend, san_path)
+                        times.append(time.time() - start)
+                    except Exception:
+                        pass
 
-            if times:
-                results[backend_name] = {
-                    'avg_ms': (sum(times) / len(times)) * 1000,
-                    'min_ms': min(times) * 1000,
-                    'max_ms': max(times) * 1000,
-                    'iterations': len(times),
-                }
+                if times:
+                    results[backend_name] = {
+                        'avg_ms': (sum(times) / len(times)) * 1000,
+                        'min_ms': min(times) * 1000,
+                        'max_ms': max(times) * 1000,
+                        'iterations': len(times),
+                    }
+        finally:
+            self._cleanup_case(san_path)
 
         return results
 

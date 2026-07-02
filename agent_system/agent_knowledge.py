@@ -14,6 +14,8 @@ import sqlite3
 import time
 from typing import Dict, List, Tuple, Optional
 
+from agent_system.paths import db_path
+
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 
@@ -160,7 +162,7 @@ class TaskSimilarity:
 class ClusterLearning:
     """自动聚类学习任务距离"""
 
-    DB_PATH = os.path.join(ROOT, 'agent_task_clusters.db')
+    DB_PATH = db_path('agent_task_clusters.db')
 
     def __init__(self, n_clusters: int = 7):
         self.n_clusters = n_clusters

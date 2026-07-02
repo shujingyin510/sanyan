@@ -11,18 +11,23 @@ import time
 from collections import defaultdict
 from typing import Dict, List, Tuple, Optional
 
+from agent_system import paths, store
+
 
 class ExperienceStore:
     """跨会话经验持久化：工具成功率、失败模式、任务类型映射"""
 
+    _TABLES = ('tool_stats', 'failure_patterns', 'task_history', 'tool_recommendations')
+
     def __init__(self, db_path: Optional[str] = None):
         if db_path is None:
-            db_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'agent_experience.db')
+            # 阶段 2：默认并入单一 agent.db（旧 agent_experience.db 数据首次自动搬入）
+            db_path = paths.db_path(store.AGENT_DB)
         self.db_path = db_path
         self._init_db()
 
     def _init_db(self):
-        """初始化数据库"""
+        """初始化数据库（建表；若并入 agent.db，则从旧独立库非破坏迁移历史数据）"""
         conn = sqlite3.connect(self.db_path)
         conn.executescript("""
             CREATE TABLE IF NOT EXISTS tool_stats (
@@ -60,6 +65,10 @@ class ExperienceStore:
             );
         """)
         conn.commit()
+        # 并入 agent.db 时：从旧的 agent_experience.db 一次性搬入历史经验（旧库保留可回滚）
+        if os.path.basename(self.db_path) == store.AGENT_DB:
+            store.adopt_legacy(conn, 'agent_experience.db', self._TABLES)
+            store.set_version(conn, 'experience', 1)
         conn.close()
 
     def record_tool_use(self, tool: str, success: bool, duration: float = 0):
@@ -267,8 +276,12 @@ class AdaptiveToolSelector:
         return False, ''
 
     def record_outcome(self, task: str, tool: str, success: bool, duration: float = 0):
-        """记录工具使用结果"""
-        self.experience.record_tool_use(tool, success, duration)
+        """逐步更新「任务关键词→工具」推荐表。
+
+        注意：这里**不**再调 record_tool_use —— 工具成功率的累计统一由收尾的
+        LearningHandler.save_experience 遍历 memory['history'] 负责（每次执行恰好一条、
+        且覆盖主循环/验证/干跑三条路径）。本方法只在主循环触发，若也记 tool_use 会双记。
+        """
         # 更新推荐
         for kw in task.lower().split()[:3]:
             self.experience.update_recommendation(kw, tool, success)

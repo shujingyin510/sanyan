@@ -14,7 +14,7 @@ import os
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 from core.lexer import tokenize
-from core.parser import parse
+from core.parser import parse_program
 from core.evaluator import SanyanEvaluator
 from sugar.parser import parse_code as sugar_parse
 from ops.file_ops import clear_cache
@@ -72,8 +72,8 @@ def compile_source(source: str, output_path: str, vars_table: dict | None = None
 
     # 解析源码为 AST
     # 检测 S-表达式输入（以 ( 开头且括号平衡），直接用 S-表达式解析器
-    ast = None
-    sugar_ast = None
+    ast: list | None = None
+    sugar_ast: list | None = None
     is_sexpr = (source.strip().startswith('(') and source.count('(') == source.count(')')) or (
         source.strip().startswith('\uff08') and source.count('\uff08') == source.count('\uff09')
     )
@@ -98,16 +98,18 @@ def compile_source(source: str, output_path: str, vars_table: dict | None = None
     # 2. 如果 sugar 解析失败或跳过，尝试 S-表达式解析器
     if not sugar_ast:
         try:
+            # parse_program：取**全部**顶层形式（parse 只取第一个，会静默丢后续语句）
             tokens = tokenize(source)
-            s_expr_ast = parse(tokens, source)  # 传递源码用于错误位置定位
-            if s_expr_ast is not None:
-                if isinstance(s_expr_ast, list) and len(s_expr_ast) > 0 and s_expr_ast[0] == '做':
+            forms = parse_program(tokens, source)  # 传递源码用于错误位置定位
+            if forms:
+                first = forms[0]
+                if len(forms) == 1 and isinstance(first, list) and len(first) > 0 and first[0] == '做':
                     # S-表达式用 (做 ...) 作为顶层包装
-                    sugar_ast = ['do'] + s_expr_ast[1:]
-                elif isinstance(s_expr_ast, list):
-                    sugar_ast = ['do', s_expr_ast]
+                    sugar_ast = ['do'] + first[1:]
+                elif len(forms) == 1:
+                    sugar_ast = ['do', first]
                 else:
-                    sugar_ast = ['do', s_expr_ast]
+                    sugar_ast = ['do'] + forms
         except SanyanSyntaxError as exc2:
             sugar_error = str(exc2)
         except Exception:

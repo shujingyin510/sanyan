@@ -18,6 +18,7 @@ import os
 import re
 import shutil
 import subprocess
+import sys
 import tempfile
 import time
 from dataclasses import dataclass, field
@@ -175,5 +176,68 @@ def combine_oracles(oracles: List[Callable[[str], OracleVerdict]]) -> Callable[[
             if not v.ok:
                 return OracleVerdict(False, f'oracle#{i} 拒绝: {v.reason}', reports)
         return OracleVerdict(True, '全部 oracle 通过', reports)
+
+    return oracle
+
+
+# ── P2：把真 agent 接成 edit_fn + 差分一致性 oracle ──────────────────────────
+
+
+def make_agent_edit_fn(
+    prompt: str,
+    *,
+    agent_cmd: Optional[Sequence[str]] = None,
+    timeout: int = 1800,
+    runner: Callable[..., subprocess.CompletedProcess] = subprocess.run,
+) -> Callable[[str], None]:
+    """把「跑一个 agent 子进程」包装成 edit_fn：`cwd=worktree`，agent 只碰副本（红线②）。
+
+    默认命令 = `python agent_system/run_agent.py <prompt> --auto`，用的是**副本里**的
+    run_agent——P4 元循环时 agent 对自身代码的修改也因此落在验证范围内。
+    `agent_cmd` 可整体覆盖默认命令（须自含任务描述）。
+    密钥经环境变量继承给子进程，绝不写入源码或命令行文件。失败/超时 → 抛异常 → 闭环整体回滚。
+    """
+
+    def edit_fn(wt: str) -> None:
+        cmd = (
+            list(agent_cmd)
+            if agent_cmd is not None
+            else [sys.executable, '-X', 'utf8', os.path.join('agent_system', 'run_agent.py'), prompt, '--auto']
+        )
+        r = runner(cmd, cwd=wt, capture_output=True, text=True, encoding='utf-8', errors='replace', timeout=timeout)
+        if r.returncode != 0:
+            raise RuntimeError(f'agent 进程失败 rc={r.returncode}: {(r.stderr or r.stdout)[-300:]}')
+
+    return edit_fn
+
+
+def make_differential_oracle(
+    cases: Optional[List[dict]] = None,
+    *,
+    verifier_factory: Optional[Callable[[str], object]] = None,
+) -> Callable[[str], OracleVerdict]:
+    """差分一致性 oracle：解释器(--eval) vs 字节码 VM 输出全一致才放行（fail-closed）。
+
+    在 **worktree** 里跑副本引擎（cwd=workdir），验证的是改过的代码。零用例判拒绝、
+    异常判拒绝。`verifier_factory(workdir)` 可注入（测试）。
+    """
+
+    def oracle(workdir: str) -> OracleVerdict:
+        try:
+            if verifier_factory is not None:
+                verifier = verifier_factory(workdir)
+            else:
+                from agent_system.agent_evolution import DifferentialVerifier
+
+                verifier = DifferentialVerifier(cwd=workdir)
+            report = verifier.verify_consistency(cases)
+        except Exception as e:
+            return OracleVerdict(False, f'差分验证异常（fail-closed）: {e}')
+        total, consistent = report.get('total', 0), report.get('consistent', 0)
+        if total <= 0:
+            return OracleVerdict(False, '差分零用例（fail-closed）', report)
+        if consistent < total:
+            return OracleVerdict(False, f'差分不一致 {consistent}/{total}', report)
+        return OracleVerdict(True, f'差分一致 {total}/{total}', report)
 
     return oracle

@@ -25,31 +25,33 @@ class LearningHandler:
         experience_store: Any,
         git_batch_learner: Any,
         llm_call: Callable,
-        memory: Dict,
     ):
         self.experience_store = experience_store
         self.git_batch_learner = git_batch_learner
         self._llm_call = llm_call
-        self.memory = memory
 
-    def save_experience(self, task: str, perf_report: Optional[Dict] = None):
-        """保存本次运行经验到跨会话存储"""
+    def save_experience(self, task: str, memory: Dict, perf_report: Optional[Dict] = None):
+        """保存本次运行经验到跨会话存储。
+
+        memory 由调用方按次传入（AgentRuntime.run 每次会重绑 self.memory，故不能在
+        构造时捕获，否则拿到的是过期的空字典）。
+        """
         try:
             # 记录工具使用
-            for entry in self.memory.get('history', []):
+            for entry in memory.get('history', []):
                 tool = entry.get('tool', '')
                 success = entry.get('trit', 0) == 1
                 duration = entry.get('duration', 0)
                 self.experience_store.record_tool_use(tool, success, duration)
 
             # 记录任务
-            tool_chain = [e.get('tool', '') for e in self.memory.get('history', [])]
-            success = bool(self.memory.get('modified'))
+            tool_chain = [e.get('tool', '') for e in memory.get('history', [])]
+            success = bool(memory.get('modified'))
             duration = perf_report.get('total_duration', 0) if perf_report else 0
             self.experience_store.record_task(task, tool_chain, success, duration)
 
             # 记录失败模式
-            for entry in self.memory.get('history', []):
+            for entry in memory.get('history', []):
                 if entry.get('trit', 0) == -1:
                     self.experience_store.record_failure_pattern(
                         entry.get('tool', ''), entry.get('result', '')[:100], 'logic_error'
@@ -104,16 +106,16 @@ class LearningHandler:
         except Exception:
             return ''
 
-    def learn_from_task(self, task: str):
+    def learn_from_task(self, task: str, memory: Dict):
         """从任务中学习项目风格，生成规则"""
         try:
-            modified = self.memory.get('modified', [])
+            modified = memory.get('modified', [])
             if not modified:
                 return
 
             # 构建学习提示
             files_str = ', '.join(set(modified))
-            history = self.memory.get('history', [])
+            history = memory.get('history', [])
             tools_used = [e.get('tool', '') for e in history]
 
             # 收集修改详情

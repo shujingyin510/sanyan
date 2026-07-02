@@ -20,8 +20,10 @@ import subprocess
 from collections import Counter, defaultdict
 from typing import Dict, List, Tuple
 
+from agent_system.paths import db_path
+
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-DB_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'git_task_knowledge.db')
+DB_PATH = db_path('git_task_knowledge.db')
 
 
 # ── 1. 解析 git log ──

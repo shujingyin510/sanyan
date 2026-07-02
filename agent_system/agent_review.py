@@ -17,6 +17,8 @@ import statistics
 import time
 from typing import Dict, List, Optional
 
+from agent_system.paths import db_path
+
 ROOT = os.path.dirname(os.path.abspath(__file__))
 
 
@@ -26,7 +28,7 @@ ROOT = os.path.dirname(os.path.abspath(__file__))
 class ReviewerAgent:
     """独立代码审查Agent：Coder的Patch必须通过审查才能接受"""
 
-    DB_PATH = os.path.join(ROOT, 'agent_review_history.db')
+    DB_PATH = db_path('agent_review_history.db')
 
     # 审查规则
     RULES = {
@@ -229,7 +231,7 @@ class ReviewerAgent:
 class PatchHistory:
     """Patch历史数据库：收益/风险/回滚率（升级版）"""
 
-    DB_PATH = os.path.join(ROOT, 'agent_patch_history.db')
+    DB_PATH = db_path('agent_patch_history.db')
 
     def __init__(self):
         self._init_db()

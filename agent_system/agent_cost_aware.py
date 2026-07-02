@@ -16,6 +16,8 @@ import sqlite3
 import time
 from typing import Dict, List, Optional
 
+from agent_system.paths import db_path
+
 ROOT = os.path.dirname(os.path.abspath(__file__))
 
 
@@ -25,7 +27,7 @@ ROOT = os.path.dirname(os.path.abspath(__file__))
 class CostTracker:
     """追踪每次验证的成本"""
 
-    DB_PATH = os.path.join(ROOT, 'agent_cost_tracking.db')
+    DB_PATH = db_path('agent_cost_tracking.db')
 
     def __init__(self):
         self._init_db()

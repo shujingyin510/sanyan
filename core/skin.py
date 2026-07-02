@@ -5,6 +5,9 @@ import os
 from core.ternary_core import TritValue
 from core.values import SanyanIOError
 
+# 仓库根：language/*.json 在根目录下；锚定 __file__ 使加载不依赖 CWD（skin.py 已迁入 core/）
+_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+
 
 class SkinManager:
     def __init__(self, lang='chinese'):
@@ -15,7 +18,7 @@ class SkinManager:
 
     def _load_skin(self, lang):
         """加载皮肤 JSON 文件，合并三态词表"""
-        path = os.path.join('language', f'{lang}.json')
+        path = os.path.join(_ROOT, 'language', f'{lang}.json')
         if not os.path.exists(path):
             raise SanyanIOError(f'皮肤文件不存在: {path}')
         with open(path, 'r', encoding='utf-8') as f:

@@ -101,11 +101,15 @@ def _parse_file(code_str):
         return SugarConverter.convert(code_str, skin_mgr), None
     except SyntaxError as e:
         from core.lexer import tokenize
-        from core.parser import parse
+        from core.parser import parse_program
 
         try:
+            # parse_program：取全部顶层形式（parse 只取第一个，多语句文件会静默丢语句）
             tokens = tokenize(code_str)
-            return parse(tokens), str(e)
+            forms = parse_program(tokens)
+            if not forms:
+                return None, str(e)
+            return (forms[0] if len(forms) == 1 else ['do'] + forms), str(e)
         except SyntaxError as e2:
             return None, f'{e2}\n  (sugar 语法解析也失败: {e})'
 
