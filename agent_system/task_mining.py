@@ -11,10 +11,12 @@
 from __future__ import annotations
 
 import ast
+import io
 import os
 import re
+import tokenize
 from dataclasses import dataclass
-from typing import List, Sequence
+from typing import Iterator, List, Sequence, Tuple
 
 SKIP_DIRS = {
     '.git',
@@ -76,20 +78,38 @@ def _walk_files(root: str, exts: Sequence[str]):
                 yield os.path.join(dirpath, fn)
 
 
+def _py_comments(text: str) -> Iterator[Tuple[int, str]]:
+    """产出 .py 源码里**真注释** token 的 (行号, 注释文本)。
+
+    字符串字面量里的 "# TODO"（测试夹具、提示词模板等）不是注释，不产出——
+    首跑实测这类假阳性占了 TODO 挖掘近半（如 test_task_mining 自己的夹具串）。
+    """
+    try:
+        for tok in tokenize.generate_tokens(io.StringIO(text).readline):
+            if tok.type == tokenize.COMMENT:
+                yield tok.start[0], tok.string
+    except (tokenize.TokenError, IndentationError, SyntaxError):
+        return  # 语法坏的文件跳过（与 mine_long_functions 的 ast 失败同策略）
+
+
 def mine_todos(root: str, *, exts: Sequence[str] = ('.py',), limit: int = 50) -> List[MinedTask]:
-    """扫描 TODO/FIXME/HACK/XXX 注释。"""
+    """扫描 TODO/FIXME/HACK/XXX 注释（.py 经 tokenize 只认真注释；其他扩展逐行正则）。"""
     tasks: List[MinedTask] = []
     for fp in _walk_files(root, exts):
         rel = os.path.relpath(fp, root)
         try:
             with open(fp, encoding='utf-8', errors='replace') as f:
-                lines = f.read().splitlines()
+                text = f.read()
         except OSError:
             continue
-        for i, line_text in enumerate(lines, 1):
-            m = _TODO_RE.search(line_text)
+        if fp.endswith('.py'):
+            found: Iterator[Tuple[int, str]] = _py_comments(text)
+        else:
+            found = ((i, ln) for i, ln in enumerate(text.splitlines(), 1))
+        for lineno, chunk in found:
+            m = _TODO_RE.search(chunk)
             if m:
-                tasks.append(MinedTask('todo', rel, i, m.group(2).strip() or m.group(1).upper()))
+                tasks.append(MinedTask('todo', rel, lineno, m.group(2).strip() or m.group(1).upper()))
                 if len(tasks) >= limit:
                     return tasks
     return tasks

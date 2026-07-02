@@ -31,6 +31,13 @@ def test_mine_todos_scans_and_skips_artifact_dirs(tmp_path):
     assert [(t.line, t.title) for t in tasks] == [(1, '修这个'), (2, '那个')]
 
 
+def test_todo_in_string_literal_is_not_mined(tmp_path):
+    # 首跑抓到的假阳性回归守护：字符串字面量里的待办标记（夹具/模板串）不是任务
+    (tmp_path / 'a.py').write_text("x = '# TODO 不是任务'\ny = 2  # TODO 真任务\n", encoding='utf-8')
+    tasks = mine_todos(str(tmp_path))
+    assert [(t.line, t.title) for t in tasks] == [(2, '真任务')]
+
+
 def test_mine_long_functions(tmp_path):
     body = '\n'.join(f'    x{i} = {i}' for i in range(90))
     (tmp_path / 'big.py').write_text(f'def huge():\n{body}\n\n\ndef tiny():\n    pass\n', encoding='utf-8')

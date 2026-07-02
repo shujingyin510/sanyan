@@ -441,6 +441,11 @@ python -X utf8 -m pytest tests/test_contracts.py tests/test_agent_v5.py -q
   四个守护文件因此**未**复原（实现不在，先复测会直接红）。建议专门一轮对账，或喂给 P2 闭环、
   以这四个测试文件为人工钉死的 oracle 逐项收回；动手前先核对 stash@{0}（分支 tip 之上的
   WIP 快照，可能比 a6301c6 更新）。
+- **--list 首跑（零成本、无 LLM）**：挖掘/排序工作正常，但 TODO 的 11 条命中经逐条核查
+  **全为假阳性**（三引号测试骨架模板、提示词示例、test_task_mining 自身夹具串）——正则扫原始
+  文本分不清注释与字符串。修法：`.py` 经 `tokenize` 只认真 COMMENT token（tokenize 失败跳过，
+  与 ast 同策略），加回归测试（6 测）。修后本仓真 TODO 注释为零 → P2 任务源实际是
+  failing_test（当前套件全绿则空）和 long_function（榜首 run_agent.init_evaluator 787 行）。
 - 下一步（P2 收尾 → P3）：真 LLM 首跑 `python -X utf8 agent_system/run_self_update.py`（需
   SANYAN_API_KEY、烧 token、人工触发）；oracle 可再并入自举验证；P3 = 一任务 N 候选淘汰赛
   （CandidateTournament 复用前先照 DifferentialVerifier 的教训验真）。
