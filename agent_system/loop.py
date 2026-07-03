@@ -61,7 +61,12 @@ def run_legacy(rt, task, max_rounds, dry_run):
             )
             result = executor.execute_rule(task, new_rule, dry_run)
             result['auto_rule'] = new_rule.name
-            return result
+            if rt.memory.get('modified'):
+                return result
+            # 生成规则的步骤参数常含未绑定模板（{func} 等垃圾参数）：跑完零改动
+            # 还可能 done 谎报"完成"（P2 首跑实测：劫持整轮、oracle 判无 diff）。
+            # 零文件改动不收工，落回下方 LLM 多轮循环真正干活。
+            print('  [规则] 生成规则执行零改动 → 回退 LLM 多轮循环')
 
     ctx = rt._build_context(task, 'init')
     t_start = _time.time()

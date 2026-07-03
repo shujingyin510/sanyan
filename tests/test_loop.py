@@ -47,3 +47,57 @@ def test_run_legacy_dry_run_forced_tool_unregistered():
 
     rt = _FakeRt(forced=('unknown_tool', 'p'), tools={})  # 强制工具未注册 → 回退
     assert run_legacy(rt, '任务', 5, dry_run=True) == {'answer': 'dry_run完成', 'memory': {'history': []}}
+
+
+# ── 生成规则闸门：零改动不收工，回退 LLM 多轮循环（P2 首跑回归守护）──
+
+
+class _RuleGenRt:
+    """覆盖生成规则路径所需最小面：真 RuleExecutor + 假 rule_engine/llm。"""
+
+    def __init__(self, rule, tools=None):
+        self.memory = {'history': [], 'modified': [], 'failures': 0}
+        self.tools = tools or {}
+        self.ternary = types.SimpleNamespace(step=lambda t, r: (1, 0.9, {'action': 'allow'}, 'AFFIRM'))
+        self.template_manager = None
+        self.rule_engine = types.SimpleNamespace(
+            match_rule=lambda task: None,
+            llm_fn=lambda p: '',  # truthy → 进入生成分支
+            generate_rule=lambda task: rule,
+            extract_filename=lambda task: 'x.py',
+            extract_module_name=lambda task, fn: 'x',
+            rules=[],
+        )
+
+    def _build_context(self, *a):
+        return 'CTX'
+
+    def _llm_call(self, ctx):
+        raise RuntimeError('模拟 LLM 失败')
+
+
+def test_generated_rule_with_zero_modification_falls_through_to_loop():
+    # 今天的案情：LLM 生成的规则参数全是未绑定模板，跑完零改动还 done 谎报完成。
+    # 旧行为直接 return 规则结果（answer='按规则…执行完成'）；新行为必须落回 LLM 循环。
+    from agent_system.loop import run_legacy
+
+    rule = types.SimpleNamespace(name='garbage-rule', steps=[], validation=None)
+    rt = _RuleGenRt(rule)
+    r = run_legacy(rt, '重构某函数', 3, dry_run=False)
+    assert r['answer'] == '已达3轮'  # 进了 LLM 循环（此处假 LLM 连败退出），而非规则结果
+    assert '按规则' not in r['answer']
+    assert rt.memory['modified'] == []
+
+
+def test_generated_rule_with_real_modification_returns_rule_result():
+    from agent_system.loop import run_legacy
+
+    rule = types.SimpleNamespace(
+        name='w',
+        steps=[{'tool': 'write_file', 'args_desc': 'x.py|print(1)', 'desc': '写文件'}],
+        validation=None,
+    )
+    rt = _RuleGenRt(rule, tools={'write_file': lambda p, d: f'已写入 {p.split("|")[0]}'})
+    r = run_legacy(rt, '创建 x.py', 3, dry_run=False)
+    assert r['answer'] == '按规则 [w] 执行完成' and r['auto_rule'] == 'w'
+    assert rt.memory['modified'] == ['x.py']
