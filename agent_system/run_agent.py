@@ -20,9 +20,13 @@ import sqlite3
 import json
 import time as _time
 
-# 仓库根（run_agent.py 已迁入 agent_system/）：本文件内相对路径均以仓库根为基准
+# 仓库根（run_agent.py 已迁入 agent_system/）：本文件内相对路径均以仓库根为基准。
+# 直接以脚本运行时 sys.path[0] 是 agent_system/ 而非仓库根，根级包（sugar/core/ops）
+# 必须显式入 path——chdir 只管相对文件路径，管不了 import。
 PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 os.chdir(PROJECT_ROOT)
+if PROJECT_ROOT not in sys.path:
+    sys.path.insert(0, PROJECT_ROOT)
 
 from sugar.parser import parse_code
 from core.evaluator import SanyanEvaluator
