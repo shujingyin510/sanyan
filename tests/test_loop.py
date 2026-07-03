@@ -89,6 +89,22 @@ def test_generated_rule_with_zero_modification_falls_through_to_loop():
     assert rt.memory['modified'] == []
 
 
+def test_skip_rule_gen_env_bypasses_generation(monkeypatch):
+    # 自更新场景：SANYAN_SKIP_RULE_GEN 跳过规则生成前奏（省 2-4 次 LLM 调用），
+    # 直接进 LLM 主循环
+    from agent_system.loop import run_legacy
+
+    monkeypatch.setenv('SANYAN_SKIP_RULE_GEN', '1')
+
+    def _boom(task):
+        raise AssertionError('不应调用 generate_rule')
+
+    rt = _RuleGenRt(types.SimpleNamespace(name='x', steps=[], validation=None))
+    rt.rule_engine.generate_rule = _boom
+    r = run_legacy(rt, '重构某函数', 3, dry_run=False)
+    assert r['answer'] == '已达3轮'  # 未触发 _boom，直接进循环（假 LLM 连败退出）
+
+
 def test_generated_rule_with_dict_args_does_not_crash():
     # P2 探针#10 回归守护：LLM 生成的步骤 args_desc 可能是 dict（协议漂移），
     # 旧实现 .replace 直接 AttributeError 崩掉整个 agent 进程

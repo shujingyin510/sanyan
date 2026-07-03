@@ -5,6 +5,8 @@ P2 探针#7 抓到的根因回归守护：模型发「路径|起始行|行数」
 在同一区域原地打转直到被 UR 判死，replace_in_file 无从谈起。
 """
 
+import os
+
 from agent_system.agent_tools import _read_file_direct_simple
 
 
@@ -41,3 +43,65 @@ def test_whole_file_default(tmp_path):
     p = _mk(tmp_path, n=5)
     out = _read_file_direct_simple(p)
     assert out.startswith('line1\n') and 'line5' in out
+
+
+# ── P3 底层优化：语法守卫 / 未找到诊断 / 行区间替换 ──────────────────────────
+
+
+def _mk_py(tmp_path, src='def foo():\n    a = 1\n    return a\n'):
+    p = tmp_path / 'm.py'
+    p.write_text(src, encoding='utf-8')
+    return str(p), src
+
+
+def test_replace_syntax_guard_reverts(tmp_path):
+    # 把文件改出语法错误还报"已替换"成功，agent 拿着 AFFIRM 走到 oracle 才发现
+    # 文件废了（P3 三连拒实录之一）——守卫必须自动还原并给出行号
+    from agent_system.agent_tools import _replace_in_file_direct
+
+    p, src = _mk_py(tmp_path)
+    out = _replace_in_file_direct(f'{p}|    return a|    return (a')
+    assert '语法错误' in out and '已自动还原' in out
+    assert open(p, encoding='utf-8').read() == src  # 原文完好
+
+
+def test_replace_not_found_gives_closest_snippet(tmp_path):
+    # 抄错一个空格不再只回"未找到"，附上文件里最接近的原文供修正
+    from agent_system.agent_tools import _replace_in_file_direct
+
+    p, _ = _mk_py(tmp_path)
+    out = _replace_in_file_direct(f'{p}|    a=1|    a=2')  # 空格抄丢了（且非原文子串）
+    assert '未找到' in out and '最接近的原文' in out and 'a = 1' in out
+
+
+def test_write_file_new_broken_py_is_deleted(tmp_path):
+    from agent_system.agent_tools import _write_file_direct_simple
+
+    p = str(tmp_path / 'new.py')
+    out = _write_file_direct_simple(f'{p}|def broken(:')
+    assert '语法错误' in out and not os.path.exists(p)
+
+
+def test_replace_lines_basic(tmp_path):
+    from agent_system.agent_tools import _replace_lines_direct
+
+    p, _ = _mk_py(tmp_path)
+    out = _replace_lines_direct(f'{p}|2|3|    b = 2\\n    return b')
+    assert '已替换' in out and '第2-3行' in out
+    assert open(p, encoding='utf-8').read() == 'def foo():\n    b = 2\n    return b\n'
+
+
+def test_replace_lines_syntax_guard(tmp_path):
+    from agent_system.agent_tools import _replace_lines_direct
+
+    p, src = _mk_py(tmp_path)
+    out = _replace_lines_direct(f'{p}|2|3|broken(')
+    assert '语法错误' in out and open(p, encoding='utf-8').read() == src
+
+
+def test_replace_lines_bad_range(tmp_path):
+    from agent_system.agent_tools import _replace_lines_direct
+
+    p, _ = _mk_py(tmp_path)
+    assert '行区间无效' in _replace_lines_direct(f'{p}|5|99|x = 1')
+    assert '格式' in _replace_lines_direct(f'{p}|2|3')

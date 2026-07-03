@@ -98,6 +98,9 @@ def main(argv=None) -> int:
     if not args.no_differential:
         oracles.append(make_differential_oracle())
 
+    # 自更新场景跳过规则生成前奏（省 2-4 次 LLM 调用与分钟级延迟；其产物垃圾参数
+    # 规则本就被零改动闸门丢弃），agent 子进程经环境继承此开关
+    os.environ['SANYAN_SKIP_RULE_GEN'] = '1'
     log_path = os.path.join(tempfile.gettempdir(), f'sanyan-su-agent-{time.strftime("%Y%m%d-%H%M%S")}.log')
     print(f'agent 日志: {log_path}')
     loop = SelfUpdateLoop(ROOT, combine_oracles(oracles))

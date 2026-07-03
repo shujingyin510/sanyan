@@ -178,7 +178,8 @@ class AgentRuntime:
             f'  find_symbol(name)      — 查找符号定义/引用\n'
             f'  read_file(path,start,count) — 读文件(行号可选)\n'
             f'  search_code(keyword)   — 搜索代码\n'
-            f'  replace_in_file(path,old,new) — 单次替换\n'
+            f'  replace_in_file(path,old,new) — 单次替换(old须逐字精确)\n'
+            f'  replace_lines(path,start,end,new) — 行区间替换(抄不准原文时用)\n'
             f'  replace_all(pattern,old,new)  — 批量替换\n'
             f'  write_file(path,content)— 写入文件\n'
             f'  list_files(pattern)     — 列出文件(可选模式)\n'
@@ -208,7 +209,7 @@ class AgentRuntime:
             f'\n'
             f'=== 阶段约束 ===\n'
             f'探索阶段: 只用 analyze/read_file/search_code/list_files\n'
-            f'修改阶段: 只用 write_file/replace_in_file/replace_all\n'
+            f'修改阶段: 只用 write_file/replace_in_file/replace_lines/replace_all\n'
             f'验证阶段: 只用 run_test/run_shell/done\n'
             f'\n'
             f'=== 反过度工程约束 ===\n'
@@ -583,10 +584,11 @@ class AgentRuntime:
             )
             if reads >= 2 and not self.memory.get('modified'):
                 parts.append(
-                    '提示: 探索已充分，现在进入修改阶段——基于上方代码立即发出 '
-                    'replace_in_file(path,old,new)：old 必须逐字复制上方结果中的连续原文（含缩进与空行），'
-                    'new 为改后文本。每次替换的 old 控制在 30 行以内，大改动分多次小步替换完成'
-                    '（如先替换 def 行插入辅助函数，再逐段替换调用处）。不要再调用读类工具。'
+                    '提示: 探索已充分，现在进入修改阶段——立即提交修改：'
+                    '优先 replace_lines(path,start,end,new)（按行号整段替换，无需逐字抄原文）；'
+                    '或 replace_in_file(path,old,new)（old 必须逐字复制含缩进）。'
+                    '每次改动控制在 30 行以内，大改动分多次小步完成'
+                    '（如先在函数前插入辅助函数，再整段替换函数体）。不要再调用读类工具。'
                 )
             # 800 字符看不全一个待重构函数，replace_in_file 需要精确旧文本 → 放宽到 4000
             # 与 read_file 工具上限对齐（范围读一个 94 行函数 ~3.3k 字符须完整透传；

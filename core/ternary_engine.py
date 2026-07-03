@@ -31,6 +31,7 @@ class TernaryEngine:
         'read_file': 0.90,
         'search_code': 0.85,
         'replace_in_file': 0.60,
+        'replace_lines': 0.60,
         'replace_all': 0.50,
         'write_file': 0.50,
         'run_test': 0.80,
@@ -79,9 +80,9 @@ class TernaryEngine:
             return 'UNCERT'  # 可能是路径问题，非逻辑错误
         if tool == 'write_file' and '已写入' in r:
             return 'AFFIRM'
-        if tool in ('replace_in_file', 'replace_all'):
-            if '未找到' in r:
-                return 'UNCERT'  # 可能目标文本不精确，非代码错误
+        if tool in ('replace_in_file', 'replace_lines', 'replace_all'):
+            if '未找到' in r or '语法错误' in r or '行区间无效' in r:
+                return 'UNCERT'  # 目标文本不精确/写坏被守卫还原——可恢复，非逻辑错误
             if '已' in r or '共' in r:
                 return 'AFFIRM'
         if tool == 'done':

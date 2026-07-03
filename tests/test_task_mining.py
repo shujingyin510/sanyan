@@ -46,6 +46,16 @@ def test_mine_long_functions(tmp_path):
     assert tasks[0].kind == 'long_function' and tasks[0].line == 1
 
 
+def test_long_function_hints_static_plan(tmp_path):
+    # P3：挖掘时静态列出函数体的候选提取块（行区间），任务书降维成"按方案执行"
+    if_body = '\n'.join(f'        y{i} = {i}' for i in range(10))
+    tail = '\n'.join(f'    z{i} = {i}' for i in range(75))
+    (tmp_path / 'big.py').write_text(f'def huge(v):\n    if v:\n{if_body}\n{tail}\n', encoding='utf-8')
+    t = mine_long_functions(str(tmp_path), max_lines=80)[0]
+    assert '条件块' in t.hints and t.hints.startswith('L2-')
+    assert '候选块' in t.prompt() and '条件块' in t.prompt()
+
+
 def test_mine_all_orders_by_verifiability(tmp_path):
     (tmp_path / 'a.py').write_text('# TODO: 一个待办\n', encoding='utf-8')
     tasks = mine_all(str(tmp_path), pytest_output='FAILED tests/t.py::test_z - x')

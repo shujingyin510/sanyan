@@ -153,6 +153,13 @@ class TestAgentRuntime(unittest.TestCase):
         self.assertEqual(tool, 'replace_in_file')
         self.assertEqual(params, 'x.py|A|B')
 
+    def test_parse_tool_replace_lines_order(self):
+        # replace_lines 走按工具参数序（通用序里 new 排在 start/end 前会拼错）
+        raw = '{"tool":"replace_lines","args":{"new":"CODE","end":20,"path":"x.py","start":10}}'
+        tool, params = self.rt._parse_tool(raw)
+        self.assertEqual(tool, 'replace_lines')
+        self.assertEqual(params, 'x.py|10|20|CODE')
+
     def test_constraint_violation(self):
         self.rt.memory = {'same_tool_count': {}, 'modified': [], 'history': []}
         for i in range(5):

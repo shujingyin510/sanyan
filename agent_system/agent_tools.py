@@ -1,5 +1,7 @@
 """Tool 包装函数 — AgentRuntime V3 工具层"""
 
+import ast as _ast_mod
+import difflib as _difflib
 import os
 import glob as _glob
 import subprocess as _sp
@@ -26,6 +28,50 @@ def param_path(params):
     if isinstance(params, dict):
         return params.get('path', params.get('test_file', params.get('file', '')))
     return str(params)
+
+
+def _check_py_syntax_or_revert(path, original):
+    """.py 写入后语法自检；坏则还原。返回错误信息（空串=通过）。
+
+    P3 底层优化①：旧行为是把文件改出语法错误还返回"已替换 N 处"成功，
+    agent 拿着 AFFIRM 继续走，直到 oracle 才发现文件废了——整轮报销。
+    守卫把致命错误变成循环内可恢复的一步。original=None 表示新建文件（坏则删除）。
+    """
+    if not str(path).endswith('.py'):
+        return ''
+    try:
+        with open(path, encoding='utf-8', errors='replace') as fh:
+            _ast_mod.parse(fh.read())
+        return ''
+    except SyntaxError as e:
+        if original is None:
+            try:
+                os.remove(path)
+            except OSError:
+                pass
+            return f'写入产生语法错误(文件已删除): 第{e.lineno}行 {e.msg}。请修正后重写'
+        with open(path, 'w', encoding='utf-8') as fh:
+            fh.write(original)
+        return f'替换产生语法错误(已自动还原): 第{e.lineno}行 {e.msg}。请修正 new 文本后重试'
+    except OSError:
+        return ''
+
+
+def _closest_snippet(content, old, max_lines=12):
+    """old 未命中时，从 content 里找最相近的原文片段（引导 agent 修正抄写）。
+
+    P3 底层优化②：弱模型抄 old 差一个空格即"未找到"且不知差在哪，只能盲重试。
+    """
+    old_lines = [ln for ln in old.splitlines() if ln.strip()]
+    if not old_lines:
+        return ''
+    content_lines = content.splitlines()
+    anchor = _difflib.get_close_matches(old_lines[0], content_lines, n=1, cutoff=0.6)
+    if not anchor:
+        return ''
+    idx = content_lines.index(anchor[0])
+    window = content_lines[idx : idx + min(len(old_lines) + 2, max_lines)]
+    return '\n'.join(window)
 
 
 def _analyze_file_direct(path):
@@ -142,11 +188,50 @@ def _replace_in_file_direct(params, dry_run=False):
         content = open(path, encoding='utf-8').read()
         count = content.count(old)
         if count == 0:
-            return f'未找到 "{old[:40]}"'
-        content = content.replace(old, new)
-        open(path, 'w', encoding='utf-8').write(content)
+            hint = _closest_snippet(content, old)
+            return f'未找到 "{old[:40]}"' + (f'；文件中最接近的原文是:\n{hint}' if hint else '')
+        open(path, 'w', encoding='utf-8').write(content.replace(old, new))
+        err = _check_py_syntax_or_revert(path, content)
+        if err:
+            return err
         return f'已替换 {count} 处'
     except Exception as e:
+        return f'替换错误: {e}'
+
+
+def _replace_lines_direct(params, dry_run=False):
+    """行区间替换: 路径|起始行|结束行|新文本（\\n→换行）。
+
+    P3 底层优化③：精确文本匹配是强加给弱模型的摩擦——它本来就在用行号思考
+    （read_file 就是按行号读的）。行区间替换绕开抄写问题；语法守卫兜底安全。
+    """
+    parts = params.split('|', 3)
+    if len(parts) < 4:
+        return '格式: 路径|起始行|结束行|新文本'
+    path = _resolve_path_simple(parts[0].strip())
+    try:
+        start, end = int(parts[1]), int(parts[2])
+    except ValueError:
+        return '格式: 路径|起始行|结束行|新文本（行号须为整数）'
+    new_text = parts[3].replace('\\n', '\n')
+    if dry_run:
+        return f'[干跑] {path}: L{start}-{end}'
+    try:
+        with open(path, encoding='utf-8', errors='replace') as fh:
+            lines = fh.read().splitlines(keepends=True)
+        total = len(lines)
+        if not (1 <= start <= end <= total):
+            return f'行区间无效: L{start}-{end}（文件共{total}行）'
+        original = ''.join(lines)
+        if new_text and not new_text.endswith('\n'):
+            new_text += '\n'
+        with open(path, 'w', encoding='utf-8') as fh:
+            fh.write(''.join(lines[: start - 1]) + new_text + ''.join(lines[end:]))
+        err = _check_py_syntax_or_revert(path, original)
+        if err:
+            return err
+        return f'已替换 {path} 第{start}-{end}行（{end - start + 1}行 → {len(new_text.splitlines())}行）'
+    except OSError as e:
         return f'替换错误: {e}'
 
 
@@ -167,7 +252,8 @@ def _replace_all_direct(params, dry_run=False):
                     results.append(f'[干跑] {fp}: {count}处')
                 else:
                     open(fp, 'w', encoding='utf-8').write(content.replace(old, new))
-                    results.append(f'{fp}: {count}处')
+                    err = _check_py_syntax_or_revert(fp, content)
+                    results.append(f'{fp}: {err}' if err else f'{fp}: {count}处')
         except Exception:
             pass
     return '\n'.join([f'共替换 {sum(1 for _ in results)} 个文件'] + results[:15]) if results else '未找到'
@@ -179,7 +265,13 @@ def _write_file_direct_simple(params, dry_run=False):
     if dry_run:
         return f'[干跑] {path}: {len(content)}字符'
     try:
+        original = None
+        if os.path.exists(path):
+            original = open(path, encoding='utf-8', errors='replace').read()
         open(path, 'w', encoding='utf-8').write(content)
+        err = _check_py_syntax_or_revert(path, original)
+        if err:
+            return err
         return f'已写入 {path}'
     except Exception as e:
         return f'写入错误: {e}'
@@ -208,8 +300,12 @@ def _run_test_direct(test_path, dry_run=False):
             ['python', '-X', 'utf8', '-m', 'pytest', test_path, '-v', '-q'],
             capture_output=True,
             text=True,
+            encoding='utf-8',
+            errors='replace',
             timeout=60,
-            cwd=os.path.dirname(os.path.abspath(__file__)) or '.',
+            # 仓库根（本文件已在 agent_system/ 下）——曾锚 agent_system/ 导致
+            # tests/ 永远找不到，agent 的自验证工具从重构起就是坏的
+            cwd=os.path.dirname(os.path.dirname(os.path.abspath(__file__))) or '.',
         )
         output = r.stdout[-500:] + r.stderr[-300:]
         from agent_system.contracts import ToolResult, ToolStatus
@@ -236,6 +332,8 @@ def _run_shell_direct(cmd, dry_run=False):
             shell=True,
             capture_output=True,
             text=True,
+            encoding='utf-8',  # Windows 默认 GBK 解码 utf-8 输出会在 reader 线程抛异常
+            errors='replace',
             timeout=60,
             cwd=os.path.dirname(os.path.dirname(os.path.abspath(__file__))) or '.',
         )

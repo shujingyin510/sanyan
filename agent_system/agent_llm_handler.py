@@ -146,6 +146,18 @@ class LLMHandler:
         '模型提供商': 'provider',
     }
 
+    # dict args 摊平的按工具参数序（缺席工具走下方通用序；通用序按键名固定，
+    # 对参数名撞车的新工具（如 replace_lines 的 start/end/new）会拼错顺序）
+    _TOOL_ARG_ORDER = {
+        'replace_lines': ('path', 'start', 'end', 'new'),
+        'replace_in_file': ('path', 'old', 'new'),
+        'replace_all': ('pattern', 'old', 'new'),
+        'read_file': ('path', 'start', 'count'),
+        'write_file': ('path', 'content'),
+        'run_shell': ('cmd',),
+        'run_test': ('test_file',),
+    }
+
     def _get_config(self, key: str, default: str) -> str:
         """安全获取配置：优先 evaluator（.san 可动态改，占位符视为未配置），其次单一 typed 配置（环境）。"""
         try:
@@ -189,7 +201,8 @@ class LLMHandler:
             '  find_symbol(name)      — 查找符号定义/引用\n'
             '  read_file(path,start,count) — 读文件(行号可选)\n'
             '  search_code(keyword)   — 搜索代码\n'
-            '  replace_in_file(path,old,new) — 单次替换\n'
+            '  replace_in_file(path,old,new) — 单次替换(old须逐字精确)\n'
+            '  replace_lines(path,start,end,new) — 行区间替换(抄不准原文时用)\n'
             '  replace_all(pattern,old,new)  — 批量替换\n'
             '  write_file(path,content)— 写入文件\n'
             '  list_files(pattern)     — 列出文件(可选模式)\n'
@@ -289,19 +302,22 @@ class LLMHandler:
                                         return tool, f'{path}|{content}'
 
                                     ordered = []
-                                    for key in (
-                                        'path',
-                                        'name',
-                                        'keyword',
-                                        'content',
-                                        'answer',
-                                        'old',
-                                        'new',
-                                        'pattern',
-                                        'start',
-                                        'count',
-                                        'test_file',
-                                        'cmd',  # run_shell——缺失时 args 被整包 JSON dump 当命令执行
+                                    for key in self._TOOL_ARG_ORDER.get(
+                                        tool,
+                                        (
+                                            'path',
+                                            'name',
+                                            'keyword',
+                                            'content',
+                                            'answer',
+                                            'old',
+                                            'new',
+                                            'pattern',
+                                            'start',
+                                            'count',
+                                            'test_file',
+                                            'cmd',  # run_shell——缺失时 args 被整包 JSON dump 当命令执行
+                                        ),
                                     ):
                                         if key in args:
                                             ordered.append(str(args[key]))

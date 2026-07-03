@@ -41,6 +41,7 @@ class MinedTask:
     line: int
     title: str
     detail: str = ''
+    hints: str = ''  # long_function: 静态分解计划（候选提取块行区间）
 
     def prompt(self) -> str:
         """给 agent 的任务书。红线①：修复失败测试不允许靠删/跳测试。"""
@@ -51,11 +52,15 @@ class MinedTask:
             )
         if self.kind == 'todo':
             return f'完成 {self.path}:{self.line} 的待办注释：{self.title}。保持现有测试全绿。'
-        return (
+        base = (
             f'重构 {self.path}:{self.line} 的超长函数 {self.title}（{self.detail}），'
             f'拆成更小的函数：行为不变、保留原函数名，重构后 {self.title} 本体必须明显变短'
             f'（提取的辅助函数要真正被调用），现有测试全绿。不得修改 tests/ 目录下的任何文件。'
         )
+        if self.hints:
+            # 静态分解计划：把"自己设计重构方案"降维成"按给定方案执行"（弱模型的质变）
+            base += f' 可优先提取的候选块：{self.hints}。'
+        return base
 
 
 def mine_failing_tests(pytest_output: str) -> List[MinedTask]:
@@ -116,6 +121,23 @@ def mine_todos(root: str, *, exts: Sequence[str] = ('.py',), limit: int = 50) ->
     return tasks
 
 
+_BLOCK_NAMES = {ast.If: '条件块', ast.For: '循环块', ast.While: '循环块', ast.Try: '异常处理块', ast.With: '上下文块'}
+
+
+def _block_hints(node, min_span: int = 8, top: int = 5) -> str:
+    """函数体内直接子块的行区间清单——喂给 agent 的静态分解计划。"""
+    out = []
+    for child in node.body:
+        name = _BLOCK_NAMES.get(type(child))
+        if name is None:
+            continue
+        end = getattr(child, 'end_lineno', None) or child.lineno
+        span = end - child.lineno + 1
+        if span >= min_span:
+            out.append(f'L{child.lineno}-{end}（{name}，{span}行）')
+    return '、'.join(out[:top])
+
+
 def mine_long_functions(root: str, *, max_lines: int = 80, limit: int = 30) -> List[MinedTask]:
     """AST 扫描超长 Python 函数（重构候选），按长度降序。"""
     tasks: List[MinedTask] = []
@@ -130,7 +152,11 @@ def mine_long_functions(root: str, *, max_lines: int = 80, limit: int = 30) -> L
             if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
                 span = (getattr(node, 'end_lineno', None) or node.lineno) - node.lineno + 1
                 if span > max_lines:
-                    tasks.append(MinedTask('long_function', rel, node.lineno, node.name, detail=f'{span} 行'))
+                    tasks.append(
+                        MinedTask(
+                            'long_function', rel, node.lineno, node.name, detail=f'{span} 行', hints=_block_hints(node)
+                        )
+                    )
     tasks.sort(key=lambda t: -int(t.detail.split()[0]))
     return tasks[:limit]
 

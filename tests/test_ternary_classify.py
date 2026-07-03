@@ -29,3 +29,12 @@ def test_non_read_tools_keep_failure_sniffing():
     assert e.classify('run_shell', 'x error y') == 'NEGATE'
     assert e.classify('replace_in_file', '已替换 3 处') == 'AFFIRM'
     assert e.classify('replace_in_file', '未找到 "旧文本"') == 'UNCERT'
+
+
+def test_replace_lines_and_guard_messages():
+    e = TernaryEngine()
+    assert e.classify('replace_lines', '已替换 m.py 第2-3行（2行 → 2行）') == 'AFFIRM'
+    # 语法守卫还原/区间无效是可恢复失误，UNCERT 而非高置信 NEGATE（不断轮）
+    assert e.classify('replace_lines', '替换产生语法错误(已自动还原): 第2行 ...') == 'UNCERT'
+    assert e.classify('replace_in_file', '替换产生语法错误(已自动还原): 第9行 ...') == 'UNCERT'
+    assert e.classify('replace_lines', '行区间无效: L5-99（文件共3行）') == 'UNCERT'

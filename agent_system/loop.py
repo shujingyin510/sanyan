@@ -8,6 +8,7 @@
 属性/私有方法，属"位移建模"——先立起 loop.py 模块边界，后续可逐步收窄 rt 接口。
 """
 
+import os
 import time as _time
 
 from agent_system.loop_policy import context_too_large, llm_output_ur, results_degenerate
@@ -43,7 +44,9 @@ def run_legacy(rt, task, max_rounds, dry_run):
         return rt._execute_rule(task, rule, dry_run)
 
     # ── 无匹配规则：尝试 LLM 生成新规则并立即执行 ──
-    if rt.rule_engine.llm_fn:
+    # SANYAN_SKIP_RULE_GEN（自更新闭环设置）：生成前奏烧 2-4 次 LLM 调用/分钟级延迟，
+    # 产物垃圾参数规则本就被下方零改动闸门丢弃——预算全留给主循环
+    if rt.rule_engine.llm_fn and not os.environ.get('SANYAN_SKIP_RULE_GEN'):
         print('  [规则] 无匹配规则，尝试生成...')
         new_rule = rt.rule_engine.generate_rule(task)
         if new_rule:
@@ -164,7 +167,7 @@ def run_legacy(rt, task, max_rounds, dry_run):
 
             if gate['action'] == 'block':
                 break
-            if tool in ('write_file', 'replace_in_file', 'replace_all'):
+            if tool in ('write_file', 'replace_in_file', 'replace_lines', 'replace_all'):
                 from agent_system.agent_tools import param_path
 
                 rt.memory['modified'].append(param_path(params))
