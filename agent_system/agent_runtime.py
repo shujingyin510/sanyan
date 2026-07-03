@@ -576,6 +576,17 @@ class AgentRuntime:
                     f'  r{h.get("round", "?")}: {h.get("tool")}({str(h.get("params", ""))[:60]})' for h in hist[-3:]
                 ]
                 parts.append('已执行过（不要原样重复同一调用）:\n' + '\n'.join(done))
+            # 阶段推进信号：system prompt 只写了静态"阶段约束"，没有任何东西告诉模型
+            # 它已到修改阶段——P2 探针#9 实测弱模型按字面守着"探索阶段"读满 5 次限额收场。
+            reads = sum(
+                1 for h in hist if h.get('tool') in ('read_file', 'analyze', 'search_code', 'find_symbol', 'list_files')
+            )
+            if reads >= 2 and not self.memory.get('modified'):
+                parts.append(
+                    '提示: 探索已充分，现在进入修改阶段——基于上方代码立即发出 '
+                    'replace_in_file(path,old,new)：old 必须逐字复制上方结果中的连续原文（含缩进与空行），'
+                    'new 为改后文本。不要再调用读类工具。'
+                )
             # 800 字符看不全一个待重构函数，replace_in_file 需要精确旧文本 → 放宽到 4000
             # 与 read_file 工具上限对齐（范围读一个 94 行函数 ~3.3k 字符须完整透传；
             # 任务+历史+结果 ≈ 4.6k < 7000，超限由 context_too_large/压缩兜底）

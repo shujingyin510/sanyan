@@ -160,6 +160,34 @@ class TestAgentRuntime(unittest.TestCase):
         ctx = self.rt._build_context('分析', 'analyze', '37函数')
         self.assertIn('analyze', ctx)
 
+    def test_build_context_nudges_modification_after_reads(self):
+        # P2 探针#9 回归守护：读类工具 ≥2 次且零改动 → 上下文必须带阶段推进提示，
+        # 否则弱模型按字面守着"探索阶段"读满限额收场
+        self.rt.memory = {
+            'task': '重构某函数',
+            'modified': [],
+            'history': [
+                {'round': 1, 'tool': 'read_file', 'params': 'a.py|1|50', 'result': '...'},
+                {'round': 2, 'tool': 'read_file', 'params': 'a.py|50|50', 'result': '...'},
+            ],
+        }
+        ctx = self.rt._build_context('a.py|50|50', 'read_file', 'def foo(): pass')
+        self.assertIn('修改阶段', ctx)
+        self.assertIn('replace_in_file', ctx)
+
+    def test_build_context_no_nudge_after_modification(self):
+        self.rt.memory = {
+            'task': '重构某函数',
+            'modified': ['a.py'],
+            'history': [
+                {'round': 1, 'tool': 'read_file', 'params': 'a.py', 'result': '...'},
+                {'round': 2, 'tool': 'read_file', 'params': 'a.py', 'result': '...'},
+                {'round': 3, 'tool': 'replace_in_file', 'params': 'a.py|x|y', 'result': '已替换 1 处'},
+            ],
+        }
+        ctx = self.rt._build_context('a.py|x|y', 'replace_in_file', '已替换 1 处')
+        self.assertNotIn('探索已充分', ctx)
+
     def test_extract_key_warning(self):
         result = self.rt._extract_key('代码:\n⚠ >50行: main, init\ndef main...')
         self.assertIn('⚠', result)
