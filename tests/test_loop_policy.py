@@ -4,11 +4,14 @@ from agent_system.loop_policy import context_too_large, llm_output_ur, results_d
 
 
 def test_results_degenerate():
-    assert results_degenerate(['a', 'a']) is True  # 连续相同 → 退化
+    # P2 调参：两轮相同不再判死（弱模型重读一次文件是合法起手），三轮才算退化
+    assert results_degenerate(['a', 'a']) is False  # 两轮相同 → 给一次恢复机会
+    assert results_degenerate(['a', 'a', 'a']) is True  # 三轮相同 → 退化
+    assert results_degenerate(['b', 'a', 'a']) is False
     assert results_degenerate(['a', 'b']) is False  # 不同
-    assert results_degenerate(['a']) is False  # 不足 2 条
+    assert results_degenerate(['a']) is False
     assert results_degenerate([]) is False
-    assert results_degenerate(['a', 'a', 'a']) is True
+    assert results_degenerate(['x', 'a', 'a', 'a']) is True  # 窗口尾部三连同
 
 
 def test_context_too_large_boundary():

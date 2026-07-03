@@ -2,10 +2,14 @@
 
 
 def results_degenerate(results: list[str]) -> bool:
-    """连续两轮结果相同 → 退化"""
-    if len(results) < 2:
+    """连续三轮结果相同 → 退化。
+
+    P2 首跑调参：原为两轮，弱模型重读一次文件（合法起手）即被判死、整轮作废；
+    三轮仍足以拦真死循环（外层另有 300s 总超时与轮数上限兜底）。
+    """
+    if len(results) < 3:
         return False
-    return results[-1] == results[-2]
+    return results[-1] == results[-2] == results[-3]
 
 
 def context_too_large(text: str, limit: int = 7000) -> bool:

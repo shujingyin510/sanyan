@@ -565,7 +565,20 @@ class AgentRuntime:
                 parts.append(f'\n当前进度 ({current_step}/{len(plan)}):')
                 parts.extend(plan_lines)
         else:
-            parts.append(f'工具 [{tool}] 结果:\n{str(result)[:800]}')
+            # 任务与已执行历史必须每轮重申：P2 首跑实测，只给"上一步结果"时
+            # 弱模型立刻忘掉目标、原样重发同一工具调用，两轮即被 UR 判死。
+            task = str(self.memory.get('task', '') or '')
+            if task:
+                parts.append(f'任务: {task}')
+            hist = self.memory.get('history', [])
+            if hist:
+                done = [
+                    f'  r{h.get("round", "?")}: {h.get("tool")}({str(h.get("params", ""))[:60]})' for h in hist[-3:]
+                ]
+                parts.append('已执行过（不要原样重复同一调用）:\n' + '\n'.join(done))
+            # 800 字符看不全一个待重构函数，replace_in_file 需要精确旧文本 → 放宽到 2500
+            # （read_file 工具本身最多返回 3000；上下文超限由 context_too_large/压缩兜底）
+            parts.append(f'工具 [{tool}] 结果:\n{str(result)[:2500]}')
 
         # 注入已修改文件
         if self.memory.get('modified'):
