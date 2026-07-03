@@ -89,6 +89,21 @@ def test_generated_rule_with_zero_modification_falls_through_to_loop():
     assert rt.memory['modified'] == []
 
 
+def test_generated_rule_with_dict_args_does_not_crash():
+    # P2 探针#10 回归守护：LLM 生成的步骤 args_desc 可能是 dict（协议漂移），
+    # 旧实现 .replace 直接 AttributeError 崩掉整个 agent 进程
+    from agent_system.loop import run_legacy
+
+    rule = types.SimpleNamespace(
+        name='dict-args',
+        steps=[{'tool': 'read_file', 'args_desc': {'path': 'x.py', 'start': 1}, 'desc': '读'}],
+        validation=None,
+    )
+    rt = _RuleGenRt(rule, tools={'read_file': lambda p, d: f'content of {p}'})
+    r = run_legacy(rt, '重构某函数', 3, dry_run=False)
+    assert r['answer'] == '已达3轮'  # 不崩溃, 零改动回退循环（假LLM连败退出）
+
+
 def test_generated_rule_with_real_modification_returns_rule_result():
     from agent_system.loop import run_legacy
 

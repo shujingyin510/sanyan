@@ -84,9 +84,15 @@ class RuleExecutor:
 
         results = []
         for i, step in enumerate(rule.steps, 1):
-            tool = step['tool']
-            args_desc = step['args_desc']
-            desc = step['desc']
+            tool = str(step.get('tool', ''))
+            args_desc = step.get('args_desc', '')
+            desc = step.get('desc', '')
+            # LLM 生成的规则步骤参数可能是 dict/list（协议漂移，P2 探针#10 实测
+            # dict 直接 .replace 崩掉整个 agent 进程）——拍平成 | 串防御
+            if isinstance(args_desc, dict):
+                args_desc = '|'.join(str(v) for v in args_desc.values())
+            elif not isinstance(args_desc, str):
+                args_desc = str(args_desc)
 
             # 替换变量
             args = args_desc
