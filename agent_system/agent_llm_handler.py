@@ -71,7 +71,9 @@ class LLMHandler:
         else:
             body, headers, parser = self._build_openai_request(model, key, sys_msg, prompt, timeout)
 
-        # 重试 3 次
+        # 重试 3 次。异常必须留痕：P2 首跑曾因全静默吞错，把「全机 TLS 中断」
+        # 排障成三轮盲跑（表象只有 error|LLM调用失败）。
+        last_err = ''
         for attempt in range(3):
             try:
                 req = _req.Request(url, data=body, headers=headers, method='POST')
@@ -91,14 +93,18 @@ class LLMHandler:
                         return f'error|LLM退化: {reason}'
 
                 return text.strip()
-            except (_err.HTTPError, _err.URLError, OSError):
+            except (_err.HTTPError, _err.URLError, OSError) as e:
+                last_err = f'{type(e).__name__}: {str(e)[:160]}'
+                print(f'  [LLM] 尝试{attempt + 1}/3 失败: {last_err}')
                 if attempt < 2:
                     _time.sleep(1.0 * (attempt + 1))
                 continue
-            except Exception:
+            except Exception as e:  # 非网络异常（解析等）不可重试
+                last_err = f'{type(e).__name__}: {str(e)[:160]}'
+                print(f'  [LLM] 不可重试异常: {last_err}')
                 break
 
-        return 'error|LLM调用失败(3次重试)'
+        return f'error|LLM调用失败(3次重试): {last_err}' if last_err else 'error|LLM调用失败(3次重试)'
 
     def complete(self, prompt: str, *, system: str | None = None) -> str:
         """LLMProvider 协议 seam —— 委托给 llm_call（见 agent_system/contracts.py）。"""
