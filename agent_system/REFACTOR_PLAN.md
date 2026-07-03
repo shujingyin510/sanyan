@@ -475,3 +475,18 @@ python -X utf8 -m pytest tests/test_contracts.py tests/test_agent_v5.py -q
 - 已知未清余留：parse_tool 按 | 摊平 args（旧文本含管道符会错切，结构化参数对账时一并收）；
   execute_rule 首段死循环体（空 results 上查 UR，i=4 必打印必 break 的幽灵行）；Kleene 传播
   被单次工具失败永久污染（置信度只降不升）；run_shell 子进程 GBK 解码线程异常（Windows）。
+
+**进度（2026-07-03 续）—— P3 前两块落地：任务感知 oracle + 重试/可观测：**
+
+- **make_shrink_oracle**（P3 第一块）：long_function 任务的验收补上"有改进"维度——目标函数
+  span 必须 < 基线（ast 静态判，毫秒级，置组合首位短路）；文件不可解析/函数消失 fail-closed。
+  首个实战即立功：agent 把文件改出语法错，oracle#0 当场拒绝，没烧 70s pytest。
+- **--pick 子串挑任务 / --attempts 顺序重试 / agent 日志持久化**（P3 第二块）：弱模型单次
+  成功方差靠重试摊薄（首个过 oracle 即停）；agent 全程输出落临时日志（回滚不灭），每次拒绝
+  自动打日志尾——P2 排障期为看行为跑了一打盲探针，此盲区永久封堵。
+- **三连拒实录（质量杆抬高后的现状）**：①改坏语法→shrink oracle 毫秒拒；②600s 超时→杀树
+  净回滚；③读两轮即 done 放弃→无改动拒。基建全部按设计工作；瓶颈已收敛为**模型能力**：
+  当前模型在 94 行重构任务上有效产出率 ~1/5，唯一过过旧 oracle 的半成品现在也会被正确拒绝。
+- 下一步候选（按杠杆排序）：换更强编码模型（SANYAN_MODEL/SANYAN_PROVIDER 一变即换，harness
+  已验证）；failing_test 类任务优先（对弱模型友好）；--attempts 加大硬怼；P3 完全体淘汰赛
+  （并行 N 候选取优——基建活，不解决单候选质量）。
