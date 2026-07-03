@@ -10,6 +10,16 @@ from ops.registry import register, register_alias
 EXEC_TIMEOUT = 30
 
 
+def _arg_str(evaluator, a) -> str:
+    """字符串参数提取：sugar 解析产物的字面量**带引号**（如 '"NAME"'），必须经 eval
+    去引号；裸原子（核心 S-式路径）直接用。曾因生取带引号名字，agent_policy.san 的
+    环境变量("SANYAN_API_KEY") 永远取空、占位符密钥上位（密钥注入反模式当年正是
+    给这个 bug 打的补丁）。"""
+    if isinstance(a, str) and not (len(a) >= 2 and a[0] == '"' and a[-1] == '"'):
+        return a
+    return str(evaluator.eval(a))
+
+
 def op_exec(evaluator, args):
     """执行(命令) — 执行系统命令并返回输出"""
     if not args:
@@ -31,7 +41,7 @@ def op_getenv(evaluator, args):
     """环境变量(名) — 获取环境变量值"""
     if not args:
         raise SanyanSyntaxError('环境变量 需要一个变量名')
-    name = args[0] if isinstance(args[0], str) else str(evaluator.eval(args[0]))
+    name = _arg_str(evaluator, args[0])
     return os.environ.get(name, '')
 
 
@@ -39,8 +49,8 @@ def op_setenv(evaluator, args):
     """设环境变量(名, 值) — 设置环境变量"""
     if len(args) < 2:
         raise SanyanSyntaxError('设环境变量 需要 变量名 和 值')
-    name = args[0] if isinstance(args[0], str) else str(evaluator.eval(args[0]))
-    val = args[1] if isinstance(args[1], str) else str(evaluator.eval(args[1]))
+    name = _arg_str(evaluator, args[0])
+    val = _arg_str(evaluator, args[1])
     os.environ[name] = val
     return TritValue(0)
 

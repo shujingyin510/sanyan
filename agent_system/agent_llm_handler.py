@@ -147,11 +147,15 @@ class LLMHandler:
     }
 
     def _get_config(self, key: str, default: str) -> str:
-        """安全获取配置：优先 evaluator（.san 可动态改），其次单一 typed 配置（环境）。"""
+        """安全获取配置：优先 evaluator（.san 可动态改，占位符视为未配置），其次单一 typed 配置（环境）。"""
         try:
             value = getattr(self.ev, 'get_var', lambda x: '')(key)
-            if value:
-                return value.strip()
+            if isinstance(value, str):
+                value = value.strip()
+                # 占位符（含"你的"，如 sk-你的key）不是配置——曾混进 Authorization 头，
+                # HTTP 头只容 latin-1，当场 UnicodeEncodeError。与 AgentConfig._clean 同判定。
+                if value and '你的' not in value:
+                    return value
         except Exception:
             pass
 

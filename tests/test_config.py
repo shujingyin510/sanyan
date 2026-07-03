@@ -78,3 +78,18 @@ def test_llmhandler_get_config_legacy_llm_env(monkeypatch):
     from agent_system.agent_llm_handler import LLMHandler
 
     assert LLMHandler()._get_config('模型名', 'd') == 'legacy-model'
+
+
+def test_llmhandler_get_config_san_placeholder_falls_through(monkeypatch):
+    # .san 侧占位符（如 sk-你的key）不是配置：跳过 evaluator 值、落到环境真值。
+    # P2 首跑实测：占位符密钥混进 Authorization 头 → latin-1 编码当场炸（HTTP 头不容汉字）
+    _isolate(monkeypatch)
+    monkeypatch.setenv('SANYAN_API_KEY', 'sk-real-456')
+    from agent_system.agent_llm_handler import LLMHandler
+
+    class FakeEv:
+        def get_var(self, k):
+            return 'sk-你的key' if k == 'API密钥' else ''
+
+    h = LLMHandler(ev=FakeEv())
+    assert h._get_config('API密钥', '') == 'sk-real-456'
