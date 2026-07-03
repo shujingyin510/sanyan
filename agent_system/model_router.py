@@ -113,6 +113,14 @@ class ModelRouter:
 
         return 'error|所有模型调用失败'
 
+    def complete(self, prompt: str, *, system: str | None = None) -> str:
+        """LLMProvider 协议 seam —— 按默认任务类型路由（见 agent_system/contracts.py）。
+
+        让 ModelRouter 与 LLMHandler 满足同一协议；路由/降级是保留下来、
+        值得继续做的能力，只是现在落在统一 seam 之后。
+        """
+        return self.call('default', prompt, system or '')
+
     def _call_model(self, model_id: str, prompt: str, system_prompt: str = '', **kwargs) -> str:
         """调用单个模型"""
         import json

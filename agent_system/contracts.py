@@ -2,7 +2,7 @@
 
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Any, Protocol
+from typing import Any, Protocol, runtime_checkable
 
 
 class ToolStatus(Enum):
@@ -38,9 +38,10 @@ class ToolResult:
             self.failed = False
 
 
+@runtime_checkable
 class LLMProvider(Protocol):
     """LLM 补全协议：统一 seam，支持多 provider / 成本路由"""
 
-    def complete(self, prompt: str, system: str | None = None) -> str:
+    def complete(self, prompt: str, *, system: str | None = None) -> str:
         """执行 LLM 补全，返回响应文本"""
         ...

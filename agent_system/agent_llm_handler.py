@@ -100,6 +100,10 @@ class LLMHandler:
 
         return 'error|LLM调用失败(3次重试)'
 
+    def complete(self, prompt: str, *, system: str | None = None) -> str:
+        """LLMProvider 协议 seam —— 委托给 llm_call（见 agent_system/contracts.py）。"""
+        return self.llm_call(prompt, override_system_prompt=system)
+
     def _local_call(self, model: str, prompt: str, override_system_prompt=None) -> str:
         """本地模型调用（HuggingFace transformers + 本地缓存）"""
         try:
