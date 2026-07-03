@@ -51,14 +51,20 @@ class SelfUpdateLoop:
         self.base = base
 
     def _git(self, *args: str, cwd: Optional[str] = None) -> subprocess.CompletedProcess:
-        return subprocess.run(
-            ['git', *args],
-            cwd=cwd or self.repo_root,
-            capture_output=True,
-            text=True,
-            encoding='utf-8',
-            errors='replace',
-        )
+        # 超时按失败返回（fail-closed）：worktree 被残留子进程锁住时 git 会吊死，
+        # 没有超时整个闭环就跟着吊死——P2 首跑实测（孤儿 pytest 锁文件 34 分钟）。
+        try:
+            return subprocess.run(
+                ['git', *args],
+                cwd=cwd or self.repo_root,
+                capture_output=True,
+                text=True,
+                encoding='utf-8',
+                errors='replace',
+                timeout=120,
+            )
+        except subprocess.TimeoutExpired:
+            return subprocess.CompletedProcess(['git', *args], 124, '', 'git 超时(120s)——工作区疑被其他进程锁定')
 
     def run(self, task_name: str, edit_fn: Callable[[str], object]) -> UpdateResult:
         ts = time.strftime('%Y%m%d-%H%M%S')
@@ -183,12 +189,47 @@ def combine_oracles(oracles: List[Callable[[str], OracleVerdict]]) -> Callable[[
 # ── P2：把真 agent 接成 edit_fn + 差分一致性 oracle ──────────────────────────
 
 
+def _kill_tree(proc: subprocess.Popen) -> None:
+    """杀整棵进程树。subprocess 的 timeout 只杀直接子进程；agent 起的工具子进程
+    （如 run_shell 跑的 pytest）会沦为孤儿、锁住 worktree 文件，把回滚一起卡死。"""
+    if os.name == 'nt':
+        subprocess.run(['taskkill', '/F', '/T', '/PID', str(proc.pid)], capture_output=True, timeout=30)
+    else:
+        import signal
+
+        try:
+            os.killpg(os.getpgid(proc.pid), signal.SIGKILL)
+        except (ProcessLookupError, PermissionError, OSError):
+            proc.kill()
+
+
+def _run_reaped(cmd, **kw) -> subprocess.CompletedProcess:
+    """subprocess.run 兼容的默认 runner：超时先杀整棵树再收管道。
+
+    树死则管道必闭，communicate 不会吊死；残留孤儿为零，worktree 可干净回滚。
+    """
+    timeout = kw.pop('timeout', None)
+    if kw.pop('capture_output', False):
+        kw.setdefault('stdout', subprocess.PIPE)
+        kw.setdefault('stderr', subprocess.PIPE)
+    if os.name != 'nt':
+        kw.setdefault('start_new_session', True)  # POSIX：独立进程组，killpg 全收
+    proc = subprocess.Popen(cmd, **kw)
+    try:
+        out, err = proc.communicate(timeout=timeout)
+    except subprocess.TimeoutExpired:
+        _kill_tree(proc)
+        out, err = proc.communicate()  # 树已死，立即返回
+        raise subprocess.TimeoutExpired(cmd, timeout or 0, output=out, stderr=err)
+    return subprocess.CompletedProcess(cmd, proc.returncode, out, err)
+
+
 def make_agent_edit_fn(
     prompt: str,
     *,
     agent_cmd: Optional[Sequence[str]] = None,
     timeout: int = 1800,
-    runner: Callable[..., subprocess.CompletedProcess] = subprocess.run,
+    runner: Callable[..., subprocess.CompletedProcess] = _run_reaped,
 ) -> Callable[[str], None]:
     """把「跑一个 agent 子进程」包装成 edit_fn：`cwd=worktree`，agent 只碰副本（红线②）。
 
