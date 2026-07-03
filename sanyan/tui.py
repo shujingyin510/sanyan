@@ -50,7 +50,7 @@ class TernaryPanel(Static):
     trit = reactive('—')
     conf = reactive(0.0)
     rule = reactive('—')
-    tools = reactive([])
+    tools: reactive[list[dict]] = reactive([])
     ur = reactive(1.0)
 
     def render(self):

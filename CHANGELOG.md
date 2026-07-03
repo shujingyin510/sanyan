@@ -2,6 +2,51 @@
 
 ---
 
+## [v3.51.0] — 2026-07-02
+
+> **自更新闭环 P2 就绪：自造任务 + 真 agent 编辑 + 差分 oracle；差分上线当天抓到真 parser bug 并当日闭环修复；被合并中间快照回退的安全/经验回路修复批量复原。**
+
+### ⭐ Highlights
+
+- **P2 落地**：`task_mining.py` 自造任务 + `make_agent_edit_fn` 真 agent 编辑 + `run_self_update.py` CLI，oracle = pytest 基线 AND 差分一致
+- **差分 oracle 首日见效**：DifferentialVerifier 假绿修复当天即抓到多语句 .san 两引擎执行分歧，`core/parser.py` 当日闭环修复
+- **安全回归复删**：密钥注入反模式（密钥写入 .san 源码文本）随合并快照复活 → 复删，密钥全程走环境变量
+- **seam 修复批量复原**：并库 / LearningHandler / 双计数 / typed config / 路径统一 5 组修复连同 20 个测试守护回归 main
+
+---
+
+### Agent
+
+- **P2 落地**：`task_mining.py` 自造任务（failing_test / TODO / 超长函数，按可验证性排序）+ `make_agent_edit_fn`（真 agent 子进程跑在 worktree 副本里）+ `run_self_update.py` CLI（oracle = pytest 基线 AND 差分一致性）
+- **DifferentialVerifier 假绿修复**：真差分（`--eval` 求值器 vs 默认字节码 VM）、fail-closed（全崩=0% 而非 100%）、代码走临时 .san 文件、输出归一化；修好当天即抓到**多语句 .san 两引擎执行分歧**（VM 只编译第一个顶层表达式，eval 行为不稳）→ **当日闭环修复**（见 Bug Fixes 的 `core/parser.py` 条），差分用例增至 5/5 作回归守护
+
+### Project Layout
+
+- 根目录清理：删除孤儿 `agent_state.db`（活库为 `agent_system/agent_state.db`）、`_test_simple.bin`、两份 VM trace 日志、空 `dist/` 及 `publish/` 下遗留构建产物（均验证零引用后删除）
+
+### Bug Fixes
+
+- 重构丢失的未提交模块已恢复：`agent_system/paths.py`（修复 `store.py` 断裂的 import）、`tests/conftest.py`（AGENT_DATA_DIR 测试隔离 + `test_deadloop.py` 退出 pytest 收集）及 `test_paths/test_store`；阶段 5 雏形 `config.py` 起初因 main 上无消费者暂缓，后在下方 seam 复原④中连同接线一并恢复
+- `core/runtime.py` BUILTIN_OPS：迁入 `core/` 后按 `core/language/` 找词表、静默得到空集 → 改锚定仓库根，259 词恢复
+- `core/skin.py`：皮肤文件路径由 CWD 相对改为锚定仓库根，子目录入口/任意 CWD 均可加载
+- `run_agent.py`：import 时 chdir 目标仍是旧的"文件所在目录=根"语义，迁入 `agent_system/` 后劫持整个进程 CWD、自身根相对路径全失效（agent CLI 起不来，亦即 test_deadloop 皮肤报错的直接原因）→ chdir 改锚仓库根
+- **多语句 .san 静默丢语句**（差分验证器抓到的引擎分歧）：`core/parser.py` 的 `parse()` 只解析**第一个**顶层形式（REPL 单表达式语义），而 `compile_bytecode.compile_source` 的 S-表达式分支和 `repl/main._parse_file` 的回退分支都误用它——第一条语句之后全部静默丢弃，且 eval 的"时好时坏"实为 sugar 解析器成败决定走哪条路。新增 `parse_program()`（解析全部顶层形式），两个文件级入口改用；探针复核三组多语句用例两引擎归一化后完全一致（VM bin 7→16 字节）
+- **密钥注入反模式复活（安全）**：阶段 5 曾删除的 `run_agent.py` 两处 `src.replace('sk-你的key', api_key)`（把真实密钥写进 `.san` 源码文本，另有密钥长度日志）随合并中间快照回退复活 → 复删。密钥全程走环境变量（主/子 Agent 路径均已 `setenv`，`agent_policy.san` 侧 `环境变量("SANYAN_API_KEY")` 优先读取），删注入零行为变化、密钥不再落源码串/日志
+- **合并中间快照回退的 seam 修复批量复原**（以 agent-refactor-seams 分支为源、含测试守护）：① 阶段 2 并库——ExperienceStore/DomainKnowledgeLayer 默认库复归单一 `agent.db`（`store.adopt_legacy` 首开非破坏搬入旧独立库数据、旧库保留可回滚），`tests/test_store.py` 复原为 5 测（含两端到端并库）；② LearningHandler 捕获陷阱——构造期捕获的 memory 被 `run()` 每次重绑甩开，收尾 `save_experience` 读到**过期空字典**、经验保存静默失效（`try/except` 吞错不报），且 `learn_from_task` 单参签名对上 runtime 的双参调用是潜伏 TypeError → 三方法改按次收 memory、runtime 构造与调用点对齐；③ 双计数——`record_outcome` 不再记 tool_use（唯一记录源 = `save_experience`），`tests/test_learning_store.py` 复原（7 测）；④ 阶段 5 typed config——`config.py` 复原并真正接线：`load_api_key` 环境读取与 `LLMHandler._get_config` 环境回退统一走 `AgentConfig.from_env()`（新认 `SANYAN_MODEL/SANYAN_PROVIDER/SANYAN_MODEL_URL`，保留 `LLM_*` 兼容、占位符视空），`tests/test_config.py` 复原（8 测）；⑤ 阶段 2 路径统一——其余 10 个模块 14 处硬编码 `DB_PATH` 复归 `paths.db_path()`（`AGENT_DATA_DIR` 对全部持久化一致生效、测试密封完整；根目录/`agent_system/` 目录分裂入口清零）
+- **任务挖掘假阳性**：`--list` 首跑发现 TODO 挖掘的 11 条命中**全部**是字符串字面量里的待办标记（测试骨架模板 `'''# TODO: 实现测试'''`、提示词示例、test_task_mining 自身夹具串）→ `.py` 改经 `tokenize` 只认真注释 token（其他扩展名保留逐行正则），加回归测试；修后仓库真 TODO 注释为零，任务源实际以 failing_test / long_function 为主
+- **httpbin 外网测试守卫**：`test_http_post_compiles` 未接超时且仅识别 503，非 503 异常响应曾把全量 CI 打红一次 → 与 `test_http_json_roundtrip` 同策略，服务响应异常一律 skip（编译/链接失败不经此路、仍硬失败）
+
+### Metrics
+
+| 指标 | 数值 |
+|------|------|
+| Tests | 2453 passed / 0 failed（全量） |
+| Self-hosting | B == C, 7894 bytes |
+| Ruff | 0 |
+| Mypy | 0 |
+
+---
+
 ## [v3.50.0] — 2026-07-01 🏁 Milestone
 
 > **闭包正式支持、编译器 Fixpoint 达成、Agent Phase 4 完成、项目目录全面重整。**
@@ -41,8 +86,6 @@
 - **自更新闭环 P1** `self_update.py`：git worktree 隔离改副本 + fail-closed pytest 基线 oracle，只产出分支、**绝不自动合并**（7 单测 + 真仓 E2E 验证）
 - `loop.py`：176 行主循环从 `agent_runtime.py` 迁出（1115→969 行），假 runtime 即可独立测试
 - 北极星路线图 P0–P5（自迭代 agent）写入 `agent_system/REFACTOR_PLAN.md`，含 oracle 防作弊 / worktree 隔离两条红线
-- **P2 落地**：`task_mining.py` 自造任务（failing_test / TODO / 超长函数，按可验证性排序）+ `make_agent_edit_fn`（真 agent 子进程跑在 worktree 副本里）+ `run_self_update.py` CLI（oracle = pytest 基线 AND 差分一致性）
-- **DifferentialVerifier 假绿修复**：真差分（`--eval` 求值器 vs 默认字节码 VM）、fail-closed（全崩=0% 而非 100%）、代码走临时 .san 文件、输出归一化；修好当天即抓到**多语句 .san 两引擎执行分歧**（VM 只编译第一个顶层表达式，eval 行为不稳）→ **当日闭环修复**（见 Bug Fixes 的 `core/parser.py` 条），差分用例增至 5/5 作回归守护
 
 ### Project Layout
 
@@ -63,21 +106,12 @@
 - `LearningHandler` 参数：补 `memory` 参数
 - `agent_strategy.py`：补 `import os`
 - `test_lsp.py`：更新 `lsp_server.py` 路径
-- 重构丢失的未提交模块已恢复：`agent_system/paths.py`（修复 `store.py` 断裂的 import）、`tests/conftest.py`（AGENT_DATA_DIR 测试隔离 + `test_deadloop.py` 退出 pytest 收集）及 `test_paths/test_store`；阶段 5 雏形 `config.py` 因 main 上无消费者不予恢复，待接线时按测试合同重建
-- `core/runtime.py` BUILTIN_OPS：迁入 `core/` 后按 `core/language/` 找词表、静默得到空集 → 改锚定仓库根，259 词恢复
-- `core/skin.py`：皮肤文件路径由 CWD 相对改为锚定仓库根，子目录入口/任意 CWD 均可加载
-- `run_agent.py`：import 时 chdir 目标仍是旧的"文件所在目录=根"语义，迁入 `agent_system/` 后劫持整个进程 CWD、自身根相对路径全失效（agent CLI 起不来，亦即 test_deadloop 皮肤报错的直接原因）→ chdir 改锚仓库根
-- **多语句 .san 静默丢语句**（差分验证器抓到的引擎分歧）：`core/parser.py` 的 `parse()` 只解析**第一个**顶层形式（REPL 单表达式语义），而 `compile_bytecode.compile_source` 的 S-表达式分支和 `repl/main._parse_file` 的回退分支都误用它——第一条语句之后全部静默丢弃，且 eval 的"时好时坏"实为 sugar 解析器成败决定走哪条路。新增 `parse_program()`（解析全部顶层形式），两个文件级入口改用；探针复核三组多语句用例两引擎归一化后完全一致（VM bin 7→16 字节）
-- **密钥注入反模式复活（安全）**：阶段 5 曾删除的 `run_agent.py` 两处 `src.replace('sk-你的key', api_key)`（把真实密钥写进 `.san` 源码文本，另有密钥长度日志）随合并中间快照回退复活 → 复删。密钥全程走环境变量（主/子 Agent 路径均已 `setenv`，`agent_policy.san` 侧 `环境变量("SANYAN_API_KEY")` 优先读取），删注入零行为变化、密钥不再落源码串/日志
-- **合并中间快照回退的 seam 修复批量复原**（以 agent-refactor-seams 分支为源、含测试守护）：① 阶段 2 并库——ExperienceStore/DomainKnowledgeLayer 默认库复归单一 `agent.db`（`store.adopt_legacy` 首开非破坏搬入旧独立库数据、旧库保留可回滚），`tests/test_store.py` 复原为 5 测（含两端到端并库）；② LearningHandler 捕获陷阱——构造期捕获的 memory 被 `run()` 每次重绑甩开，收尾 `save_experience` 读到**过期空字典**、经验保存静默失效（`try/except` 吞错不报），且 `learn_from_task` 单参签名对上 runtime 的双参调用是潜伏 TypeError → 三方法改按次收 memory、runtime 构造与调用点对齐；③ 双计数——`record_outcome` 不再记 tool_use（唯一记录源 = `save_experience`），`tests/test_learning_store.py` 复原（7 测）；④ 阶段 5 typed config——`config.py` 复原并真正接线：`load_api_key` 环境读取与 `LLMHandler._get_config` 环境回退统一走 `AgentConfig.from_env()`（新认 `SANYAN_MODEL/SANYAN_PROVIDER/SANYAN_MODEL_URL`，保留 `LLM_*` 兼容、占位符视空），`tests/test_config.py` 复原（8 测）；⑤ 阶段 2 路径统一——其余 10 个模块 14 处硬编码 `DB_PATH` 复归 `paths.db_path()`（`AGENT_DATA_DIR` 对全部持久化一致生效、测试密封完整；根目录/`agent_system/` 目录分裂入口清零）
-- **任务挖掘假阳性**：`--list` 首跑发现 TODO 挖掘的 11 条命中**全部**是字符串字面量里的待办标记（测试骨架模板 `'''# TODO: 实现测试'''`、提示词示例、test_task_mining 自身夹具串）→ `.py` 改经 `tokenize` 只认真注释 token（其他扩展名保留逐行正则），加回归测试；修后仓库真 TODO 注释为零，任务源实际以 failing_test / long_function 为主
-- **httpbin 外网测试守卫**：`test_http_post_compiles` 未接超时且仅识别 503，非 503 异常响应曾把全量 CI 打红一次 → 与 `test_http_json_roundtrip` 同策略，服务响应异常一律 skip（编译/链接失败不经此路、仍硬失败）
 
 ### Metrics
 
 | 指标 | 数值 |
 |------|------|
-| Tests | Core 991 / Agent 189 / Integration 45/46 |
+| Tests | 2457 passed / 0 failed |
 | Self-hosting | B == C, 7894 bytes |
 | Ruff | 0 |
 | Mypy | 0 |

@@ -1,4 +1,4 @@
-# Tri-State Cognitive Framework Sanyan v3.50.0
+# Tri-State Cognitive Framework Sanyan v3.51.0
 
 [![VS Code Extension](https://img.shields.io/badge/VS%20Code-Syntax%20Highlight-%23007ACC?logo=visualstudiocode)](sanyan-vscode/README.md)
 [![CI](https://github.com/shujingyin510/sanyan/actions/workflows/test.yml/badge.svg)](https://github.com/shujingyin510/sanyan/actions)
