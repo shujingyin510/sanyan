@@ -50,6 +50,18 @@ class TernaryEngine:
         result_str = str(result).lower()
         r = str(result)
 
+        # ── 读类工具：返回值是内容负载（代码/搜索结果天然含 error/失败 字样），
+        #    失败判定只看工具自身错误信封（前缀区），绝不嗅探负载正文。
+        #    P2 探针#8 实测：read_file 读回 ternary_match 函数体被全文嗅探判成
+        #    高置信 NEGATE(0.77)，门控当场断轮 —— string sniff 假阳性在读操作还魂。 ──
+        if tool in ('read_file', 'search_code', 'analyze', 'find_symbol', 'list_files', 'git_diff', 'git_status'):
+            head = r[:80]
+            if '错误' in head or '未找到' in head or 'No such file' in head or head.startswith('(空:'):
+                return 'UNCERT'  # 工具错误信封：可恢复（路径/范围问题，非逻辑错误）
+            if not r.strip():
+                return 'UNCERT'  # 空负载：无信息量
+            return 'AFFIRM'
+
         # ── NEGATE: 明确失败 ──
         if 'error' in result_str and 'No such file' not in r:
             return 'NEGATE'
@@ -72,16 +84,12 @@ class TernaryEngine:
                 return 'UNCERT'  # 可能目标文本不精确，非代码错误
             if '已' in r or '共' in r:
                 return 'AFFIRM'
-        if tool == 'read_file' and ('No such file' in r or '读文件错误' in r or '未找到' in r):
-            return 'UNCERT'  # 文件不存在是可恢复的
         if tool == 'done':
             return 'AFFIRM'
 
         # ── AFFIRM: 明确成功 ──
         if '通过' in r or 'ok' in r or 'success' in result_str:
             return 'AFFIRM'
-        if tool in ('analyze', 'find_symbol', 'read_file', 'search_code', 'list_files', 'git_diff', 'git_status'):
-            return 'AFFIRM'  # 读操作默认成功
         if '⚠' in r and len(r) > 50:
             return 'AFFIRM'  # 分析结果（有内容）
 
