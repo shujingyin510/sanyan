@@ -235,7 +235,9 @@ class LLMHandler:
         body = _json.dumps(
             {
                 'model': model,
-                'max_tokens': 4096,
+                # 8192: 4096 时整函数级 replace_in_file 的 old+new 会截断在 JSON 中途，
+                # 括号计数永不闭合 → 解析跌进关键词启发式（P2 探针#11 实测）
+                'max_tokens': 8192,
                 'temperature': 0.7,
                 'thinking': {'type': 'enabled', 'budget_tokens': 2048},
                 'messages': [
@@ -299,6 +301,7 @@ class LLMHandler:
                                         'start',
                                         'count',
                                         'test_file',
+                                        'cmd',  # run_shell——缺失时 args 被整包 JSON dump 当命令执行
                                     ):
                                         if key in args:
                                             ordered.append(str(args[key]))

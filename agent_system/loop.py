@@ -84,8 +84,9 @@ def run_legacy(rt, task, max_rounds, dry_run):
 
         # ── 超时护杀 ──
         total_elapsed = _time.time() - t_start
-        if total_elapsed > 300:  # 总超时5分钟
-            print('  [TIMEOUT] 总执行时间超过300秒，强制退出')
+        if total_elapsed > 420:  # 总超时7分钟（代理慢时单次LLM可达60s，300s只够~7轮
+            # 还没走到修改动作；自更新闭环外层 agent-timeout=480s 仍兜底）
+            print('  [TIMEOUT] 总执行时间超过420秒，强制退出')
             rt.memory['failures'] += 1
             break
         if rnd > 1 and step_duration_last > 60:

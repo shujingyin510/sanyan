@@ -139,6 +139,20 @@ class TestAgentRuntime(unittest.TestCase):
         tool, params = self.rt._parse_tool('random noise')
         self.assertEqual(tool, 'random noise')
 
+    def test_parse_tool_run_shell_cmd_key(self):
+        # P2 探针#11 回归守护：ordered 键列表曾缺 cmd，run_shell 的 args
+        # 被整包 JSON dump 后当 shell 命令执行
+        tool, params = self.rt._parse_tool('{"tool":"run_shell","args":{"cmd":"echo hi"}}')
+        self.assertEqual(tool, 'run_shell')
+        self.assertEqual(params, 'echo hi')
+
+    def test_parse_tool_replace_args_order(self):
+        # replace_in_file 的 dict args 摊平顺序必须是 path|old|new
+        raw = '{"tool":"replace_in_file","args":{"new":"B","path":"x.py","old":"A"}}'
+        tool, params = self.rt._parse_tool(raw)
+        self.assertEqual(tool, 'replace_in_file')
+        self.assertEqual(params, 'x.py|A|B')
+
     def test_constraint_violation(self):
         self.rt.memory = {'same_tool_count': {}, 'modified': [], 'history': []}
         for i in range(5):
