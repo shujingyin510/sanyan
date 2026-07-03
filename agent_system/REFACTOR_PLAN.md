@@ -449,3 +449,29 @@ python -X utf8 -m pytest tests/test_contracts.py tests/test_agent_v5.py -q
 - 下一步（P2 收尾 → P3）：真 LLM 首跑 `python -X utf8 agent_system/run_self_update.py`（需
   SANYAN_API_KEY、烧 token、人工触发）；oracle 可再并入自举验证；P3 = 一任务 N 候选淘汰赛
   （CandidateTournament 复用前先照 DifferentialVerifier 的教训验真）。
+
+**进度（2026-07-03）—— P2 真 LLM 首跑闭环成功（12 轮探针、10 个真 bug）：**
+
+- **里程碑**：`run_self_update.py` 正式产出首个 oracle 全过的分支
+  `self-update/custom-20260703-183546`（pytest 基线 2469/0 AND 差分 5/5），待人工审。
+  安全机制全程零事故：每次失败干净回滚、无残留 worktree/分支、绝无自动合并。
+- **首跑连环挖出的真 bug（各带回归测试，逐一提交）**：① run_agent.py 直跑缺 sys.path 锚定
+  （重构遗留）；② LLMHandler/ModelRouter 缺 complete()——**主 LLM 通路自 Phase 4 合并起
+  就是断的**，单测全假件无人察觉（+协议一致性 3 测）；③ `环境变量()` 对 sugar 带引号字面量
+  生取→永取空——**密钥注入反模式当年正是给这个语言 bug 打的补丁**（+system_ops 3 测 +
+  配置层占位符过滤）；④ edit_fn 超时只杀子不杀树，孤儿 pytest 锁 worktree、`_git()` 无超时
+  吊死回滚 30+ 分钟（+杀树 2 测 + git 120s 超时）；⑤ LLM 生成规则垃圾参数劫持整轮、done
+  谎报完成→零改动闸门回退主循环（+2 测）；⑥ read_file「起始行|行数」被当「结束行」切出
+  永远的空串——模型反复读 308 行读到的全是虚空（+4 测）；⑦ 三态 classify 全文嗅探内容负载,
+  读到含 error 字样的代码即判高置信 NEGATE 断轮——agent 被禁止阅读一切含错误处理的代码
+  （读类工具改信封判定，+3 测）；⑧ execute_rule 对 dict 参数直接崩进程（+1 测）；
+  ⑨ max_tokens=4096 截断整函数级 replace 的 JSON、parse_tool 缺 cmd 键、内部 300s 预算
+  不够慢代理（8192/补键/420s，+2 测）；⑩ 上下文只喂「上一步结果[:800]」——任务与历史每轮
+  丢失、弱模型必然打转（重申任务+历史+阶段推进提示+4000 字符结果窗，+2 测）。
+- **产物质量的诚实评估**：首个分支的 diff 行为不变、测试全绿，但属**半成品重构**——
+  辅助函数嵌套定义且未被调用，目标函数反而 94→~125 行。oracle 只判「不退化」，判不了
+  「有改进」。这正是 P3 的入口：任务感知 oracle（long_function 任务附加「目标函数行数
+  必须下降」的静态检查）+ 候选淘汰赛。
+- 已知未清余留：parse_tool 按 | 摊平 args（旧文本含管道符会错切，结构化参数对账时一并收）；
+  execute_rule 首段死循环体（空 results 上查 UR，i=4 必打印必 break 的幽灵行）；Kleene 传播
+  被单次工具失败永久污染（置信度只降不升）；run_shell 子进程 GBK 解码线程异常（Windows）。
