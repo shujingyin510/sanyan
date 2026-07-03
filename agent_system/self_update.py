@@ -225,12 +225,22 @@ def _run_reaped(cmd, **kw) -> subprocess.CompletedProcess:
     return subprocess.CompletedProcess(cmd, proc.returncode, out, err)
 
 
+def tail_file(path: str, n: int = 15) -> str:
+    """读文件尾 n 行（诊断用；文件缺失返回空串）。"""
+    try:
+        with open(path, encoding='utf-8', errors='replace') as f:
+            return ''.join(f.readlines()[-n:])
+    except OSError:
+        return ''
+
+
 def make_agent_edit_fn(
     prompt: str,
     *,
     agent_cmd: Optional[Sequence[str]] = None,
     timeout: int = 1800,
     runner: Callable[..., subprocess.CompletedProcess] = _run_reaped,
+    log_path: str = '',
 ) -> Callable[[str], None]:
     """把「跑一个 agent 子进程」包装成 edit_fn：`cwd=worktree`，agent 只碰副本（红线②）。
 
@@ -238,6 +248,8 @@ def make_agent_edit_fn(
     run_agent——P4 元循环时 agent 对自身代码的修改也因此落在验证范围内。
     `agent_cmd` 可整体覆盖默认命令（须自含任务描述）。
     密钥经环境变量继承给子进程，绝不写入源码或命令行文件。失败/超时 → 抛异常 → 闭环整体回滚。
+    `log_path`：agent 全程输出落此文件（追加，回滚不灭）——P2 排障期因输出只在
+    rc≠0 时可见，多跑了一打盲探针；给路径即永久可观测。
     """
 
     def edit_fn(wt: str) -> None:
@@ -246,9 +258,18 @@ def make_agent_edit_fn(
             if agent_cmd is not None
             else [sys.executable, '-X', 'utf8', os.path.join('agent_system', 'run_agent.py'), prompt, '--auto']
         )
-        r = runner(cmd, cwd=wt, capture_output=True, text=True, encoding='utf-8', errors='replace', timeout=timeout)
-        if r.returncode != 0:
-            raise RuntimeError(f'agent 进程失败 rc={r.returncode}: {(r.stderr or r.stdout)[-300:]}')
+        common = dict(cwd=wt, text=True, encoding='utf-8', errors='replace', timeout=timeout)
+        if log_path:
+            with open(log_path, 'a', encoding='utf-8', errors='replace') as log:
+                log.write(f'\n=== agent 启动 {time.strftime("%H:%M:%S")} cwd={wt} ===\n')
+                log.flush()
+                r = runner(cmd, stdout=log, stderr=subprocess.STDOUT, **common)
+            if r.returncode != 0:
+                raise RuntimeError(f'agent 进程失败 rc={r.returncode}: {tail_file(log_path, 8)[-300:]}')
+        else:
+            r = runner(cmd, capture_output=True, **common)
+            if r.returncode != 0:
+                raise RuntimeError(f'agent 进程失败 rc={r.returncode}: {(r.stderr or r.stdout)[-300:]}')
 
     return edit_fn
 

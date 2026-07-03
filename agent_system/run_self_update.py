@@ -16,6 +16,8 @@ AND pytest 全量基线（--baseline，默认 0 失败）AND 差分一致性（-
 import argparse
 import os
 import sys
+import tempfile
+import time
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 if ROOT not in sys.path:
@@ -29,6 +31,7 @@ from agent_system.self_update import (  # noqa: E402
     make_differential_oracle,
     make_pytest_oracle,
     make_shrink_oracle,
+    tail_file,
 )
 
 # P2 十二轮探针的实战最优执行指引，统一追加到任务书尾
@@ -56,6 +59,9 @@ def main(argv=None) -> int:
     parser.add_argument('--pytest-timeout', type=int, default=900, help='oracle 中 pytest 超时秒数')
     parser.add_argument('--agent-timeout', type=int, default=1800, help='agent 子进程超时秒数')
     parser.add_argument('--no-differential', action='store_true', help='关闭差分一致性 oracle')
+    parser.add_argument(
+        '--attempts', type=int, default=1, help='最多尝试次数（P3：弱模型方差靠重试摊薄，首个过 oracle 即停）'
+    )
     args = parser.parse_args(argv)
 
     log_text = ''
@@ -92,12 +98,20 @@ def main(argv=None) -> int:
     if not args.no_differential:
         oracles.append(make_differential_oracle())
 
+    log_path = os.path.join(tempfile.gettempdir(), f'sanyan-su-agent-{time.strftime("%Y%m%d-%H%M%S")}.log')
+    print(f'agent 日志: {log_path}')
     loop = SelfUpdateLoop(ROOT, combine_oracles(oracles))
-    result = loop.run(name, make_agent_edit_fn(prompt, timeout=args.agent_timeout))
-    if result.accepted:
-        print(f'✓ oracle 通过，产出分支: {result.branch}（请人工审查后合并）')
-        return 0
-    print(f'✗ 已回滚: {result.reason}')
+    for attempt in range(1, max(args.attempts, 1) + 1):
+        if args.attempts > 1:
+            print(f'—— 尝试 {attempt}/{args.attempts} ——')
+        result = loop.run(name, make_agent_edit_fn(prompt, timeout=args.agent_timeout, log_path=log_path))
+        if result.accepted:
+            print(f'✓ oracle 通过，产出分支: {result.branch}（请人工审查后合并）')
+            return 0
+        print(f'✗ 已回滚: {result.reason}')
+        t = tail_file(log_path)
+        if t:
+            print(f'—— agent 日志尾 ——\n{t}')
     return 1
 
 
