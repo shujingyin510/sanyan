@@ -14,6 +14,7 @@
 
 from __future__ import annotations
 
+import ast
 import os
 import re
 import shutil
@@ -280,5 +281,39 @@ def make_differential_oracle(
         if consistent < total:
             return OracleVerdict(False, f'差分不一致 {consistent}/{total}', report)
         return OracleVerdict(True, f'差分一致 {total}/{total}', report)
+
+    return oracle
+
+
+# ── P3：任务感知 oracle ──────────────────────────────────────────────────────
+
+
+def make_shrink_oracle(rel_path: str, func_name: str, baseline_span: int) -> Callable[[str], OracleVerdict]:
+    """任务感知 oracle（P3 第一块）：long_function 重构后目标函数必须真的变短。
+
+    P2 首跑实测：行为不变+测试全绿的"半成品重构"（辅助函数嵌套定义且未被调用、
+    目标函数 94→125 行反而变长）会被通用 oracle 放行——通用 oracle 只判"不退化"，
+    判不了"有改进"。本 oracle 零成本静态判改进，应放在组合首位先行短路。
+    fail-closed：文件不可解析 / 目标函数消失（任务书要求行为不变、保留原名）一律拒绝。
+    """
+
+    def oracle(workdir: str) -> OracleVerdict:
+        fp = os.path.join(workdir, rel_path)
+        try:
+            with open(fp, encoding='utf-8', errors='replace') as f:
+                tree = ast.parse(f.read())
+        except (SyntaxError, ValueError, OSError) as e:
+            return OracleVerdict(False, f'目标文件不可解析（fail-closed）: {e}')
+        spans = [
+            (getattr(n, 'end_lineno', None) or n.lineno) - n.lineno + 1
+            for n in ast.walk(tree)
+            if isinstance(n, (ast.FunctionDef, ast.AsyncFunctionDef)) and n.name == func_name
+        ]
+        if not spans:
+            return OracleVerdict(False, f'目标函数 {func_name} 消失（fail-closed：任务要求行为不变、保留原名）')
+        span = max(spans)  # 同名多处取最长（保守）
+        if span >= baseline_span:
+            return OracleVerdict(False, f'{func_name} 未变短: {span} 行 ≥ 基线 {baseline_span} 行', {'span': span})
+        return OracleVerdict(True, f'{func_name}: {baseline_span} → {span} 行', {'span': span})
 
     return oracle

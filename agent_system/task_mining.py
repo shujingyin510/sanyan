@@ -53,7 +53,8 @@ class MinedTask:
             return f'完成 {self.path}:{self.line} 的待办注释：{self.title}。保持现有测试全绿。'
         return (
             f'重构 {self.path}:{self.line} 的超长函数 {self.title}（{self.detail}），'
-            f'拆成更小的函数，行为不变，现有测试全绿。'
+            f'拆成更小的函数：行为不变、保留原函数名，重构后 {self.title} 本体必须明显变短'
+            f'（提取的辅助函数要真正被调用），现有测试全绿。不得修改 tests/ 目录下的任何文件。'
         )
 
 
