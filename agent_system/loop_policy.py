@@ -19,7 +19,12 @@ def context_too_large(text: str, limit: int = 7000) -> bool:
 
 def llm_output_ur(outputs: list[str]) -> float | None:
     """LLM 输出 UR 退化检测：按 10-字符 token 切分，计算 unique_ratio。
-    返回 None 表示不判定（输出 < 4 条 或 tokens < 8 或过于 diverse）。
+    返回 None 表示不判定（输出 < 4 条 或 tokens < 8 或不算退化）。
+
+    阈值 0.5（P2 探针调参，原 0.85）：工具调用回复天生结构相似（每条都是
+    `{"tool": ..., "args": ...}` JSON，共享大段前缀），健康推进的 UR 落在
+    0.6~0.8，0.85 会误杀；本检测的独特价值是兜住"解析不出工具调用的重复
+    胡言"（不进 history，results_degenerate 看不见）——那种 UR < 0.3。
     """
     if len(outputs) < 4:
         return None
@@ -36,8 +41,8 @@ def llm_output_ur(outputs: list[str]) -> float | None:
     unique = len(set(tokens))
     ur = unique / len(tokens)
 
-    # 过于 diverse → 不退化
-    if ur >= 0.85:
+    # 结构相似但仍在推进（如连续工具调用）→ 不判退化
+    if ur >= 0.5:
         return None
 
     return ur

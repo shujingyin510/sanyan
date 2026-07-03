@@ -44,6 +44,21 @@ def test_llm_output_ur_diverse_returns_none():
     assert llm_output_ur(diverse) is None
 
 
+def test_llm_output_ur_structured_tool_calls_not_degenerate():
+    # P2 探针#6 误杀回归守护：工具调用 JSON 共享大段前缀、尾部各异（UR≈0.625），
+    # 是健康推进而非退化，不得判死
+    prefix = '{"tool": "read_file", "args": {"path": "ops/control_ops.py"'  # 共享前缀
+    outs, k = [], 0
+    for _ in range(4):
+        tail = ''
+        for _ in range(10):
+            tail += f'{k:010d}'
+            k += 1
+        outs.append((prefix + '0' * (100 - len(prefix)))[:100] + tail[:100])
+    ur_val = llm_output_ur(outs)
+    assert ur_val is None  # 0.5 ≤ UR < 0.85 区间：旧阈值会误杀，新阈值放行
+
+
 def test_llm_output_ur_too_few_tokens_none():
     # 输出太短 → tokens < 8 → None（与原内联 len(tokens)>=8 门一致）
     assert llm_output_ur(['ab', 'cd', 'ef', 'gh']) is None
