@@ -576,9 +576,10 @@ class AgentRuntime:
                     f'  r{h.get("round", "?")}: {h.get("tool")}({str(h.get("params", ""))[:60]})' for h in hist[-3:]
                 ]
                 parts.append('已执行过（不要原样重复同一调用）:\n' + '\n'.join(done))
-            # 800 字符看不全一个待重构函数，replace_in_file 需要精确旧文本 → 放宽到 2500
-            # （read_file 工具本身最多返回 3000；上下文超限由 context_too_large/压缩兜底）
-            parts.append(f'工具 [{tool}] 结果:\n{str(result)[:2500]}')
+            # 800 字符看不全一个待重构函数，replace_in_file 需要精确旧文本 → 放宽到 4000
+            # 与 read_file 工具上限对齐（范围读一个 94 行函数 ~3.3k 字符须完整透传；
+            # 任务+历史+结果 ≈ 4.6k < 7000，超限由 context_too_large/压缩兜底）
+            parts.append(f'工具 [{tool}] 结果:\n{str(result)[:4000]}')
 
         # 注入已修改文件
         if self.memory.get('modified'):

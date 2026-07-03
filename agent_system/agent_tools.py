@@ -95,9 +95,17 @@ def _read_file_direct_simple(params):
             all_lines = fh.readlines()
         total = len(all_lines)
         if start > 0:
-            all_lines = all_lines[max(start - 1, 0) : min(end, total) if end else total]
+            # 第三段双语义兼容：LLM 常发"起始行|行数"（如 308|100），旧实现按"结束行"
+            # 切出 [307:100]=空串——P2 探针实测模型每轮读到虚空、只能原地打转。
+            # 小于起始行 → 行数；否则 → 结束行（start=1 时两种语义结果相同）。
+            if end and end < start:
+                end = start + end - 1
+            if start > total:
+                return f'(空: 文件共{total}行, 起始行{start}超界)'
+            all_lines = all_lines[start - 1 : min(end, total) if end else total]
         content = ''.join(all_lines)
-        return content[:3000] + (f'\n...(共{total}行)' if len(content) > 3000 else '')
+        # 4000: 94行级函数(~3.3k字符)须完整可见, replace_in_file 需要精确旧文本
+        return content[:4000] + (f'\n...(共{total}行)' if len(content) > 4000 else '')
     except Exception as e:
         return f'读文件错误: {e}'
 
