@@ -6,7 +6,14 @@ import sys
 
 
 import unittest
-from compiler.compile_bytecode import compile_source
+
+# 目录重构遗留：直跑（preflight 即 python tests/test_self_host.py）时 sys.path[0]
+# 是 tests/，需锚定仓库根才能导入 compiler 包；pytest 收集路径不受影响
+ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+if ROOT not in sys.path:
+    sys.path.insert(0, ROOT)
+
+from compiler.compile_bytecode import compile_source  # noqa: E402
 
 REFERENCE_BIN = os.path.join(
     os.path.dirname(os.path.dirname(os.path.abspath(__file__))),

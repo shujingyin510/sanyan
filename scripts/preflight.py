@@ -24,6 +24,9 @@ from typing import Callable
 
 ROOT = Path(__file__).parent.resolve()  # scripts/ dir
 ROOT = ROOT.parent if ROOT.name == 'scripts' else ROOT  # back to project root
+# 目录重构后 preflight 迁入 scripts/：进程内 import 仓库包（bin_consistency 等）需锚定仓库根
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
 RED = '\033[31m'
 GREEN = '\033[32m'
 YELLOW = '\033[33m'
