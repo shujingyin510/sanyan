@@ -3,6 +3,8 @@
 P2 排障期 agent 输出只在 rc≠0 时可见，多跑了一打盲探针——日志文件回滚不灭。
 """
 
+import os
+import subprocess
 from types import SimpleNamespace
 
 import agent_system.run_self_update as rsu
@@ -13,8 +15,8 @@ def test_attempts_stops_at_first_accept(monkeypatch):
     calls = {'n': 0}
 
     class FakeLoop:
-        def __init__(self, root, oracle):
-            pass
+        def __init__(self, root, oracle, *, reject_hook=None):
+            calls['hook'] = reject_hook
 
         def run(self, name, edit_fn):
             calls['n'] += 1
@@ -25,11 +27,12 @@ def test_attempts_stops_at_first_accept(monkeypatch):
     monkeypatch.setattr(rsu, 'make_agent_edit_fn', lambda *a, **k: lambda wt: None)
     rc = rsu.main(['--task', 'x', '--attempts', '3'])
     assert rc == 0 and calls['n'] == 2  # 第二次过 oracle 即停，不烧第三次
+    assert callable(calls['hook'])  # CLI 接线了尸检钩子
 
 
 def test_attempts_exhausted_returns_1(monkeypatch):
     class FakeLoop:
-        def __init__(self, root, oracle):
+        def __init__(self, root, oracle, *, reject_hook=None):
             pass
 
         def run(self, name, edit_fn):
@@ -68,3 +71,43 @@ def test_edit_fn_failure_reports_log_tail(tmp_path):
 
 def test_tail_file_missing_returns_empty(tmp_path):
     assert tail_file(str(tmp_path / '不存在.log')) == ''
+
+
+# ── 被拒改动尸检（reject_hook 落 diff 进 agent 日志）──
+
+
+def _mini_repo(tmp_path, subject):
+    """一次性小仓库充当"被拒 worktree"（HEAD 提交主题可控）。"""
+    repo = tmp_path / 'repo'
+    repo.mkdir()
+
+    def g(*a):
+        subprocess.run(['git', *a], cwd=str(repo), capture_output=True, text=True)
+
+    g('init', '-b', 'main')
+    g('config', 'user.email', 't@t')
+    g('config', 'user.name', 't')
+    g('config', 'commit.gpgsign', 'false')
+    (repo / 'code.py').write_text('x = 1\n', encoding='utf-8')
+    g('add', '-A')
+    g('commit', '-m', subject)
+    return str(repo)
+
+
+def test_reject_diff_dumper_patch_then_stat(tmp_path):
+    # 尸检落盘：patch 在前、stat 收尾——CLI 打日志尾时尾部正好是"改了哪些文件几行"
+    repo = _mini_repo(tmp_path, 'self-update: demo')
+    log = str(tmp_path / 'agent.log')
+    rsu.make_reject_diff_dumper(log)(repo, '失败数 1 > 基线 0')
+    content = open(log, encoding='utf-8').read()
+    assert '被拒改动尸检' in content and '失败数 1 > 基线 0' in content
+    assert '+x = 1' in content  # patch 本体在
+    assert content.rindex('—— 被拒改动 stat ——') > content.rindex('+x = 1')
+
+
+def test_reject_diff_dumper_skips_without_selfupdate_commit(tmp_path):
+    # HEAD 不是自更新提交（edit_fn 异常/无改动路径）——没有 diff 可留，不产日志
+    repo = _mini_repo(tmp_path, '普通提交')
+    log = str(tmp_path / 'agent.log')
+    rsu.make_reject_diff_dumper(log)(repo, '原因')
+    assert not os.path.exists(log)

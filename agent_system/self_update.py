@@ -46,10 +46,20 @@ class UpdateResult:
 class SelfUpdateLoop:
     """隔离 → 改 → 验（fail-closed）→ 过则留分支 / 败则回滚。绝不自动合并。"""
 
-    def __init__(self, repo_root: str, oracle: Callable[[str], OracleVerdict], *, base: str = 'HEAD'):
+    def __init__(
+        self,
+        repo_root: str,
+        oracle: Callable[[str], OracleVerdict],
+        *,
+        base: str = 'HEAD',
+        reject_hook: Optional[Callable[[str, str], None]] = None,
+    ):
         self.repo_root = os.path.abspath(repo_root)
         self.oracle = oracle
         self.base = base
+        # 观测钩子：每次拒绝在回滚**之前**以 (worktree路径, 拒绝原因) 调用——被拒改动
+        # 随回滚蒸发，这是唯一的尸检窗口（如把 diff 落日志）。异常被吞：观测绝不阻断回滚。
+        self.reject_hook = reject_hook
 
     def _git(self, *args: str, cwd: Optional[str] = None) -> subprocess.CompletedProcess:
         # 超时按失败返回（fail-closed）：worktree 被残留子进程锁住时 git 会吊死，
@@ -108,6 +118,11 @@ class SelfUpdateLoop:
             return self._reject(holder, wt, branch, f'循环异常（fail-closed）: {e}')
 
     def _reject(self, holder: str, wt: str, branch: str, reason: str, report: Optional[dict] = None) -> UpdateResult:
+        if self.reject_hook is not None:
+            try:
+                self.reject_hook(wt, reason)
+            except Exception:
+                pass  # 尸检失败不能挡回滚
         self._git('worktree', 'remove', '--force', wt)
         shutil.rmtree(holder, ignore_errors=True)
         self._git('branch', '-D', branch)  # 丢弃分支（worktree 已移除，可删）
@@ -128,6 +143,15 @@ def parse_pytest_summary(text: str) -> dict:
     errors = counts['error'] + counts['errors']
     parsed = bool(re.search(r'\d+\s+(passed|failed|error)', text))
     return {'passed': counts['passed'], 'failed': counts['failed'], 'errors': errors, 'parsed': parsed}
+
+
+def failing_test_names(text: str, top: int = 3) -> List[str]:
+    """从 pytest 短摘要区提取失败/错误用例名——拒绝理由带上名字，分支随回滚蒸发后仍知道挂在哪。"""
+    names: List[str] = []
+    for n in re.findall(r'^(?:FAILED|ERROR)\s+(\S+)', text, re.M):
+        if n not in names:
+            names.append(n)
+    return names[:top]
 
 
 def make_pytest_oracle(
@@ -157,13 +181,18 @@ def make_pytest_oracle(
             return OracleVerdict(False, f'pytest 超时 {timeout}s（fail-closed）')
         except Exception as e:
             return OracleVerdict(False, f'pytest 启动失败（fail-closed）: {e}')
-        s = parse_pytest_summary(r.stdout + '\n' + r.stderr)
+        text = r.stdout + '\n' + r.stderr
+        s = parse_pytest_summary(text)
         if not s['parsed']:
             return OracleVerdict(False, 'pytest 摘要不可解析（fail-closed）', s)
+        names = failing_test_names(text)
+        if names:
+            s['failed_names'] = names
+        hint = f'；失败用例: {", ".join(names)}' if names else ''
         if s['errors'] > 0:
-            return OracleVerdict(False, f'收集/执行错误 {s["errors"]}（fail-closed）', s)
+            return OracleVerdict(False, f'收集/执行错误 {s["errors"]}（fail-closed）{hint}', s)
         if s['failed'] > baseline_failed:
-            return OracleVerdict(False, f'失败数 {s["failed"]} > 基线 {baseline_failed}', s)
+            return OracleVerdict(False, f'失败数 {s["failed"]} > 基线 {baseline_failed}{hint}', s)
         return OracleVerdict(True, f'失败 {s["failed"]} ≤ 基线 {baseline_failed}，通过 {s["passed"]}', s)
 
     return oracle

@@ -10,14 +10,17 @@
 oracle = 任务感知静态检查（P3：long_function 必须真变短，组合首位零成本短路）
 AND pytest 全量基线（--baseline，默认 0 失败）AND 差分一致性（--no-differential 可关）。
 密钥：SANYAN_API_KEY 环境变量，经子进程继承；绝不写入源码。
-产出：通过 → `self-update/<名>-<时间>` 分支**待人工审查合并**；拒绝 → 整体回滚零残留。
+产出：通过 → `self-update/<名>-<时间>` 分支**待人工审查合并**；拒绝 → 整体回滚零残留，
+回滚前被拒改动的 diff+stat 自动落 agent 日志（尸检窗口）。
 """
 
 import argparse
 import os
+import subprocess
 import sys
 import tempfile
 import time
+from typing import Callable
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 if ROOT not in sys.path:
@@ -47,6 +50,44 @@ def pick_task(tasks, key: str):
         if key in t.title or key in t.path:
             return t
     return None
+
+
+def _git_out(wt: str, *args: str) -> str:
+    """在被拒 worktree 里跑 git（观测用）。任何失败返回空串——尸检绝不影响回滚。"""
+    try:
+        r = subprocess.run(
+            ['git', *args],
+            cwd=wt,
+            capture_output=True,
+            text=True,
+            encoding='utf-8',
+            errors='replace',
+            timeout=60,
+        )
+        return r.stdout
+    except Exception:
+        return ''
+
+
+def make_reject_diff_dumper(log_path: str) -> Callable[[str, str], None]:
+    """回滚前把被拒改动的 diff 追加进 agent 日志——被拒分支随回滚蒸发，diff 是唯一尸检材料。
+
+    P3 实测的缺口：某次尝试过了 shrink oracle、只差 1 个测试挂掉，但回滚后既不知道
+    改成了什么样、也不知道挂的是哪个测试。patch 在前、--stat 概要收尾：CLI 每次拒绝
+    打印日志尾，尾部正好是"改了哪些文件几行"。
+    """
+
+    def dump(wt: str, reason: str) -> None:
+        if not _git_out(wt, 'log', '-1', '--format=%s').startswith('self-update:'):
+            return  # 无自更新提交（edit_fn 异常/无改动路径）——没有 diff 可留
+        patch = _git_out(wt, 'show', 'HEAD', '--no-color', '--format=')
+        stat = _git_out(wt, 'show', 'HEAD', '--no-color', '--format=', '--stat')
+        with open(log_path, 'a', encoding='utf-8', errors='replace') as f:
+            f.write(f'\n=== 被拒改动尸检 {time.strftime("%H:%M:%S")} 原因: {reason[:200]} ===\n')
+            f.write(patch[:8000] + ('\n…(patch 截断)\n' if len(patch) > 8000 else ''))
+            f.write(f'—— 被拒改动 stat ——\n{stat}')
+
+    return dump
 
 
 def main(argv=None) -> int:
@@ -103,7 +144,7 @@ def main(argv=None) -> int:
     os.environ['SANYAN_SKIP_RULE_GEN'] = '1'
     log_path = os.path.join(tempfile.gettempdir(), f'sanyan-su-agent-{time.strftime("%Y%m%d-%H%M%S")}.log')
     print(f'agent 日志: {log_path}')
-    loop = SelfUpdateLoop(ROOT, combine_oracles(oracles))
+    loop = SelfUpdateLoop(ROOT, combine_oracles(oracles), reject_hook=make_reject_diff_dumper(log_path))
     for attempt in range(1, max(args.attempts, 1) + 1):
         if args.attempts > 1:
             print(f'—— 尝试 {attempt}/{args.attempts} ——')

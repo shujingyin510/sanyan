@@ -107,6 +107,32 @@ def test_oracle_sees_worktree_content(tmp_path):
     assert loop.run('good', _write_edit('code.py', 'x = 42\n')).accepted
 
 
+def test_reject_hook_sees_worktree_before_rollback(tmp_path):
+    # 尸检窗口：钩子在回滚**前**拿到 (被拒worktree, 原因)，此刻还能读被拒内容
+    repo = _init_repo(tmp_path / 'repo')
+    seen = {}
+
+    def hook(wt, reason):
+        seen['reason'] = reason
+        seen['content'] = open(os.path.join(wt, 'code.py'), encoding='utf-8').read()
+
+    loop = SelfUpdateLoop(str(repo), oracle=lambda wt: OracleVerdict(False, 'nope'), reject_hook=hook)
+    assert not loop.run('demo', _write_edit('code.py', 'x = 999\n')).accepted
+    assert seen['content'] == 'x = 999\n' and 'nope' in seen['reason']
+    assert 'self-update/demo' not in _branches(repo) and _worktree_count(repo) == 1  # 回滚不受影响
+
+
+def test_reject_hook_exception_never_blocks_rollback(tmp_path):
+    repo = _init_repo(tmp_path / 'repo')
+
+    def bad_hook(wt, reason):
+        raise RuntimeError('尸检崩了')
+
+    loop = SelfUpdateLoop(str(repo), oracle=lambda wt: OracleVerdict(False, 'no'), reject_hook=bad_hook)
+    assert not loop.run('demo', _write_edit('code.py', 'x = 2\n')).accepted
+    assert 'self-update/demo' not in _branches(repo) and _worktree_count(repo) == 1
+
+
 # ── oracle 判定逻辑（注入假 runner，不跑真 pytest）──
 
 
@@ -135,6 +161,21 @@ def test_pytest_oracle_baseline_gate():
     assert not make_pytest_oracle(41, runner=lambda *a, **k: _Fake('42 failed, 2399 passed in 60s'))('.').ok
     assert not make_pytest_oracle(41, runner=lambda *a, **k: _Fake('1 error in 2s'))('.').ok
     assert not make_pytest_oracle(41, runner=lambda *a, **k: _Fake('乱七八糟无摘要'))('.').ok  # 不可解析 → 拒绝
+
+
+def test_pytest_oracle_reason_names_failed_tests():
+    # P3 实测缺口：拒绝理由只有"失败数 1 > 基线 0"，挂的是哪个测试随回滚一起消失
+    out = (
+        'FAILED tests/test_a.py::test_x - AssertionError: 1 != 2\n'
+        'FAILED tests/test_b.py::test_y - KeyError\n'
+        'FAILED tests/test_c.py::test_z - x\n'
+        'FAILED tests/test_d.py::test_w - x\n'
+        '4 failed, 10 passed in 3s\n'
+    )
+    v = make_pytest_oracle(0, runner=lambda *a, **k: _Fake(out))('.')
+    assert not v.ok and 'tests/test_a.py::test_x' in v.reason and 'tests/test_c.py::test_z' in v.reason
+    assert 'tests/test_d.py::test_w' not in v.reason  # 封顶 3 个，拒绝理由不爆长
+    assert v.report['failed_names'][0] == 'tests/test_a.py::test_x'  # 完整名单进 report
 
 
 # ── P2：agent edit_fn + 差分 oracle（注入假件，不跑真 agent/真引擎）──
