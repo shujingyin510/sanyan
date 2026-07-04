@@ -53,6 +53,7 @@ class SelfUpdateLoop:
         *,
         base: str = 'HEAD',
         reject_hook: Optional[Callable[[str, str], None]] = None,
+        commit_excludes: Sequence[str] = (),
     ):
         self.repo_root = os.path.abspath(repo_root)
         self.oracle = oracle
@@ -60,6 +61,10 @@ class SelfUpdateLoop:
         # 观测钩子：每次拒绝在回滚**之前**以 (worktree路径, 拒绝原因) 调用——被拒改动
         # 随回滚蒸发，这是唯一的尸检窗口（如把 diff 落日志）。异常被吞：观测绝不阻断回滚。
         self.reject_hook = reject_hook
+        # 提交排除清单（git pathspec）：agent 运行副产物（学习记录/状态库）不是代码变更。
+        # 尸检首战战果：零改动尝试曾靠一条学习记录伪装成真 diff，被 shrink oracle 按
+        # "未变短"误拒（真相是根本没改码）；昨日被接受分支也混入了这类噪音。
+        self.commit_excludes = tuple(commit_excludes)
 
     def _git(self, *args: str, cwd: Optional[str] = None) -> subprocess.CompletedProcess:
         # 超时按失败返回（fail-closed）：worktree 被残留子进程锁住时 git 会吊死，
@@ -96,8 +101,10 @@ class SelfUpdateLoop:
             except Exception as e:  # edit 失败 → 回滚
                 return self._reject(holder, wt, branch, f'edit_fn 异常: {e}')
 
-            # 2. 捕获改动；无 diff 则拒绝
+            # 2. 捕获改动；无 diff 则拒绝（副产物先出栈：只剩副产物即视同零改动）
             self._git('add', '-A', cwd=wt)
+            if self.commit_excludes:
+                self._git('reset', '-q', '--', *self.commit_excludes, cwd=wt)
             if not self._git('diff', '--cached', '--stat', cwd=wt).stdout.strip():
                 return self._reject(holder, wt, branch, '无改动（edit_fn 未产生 diff）')
             self._git('commit', '-m', f'self-update: {task_name}', cwd=wt)

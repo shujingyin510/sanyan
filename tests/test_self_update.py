@@ -133,6 +133,35 @@ def test_reject_hook_exception_never_blocks_rollback(tmp_path):
     assert 'self-update/demo' not in _branches(repo) and _worktree_count(repo) == 1
 
 
+# ── commit_excludes：agent 运行副产物不进自更新提交 ──
+
+
+def test_commit_excludes_kept_out_of_branch(tmp_path):
+    # 副产物（学习记录/状态库）被 git reset 出暂存区：产出分支只含真代码改动
+    repo = _init_repo(tmp_path / 'repo')
+
+    def edit(wt):
+        with open(os.path.join(wt, 'code.py'), 'w', encoding='utf-8') as f:
+            f.write('x = 2\n')
+        with open(os.path.join(wt, 'noise.md'), 'w', encoding='utf-8') as f:
+            f.write('运行副产物\n')
+
+    loop = SelfUpdateLoop(str(repo), oracle=lambda wt: OracleVerdict(True), commit_excludes=('noise.md',))
+    res = loop.run('demo', edit)
+    assert res.accepted
+    files = _git(repo, 'show', '--name-only', '--format=', res.branch).stdout
+    assert 'code.py' in files and 'noise.md' not in files  # 只提交真代码
+
+
+def test_only_excluded_change_rejected(tmp_path):
+    # 只动了副产物 → 排除后暂存区为空 → 视同零改动拒绝（不产出噪音分支）
+    repo = _init_repo(tmp_path / 'repo')
+    loop = SelfUpdateLoop(str(repo), oracle=lambda wt: OracleVerdict(True), commit_excludes=('noise.md',))
+    res = loop.run('demo', _write_edit('noise.md', '只有副产物\n'))
+    assert not res.accepted and '无改动' in res.reason
+    assert 'self-update/demo' not in _branches(repo)
+
+
 # ── oracle 判定逻辑（注入假 runner，不跑真 pytest）──
 
 

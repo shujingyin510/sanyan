@@ -40,7 +40,8 @@ from agent_system.self_update import (  # noqa: E402
 # P2 十二轮探针的实战最优执行指引，统一追加到任务书尾
 _RUNBOOK = (
     ' 用 read_file 查看、replace_in_file 小步修改（每次 old 控制在 30 行内）；'
-    '不要自己运行完整测试套件（外部验证会跑）；改完用 done 结束。'
+    '不要自己运行完整测试套件、也不要用 run_shell 数行数/量函数长度（外部会验证与度量，'
+    '空转数行只会烧光轮次）；改完用 done 结束。'
 )
 
 
@@ -142,9 +143,23 @@ def main(argv=None) -> int:
     # 自更新场景跳过规则生成前奏（省 2-4 次 LLM 调用与分钟级延迟；其产物垃圾参数
     # 规则本就被零改动闸门丢弃），agent 子进程经环境继承此开关
     os.environ['SANYAN_SKIP_RULE_GEN'] = '1'
+    # 自更新任务必须落到文件改动：agent 零改动就 done 时循环顶回（loop.py ⑥），逼向
+    # 真正的编辑而非 run_shell 空转；经子进程环境继承。
+    os.environ['SANYAN_REQUIRE_EDIT'] = '1'
     log_path = os.path.join(tempfile.gettempdir(), f'sanyan-su-agent-{time.strftime("%Y%m%d-%H%M%S")}.log')
     print(f'agent 日志: {log_path}')
-    loop = SelfUpdateLoop(ROOT, combine_oracles(oracles), reject_hook=make_reject_diff_dumper(log_path))
+    loop = SelfUpdateLoop(
+        ROOT,
+        combine_oracles(oracles),
+        reject_hook=make_reject_diff_dumper(log_path),
+        # agent 学习记录/状态库是运行副产物，不属于代码变更（写进提交会伪装零改动、
+        # 污染产出分支——今晨尸检与昨日被接受分支双重实证）
+        commit_excludes=(
+            'agent_system/learned_styles.md',
+            'agent_system/agent.db',
+            'agent_system/agent_state.db',
+        ),
+    )
     for attempt in range(1, max(args.attempts, 1) + 1):
         if args.attempts > 1:
             print(f'—— 尝试 {attempt}/{args.attempts} ——')

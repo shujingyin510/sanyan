@@ -167,7 +167,11 @@ def run_legacy(rt, task, max_rounds, dry_run):
 
             if gate['action'] == 'block':
                 break
-            if tool in ('write_file', 'replace_in_file', 'replace_lines', 'replace_all'):
+            if tool in ('write_file', 'replace_in_file', 'replace_lines', 'replace_all') and cog == 'AFFIRM':
+                # 只在本步认知为 AFFIRM（真落盘：已替换/已写入）时记改动。失败的替换
+                # （未找到/语法错误被守卫还原→UNCERT）不再伪装成"修改文件"：否则面板谎报、
+                # 学习器记假风格，⑥ 的零改动顶回也会被这条假记录骗过（尸检实录：r5
+                # replace_in_file 判 UNCERT 0.10，面板却写"修改文件: ops/control_ops.py"）。
                 from agent_system.agent_tools import param_path
 
                 rt.memory['modified'].append(param_path(params))
@@ -175,8 +179,23 @@ def run_legacy(rt, task, max_rounds, dry_run):
             result = f'未知工具: {tool}'
         # 不再硬编码"成功"——让 UR 退化检测判定是否该停止
         if tool == 'done':
-            # UR 保护：第一轮就 done 说明无实质进展，继续观察
-            if rnd == 1:
+            # ⑥ 自更新场景（SANYAN_REQUIRE_EDIT）：任务必须落到文件改动。零改动 done 是
+            # 弱模型的谎报"完成"（oracle 必判无 diff）——顶回并点名去改文件、别 run_shell
+            # 数行数，把预算逼向真正的编辑。至多顶两次，仍无改动则停止交回上层判定。
+            if os.environ.get('SANYAN_REQUIRE_EDIT') and not rt.memory.get('modified'):
+                rt.memory['empty_done'] = rt.memory.get('empty_done', 0) + 1
+                if rt.memory['empty_done'] <= 2:
+                    print(f'  [UR] done 但零改动（第{rt.memory["empty_done"]}次）→ 顶回：任务要求改文件')
+                    ctx = rt._build_context(
+                        '你还没有修改任何文件，任务尚未完成。直接用 replace_in_file 或 write_file '
+                        '修改目标代码——行数/长度由外部验证，不要用 run_shell 数行数。改完再 done。',
+                        tool,
+                        result,
+                    )
+                    continue
+                print('  [UR] done 连续零改动顶回仍无进展 → 停止（交回上层判定）')
+            elif rnd == 1:
+                # 通用兜底：首轮就 done 往往无实质进展，观察一轮
                 print('  [UR] 首轮done → 可能无实质进展，继续观察')
                 ctx = rt._build_context(params, tool, result)
                 continue

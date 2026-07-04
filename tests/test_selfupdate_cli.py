@@ -30,8 +30,9 @@ def test_attempts_stops_at_first_accept(monkeypatch):
     calls = {'n': 0}
 
     class FakeLoop:
-        def __init__(self, root, oracle, *, reject_hook=None):
+        def __init__(self, root, oracle, *, reject_hook=None, commit_excludes=()):
             calls['hook'] = reject_hook
+            calls['excludes'] = commit_excludes
 
         def run(self, name, edit_fn):
             calls['n'] += 1
@@ -43,11 +44,13 @@ def test_attempts_stops_at_first_accept(monkeypatch):
     rc = rsu.main(['--task', 'x', '--attempts', '3'])
     assert rc == 0 and calls['n'] == 2  # 第二次过 oracle 即停，不烧第三次
     assert callable(calls['hook'])  # CLI 接线了尸检钩子
+    # 学习记录/状态库属运行副产物，必须排除在自更新提交外（尸检实证：曾伪装成真 diff）
+    assert 'agent_system/learned_styles.md' in calls['excludes']
 
 
 def test_attempts_exhausted_returns_1(monkeypatch):
     class FakeLoop:
-        def __init__(self, root, oracle, *, reject_hook=None):
+        def __init__(self, root, oracle, *, reject_hook=None, commit_excludes=()):
             pass
 
         def run(self, name, edit_fn):

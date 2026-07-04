@@ -132,3 +132,102 @@ def test_generated_rule_with_real_modification_returns_rule_result():
     r = run_legacy(rt, '创建 x.py', 3, dry_run=False)
     assert r['answer'] == '按规则 [w] 执行完成' and r['auto_rule'] == 'w'
     assert rt.memory['modified'] == ['x.py']
+
+
+# ── LLM 多轮循环：改动记录只认成功(B) + 零改动 done 顶回(⑥) ──
+
+
+class _LoopRt:
+    """驱动 LLM 多轮主循环的最小 rt：脚本化 (tool, params) 序列 + 真 TernaryEngine。
+
+    用真引擎（而非假 step）才能验证 B：`cog=='AFFIRM'` 门必须依赖真 classify——
+    成功替换(已替换)判 AFFIRM 记改动，失败替换(未找到/错误)判 UNCERT 不记。
+    """
+
+    def __init__(self, script, tools=None):
+        from core.ternary_engine import TernaryEngine
+
+        self._script = list(script)
+        self._last = None
+        self.memory = {'history': [], 'modified': [], 'failures': 0, 'retry_count': 0}
+        self.tools = tools or {}
+        self.ternary = TernaryEngine()
+        self.rule_engine = types.SimpleNamespace(match_rule=lambda task: None, llm_fn=None)
+        self.profiler = types.SimpleNamespace(record_step=lambda *a: None)
+        self.mem = types.SimpleNamespace(add=lambda *a: None)
+        self.tracer = types.SimpleNamespace(add_step=lambda *a: None)
+        self.context_compressor = types.SimpleNamespace(add_entry=lambda *a: None)
+        self.tool_selector = types.SimpleNamespace(record_outcome=lambda *a: None)
+
+    def _build_context(self, *a):
+        return 'CTX'
+
+    def _llm_call(self, ctx):
+        if self._script:
+            self._last = self._script.pop(0)
+        return self._last  # 脚本耗尽后重复最后一条（收尾轮不再变化）
+
+    def _parse_tool(self, raw):
+        return raw  # 脚本直接给 (tool, params)
+
+    def _fail_closed(self, tool, params, dry_run):
+        return False
+
+    def _constraint_violation(self, tool):
+        return False
+
+    def _reflect(self, msg, ctx):
+        return ctx
+
+    def _test_failed(self, result):
+        return False
+
+    def _compress_ctx(self, ctx):
+        return ctx
+
+
+def test_failed_edit_not_recorded_as_modified(monkeypatch):
+    # B：替换失败（未找到 → UNCERT）不得记为"修改文件"——否则面板/学习器/⑥ 全被骗
+    from agent_system.loop import run_legacy
+
+    monkeypatch.delenv('SANYAN_REQUIRE_EDIT', raising=False)
+    rt = _LoopRt(
+        script=[('replace_in_file', 'a.py|old|new'), ('done', '')],
+        tools={'replace_in_file': lambda p, d: '替换错误: 未找到匹配文本'},
+    )
+    run_legacy(rt, '改文件', 6, dry_run=False)
+    assert rt.memory['modified'] == []
+
+
+def test_successful_edit_recorded_as_modified(monkeypatch):
+    # B：替换成功（已替换 → AFFIRM）正常记录，功能不回退
+    from agent_system.loop import run_legacy
+
+    monkeypatch.delenv('SANYAN_REQUIRE_EDIT', raising=False)
+    rt = _LoopRt(
+        script=[('replace_in_file', 'a.py|old|new'), ('done', '')],
+        tools={'replace_in_file': lambda p, d: '已替换 1 处'},
+    )
+    run_legacy(rt, '改文件', 6, dry_run=False)
+    assert rt.memory['modified'] == ['a.py']
+
+
+def test_zero_mod_done_pushed_back_under_require_edit(monkeypatch):
+    # ⑥：SANYAN_REQUIRE_EDIT 下零改动 done 被顶回（至多两次），不首个 done 就收工
+    from agent_system.loop import run_legacy
+
+    monkeypatch.setenv('SANYAN_REQUIRE_EDIT', '1')
+    rt = _LoopRt(script=[('done', ''), ('done', ''), ('done', '')])
+    run_legacy(rt, '重构某函数', 6, dry_run=False)
+    assert rt.memory['empty_done'] == 3  # 顶回两次后第三次才停
+    assert rt.memory['modified'] == []
+
+
+def test_zero_mod_done_returns_without_require_edit(monkeypatch):
+    # 通用兜底不变：无 REQUIRE_EDIT 时首轮 done 观察一轮、次轮 done 直接收工（非编辑任务）
+    from agent_system.loop import run_legacy
+
+    monkeypatch.delenv('SANYAN_REQUIRE_EDIT', raising=False)
+    rt = _LoopRt(script=[('done', ''), ('done', '答案')])
+    r = run_legacy(rt, '问个问题', 6, dry_run=False)
+    assert r['answer'] == '答案' and 'empty_done' not in rt.memory
