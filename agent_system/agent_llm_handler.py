@@ -154,7 +154,7 @@ class LLMHandler:
         'replace_all': ('pattern', 'old', 'new'),
         'read_file': ('path', 'start', 'count'),
         'write_file': ('path', 'content'),
-        'run_shell': ('cmd',),
+        'run_shell': ('cmd', 'command'),  # 模型实测顽固用 command 键（P3 三连废实录）
         'run_test': ('test_file',),
     }
 
@@ -323,7 +323,9 @@ class LLMHandler:
                                             ordered.append(str(args[key]))
                                     if ordered:
                                         return tool, '|'.join(ordered)
-                                    return tool, _json.dumps(args, ensure_ascii=False)
+                                    # 键名全不在序里：按模型给出的顺序拼值兜底——
+                                    # 整包 JSON dump 会被工具当参数原样执行（run_shell 必败）
+                                    return tool, '|'.join(str(v) for v in args.values())
                                 return tool, ''
                         except (_json.JSONDecodeError, KeyError):
                             pass

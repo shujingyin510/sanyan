@@ -285,7 +285,9 @@ def make_agent_edit_fn(
         cmd = (
             list(agent_cmd)
             if agent_cmd is not None
-            else [sys.executable, '-X', 'utf8', os.path.join('agent_system', 'run_agent.py'), prompt, '--auto']
+            # -u：agent 被超时树杀时满缓冲的 stdout 整体蒸发（实测 600s 只剩启动头），
+            # 无缓冲让日志随跑随落、杀掉也留现场
+            else [sys.executable, '-X', 'utf8', '-u', os.path.join('agent_system', 'run_agent.py'), prompt, '--auto']
         )
         common = dict(cwd=wt, text=True, encoding='utf-8', errors='replace', timeout=timeout)
         if log_path:

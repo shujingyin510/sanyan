@@ -146,6 +146,19 @@ class TestAgentRuntime(unittest.TestCase):
         self.assertEqual(tool, 'run_shell')
         self.assertEqual(params, 'echo hi')
 
+    def test_parse_tool_run_shell_command_synonym(self):
+        # P3 三连废实录：模型三次尝试一致用 "command" 键，旧映射只认 cmd →
+        # args 整包 JSON dump 当 shell 命令执行必败 → NEGATE 连锁毒化置信度
+        tool, params = self.rt._parse_tool('{"tool":"run_shell","args":{"command":"python -V"}}')
+        self.assertEqual(tool, 'run_shell')
+        self.assertEqual(params, 'python -V')
+
+    def test_parse_tool_unknown_keys_join_values(self):
+        # 键名全不认识时按模型给出顺序拼值兜底——JSON dump 会被工具当参数原样执行
+        tool, params = self.rt._parse_tool('{"tool":"run_shell","args":{"shell_cmd":"dir"}}')
+        self.assertEqual(tool, 'run_shell')
+        self.assertEqual(params, 'dir')
+
     def test_parse_tool_replace_args_order(self):
         # replace_in_file 的 dict args 摊平顺序必须是 path|old|new
         raw = '{"tool":"replace_in_file","args":{"new":"B","path":"x.py","old":"A"}}'

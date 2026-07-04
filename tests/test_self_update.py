@@ -196,6 +196,7 @@ def test_agent_edit_fn_runs_agent_in_worktree(tmp_path):
     res = loop.run('agent-task', make_agent_edit_fn('修复某测试', runner=fake_agent))
     assert res.accepted
     assert calls['cwd'] != str(repo) and '修复某测试' in calls['cmd']  # cwd=worktree 而非主仓库（红线②）
+    assert '-u' in calls['cmd']  # 无缓冲：超时树杀不再吞掉整段日志
     assert (repo / 'code.py').read_text(encoding='utf-8') == 'x = 1\n'  # 主工作树未动
 
 

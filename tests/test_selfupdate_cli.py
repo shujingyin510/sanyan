@@ -7,8 +7,23 @@ import os
 import subprocess
 from types import SimpleNamespace
 
+import pytest
+
 import agent_system.run_self_update as rsu
 from agent_system.self_update import make_agent_edit_fn, tail_file
+
+
+@pytest.fixture(autouse=True)
+def _restore_skip_rule_gen():
+    # main() 会写 SANYAN_SKIP_RULE_GEN='1'（自更新子进程继承的正当机制）；测试进程内
+    # 直调 main 会把它遗留给同进程后续测试——test_loop 的规则生成用例会被静默关闭
+    # （全量按字母序 test_loop 在前侥幸不炸，换序/并行即炸）。显式还原。
+    prev = os.environ.get('SANYAN_SKIP_RULE_GEN')
+    yield
+    if prev is None:
+        os.environ.pop('SANYAN_SKIP_RULE_GEN', None)
+    else:
+        os.environ['SANYAN_SKIP_RULE_GEN'] = prev
 
 
 def test_attempts_stops_at_first_accept(monkeypatch):
