@@ -404,7 +404,16 @@ class TestTernaryEngine(unittest.TestCase):
 
     def test_propagate_confidence(self):
         r = self.engine.propagate_confidence(0.9, 0.8)
-        self.assertAlmostEqual(r, 0.72, delta=0.01)
+        self.assertAlmostEqual(r, 0.72, delta=0.01)  # 默认(非成功)仍乘性衰减
+
+    def test_propagate_confidence_affirm_recovers(self):
+        # ⑦：本步成功(trit=1)回血，不再乘性稀释到 0.01
+        self.assertGreater(self.engine.propagate_confidence(0.2, 0.81, 1), 0.2)  # 上游低也被本步拉回
+        c = 1.0
+        for _ in range(10):
+            c = self.engine.propagate_confidence(c, 0.81, 1)
+        self.assertGreater(c, 0.6)  # 十步纯成功仍高置信（旧乘性此时早已 <0.05）
+        self.assertLess(self.engine.propagate_confidence(0.9, 0.8, -1), 0.8)  # 失败(trit≠1)仍衰减
 
     def test_protect_high_risk(self):
         gate = self.engine.protect('高', -1, 0.5, [])
@@ -420,6 +429,15 @@ class TestTernaryEngine(unittest.TestCase):
         self.engine.hesitation = 0
         gate = self.engine.protect('低', 0, 0.815, self.engine.history)
         self.assertIn('不确定', gate['reason'])  # trit=0 → UNCERT
+
+    def test_protect_high_conf_stable_not_blocked(self):
+        # ⑦：高置信稳态是健康收敛（回血后长成功链常驻高位），不该判"信息增益不足"逼人工介入
+        hist = [(1, 0.81), (1, 0.82), (1, 0.81), (1, 0.82)]
+        self.engine.hesitation = 0
+        self.assertNotEqual(self.engine.protect('低', 1, 0.815, hist)['action'], 'block')
+        # 低置信原地打转才是真停滞 → 阻断
+        low = [(1, 0.3), (1, 0.31), (1, 0.3), (1, 0.31)]
+        self.assertEqual(self.engine.protect('低', 1, 0.305, low)['action'], 'block')
 
     def test_protect_continue(self):
         gate = self.engine.protect('低', 1, 0.9, [])

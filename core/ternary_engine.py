@@ -112,7 +112,14 @@ class TernaryEngine:
         tool_conf = self.TOOL_CONFIDENCE.get(tool, 0.7)
         return min(0.99, max(0.01, base * tool_conf))
 
-    def propagate_confidence(self, upstream_conf, current_conf):
+    def propagate_confidence(self, upstream_conf, current_conf, current_trit=0):
+        # ⑦ 置信度回血：本步成功(AFFIRM, trit=1)用几何均值向当前步收敛——健康长链稳在
+        # 高位，不再被"跑得久"乘性稀释到 0.01（旧行为让 NEGATE 门失灵：晚到的失败因低
+        # 置信落进"可重试"而非"停止"，长成功链还会撞上"信息增益不足"误判人工介入）。
+        # 失败/不确定(默认)仍乘性衰减，疑虑逐步累积——偶发成功不一笔勾销既有失败信号。
+        if current_trit == 1:
+            blended = (max(upstream_conf, 0.01) * max(current_conf, 0.01)) ** 0.5
+            return min(0.99, max(0.01, blended))
         return min(0.99, max(0.01, upstream_conf * current_conf))
 
     def protect(self, risk, trit, confidence, history):
@@ -149,7 +156,9 @@ class TernaryEngine:
         if history:
             hist_avg = sum(c for _, c in history[-5:]) / min(len(history), 5)
             gain = abs(confidence - hist_avg)
-            if gain < self.min_gain and len(history) >= 4:
+            # ⑦ 仅"低置信 + 无增益"才判停滞：高置信稳态是健康收敛（回血后长成功链常驻
+            # 高位），不该逼人工介入；真正卡死的是低置信还原地打转。
+            if gain < self.min_gain and len(history) >= 4 and confidence < 0.6:
                 return {'action': 'block', 'reason': '信息增益不足，建议人工介入', 'conf': confidence}
 
         return {'action': 'continue', 'reason': '', 'conf': confidence}
@@ -166,7 +175,7 @@ class TernaryEngine:
             upstream_trit, upstream_conf = self.history[-1]
 
         propagated = self.propagate(upstream_trit, trit)
-        propagated_conf = self.propagate_confidence(upstream_conf, conf)
+        propagated_conf = self.propagate_confidence(upstream_conf, conf, trit)
 
         if trit == 0:
             self.hesitation += 1
