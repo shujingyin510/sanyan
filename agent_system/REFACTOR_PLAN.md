@@ -490,3 +490,44 @@ python -X utf8 -m pytest tests/test_contracts.py tests/test_agent_v5.py -q
 - 下一步候选（按杠杆排序）：换更强编码模型（SANYAN_MODEL/SANYAN_PROVIDER 一变即换，harness
   已验证）；failing_test 类任务优先（对弱模型友好）；--attempts 加大硬怼；P3 完全体淘汰赛
   （并行 N 候选取优——基建活，不解决单候选质量）。
+
+**进度（2026-07-04）—— 循环内生存性批 + 尸检可观测链 + 置信度回血；3 连验证首现"真变短候选进 pytest"：**
+
+- **preflight 复活（自 v3.50 目录重构后首次全绿）**：两处 script-mode `sys.path` 断裂
+  （`preflight.py` 迁进 `scripts/`、`test_self_host.py` 直跑 → `ModuleNotFoundError: compiler`）
+  + 170 个 `.py` 工作树 CRLF 归一（`core.autocrlf input`）→ ALL CHECKS PASSED。CI 长期红
+  导致的"改前不敢跑全量"隐患解除。
+- **尸检可观测链**：拒绝理由带失败用例名（`FAILED/ERROR` 短摘要，封顶 3）；`reject_hook`
+  回滚**前**把被拒 `patch+stat` 落 agent 日志（红线内只读缝，异常吞掉不挡回滚）；agent 子进程
+  `-u` 无缓冲（超时树杀不再只剩启动头）。首战即揪出污染：某"未变短"拒绝的 diff 里只有一条
+  `learned_styles.md` 学习记录，**根本没改码**——据此有了下面的 A/B。
+- **循环内生存性批（A/B/⑥）**：A 副产物排除（学习记录/状态库 `reset` 出暂存区，只剩副产物即判
+  无改动，产出分支不再混噪音）；B 改动只认成功（`cog=='AFFIRM'` 才记 `modified`，UNCERT 失败
+  替换不再伪装"修改文件"）；⑥ 零改动 `done` 顶回（`SANYAN_REQUIRE_EDIT`，至多两次）+ 任务书
+  "别 `run_shell` 数行数"指引。
+- **置信度回血（⑦，`core/ternary_engine.py`）**：Kleene 传播旧无条件乘性衰减（纯成功链也
+  0.81→…→0.01、失败毒化只降不升，两处恶果——NEGATE 门因低置信失灵、长成功链撞"信息增益不足"）
+  → 成功用几何均值回血、"信息增益不足"阻断加 `confidence<0.6` 守卫。
+- **3 连验证跑（`--pick ternary_match --attempts 3`，18:00–18:20，全拒但基建全绿）**：
+  - **里程碑 —— 尝试 2 首现"真变短候选进 pytest"**：agent 用 `replace_lines` 把 L326-399 循环块
+    换成 `result = _ternary_match_branch_loop(...); if result is not None: return result`（-74/+3
+    行），**过了 shrink oracle（真变短）**，止步 oracle#1——3 测试挂。失败用例名
+    （`test_run_analyze_auto` / `test_run_find_symbol_auto` / `test_generated_rule…`）+ 尸检 diff
+    一并落盘。**bug 是弱模型典型：抽取后调用了 `_ternary_match_branch_loop` 却从没定义它**
+    （r9 search `def _ternary_match_branch_loop` 空手而归）——静态长度 oracle 抓不到"引用未定义"，
+    pytest 抓到了。全链路首次产出真候选并被 oracle 精确、可读地拒绝。
+  - **B/A/⑦ 实证**：B——尝试 1 的 UNCERT replace 未记 `modified`（面板无"修改文件"、诚实判无
+    改动），尝试 2 的成功 `replace_lines` 记了（面板"修改文件: ops/control_ops.py"）；A——三次尸检
+    零 `learned_styles` 噪音（尝试 2 面板仍"[学习]…"写了 worktree 副本，但排除出提交，尸检 diff
+    纯代码）；⑦——成功链稳在 0.81-0.90，毒化链也回血（尝试 2 验证段 0.24→0.48→0.61→0.70 上行，
+    旧行为此处早塌到 0.01）。
+  - **新暴露的模型侧失效（都非基建）**：①抽取后忘定义辅助函数（尝试 2，静态长度 oracle 盲区）；
+    ②思维链整段漏成"工具"（尝试 1 r7 把大段推理当 tool 名，解析废一轮）；③用 `sed -n` 走
+    `run_shell` 读文件绕过 `read_file`（尝试 3，"数行"指引没覆盖"shell 读"）。
+  - **瓶颈判定不变**：oracle/观测/安全/⑦/A/B/⑥ 全按设计工作，唯一真候选栽在模型没自查"调用了
+    未定义函数"。质量杆下模型有效产出率仍 ~1/5。
+- **下一步候选（按杠杆，据本轮更新）**：① shrink oracle 加"新函数体引用的名字必须在模块内可解析"
+  静态检查（直接抓尝试 2 这类抽取残缺，成本毫秒级，置组合首位）；②换更强编码模型；③ `failing_test`
+  类任务（改动局部、对弱模型更友好）；④ hesitation 计数应算"连续"而非"累计"（尝试 3 三连 UNCERT
+  触顶合理，非连续累计触顶偏严）；⑤ `learned_styles.md` 路径应认 `AGENT_DATA_DIR/paths.py`（当前
+  `__file__` 锚定，测试跑会污染真 tracked 文件——架构遗留）。

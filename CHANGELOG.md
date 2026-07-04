@@ -2,6 +2,50 @@
 
 ---
 
+## [v3.53.0] — 2026-07-04
+
+> **P3 循环内生存性：新落地的尸检可观测链首战即揪出"零改动伪装成真 diff"的元凶（agent 学习记录污染），据此收紧三道闸门——副产物不进提交、改动记录只认成功、零改动 done 顶回；另修 Kleene 置信度无条件衰减（纯成功链也塌到 0.01）与弱模型三连废的三个根因；preflight 自 v3.50 目录重构后首次全绿。**
+
+### ⭐ Highlights
+
+- **preflight 复活（自 v3.50 目录重构后首次全绿）**：重构把 `preflight.py` 迁进 `scripts/`、`test_self_host.py` 直跑，两处 script-mode `sys.path` 断裂（`ModuleNotFoundError: compiler`），叠加 170 个 `.py` 工作树 CRLF——两处锚定仓库根 + `core.autocrlf input` 归一 → `ALL CHECKS PASSED`
+- **尸检可观测链**：拒绝理由带失败用例名（分支随回滚蒸发后仍知挂在哪）+ `reject_hook` 回滚**前**把被拒 diff/stat 落 agent 日志（尸检窗口）+ agent 子进程 `-u` 无缓冲（超时树杀不再吞掉整段日志）
+- **尸检首战战果**：首个自动落盘的被拒 diff 当场揭穿——某次"未变短"拒绝的 diff 里只有一条 `learned_styles.md` 学习记录，**根本没改码**；同一污染还混进了昨日被接受的分支
+- **循环内生存性批（A/B/⑥）**：副产物排除（学习记录/状态库 `reset` 出暂存区，只剩副产物即判无改动）+ 改动只认成功（`cog=='AFFIRM'` 才记 `modified`，失败替换不再谎报"修改文件"）+ 零改动 `done` 顶回（`SANYAN_REQUIRE_EDIT` 下至多顶两次，逼向真编辑而非 `run_shell` 空转数行）
+- **置信度回血（⑦）**：Kleene 传播旧行为无条件乘性衰减——纯成功链也 0.81→0.66→…→0.01、失败毒化只降不升 → 成功用几何均值回血、高置信稳态不再误判"信息增益不足"逼人工介入
+- **三连废三根因**：模型顽固发 `{"command":...}`（`run_shell` 收编同义键 + 键名全不认时按序拼值兜底，不再整包 JSON dump 当 shell 命令必败）；`-u` 无缓冲留现场；CLI 直调 `main()` 遗留 `SANYAN_SKIP_RULE_GEN` 污染同进程后续测试（autouse 夹具还原）
+
+### Agent — 自更新闭环
+
+- **尸检可观测链（P3 补件）**：上轮缺口是"某次过了 shrink oracle、只差 1 个测试挂掉，却既不知改成啥样、也不知挂的哪个测试"。三处补齐——`make_pytest_oracle` 从短摘要区提取 `FAILED/ERROR` 用例名（封顶 3 个）进拒绝理由与 `report.failed_names`；`SelfUpdateLoop(reject_hook=)` 每次拒绝在回滚**前**以 `(worktree, 原因)` 调用、异常被吞（观测绝不阻断回滚，红线内只读缝）；`make_reject_diff_dumper` 把被拒提交 `patch+stat` 追加进 agent 日志（patch 在前、stat 收尾，日志尾正好是改动概要）
+- **副产物排除（A）**：`SelfUpdateLoop(commit_excludes=)`——`git add -A` 后把 `learned_styles.md` / `agent*.db` 等运行副产物 `reset` 出暂存区。写进提交会伪装零改动、污染产出分支（今晨尸检 + 昨日被接受分支双重实证）；排除后只剩副产物即视同零改动拒绝
+- **改动只认成功（B）**：`loop.py` 记 `memory['modified']` 加 `cog=='AFFIRM'` 门。失败替换（未找到/语法错误被守卫还原 → UNCERT）不再伪装成"修改文件"——否则面板谎报、学习器记假风格、⑥ 的零改动顶回也被这条假记录骗过（实录：`r5 replace_in_file` 判 UNCERT 0.10，面板却写"修改文件: ops/control_ops.py"）
+- **零改动 done 顶回（⑥）**：`SANYAN_REQUIRE_EDIT` 下零改动 `done` 顶回循环（至多两次），点名"去改文件、别 `run_shell` 数行数"；通用兜底（无此开关，非编辑任务）行为不变。CLI 置此开关并在任务书补"不要数行数/量长度，外部会验证与度量"指引——直击弱模型三连废里"空转数行到超时"的实录
+- **三连废根因修复**：三次尝试一致发 `{"command":...}`，映射只认 `cmd` → `args` 整包 JSON dump 当 shell 命令必败 → NEGATE 连锁毒化置信度 → UR 处决/超时。`run_shell` 收编 `command` 同义键；键名全不在序里时按模型给出顺序拼值兜底
+
+### 引擎 — 三态认知
+
+- **置信度回血（⑦，`core/ternary_engine.py`）**：`propagate_confidence` 新增 `current_trit`——本步成功（AFFIRM）用几何均值向当前步收敛，健康长链稳在高位；失败/不确定（默认）仍乘性衰减，偶发成功不勾销既有失败信号（默认参数保持旧两参调用语义 `0.9,0.8→0.72` 不变）。`protect` 的"信息增益不足"阻断加 `confidence<0.6` 守卫：高置信稳态是健康收敛、不该逼人工介入，真停滞是低置信原地打转。旧无条件衰减的两处恶果——晚到的 NEGATE 因低置信落进"可重试"而非"停止"（NEGATE 门形同虚设）、长成功链撞上"信息增益不足"误判——一并消除
+
+### Bug Fixes
+
+- **preflight 两处 script-mode 断裂**：`scripts/preflight.py` 进程内 import 仓库包（`bin_consistency` 等）、`tests/test_self_host.py` 直跑 `python tests/...` 时仓库根不在 `sys.path[0]` → `ModuleNotFoundError: compiler`。两处显式锚定仓库根
+- **工作树 CRLF 漂移**：170 个 tracked `.py` 工作树为 CRLF、index 为 LF（`core.autocrlf` 曾为 `true`）→ 编码检查红、幽灵 `M` 状态。归一为 LF + `core.autocrlf input` + `.gitattributes * text=auto`
+- **测试污染（预存炸弹）**：CLI 测试直调 `rsu.main()` 遗留 `os.environ['SANYAN_SKIP_RULE_GEN']='1'` 给同进程后续测试，`test_loop` 规则生成用例被静默关闭（全量按字母序侥幸不炸，换序/并行即炸）→ autouse 夹具显式存还
+- **agent 日志被超时树杀吞没**：满缓冲 stdout 在进程树被 `taskkill /T` 时整体蒸发（实测 600s 只剩启动头）→ agent 子进程 `-u` 无缓冲，日志随跑随落
+
+### Metrics
+
+| 指标 | 值 |
+| --- | --- |
+| pytest（`tests/`） | 2514 passed / 0 failed / 6 skipped（gcc 环境性）|
+| ruff check / format | 0 问题 / 317 文件已格式化 |
+| mypy | 0 问题（240 源文件）|
+| 自举字节一致 | B == C 7894 B（SHA256 `f0d17234…`）|
+| preflight --quick | ALL CHECKS PASSED 10/12（2 quick-skip）|
+
+---
+
 ## [v3.52.0] — 2026-07-03
 
 > **P2 真 LLM 首跑闭环成功：12 轮探针连环挖出 10 个真 bug（每个都藏在上一个后面），产出首个 oracle 全过分支，安全机制全程零事故；P3 开工——任务感知 shrink oracle、--attempts 重试、面向弱模型的底层优化批。**
