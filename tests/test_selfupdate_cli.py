@@ -61,6 +61,44 @@ def test_attempts_exhausted_returns_1(monkeypatch):
     assert rsu.main(['--task', 'x', '--attempts', '2']) == 1
 
 
+def test_build_retry_feedback_classifies():
+    # 分类纠偏：每类失败给出对症提示，且都带上原因原文
+    assert '真正改文件' in rsu.build_retry_feedback('无改动（edit_fn 未产生 diff）')
+    fb = rsu.build_retry_feedback('big 调用了模块内解析不到的名字: _helper')
+    assert '辅助函数' in fb and '定义' in fb
+    assert '逻辑严格等价' in rsu.build_retry_feedback('失败数 3 > 基线 0；失败用例: test_a')
+    assert '抽成模块级辅助函数' in rsu.build_retry_feedback('big 未变短: 94 行 ≥ 基线 94 行')
+    assert '上一次尝试被拒' in rsu.build_retry_feedback('莫名其妙的原因')  # 兜底也不丢信息
+
+
+def test_retry_threads_feedback_into_next_prompt(monkeypatch):
+    # 带记忆重试：首轮干净任务书；次轮把上次拒绝原因+纠偏喂回 prompt
+    prompts = []
+
+    class FakeLoop:
+        def __init__(self, root, oracle, *, reject_hook=None, commit_excludes=()):
+            pass
+
+        def run(self, name, edit_fn):
+            edit_fn('wt')  # 触发 fake 工厂记录本轮 prompt
+            ok = len(prompts) >= 2
+            reason = '' if ok else 'oracle 未过: big 调用了模块内解析不到的名字: _helper'
+            return SimpleNamespace(accepted=ok, branch='br' if ok else None, reason=reason)
+
+    def fake_edit_factory(prompt, **kw):
+        def edit(wt):
+            prompts.append(prompt)
+
+        return edit
+
+    monkeypatch.setattr(rsu, 'SelfUpdateLoop', FakeLoop)
+    monkeypatch.setattr(rsu, 'make_agent_edit_fn', fake_edit_factory)
+    rc = rsu.main(['--task', 'x', '--attempts', '3'])
+    assert rc == 0 and len(prompts) == 2
+    assert '上一次尝试被拒' not in prompts[0]  # 首轮是干净任务书
+    assert '上一次尝试被拒' in prompts[1] and '辅助函数' in prompts[1]  # 次轮带纠偏
+
+
 def test_edit_fn_writes_agent_log(tmp_path):
     log = str(tmp_path / 'agent.log')
 

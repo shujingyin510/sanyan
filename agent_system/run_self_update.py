@@ -53,6 +53,32 @@ def pick_task(tasks, key: str):
     return None
 
 
+def build_retry_feedback(reason: str) -> str:
+    """把上次拒绝原因转成给下一次 agent 的定向纠偏提示，塞回任务书首。
+
+    --attempts 的重试此前是 N 次冷启动，每次都不知道上次为啥挂；可 reject_hook 已把
+    失败用例名/被拒 diff 落了盘。弱模型缺的往往就是『有人告诉它错在哪』——把最近一次
+    拒绝原因连同分类纠偏喂回，把盲目重试变成迭代修正（零额外成本，只串上下文）。
+    """
+    if '无改动' in reason:
+        tip = '这次务必真正改文件（replace_in_file / replace_lines / write_file），别在 run_shell 里空转数行。'
+    elif '解析不到的名字' in reason or 'NameError' in reason:
+        tip = (
+            '你抽取了辅助函数却没定义它。这次分两步都落到文件：先用 write_file/replace 把这个'
+            '辅助函数的完整定义加进模块（模块级、平级于原函数），再在原函数里调用它。'
+        )
+    elif '失败用例' in reason or '失败数' in reason or '收集/执行错误' in reason:
+        tip = (
+            '你的改动跑挂了上面列出的测试，说明行为变了。回到目标函数，保持逻辑严格等价'
+            '（分支条件、返回值一字不差），只做结构拆分，别顺手改逻辑。'
+        )
+    elif '未变短' in reason:
+        tip = '目标函数没真变短。把最大的一整块（循环体/分支体）抽成模块级辅助函数并调用，别只挪几行。'
+    else:
+        tip = '针对上面的原因修正后再试。'
+    return f'⚠ 上一次尝试被拒，原因：{reason[:300]}\n本次纠偏：{tip}\n\n'
+
+
 def _git_out(wt: str, *args: str) -> str:
     """在被拒 worktree 里跑 git（观测用）。任何失败返回空串——尸检绝不影响回滚。"""
     try:
@@ -160,14 +186,18 @@ def main(argv=None) -> int:
             'agent_system/agent_state.db',
         ),
     )
+    feedback = ''  # 上一次拒绝的纠偏提示，喂回下一次任务书首（带记忆重试）
     for attempt in range(1, max(args.attempts, 1) + 1):
         if args.attempts > 1:
             print(f'—— 尝试 {attempt}/{args.attempts} ——')
-        result = loop.run(name, make_agent_edit_fn(prompt, timeout=args.agent_timeout, log_path=log_path))
+        if feedback:
+            print('  [UR] 已把上次拒绝原因喂回本次任务书（带记忆重试）')
+        result = loop.run(name, make_agent_edit_fn(feedback + prompt, timeout=args.agent_timeout, log_path=log_path))
         if result.accepted:
             print(f'✓ oracle 通过，产出分支: {result.branch}（请人工审查后合并）')
             return 0
         print(f'✗ 已回滚: {result.reason}')
+        feedback = build_retry_feedback(result.reason)  # 只带最近一次，避免任务书越滚越长
         t = tail_file(log_path)
         if t:
             print(f'—— agent 日志尾 ——\n{t}')
