@@ -550,10 +550,14 @@ python -X utf8 -m pytest tests/test_contracts.py tests/test_agent_v5.py -q
   非连续 UNCERT 攒够而误停；此改让实现与既有文案对齐，连续 UNCERT 仍照常触顶。
 - **⑤ learned_styles 认 AGENT_DATA_DIR（`872010e`）**：两处 `__file__` 锚定换成 `paths.data_dir()`
   （默认仍 `agent_system/`，生产路径不变）；测试隔离目录下学习记录不再污染真 tracked 文件。
+- **模型侧：思维链漏成工具名的解析兜底（`d6f0eba`）**：`parse_tool` 最后兜底 `return raw, ''` 从不返
+  None，使 loop 里既有的 `if tool is None` 优雅重提示成死代码——模型整段思维链没给 JSON 时被当工具名，
+  "未知工具: <上千字推理>" 白烧一轮（07-04 尝试 1 r7）。改成：单 token 原样返回（"未知工具"仍是有效
+  反馈），多词散文/大段思维链返 None 命中优雅路径。签名 `-> Tuple[Optional[str], str]`，mypy 验证调用方。
 - **仍待做（按杠杆）**：**候选淘汰赛（P3 完全体）**——一任务并行 N 候选、各过（已加固）oracle 栈、取
   首个通过或全弃，是对付弱模型方差的结构性正解；先看①+带记忆重试把成功率抬到多少再定是否上全并行。
-  ②换更强编码模型（用户暂搁置）；③ `failing_test` 类任务（改动局部、对弱模型友好）；模型侧行为件：
-  思维链整段漏成"工具"的解析兜底、`sed -n` 走 `run_shell` 绕过 `read_file`。
-- **注**：①④⑤+带记忆重试均单测封住（全量 2526 passed/6 skipped），但**尚未实跑验证**——下一步空一次
+  ②换更强编码模型（用户暂搁置）；③ `failing_test` 类任务（改动局部、对弱模型友好）；模型侧行为件残余：
+  `sed -n` 走 `run_shell` 绕过 `read_file`（"数行"指引没覆盖"shell 读文件"）。
+- **注**：①④⑤+带记忆重试+解析兜底均单测封住（全量 2527 passed/6 skipped），但**尚未实跑验证**——下一步空一次
   `--pick ternary_match --attempts 3` 实跑，看引用检查能否在 oracle#0 秒毙尝试 2 类残缺、带记忆重试能否
   让次轮真修正上一轮的错（预算/代理允许时）。
