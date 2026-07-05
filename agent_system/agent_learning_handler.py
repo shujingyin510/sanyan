@@ -16,6 +16,8 @@ import re as _re
 from datetime import datetime
 from typing import Any, Callable, Dict, Optional
 
+from agent_system import paths
+
 
 class LearningHandler:
     """学习和经验管理"""
@@ -62,7 +64,9 @@ class LearningHandler:
     def lookup_style(self, task: str) -> str:
         """查学习记录，返回风格提示"""
         try:
-            rules_file = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'learned_styles.md')
+            # 认 AGENT_DATA_DIR（默认仍是 agent_system/）：测试设了隔离目录后，学习记录不再
+            # 落进真 tracked 的 agent_system/learned_styles.md，跑测试不再污染开发者工作树。
+            rules_file = os.path.join(paths.data_dir(), 'learned_styles.md')
             if not os.path.exists(rules_file):
                 return ''
 
@@ -231,7 +235,9 @@ class LearningHandler:
     def _save_style_rule(self, task: str, style: Dict, change_details: str = ''):
         """保存风格规则到文件"""
         try:
-            rules_file = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'learned_styles.md')
+            # 认 AGENT_DATA_DIR（默认仍是 agent_system/）：测试设了隔离目录后，学习记录不再
+            # 落进真 tracked 的 agent_system/learned_styles.md，跑测试不再污染开发者工作树。
+            rules_file = os.path.join(paths.data_dir(), 'learned_styles.md')
 
             # 生成新规则
             pattern = style.get('pattern', '未知')

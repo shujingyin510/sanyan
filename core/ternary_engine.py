@@ -179,6 +179,12 @@ class TernaryEngine:
 
         if trit == 0:
             self.hesitation += 1
+        else:
+            # 连续性复位：笃定一步(AFFIRM/NEGATE)打断犹豫 streak——计"连续 UNCERT"而非"累计"。
+            # agent_execution 早写着"连续N次不确定，停止执行"，但计数器从不复位使它实为累计：
+            # 偶有不确定却在推进的健康长环会被非连续 UNCERT 攒够而误停（07-04 尝试 3 印证连续三
+            # UNCERT 触顶才是真卡死）。此处让实现与那句既有文案对齐。
+            self.hesitation = 0
 
         gate = self.protect(risk, propagated, propagated_conf, self.history)
         self.history.append((propagated, propagated_conf))

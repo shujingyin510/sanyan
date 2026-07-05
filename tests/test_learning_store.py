@@ -96,3 +96,15 @@ def test_handler_lookup_style_no_file_is_safe(tmp_path):
     handler = LearningHandler(experience_store=_store(tmp_path), git_batch_learner=None, llm_call=lambda p: '')
     # 任务无匹配/无文件时返回空串，不抛
     assert isinstance(handler.lookup_style('随便什么任务'), str)
+
+
+def test_learned_styles_honors_agent_data_dir(tmp_path, monkeypatch):
+    # 学习记录认 AGENT_DATA_DIR：隔离目录下读写往返，不碰真 tracked 的
+    # agent_system/learned_styles.md（跑测试不再污染开发者工作树）
+    monkeypatch.setenv('AGENT_DATA_DIR', str(tmp_path))
+    handler = LearningHandler(experience_store=None, git_batch_learner=None, llm_call=lambda p: '')
+    style = {'pattern': '小步替换', 'style': 'PEP8', 'conventions': ['类型注解'], 'keywords': ['refactor', 'ternary']}
+    handler._save_style_rule('重构 ternary_match', style)
+    written = tmp_path / 'learned_styles.md'
+    assert written.exists() and '小步替换' in written.read_text(encoding='utf-8')  # 写落隔离目录
+    assert '小步替换' in handler.lookup_style('refactor ternary')  # 同目录读回、关键词命中

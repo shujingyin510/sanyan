@@ -415,6 +415,21 @@ class TestTernaryEngine(unittest.TestCase):
         self.assertGreater(c, 0.6)  # 十步纯成功仍高置信（旧乘性此时早已 <0.05）
         self.assertLess(self.engine.propagate_confidence(0.9, 0.8, -1), 0.8)  # 失败(trit≠1)仍衰减
 
+    def test_hesitation_resets_on_confident_step(self):
+        # 连续性：笃定一步(AFFIRM)打断犹豫 streak——非连续 UNCERT 不再累计误停
+        self.engine.step('replace_in_file', '操作完成')  # UNCERT → 1
+        self.assertEqual(self.engine.hesitation, 1)
+        self.engine.step('analyze', '函数列表')  # AFFIRM → 复位 0
+        self.assertEqual(self.engine.hesitation, 0)
+        self.engine.step('replace_in_file', '操作完成')  # UNCERT → 1（不是 2）
+        self.assertEqual(self.engine.hesitation, 1)
+
+    def test_hesitation_accumulates_when_consecutive(self):
+        # 连续 UNCERT 仍照常累计触顶（07-04 尝试 3 的真卡死信号不被削弱）
+        for _ in range(3):
+            self.engine.step('replace_in_file', '操作完成')
+        self.assertEqual(self.engine.hesitation, 3)
+
     def test_protect_high_risk(self):
         gate = self.engine.protect('高', -1, 0.5, [])
         self.assertEqual(gate['action'], 'block')
