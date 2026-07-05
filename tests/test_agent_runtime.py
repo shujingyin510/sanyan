@@ -135,9 +135,16 @@ class TestAgentRuntime(unittest.TestCase):
         tool, params = self.rt._parse_tool('done|任务完成')
         self.assertEqual(tool, 'done')
 
-    def test_parse_tool_garbage(self):
-        tool, params = self.rt._parse_tool('random noise')
-        self.assertEqual(tool, 'random noise')
+    def test_parse_tool_prose_returns_none(self):
+        # 变更（07-04 尝试1 r7 实录）：多词散文/思维链解析不出工具调用 → tool=None，命中
+        # loop 的 `if tool is None` 优雅重提示，不再把整段文本当工具名报"未知工具"白烧一轮。
+        tool, _ = self.rt._parse_tool('random noise')
+        self.assertIsNone(tool)
+
+    def test_parse_tool_bare_token_kept_as_unknown(self):
+        # 单 token 仍原样返回，交由 loop 报"未知工具"给出有效反馈（如拼错的工具名）
+        tool, _ = self.rt._parse_tool('reed_file')
+        self.assertEqual(tool, 'reed_file')
 
     def test_parse_tool_run_shell_cmd_key(self):
         # P2 探针#11 回归守护：ordered 键列表曾缺 cmd，run_shell 的 args

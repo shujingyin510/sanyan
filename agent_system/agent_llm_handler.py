@@ -270,8 +270,8 @@ class LLMHandler:
 
         return body, headers, parser
 
-    def parse_tool(self, raw: str) -> Tuple[str, str]:
-        """解析工具调用"""
+    def parse_tool(self, raw: str) -> Tuple[Optional[str], str]:
+        """解析工具调用。无法解析出工具调用时 tool 返回 None（loop 有优雅重提示路径）。"""
         raw = raw.strip().replace('---END---', '').strip()
 
         # 1: bracket-counting JSON extraction
@@ -343,7 +343,13 @@ class LLMHandler:
         if 'def' in raw or '函数' in raw or '结构' in raw:
             return 'analyze', 'agent_system/run_agent.py'
 
-        return raw, ''
+        # 4: 兜底——raw 未匹配任何工具调用形态。单 token 当作（可能拼错的）工具名，交由
+        # loop 报"未知工具"给出有效反馈；但整段散文/思维链绝不能当工具名（否则会
+        # "未知工具: <上千字推理>" 白烧一轮——07-04 尝试 1 r7 实录）→ 返回 None，命中 loop
+        # 里既有的 `if tool is None` 优雅重提示路径（配 UR 退化检测兜住重复）。
+        if raw and '\n' not in raw and len(raw) <= 30 and raw == raw.split()[0]:
+            return raw, ''
+        return None, ''
 
     def _fix_json_newlines(self, s: str) -> str:
         """修复 JSON 字符串中的换行符"""
