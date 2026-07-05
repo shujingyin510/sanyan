@@ -531,3 +531,29 @@ python -X utf8 -m pytest tests/test_contracts.py tests/test_agent_v5.py -q
   类任务（改动局部、对弱模型更友好）；④ hesitation 计数应算"连续"而非"累计"（尝试 3 三连 UNCERT
   触顶合理，非连续累计触顶偏严）；⑤ `learned_styles.md` 路径应认 `AGENT_DATA_DIR/paths.py`（当前
   `__file__` 锚定，测试跑会污染真 tracked 文件——架构遗留）。
+
+**进度（2026-07-05）—— 下一步候选①④⑤ + 带记忆重试落地（单测已封，待实跑验证）：**
+
+- **① shrink oracle 加"引用可解析"静态检查（`51c782c`）**：新增 `_unresolved_calls_in_function`——
+  查目标函数体内『裸名调用』(`NAME(...)`) 里模块内解析不到的名字，接在 span 变短检查之后、
+  组合首位先行短路。直击 07-04 尝试 2 的死法（抽了 `_ternary_match_branch_loop` 却没定义、过了
+  span，靠 pytest 花 ~1 分钟才报 3 个 NameError）：现在 ast 级毫秒成本当场毙。解析范围刻意宽松
+  （模块内任意 def/class/import 名 + 任意 Store 名 + 形参 + builtins），宁可漏报绝不误杀——pytest
+  才是真兜底；`from x import *` 无法静态推断绑定则放行。守护 +5。
+- **带记忆重试（`c9089fe`）**：`--attempts` 此前是 N 次冷启动，每次都不知上次为啥挂；但 reject_hook
+  已把失败用例名/被拒 diff 落了盘。新增 `build_retry_feedback`：按拒绝原因分类给对症提示（无改动→
+  务必真改文件；解析不到的名字→先定义辅助函数再调用；失败用例→保持逻辑严格等价只做结构拆分；
+  未变短→抽最大整块），塞回下一轮任务书首，把盲目重试变成迭代修正（零额外成本、只串上下文）。
+  只带最近一次防任务书膨胀。守护 +2。
+- **④ hesitation 连续计数（`872010e`）**：`step()` 里笃定一步(AFFIRM/NEGATE)复位犹豫计数。
+  `agent_execution` 早写着"连续N次不确定，停止执行"，但计数器从不复位使它实为累计——健康长环会被
+  非连续 UNCERT 攒够而误停；此改让实现与既有文案对齐，连续 UNCERT 仍照常触顶。
+- **⑤ learned_styles 认 AGENT_DATA_DIR（`872010e`）**：两处 `__file__` 锚定换成 `paths.data_dir()`
+  （默认仍 `agent_system/`，生产路径不变）；测试隔离目录下学习记录不再污染真 tracked 文件。
+- **仍待做（按杠杆）**：**候选淘汰赛（P3 完全体）**——一任务并行 N 候选、各过（已加固）oracle 栈、取
+  首个通过或全弃，是对付弱模型方差的结构性正解；先看①+带记忆重试把成功率抬到多少再定是否上全并行。
+  ②换更强编码模型（用户暂搁置）；③ `failing_test` 类任务（改动局部、对弱模型友好）；模型侧行为件：
+  思维链整段漏成"工具"的解析兜底、`sed -n` 走 `run_shell` 绕过 `read_file`。
+- **注**：①④⑤+带记忆重试均单测封住（全量 2526 passed/6 skipped），但**尚未实跑验证**——下一步空一次
+  `--pick ternary_match --attempts 3` 实跑，看引用检查能否在 oracle#0 秒毙尝试 2 类残缺、带记忆重试能否
+  让次轮真修正上一轮的错（预算/代理允许时）。
