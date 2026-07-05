@@ -86,10 +86,16 @@ def run_legacy(rt, task, max_rounds, dry_run):
                 break
 
         # ── 超时护杀 ──
+        # 总预算默认 420s（7 分钟），SANYAN_LOOP_TIME_BUDGET 可调。0705 三连实跑：代理
+        # 抖动时单次 LLM 重试吃 60-120s，420s 把三次尝试全掐死在编辑前（零编辑调用）——
+        # 自更新闭环放宽到 900s（外层 --agent-timeout 子进程硬杀仍兜底，跑不飞）。
+        try:
+            budget = int(os.environ.get('SANYAN_LOOP_TIME_BUDGET', '420'))
+        except ValueError:
+            budget = 420  # 环境值损坏 → 回默认，护杀不失效
         total_elapsed = _time.time() - t_start
-        if total_elapsed > 420:  # 总超时7分钟（代理慢时单次LLM可达60s，300s只够~7轮
-            # 还没走到修改动作；自更新闭环外层 agent-timeout=480s 仍兜底）
-            print('  [TIMEOUT] 总执行时间超过420秒，强制退出')
+        if total_elapsed > budget:
+            print(f'  [TIMEOUT] 总执行时间超过{budget}秒，强制退出')
             rt.memory['failures'] += 1
             break
         if rnd > 1 and step_duration_last > 60:

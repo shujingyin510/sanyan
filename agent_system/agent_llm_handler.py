@@ -339,8 +339,11 @@ class LLMHandler:
         if raw.startswith('done'):
             return 'done', raw.split('|', 1)[1] if '|' in raw else ''
 
-        # 3: keyword heuristic
-        if 'def' in raw or '函数' in raw or '结构' in raw:
+        # 3: keyword heuristic——只对"短单行"生效。原版对任意文本生效：中文推理散文几乎
+        # 必含"函数"，整段思维链被劫持成一次写死目标的 analyze 调用白烧一轮，还抢在 #4
+        # 散文兜底之前把它架空（0705 实跑尝试 2/3 各中一枪：LLM 超时后模型吐散文 →
+        # analyze agent_system/run_agent.py，与任务毫不相干）。
+        if ('def' in raw or '函数' in raw or '结构' in raw) and '\n' not in raw and len(raw) <= 80:
             return 'analyze', 'agent_system/run_agent.py'
 
         # 4: 兜底——raw 未匹配任何工具调用形态。单 token 当作（可能拼错的）工具名，交由

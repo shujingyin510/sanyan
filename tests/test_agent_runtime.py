@@ -146,6 +146,18 @@ class TestAgentRuntime(unittest.TestCase):
         tool, _ = self.rt._parse_tool('reed_file')
         self.assertEqual(tool, 'reed_file')
 
+    def test_parse_tool_prose_with_keyword_returns_none(self):
+        # 0705 实跑：关键词启发式原对任意文本生效，中文推理散文必含"函数"，整段思维链
+        # 被劫持成写死目标的 analyze 白烧一轮。多行散文即使含关键词也应返 None 走重提示。
+        prose = '我需要先理解 ternary_match 函数的结构。\n这个函数有94行，主循环在L326。\n接下来我应该提取辅助函数。'
+        tool, _ = self.rt._parse_tool(prose)
+        self.assertIsNone(tool)
+
+    def test_parse_tool_short_keyword_line_still_analyze(self):
+        # 短单行含关键词仍走启发式（保留原有救援能力，只是不再吞散文）
+        tool, params = self.rt._parse_tool('查看函数结构')
+        self.assertEqual(tool, 'analyze')
+
     def test_parse_tool_run_shell_cmd_key(self):
         # P2 探针#11 回归守护：ordered 键列表曾缺 cmd，run_shell 的 args
         # 被整包 JSON dump 后当 shell 命令执行

@@ -231,3 +231,28 @@ def test_zero_mod_done_returns_without_require_edit(monkeypatch):
     rt = _LoopRt(script=[('done', ''), ('done', '答案')])
     r = run_legacy(rt, '问个问题', 6, dry_run=False)
     assert r['answer'] == '答案' and 'empty_done' not in rt.memory
+
+
+def test_loop_time_budget_env_tunable(monkeypatch):
+    # 总预算认 SANYAN_LOOP_TIME_BUDGET（0705 实跑：代理抖动时 420s 掐死在编辑前，
+    # 自更新场景放宽）。预算 -1 → 首轮即触护杀，一次 LLM 都不调。
+    # （不用 0：Windows time.time() 粒度粗，首轮 elapsed 可恰为 0.0，0.0 > 0 为 False）
+    from agent_system.loop import run_legacy
+
+    monkeypatch.delenv('SANYAN_REQUIRE_EDIT', raising=False)
+    monkeypatch.setenv('SANYAN_LOOP_TIME_BUDGET', '-1')
+    rt = _LoopRt(script=[('done', '答案')])
+    run_legacy(rt, '任务', 6, dry_run=False)
+    assert rt.memory['failures'] == 1
+    assert len(rt._script) == 1  # 脚本没被消费 → 没进过 LLM 轮
+
+
+def test_loop_time_budget_garbage_falls_back(monkeypatch):
+    # 环境值损坏 → 回默认 420s，护杀不失效也不炸；正常脚本照常收工
+    from agent_system.loop import run_legacy
+
+    monkeypatch.delenv('SANYAN_REQUIRE_EDIT', raising=False)
+    monkeypatch.setenv('SANYAN_LOOP_TIME_BUDGET', '不是数字')
+    rt = _LoopRt(script=[('done', ''), ('done', '答案')])
+    r = run_legacy(rt, '问个问题', 6, dry_run=False)
+    assert r['answer'] == '答案'

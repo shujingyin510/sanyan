@@ -172,6 +172,9 @@ def main(argv=None) -> int:
     # 自更新任务必须落到文件改动：agent 零改动就 done 时循环顶回（loop.py ⑥），逼向
     # 真正的编辑而非 run_shell 空转；经子进程环境继承。
     os.environ['SANYAN_REQUIRE_EDIT'] = '1'
+    # 循环总预算放宽到 900s：0705 三连实跑证明代理抖动时默认 420s 会把 agent 掐死在
+    # 编辑前（6 次 LLM 超时、零编辑调用、3/3 无改动拒）。--agent-timeout 子进程硬杀兜底。
+    os.environ['SANYAN_LOOP_TIME_BUDGET'] = '900'
     log_path = os.path.join(tempfile.gettempdir(), f'sanyan-su-agent-{time.strftime("%Y%m%d-%H%M%S")}.log')
     print(f'agent 日志: {log_path}')
     loop = SelfUpdateLoop(
