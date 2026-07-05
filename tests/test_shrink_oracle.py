@@ -77,6 +77,57 @@ def test_star_import_skips_resolvability(tmp_path):
     assert make_shrink_oracle('mod.py', 'big', 10)(wd).ok
 
 
+def test_class_method_helper_called_as_bare_name_rejected(tmp_path):
+    # 0705 第二轮实跑回归钉：agent 把辅助函数定义成类方法、又在目标方法里裸名调用——
+    # 类体绑定对方法内裸名不可见（LEGB 无类作用域），必然 NameError。旧实现把全树
+    # FunctionDef 名一律计入可解析而放行，靠 pytest 才炸；现在毫秒毙。
+    body = (
+        'class C:\n'
+        '    @staticmethod\n'
+        '    def _impl(x):\n'
+        '        return x\n'
+        '\n'
+        '    @staticmethod\n'
+        '    def big(x):\n'
+        '        return _impl(x)\n'
+    )
+    wd = _write(tmp_path, body)
+    v = make_shrink_oracle('mod.py', 'big', 10)(wd)
+    assert not v.ok and '_impl' in v.reason
+
+
+def test_class_method_helper_called_via_class_passes(tmp_path):
+    # 防误杀：同样的类方法辅助函数，走 C._impl(x)（Attribute 调用）是正确写法——放行。
+    body = (
+        'class C:\n'
+        '    @staticmethod\n'
+        '    def _impl(x):\n'
+        '        return x\n'
+        '\n'
+        '    @staticmethod\n'
+        '    def big(x):\n'
+        '        return C._impl(x)\n'
+    )
+    wd = _write(tmp_path, body)
+    assert make_shrink_oracle('mod.py', 'big', 10)(wd).ok
+
+
+def test_module_level_class_and_assign_resolve(tmp_path):
+    # 防误杀：类名/模块级赋值名都是模块层绑定，方法内裸名调用可解析。
+    body = (
+        'handler = len\n\n\nclass Helper:\n    pass\n\n\ndef big(xs):\n    return Helper() if handler(xs) else None\n'
+    )
+    wd = _write(tmp_path, body)
+    assert make_shrink_oracle('mod.py', 'big', 10)(wd).ok
+
+
+def test_nested_function_sees_enclosing_locals(tmp_path):
+    # 防误杀：目标函数嵌套在外层函数里时，外层局部（含外层定义的辅助函数）经闭包可见。
+    body = 'def outer():\n    def helper(x):\n        return x\n\n    def big(x):\n        return helper(x)\n\n    return big\n'
+    wd = _write(tmp_path, body)
+    assert make_shrink_oracle('mod.py', 'big', 10)(wd).ok
+
+
 def test_pick_task_by_substring():
     tasks = [
         MinedTask('long_function', 'a/x.py', 1, 'huge_fn', detail='100 行'),

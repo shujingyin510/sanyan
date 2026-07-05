@@ -348,52 +348,100 @@ def make_differential_oracle(
 # ── P3：任务感知 oracle ──────────────────────────────────────────────────────
 
 
+def _bound_names(node: ast.AST) -> set[str]:
+    """单个节点直接产生的名字绑定（只认绑定形态，不管作用域——作用域由调用方划定）。"""
+    names: set[str] = set()
+    if isinstance(node, (ast.Import, ast.ImportFrom)):
+        for alias in node.names:
+            names.add((alias.asname or alias.name).split('.')[0])
+    elif isinstance(node, ast.Name) and isinstance(node.ctx, ast.Store):
+        names.add(node.id)
+    elif isinstance(node, ast.Global):
+        names.update(node.names)
+    elif isinstance(node, ast.ExceptHandler) and node.name:
+        names.add(node.name)
+    elif isinstance(node, ast.MatchAs) and node.name:
+        names.add(node.name)
+    elif isinstance(node, ast.MatchStar) and node.name:
+        names.add(node.name)
+    elif isinstance(node, ast.MatchMapping) and node.rest:
+        names.add(node.rest)
+    return names
+
+
+def _scope_names(fn: ast.AST) -> set[str]:
+    """函数子树内可见的绑定名：形参 + 局部 Store + 嵌套 def/类名（宽松：含嵌套函数的局部）。"""
+    names: set[str] = set()
+    for node in ast.walk(fn):
+        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
+            names.add(node.name)
+            args = node.args
+            for arg in (*args.posonlyargs, *args.args, *args.kwonlyargs):
+                names.add(arg.arg)
+            if args.vararg:
+                names.add(args.vararg.arg)
+            if args.kwarg:
+                names.add(args.kwarg.arg)
+        elif isinstance(node, ast.ClassDef):
+            names.add(node.name)
+        else:
+            names |= _bound_names(node)
+    return names
+
+
 def _unresolved_calls_in_function(tree: ast.Module, func_name: str) -> List[str]:
-    """目标函数体内『裸名调用』(``NAME(...)``) 里、在模块内解析不到的名字。
+    """目标函数体内『裸名调用』(``NAME(...)``) 里、按 Python 作用域规则解析不到的名字。
 
-    直击首个真候选（2026-07-04 尝试 2）的死法：agent 把循环块抽成
-    ``_ternary_match_branch_loop(...)`` 并调用它，却从没定义这个辅助函数——目标函数
-    确实变短、过了 span 检查，最后靠 pytest 花 ~1 分钟才报 NameError。此处 ast 级、
-    毫秒成本，在组合首位就先把这类"抽了没落地"的半成品毙掉。
+    直击两轮实跑的真候选死法：07-04 尝试 2 抽了 ``_ternary_match_branch_loop(...)``
+    却从没定义（全模块查无此名）；07-05 第二轮把辅助函数定义成**类方法**、又在
+    ``ternary_match`` 里裸名调用——类体绑定对方法内裸名不可见（LEGB 链里没有类作用域），
+    必然 NameError，旧实现把全树 FunctionDef 名一律计入可解析而放行，靠 pytest 才炸。
+    此处 ast 级、毫秒成本，在组合首位就把这两类"抽了没落地"当场毙。
 
-    解析范围刻意宽松（宁可漏报、绝不误杀——pytest 才是真兜底，本检查只图早毙）：
-    模块内任意 def/class/import 名 + 任意 Store 位置的名字 + 任意函数形参 + builtins。
-    只有『仅作 Load/Call 目标、模块任何处都没被定义/赋值/导入/入参』的名字才算未解析。
+    作用域模型（该宽松处仍宽松——宁可漏报、绝不误杀，pytest 是真兜底）：
+    裸名解析链 = 目标函数局部（形参/Store/嵌套 def，含闭包外层函数）→ 模块层
+    （def/class/import/Store，**不进类体**）→ builtins；函数内 ``global X`` 视同模块层绑定。
     遇到 ``from x import *``（绑定无法静态推断）直接放行，避免误杀。
     """
     for node in ast.walk(tree):
         if isinstance(node, ast.ImportFrom) and any(a.name == '*' for a in node.names):
             return []
 
+    parents: dict = {}
+    for parent in ast.walk(tree):
+        for child in ast.iter_child_nodes(parent):
+            parents[child] = parent
+
+    # 模块作用域：不下潜进 def/类体——类体里的方法名对方法内裸名解析不可见（0705 实录）
     known = set(dir(builtins))
-    for node in ast.walk(tree):
-        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
-            known.add(node.name)
-            args = node.args
-            for arg in (*args.posonlyargs, *args.args, *args.kwonlyargs):
-                known.add(arg.arg)
-            if args.vararg:
-                known.add(args.vararg.arg)
-            if args.kwarg:
-                known.add(args.kwarg.arg)
-        elif isinstance(node, ast.ClassDef):
-            known.add(node.name)
-        elif isinstance(node, (ast.Import, ast.ImportFrom)):
-            for alias in node.names:
-                known.add((alias.asname or alias.name).split('.')[0])
-        elif isinstance(node, ast.Name) and isinstance(node.ctx, ast.Store):
-            known.add(node.id)
+    stack: List[ast.AST] = list(tree.body)
+    while stack:
+        node = stack.pop()
+        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)):
+            known.add(node.name)  # def/class 名本身绑定在模块层；体内绑定不外泄
+            continue
+        known |= _bound_names(node)
+        stack.extend(ast.iter_child_nodes(node))
+    for node in ast.walk(tree):  # 函数内 `global X; X=...` 在模块层制造绑定——宽松计入
+        if isinstance(node, ast.Global):
+            known.update(node.names)
 
     unresolved: List[str] = []
     seen: set[str] = set()
     for fn in (
         n for n in ast.walk(tree) if isinstance(n, (ast.FunctionDef, ast.AsyncFunctionDef)) and n.name == func_name
     ):
+        local = known | _scope_names(fn)
+        anc = parents.get(fn)  # 闭包链：目标嵌套在别的函数里时，外层函数局部对它可见
+        while anc is not None:
+            if isinstance(anc, (ast.FunctionDef, ast.AsyncFunctionDef)):
+                local |= _scope_names(anc)
+            anc = parents.get(anc)
         for node in ast.walk(fn):
             if (
                 isinstance(node, ast.Call)
                 and isinstance(node.func, ast.Name)
-                and node.func.id not in known
+                and node.func.id not in local
                 and node.func.id not in seen
             ):
                 seen.add(node.func.id)
