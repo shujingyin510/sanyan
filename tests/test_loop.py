@@ -149,6 +149,7 @@ class _LoopRt:
 
         self._script = list(script)
         self._last = None
+        self.ctx_calls = []  # 记录 _build_context 入参（顶推/纠偏文案断言用）
         self.memory = {'history': [], 'modified': [], 'failures': 0, 'retry_count': 0}
         self.tools = tools or {}
         self.ternary = TernaryEngine()
@@ -160,6 +161,7 @@ class _LoopRt:
         self.tool_selector = types.SimpleNamespace(record_outcome=lambda *a: None)
 
     def _build_context(self, *a):
+        self.ctx_calls.append(a)
         return 'CTX'
 
     def _llm_call(self, ctx):
@@ -231,6 +233,35 @@ def test_zero_mod_done_returns_without_require_edit(monkeypatch):
     rt = _LoopRt(script=[('done', ''), ('done', '答案')])
     r = run_legacy(rt, '问个问题', 6, dry_run=False)
     assert r['answer'] == '答案' and 'empty_done' not in rt.memory
+
+
+def test_wandering_nudge_fires_at_midpoint(monkeypatch):
+    # 徘徊顶推：REQUIRE_EDIT 下过半仍零改动 → 顶推一次"停止阅读、动手改"（0705 第二轮
+    # 实录：预算修好后模型 15 轮全在读，一次编辑不做）
+    from agent_system.loop import run_legacy
+
+    monkeypatch.setenv('SANYAN_REQUIRE_EDIT', '1')
+    monkeypatch.delenv('SANYAN_LOOP_TIME_BUDGET', raising=False)
+    script = [('read_file', f'a.py|{i}') for i in range(1, 5)]  # 参数各异防 UR 退化误停
+    rt = _LoopRt(script=script, tools={'read_file': lambda p, d: f'内容 {p}'})
+    run_legacy(rt, '重构某函数', 4, dry_run=False)
+    nudges = [a for a in rt.ctx_calls if '停止继续阅读' in str(a[0])]
+    assert len(nudges) == 1 and nudges[0][1] == 'init'  # 恰好一次，rnd==3（4//2+1）
+    assert '重构某函数' in str(nudges[0][0])  # 原任务随顶推保留
+
+
+def test_wandering_nudge_absent_after_edit(monkeypatch):
+    # 已有真实改动就不顶推（顶推只治零改动徘徊，不打扰正常工作流）
+    from agent_system.loop import run_legacy
+
+    monkeypatch.setenv('SANYAN_REQUIRE_EDIT', '1')
+    script = [('replace_in_file', 'a.py|old|new'), ('read_file', 'a.py|2'), ('read_file', 'a.py|3'), ('done', '完')]
+    rt = _LoopRt(
+        script=script,
+        tools={'replace_in_file': lambda p, d: '已替换 1 处', 'read_file': lambda p, d: f'内容 {p}'},
+    )
+    run_legacy(rt, '重构某函数', 4, dry_run=False)
+    assert not [a for a in rt.ctx_calls if '停止继续阅读' in str(a[0])]
 
 
 def test_loop_time_budget_env_tunable(monkeypatch):

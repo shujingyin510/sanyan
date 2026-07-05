@@ -103,6 +103,18 @@ def run_legacy(rt, task, max_rounds, dry_run):
             rt.memory['failures'] += 1
             break
 
+        # ── 徘徊顶推（自更新场景，一次性）──
+        # 0705 第二轮实录：预算修好后模型 15 轮全在读/搜索（同一段 read_file 反复读了
+        # 三遍），一次编辑不做。过半仍零改动就顶推一把：停止阅读、现在动手。
+        if rnd == max_rounds // 2 + 1 and os.environ.get('SANYAN_REQUIRE_EDIT') and not rt.memory.get('modified'):
+            print('  [UR] 过半仍零改动 → 顶推：停止阅读，现在动手改文件')
+            ctx = rt._build_context(
+                f'已用掉一半轮次但还没有任何文件修改。停止继续阅读/搜索——你已经看过目标代码了。'
+                f'现在就用 replace_lines 或 replace_in_file 对目标文件做出第一处修改'
+                f'（小步即可，外部会验证）。原任务：{task}',
+                'init',
+            )
+
         # ── 上下文压缩 ──
         if context_too_large(ctx):
             ctx = rt._compress_ctx(ctx)
