@@ -15,6 +15,7 @@
 from __future__ import annotations
 
 import ast
+import builtins
 import os
 import re
 import shutil
@@ -347,6 +348,59 @@ def make_differential_oracle(
 # ── P3：任务感知 oracle ──────────────────────────────────────────────────────
 
 
+def _unresolved_calls_in_function(tree: ast.Module, func_name: str) -> List[str]:
+    """目标函数体内『裸名调用』(``NAME(...)``) 里、在模块内解析不到的名字。
+
+    直击首个真候选（2026-07-04 尝试 2）的死法：agent 把循环块抽成
+    ``_ternary_match_branch_loop(...)`` 并调用它，却从没定义这个辅助函数——目标函数
+    确实变短、过了 span 检查，最后靠 pytest 花 ~1 分钟才报 NameError。此处 ast 级、
+    毫秒成本，在组合首位就先把这类"抽了没落地"的半成品毙掉。
+
+    解析范围刻意宽松（宁可漏报、绝不误杀——pytest 才是真兜底，本检查只图早毙）：
+    模块内任意 def/class/import 名 + 任意 Store 位置的名字 + 任意函数形参 + builtins。
+    只有『仅作 Load/Call 目标、模块任何处都没被定义/赋值/导入/入参』的名字才算未解析。
+    遇到 ``from x import *``（绑定无法静态推断）直接放行，避免误杀。
+    """
+    for node in ast.walk(tree):
+        if isinstance(node, ast.ImportFrom) and any(a.name == '*' for a in node.names):
+            return []
+
+    known = set(dir(builtins))
+    for node in ast.walk(tree):
+        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
+            known.add(node.name)
+            args = node.args
+            for arg in (*args.posonlyargs, *args.args, *args.kwonlyargs):
+                known.add(arg.arg)
+            if args.vararg:
+                known.add(args.vararg.arg)
+            if args.kwarg:
+                known.add(args.kwarg.arg)
+        elif isinstance(node, ast.ClassDef):
+            known.add(node.name)
+        elif isinstance(node, (ast.Import, ast.ImportFrom)):
+            for alias in node.names:
+                known.add((alias.asname or alias.name).split('.')[0])
+        elif isinstance(node, ast.Name) and isinstance(node.ctx, ast.Store):
+            known.add(node.id)
+
+    unresolved: List[str] = []
+    seen: set[str] = set()
+    for fn in (
+        n for n in ast.walk(tree) if isinstance(n, (ast.FunctionDef, ast.AsyncFunctionDef)) and n.name == func_name
+    ):
+        for node in ast.walk(fn):
+            if (
+                isinstance(node, ast.Call)
+                and isinstance(node.func, ast.Name)
+                and node.func.id not in known
+                and node.func.id not in seen
+            ):
+                seen.add(node.func.id)
+                unresolved.append(node.func.id)
+    return unresolved
+
+
 def make_shrink_oracle(rel_path: str, func_name: str, baseline_span: int) -> Callable[[str], OracleVerdict]:
     """任务感知 oracle（P3 第一块）：long_function 重构后目标函数必须真的变短。
 
@@ -354,6 +408,8 @@ def make_shrink_oracle(rel_path: str, func_name: str, baseline_span: int) -> Cal
     目标函数 94→125 行反而变长）会被通用 oracle 放行——通用 oracle 只判"不退化"，
     判不了"有改进"。本 oracle 零成本静态判改进，应放在组合首位先行短路。
     fail-closed：文件不可解析 / 目标函数消失（任务书要求行为不变、保留原名）一律拒绝。
+    变短之外还静态查『引用可解析』（见 `_unresolved_calls_in_function`）：抽了辅助函数
+    却没真正定义（2026-07-04 尝试 2 的死法）也当场拒绝，不必烧一整轮 pytest 才发现。
     """
 
     def oracle(workdir: str) -> OracleVerdict:
@@ -373,6 +429,14 @@ def make_shrink_oracle(rel_path: str, func_name: str, baseline_span: int) -> Cal
         span = max(spans)  # 同名多处取最长（保守）
         if span >= baseline_span:
             return OracleVerdict(False, f'{func_name} 未变短: {span} 行 ≥ 基线 {baseline_span} 行', {'span': span})
+        missing = _unresolved_calls_in_function(tree, func_name)
+        if missing:
+            names = ', '.join(missing[:3])
+            return OracleVerdict(
+                False,
+                f'{func_name} 调用了模块内解析不到的名字: {names}（fail-closed：抽取的辅助函数没真正定义/导入）',
+                {'span': span, 'unresolved': missing},
+            )
         return OracleVerdict(True, f'{func_name}: {baseline_span} → {span} 行', {'span': span})
 
     return oracle

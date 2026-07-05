@@ -41,6 +41,42 @@ def test_broken_file_rejected_fail_closed(tmp_path):
     assert not v.ok and '不可解析' in v.reason
 
 
+def test_calls_undefined_helper_rejected(tmp_path):
+    # 2026-07-04 尝试 2 回归钉：抽取的辅助函数被调用却从没定义——目标函数确实变短、
+    # 过了 span 检查，旧实现放行、靠 pytest 花 ~1 分钟才报 NameError。现在秒毙。
+    wd = _write(tmp_path, 'def big(x):\n    return _ternary_match_branch_loop(x)\n')
+    v = make_shrink_oracle('mod.py', 'big', 10)(wd)
+    assert not v.ok and '_ternary_match_branch_loop' in v.reason
+    assert v.report.get('unresolved') == ['_ternary_match_branch_loop']
+
+
+def test_calls_module_level_helper_passes(tmp_path):
+    # 抽取正确落地：辅助函数在模块级定义并被调用——放行（真变短 + 引用可解析）。
+    body = 'def _helper(x):\n    return x + 1\n\n\ndef big(x):\n    return _helper(x)\n'
+    wd = _write(tmp_path, body)
+    v = make_shrink_oracle('mod.py', 'big', 10)(wd)
+    assert v.ok and '10 → 2' in v.reason
+
+
+def test_calls_builtin_not_flagged(tmp_path):
+    # 防误杀：调用 builtins 不算未解析。
+    wd = _write(tmp_path, 'def big(xs):\n    return len(list(xs))\n')
+    assert make_shrink_oracle('mod.py', 'big', 10)(wd).ok
+
+
+def test_calls_local_binding_not_flagged(tmp_path):
+    # 防误杀：函数内绑定的名字（Store）可解析。
+    wd = _write(tmp_path, 'def big(x):\n    helper = abs\n    return helper(x)\n')
+    assert make_shrink_oracle('mod.py', 'big', 10)(wd).ok
+
+
+def test_star_import_skips_resolvability(tmp_path):
+    # 防误杀：from x import * 无法静态推断绑定，跳过引用检查（仍走变短判定）。
+    body = 'from os.path import *\n\n\ndef big(p):\n    return mystery_fn(p)\n'
+    wd = _write(tmp_path, body)
+    assert make_shrink_oracle('mod.py', 'big', 10)(wd).ok
+
+
 def test_pick_task_by_substring():
     tasks = [
         MinedTask('long_function', 'a/x.py', 1, 'huge_fn', detail='100 行'),
