@@ -128,6 +128,74 @@ def test_nested_function_sees_enclosing_locals(tmp_path):
     assert make_shrink_oracle('mod.py', 'big', 10)(wd).ok
 
 
+_BASELINE = (
+    'class C:\n'
+    '    @staticmethod\n'
+    '    def big(evaluator, args):\n'
+    '        """老文档。"""\n'
+    '        # 注释行\n'
+    '        if len(args) < 2:\n'
+    "            raise SanyanSyntaxError('需要值和至少一个分支')\n"
+    '        val = evaluator.eval(args[0])\n'
+    '        for i in range(0, len(val), 2):\n'
+    '            result = evaluator.eval(val[i])\n'
+    '        return result\n'
+)
+
+
+def test_rewrite_not_move_rejected(tmp_path):
+    # 0705 第二轮真候选回归钉：变短、引用可解析，但把校验条件/异常类型改写了——
+    # 守恒检查点名消失的原始行，毫秒毙，不再烧 pytest 才发现"重写而非搬运"。
+    new = (
+        'def _impl(evaluator, args):\n'
+        '    if len(args) % 2 != 0:\n'
+        "        raise ValueError('even required')\n"
+        '    val = evaluator.eval(args[0])\n'
+        '    for i in range(0, len(val), 2):\n'
+        '        result = evaluator.eval(val[i])\n'
+        '    return result\n'
+        '\n'
+        '\n'
+        'class C:\n'
+        '    @staticmethod\n'
+        '    def big(evaluator, args):\n'
+        '        return _impl(evaluator, args)\n'
+    )
+    wd = _write(tmp_path, new)
+    v = make_shrink_oracle('mod.py', 'big', 10, baseline_source=_BASELINE)(wd)
+    assert not v.ok and '重写而非搬运' in v.reason and 'SanyanSyntaxError' in v.reason
+    assert any('len(args) < 2' in ln for ln in v.report['missing_lines'])
+
+
+def test_true_move_passes_conservation(tmp_path):
+    # 纯搬运：原函数体每一行原样存活（缩进变了不算），docstring/注释重写不追责——放行。
+    new = (
+        'def _impl(evaluator, args):\n'
+        '    """新文档随便写。"""\n'
+        '    if len(args) < 2:\n'
+        "        raise SanyanSyntaxError('需要值和至少一个分支')\n"
+        '    val = evaluator.eval(args[0])\n'
+        '    for i in range(0, len(val), 2):\n'
+        '        result = evaluator.eval(val[i])\n'
+        '    return result\n'
+        '\n'
+        '\n'
+        'class C:\n'
+        '    @staticmethod\n'
+        '    def big(evaluator, args):\n'
+        '        return _impl(evaluator, args)\n'
+    )
+    wd = _write(tmp_path, new)
+    v = make_shrink_oracle('mod.py', 'big', 10, baseline_source=_BASELINE)(wd)
+    assert v.ok, v.reason
+
+
+def test_no_baseline_source_skips_conservation(tmp_path):
+    # 不传基线源码 → 守恒静默跳过（宽松方向），变短+可解析即放行。
+    wd = _write(tmp_path, 'def big(x):\n    return x\n')
+    assert make_shrink_oracle('mod.py', 'big', 10)(wd).ok
+
+
 def test_pick_task_by_substring():
     tasks = [
         MinedTask('long_function', 'a/x.py', 1, 'huge_fn', detail='100 行'),

@@ -449,22 +449,68 @@ def _unresolved_calls_in_function(tree: ast.Module, func_name: str) -> List[str]
     return unresolved
 
 
-def make_shrink_oracle(rel_path: str, func_name: str, baseline_span: int) -> Callable[[str], OracleVerdict]:
+def _function_body_lines(source: str, func_name: str) -> List[str]:
+    """基线文件里目标函数的『应守恒行』——纯搬运重构下每一行都该在新文件里原样存活。
+
+    取函数体源码行（跳过 def 行/装饰器/docstring），去注释与空行，strip 归一
+    （搬进辅助函数只改缩进），只留 ≥8 字符且含字母数字的行（短胶水行 reflow 不该
+    误杀）。解析失败/函数不存在返回空——守恒检查静默跳过（宽松方向）。
+    """
+    try:
+        tree = ast.parse(source)
+    except (SyntaxError, ValueError):
+        return []
+    fns = [n for n in ast.walk(tree) if isinstance(n, (ast.FunctionDef, ast.AsyncFunctionDef)) and n.name == func_name]
+    if not fns:
+        return []
+    fn = max(fns, key=lambda n: (getattr(n, 'end_lineno', None) or n.lineno) - n.lineno)
+    if not fn.body:
+        return []
+    first_stmt = fn.body[0]
+    start = first_stmt.lineno
+    if (
+        isinstance(first_stmt, ast.Expr)
+        and isinstance(first_stmt.value, ast.Constant)
+        and isinstance(first_stmt.value.value, str)
+    ):
+        start = (first_stmt.end_lineno or first_stmt.lineno) + 1  # docstring 改写不算改行为
+    lines = source.splitlines()
+    out: List[str] = []
+    for raw in lines[start - 1 : fn.end_lineno or fn.lineno]:
+        s = raw.strip()
+        if len(s) >= 8 and not s.startswith('#') and any(c.isalnum() for c in s):
+            out.append(s)
+    return out
+
+
+def make_shrink_oracle(
+    rel_path: str,
+    func_name: str,
+    baseline_span: int,
+    *,
+    baseline_source: Optional[str] = None,
+) -> Callable[[str], OracleVerdict]:
     """任务感知 oracle（P3 第一块）：long_function 重构后目标函数必须真的变短。
 
     P2 首跑实测：行为不变+测试全绿的"半成品重构"（辅助函数嵌套定义且未被调用、
     目标函数 94→125 行反而变长）会被通用 oracle 放行——通用 oracle 只判"不退化"，
     判不了"有改进"。本 oracle 零成本静态判改进，应放在组合首位先行短路。
     fail-closed：文件不可解析 / 目标函数消失（任务书要求行为不变、保留原名）一律拒绝。
-    变短之外还静态查『引用可解析』（见 `_unresolved_calls_in_function`）：抽了辅助函数
-    却没真正定义（2026-07-04 尝试 2 的死法）也当场拒绝，不必烧一整轮 pytest 才发现。
+    变短之外还有两道毫秒级静态闸：
+    - 『引用可解析』（`_unresolved_calls_in_function`）：抽了辅助函数却没真正落地
+      （07-04 未定义 / 07-05 定义成类方法裸名调用）当场拒，不烧 pytest；
+    - 『守恒检查』（`_function_body_lines`，需传 `baseline_source`）：0705 第二轮唯一
+      真候选死于**重写而非搬运**（校验条件被改写、异常类型被换）——纯搬运重构下原函数
+      体每一行都该在新文件里原样存活（缩进不计），消失的行按名列出，喂给带记忆重试。
     """
+    conserve = _function_body_lines(baseline_source, func_name) if baseline_source else []
 
     def oracle(workdir: str) -> OracleVerdict:
         fp = os.path.join(workdir, rel_path)
         try:
             with open(fp, encoding='utf-8', errors='replace') as f:
-                tree = ast.parse(f.read())
+                src = f.read()
+            tree = ast.parse(src)
         except (SyntaxError, ValueError, OSError) as e:
             return OracleVerdict(False, f'目标文件不可解析（fail-closed）: {e}')
         spans = [
@@ -485,6 +531,16 @@ def make_shrink_oracle(rel_path: str, func_name: str, baseline_span: int) -> Cal
                 f'{func_name} 调用了模块内解析不到的名字: {names}（fail-closed：抽取的辅助函数没真正定义/导入）',
                 {'span': span, 'unresolved': missing},
             )
+        if conserve:
+            new_lines = {ln.strip() for ln in src.splitlines()}
+            lost = [ln for ln in conserve if ln not in new_lines]
+            if lost:
+                shown = ' ⏎ '.join(lost[:3])
+                return OracleVerdict(
+                    False,
+                    f'{func_name} 重写而非搬运：{len(lost)} 行原始语句消失（守恒检查）: {shown}',
+                    {'span': span, 'missing_lines': lost[:10]},
+                )
         return OracleVerdict(True, f'{func_name}: {baseline_span} → {span} 行', {'span': span})
 
     return oracle

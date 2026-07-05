@@ -37,11 +37,13 @@ from agent_system.self_update import (  # noqa: E402
     tail_file,
 )
 
-# P2 十二轮探针的实战最优执行指引，统一追加到任务书尾
+# P2 十二轮探针 + 0705 两轮实跑的实战最优执行指引，统一追加到任务书尾
 _RUNBOOK = (
     ' 用 read_file 查看、replace_in_file 小步修改（每次 old 控制在 30 行内）；'
-    '不要自己运行完整测试套件、也不要用 run_shell 数行数/量函数长度（外部会验证与度量，'
-    '空转数行只会烧光轮次）；改完用 done 结束。'
+    '只搬不改：原函数的每一行原样搬进辅助函数或留在原地，不得改写/删除任何语句、'
+    '校验条件或异常类型（外部会逐行核对）；不要自己运行完整测试套件、不要用 run_shell '
+    '数行数/量函数长度，也不要用 run_shell/sed 读文件——读文件一律 read_file（外部会验证'
+    '与度量，空转只会烧光轮次）；改完用 done 结束。'
 )
 
 
@@ -66,6 +68,11 @@ def build_retry_feedback(reason: str) -> str:
         tip = (
             '你抽取了辅助函数却没定义它。这次分两步都落到文件：先用 write_file/replace 把这个'
             '辅助函数的完整定义加进模块（模块级、平级于原函数），再在原函数里调用它。'
+        )
+    elif '重写而非搬运' in reason or '守恒检查' in reason:
+        tip = (
+            '你改写了原有语句而不是搬运。上面列出的原始行必须原样保留（搬进辅助函数即可）——'
+            '不要改校验条件、异常类型、返回值或文案，只做纯粹的整块搬移 + 调用替换。'
         )
     elif '失败用例' in reason or '失败数' in reason or '收集/执行错误' in reason:
         tip = (
@@ -160,8 +167,16 @@ def main(argv=None) -> int:
 
     oracles = []
     if picked is not None and picked.kind == 'long_function':
-        # 任务感知 oracle 放首位：毫秒级静态检查先行短路，半成品重构不烧全量 pytest
-        oracles.append(make_shrink_oracle(picked.path, picked.title, int(picked.detail.split()[0])))
+        # 任务感知 oracle 放首位：毫秒级静态检查先行短路，半成品重构不烧全量 pytest。
+        # 基线源码给守恒检查（重写而非搬运当场毙）；读不到则守恒静默跳过、其余照跑。
+        try:
+            with open(os.path.join(ROOT, picked.path), encoding='utf-8', errors='replace') as f:
+                baseline_src = f.read()
+        except OSError:
+            baseline_src = None
+        oracles.append(
+            make_shrink_oracle(picked.path, picked.title, int(picked.detail.split()[0]), baseline_source=baseline_src)
+        )
     oracles.append(make_pytest_oracle(args.baseline, timeout=args.pytest_timeout))
     if not args.no_differential:
         oracles.append(make_differential_oracle())
