@@ -511,6 +511,7 @@ def make_shrink_oracle(
       体每一行都该在新文件里原样存活（缩进不计），消失的行按名列出，喂给带记忆重试。
     """
     conserve = _function_body_lines(baseline_source, func_name) if baseline_source else []
+    baseline_total_lines = len(baseline_source.splitlines()) if baseline_source else 0
     # 基线是否本就有嵌套 def：未知（无基线/解析失败）按"有"处理——病灶提示宁缺毋滥
     baseline_nested = True
     if baseline_source:
@@ -546,6 +547,12 @@ def make_shrink_oracle(
             # 目标函数体内，目标反而变长。点名病灶，纠偏才有的放矢（否则模型只知道"没变短"）。
             nested = not baseline_nested and _has_nested_def(fns)
             hint = '；辅助函数嵌套在目标函数内部——须定义在与原函数平级处才可能变短' if nested else ''
+            if not hint and baseline_total_lines:
+                # 大粘贴诊断（0706 第七轮尝试 3：+390/-0 整段重复贴入）：文件增长超过一个
+                # 目标函数的体量，"两步都做完"的药方不对症——病是重复粘贴，不是漏了替换。
+                grown = len(src.splitlines()) - baseline_total_lines
+                if grown > baseline_span:
+                    hint = f'；文件净增 {grown} 行（超过目标函数整体体量）——疑似整段重复粘贴'
             return OracleVerdict(
                 False, f'{func_name} 未变短: {span} 行 ≥ 基线 {baseline_span} 行{hint}', {'span': span}
             )

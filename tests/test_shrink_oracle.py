@@ -224,6 +224,23 @@ def test_nested_def_hint_suppressed_without_baseline(tmp_path):
     assert not v.ok and '未变短' in v.reason and '嵌套' not in v.reason
 
 
+def test_paste_dump_diagnosed(tmp_path):
+    # 0706 第七轮尝试 3 回归钉：+390/-0 整段重复粘贴——文件净增超过目标函数整体体量时
+    # 点名"疑似整段重复粘贴"，纠偏不再开"两步都做完"的错药。
+    dup = _PLAIN_BASELINE + '\n\n' + _PLAIN_BASELINE.replace('def big', 'def big_copy') * 3
+    wd = _write(tmp_path, dup)
+    v = make_shrink_oracle('mod.py', 'big', 4, baseline_source=_PLAIN_BASELINE)(wd)
+    assert not v.ok and '疑似整段重复粘贴' in v.reason
+
+
+def test_small_growth_not_flagged_as_paste(tmp_path):
+    # 正常插入一个辅助函数（净增 < 函数体量）不误报大粘贴——只报未变短走两步纠偏
+    new = 'def _h(x):\n    return x\n\n\n' + _PLAIN_BASELINE
+    wd = _write(tmp_path, new)
+    v = make_shrink_oracle('mod.py', 'big', 4, baseline_source=_PLAIN_BASELINE)(wd)
+    assert not v.ok and '未变短' in v.reason and '粘贴' not in v.reason
+
+
 def test_nested_def_hint_suppressed_when_baseline_had_nested(tmp_path):
     # 基线本就有嵌套 def → 不把既有结构误报成本次病灶
     baseline = 'def big(x):\n    def _old():\n        return 1\n\n    return _old() + x\n'
