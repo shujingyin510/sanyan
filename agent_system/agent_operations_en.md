@@ -52,7 +52,8 @@ python -X utf8 run_agent.py
 |------|------------|-------------|
 | `read_file` | `path\|start\|end` | Read file content |
 | `write_file` | `path\|content` | Write file |
-| `replace_in_file` | `path\|old\|new` | Replace in file |
+| `replace_in_file` | `path\|old\|new` | Replace in file (closest-match hint on miss) |
+| `replace_lines` | `path\|start\|end\|new` | Replace by line range (no verbatim copying) |
 | `replace_all` | `pattern\|old\|new` | Batch replace |
 | `list_files` | `pattern` | List files |
 | `analyze` | `path` | Analyze file structure |
@@ -185,14 +186,50 @@ python -X utf8 run_agent.py --evo-dashboard
 
 ```bash
 # File monitoring mode
-python -X utf8 agent_loop.py --watch
+python -X utf8 agent_system/agent_loop.py --watch
 
 # Continuous loop mode
-python -X utf8 agent_loop.py --continuous
+python -X utf8 agent_system/agent_loop.py --continuous
 
 # View stats and health
-python -X utf8 agent_loop.py --status
+python -X utf8 agent_system/agent_loop.py --status
 ```
+
+### Self-Update Loop Commands (north star: the agent safely iterates its own repo)
+
+```bash
+# List mined tasks (failing_test > todo > long_function)
+python -X utf8 agent_system/run_self_update.py --list
+
+# Pick a task by substring and run the loop (isolated worktree -> oracle -> branch for HUMAN merge)
+python -X utf8 agent_system/run_self_update.py --pick ternary_match --attempts 4
+
+# Custom task / feed failing-test source / tune oracle
+python -X utf8 agent_system/run_self_update.py --task "task text"
+python -X utf8 agent_system/run_self_update.py --pytest-log fail.log
+python -X utf8 agent_system/run_self_update.py --baseline 0 --pytest-timeout 900 --no-differential
+```
+
+| Item | Notes |
+|---|---|
+| Exit codes | `0`=candidate accepted (branch printed); `1`=all attempts rejected; `2`=`--pick` missed |
+| Pre-flight | clean `git status`, no leftover `self-update/*` branches, single worktree |
+| Red lines | oracle files (tests/, self_update.py, ...) are outside the agent's write reach; **never auto-merge** |
+| Oracle stack | static shrink gauntlet (shrink -> nested-def/paste diagnosis -> name resolvability -> line conservation) -> pytest baseline -> differential |
+| Retry memory | every rejection is classified into corrective feedback for the next attempt (up to two lessons) |
+| Autopsy | rejected diff+stat logged to `%TEMP%/sanyan-su-agent-<ts>.log` before rollback |
+
+Self-update env vars (set by the CLI, inherited by the agent subprocess):
+
+| Var | Value | Meaning |
+|---|---|---|
+| `SANYAN_LOOP_TIME_BUDGET` | 900 | main-loop wall budget in seconds (default 420) |
+| `SANYAN_TOOL_REPEAT_LIMIT` | 10 | per-tool call cap (default 5) |
+| `SANYAN_REQUIRE_EDIT` | 1 | zero-edit done pushback + wander nudge |
+| `SANYAN_SKIP_RULE_GEN` | 1 | skip rule-generation prelude |
+
+See `agent_system/REFACTOR_PLAN.md` for the P0-P5 progress log and the S0-S6 forward
+roadmap (autopsy workflow, failure-vs-countermeasure table).
 
 ---
 

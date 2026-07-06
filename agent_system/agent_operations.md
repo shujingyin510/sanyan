@@ -52,7 +52,8 @@ python -X utf8 run_agent.py
 |------|------|------|
 | `read_file` | `path\|start\|end` | 读取文件内容 |
 | `write_file` | `path\|content` | 写入文件 |
-| `replace_in_file` | `path\|old\|new` | 替换文件内容 |
+| `replace_in_file` | `path\|old\|new` | 替换文件内容（未命中附最接近原文） |
+| `replace_lines` | `path\|start\|end\|new` | 按行号整段替换（无需逐字抄原文） |
 | `replace_all` | `pattern\|old\|new` | 批量替换 |
 | `list_files` | `pattern` | 列出文件 |
 | `analyze` | `path` | 分析文件结构 |
@@ -185,14 +186,50 @@ python -X utf8 run_agent.py --evo-dashboard
 
 ```bash
 # 文件监控模式
-python -X utf8 agent_loop.py --watch
+python -X utf8 agent_system/agent_loop.py --watch
 
 # 连续循环模式
-python -X utf8 agent_loop.py --continuous
+python -X utf8 agent_system/agent_loop.py --continuous
 
 # 查看统计和健康状态
-python -X utf8 agent_loop.py --status
+python -X utf8 agent_system/agent_loop.py --status
 ```
+
+### 自更新闭环命令（北极星：agent 安全迭代自己的代码）
+
+```bash
+# 列出挖掘到的任务榜（failing_test > todo > long_function）
+python -X utf8 agent_system/run_self_update.py --list
+
+# 按子串挑任务跑闭环（隔离 worktree → oracle → 产出分支由人合并）
+python -X utf8 agent_system/run_self_update.py --pick ternary_match --attempts 4
+
+# 自定义任务书 / 喂失败测试来源 / 调 oracle 参数
+python -X utf8 agent_system/run_self_update.py --task "任务书"
+python -X utf8 agent_system/run_self_update.py --pytest-log fail.log
+python -X utf8 agent_system/run_self_update.py --baseline 0 --pytest-timeout 900 --no-differential
+```
+
+| 项 | 说明 |
+|---|---|
+| 退出码 | `0`=有候选被接受（打印分支名）；`1`=尝试耗尽全拒；`2`=`--pick` 未命中 |
+| 跑前检查 | `git status` 干净、无残留 `self-update/*` 分支、`git worktree list` 只有主树 |
+| 红线 | oracle（tests/、self_update.py 等考官域）在 agent 写权限外；**绝不自动合并** |
+| oracle 栈 | shrink 静态四连闸（变短→嵌套/大粘贴诊断→引用可解析→守恒）→ pytest 基线 → 差分 |
+| 带记忆重试 | 每次拒绝分类成对症纠偏塞回下一轮任务书（最多带两课） |
+| 尸检 | 被拒 diff+stat 回滚前落 `%TEMP%/sanyan-su-agent-<时间戳>.log` |
+
+自更新专用环境变量（CLI 自动设置、经 agent 子进程继承）：
+
+| 变量 | 值 | 语义 |
+|---|---|---|
+| `SANYAN_LOOP_TIME_BUDGET` | 900 | 主循环总预算秒（默认 420） |
+| `SANYAN_TOOL_REPEAT_LIMIT` | 10 | 同工具调用上限（默认 5） |
+| `SANYAN_REQUIRE_EDIT` | 1 | 零改动 done 顶回 + 徘徊顶推 |
+| `SANYAN_SKIP_RULE_GEN` | 1 | 跳过规则生成前奏 |
+
+详见 `agent_system/REFACTOR_PLAN.md`（P0-P5 进度日志 + S0-S6 前瞻规划，含尸检工作流
+与死法↔反制对照表）。
 
 ---
 

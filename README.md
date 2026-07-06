@@ -525,6 +525,7 @@ tests/
 | **失败分类** | 6 类 FailureMode（空/缺/格式/超时/逻辑/循环），精准重试 |
 | **安全沙箱** | 命令黑名单/白名单、文件系统守卫、只读模式、审计日志 |
 | **多提供商** | DeepSeek / OpenAI / Anthropic / Gemini / Qwen / GLM / Moonshot / SiliconFlow / OpenRouter 九家 |
+| **自更新闭环** | agent 在隔离 worktree 改本仓库，fail-closed oracle 把关（静态四连闸+pytest+差分），产出分支由人合并——见 `agent_system/REFACTOR_PLAN.md` |
 
 使用方式：
 
@@ -579,13 +580,13 @@ python -X utf8 agent_system/run_agent.py --review-evolve
 
 ```bash
 # 文件监控模式
-python -X utf8 agent_loop.py --watch
+python -X utf8 agent_system/agent_loop.py --watch
 
 # 连续循环模式
-python -X utf8 agent_loop.py --continuous
+python -X utf8 agent_system/agent_loop.py --continuous
 
 # 查看统计和健康状态
-python -X utf8 agent_loop.py --status
+python -X utf8 agent_system/agent_loop.py --status
 ```
 
 交互模式命令：
@@ -679,54 +680,36 @@ sanyan/
 ├── core/ternary_core.py            # 平衡三进制算术（模拟）
 ├── core/values.py                  # 值类型 + 异常体系
 ├── vm/__init__.py                      # 字节码 VM（自举能力）
-├── agent_system/              # Agent 系统（Python 运行时 + Sanyan DSL）
-│   ├── __init__.py
-│   ├── README.md              # Agent 文档
-│   ├── agent_core/runtime.py       # Agent V5 引擎
-│   ├── agent_tools.py         # Agent V5 工具层
-│   ├── agent_tool_graph.py    # 工具依赖图 + 能力注册 + 工具元数据 + 自发现
-│   ├── agent_decompose.py     # Phase 0: 任务分解
-│   ├── agent_hypothesis.py    # Phase 1: 多假设 + 锦标赛
-│   ├── agent_resource.py      # Phase 2: 资源管控
-│   ├── agent_project.py       # 项目引擎: 分解→执行→验证→重试
-│   ├── agent_context.py       # 智能上下文压缩（分层摘要+滑动窗口+重要性评分）
-│   ├── agent_experience.py    # 经验库: 跨任务 pattern 匹配 + AVOID 提示
-│   ├── agent_parallel.py      # 并行执行引擎（工具链并行+假设并行验证）
-│   ├── agent_core/sandbox.py       # 安全沙箱（命令过滤+文件系统守卫+审计日志）
-│   ├── agent_learning.py      # 跨会话学习（SQLite持久化+失败模式库+自适应选择）
-│   ├── agent_obs.py           # 可观测性（决策追踪+性能分析+仪表盘）
-│   ├── agent_streaming.py     # 流式响应（LLM边生成边显示+可中断）
-│   ├── agent_composition.py   # 高阶工具组合（管道+复合工具+条件链）
-│   ├── agent_shared.py        # 多Agent共享上下文（共享空间+符号表+协调器）
-│   ├── agent_strategy.py      # Layer 1: 策略自优化（Prompt进化+Tool学习+策略切换+A/B）
-│   ├── agent_loop.py          # Layer 2: 自主循环（文件监控+连续循环+健康监控）
-│   ├── agent_loop_monitor.py  # Layer 2: 循环监控（日志+统计+健康+回滚验证）
-│   ├── agent_evolution.py     # Layer 3: 约束进化（接口不变+差分验证+多目标评估）
-│   ├── agent_evolution_v2.py  # Layer 3: Patch DSL + Mutation Budget + 三态评分 + Tournament
-│   ├── agent_review.py        # Layer 4: Reviewer Agent（独立代码审查+对抗补丁检测）
-│   ├── agent_benchmark.py     # Layer 4: Real Benchmark（真实基准测试）
-│   ├── agent_dashboard.py     # Layer 4: Evolution Dashboard（进化仪表盘）
-│   ├── agent_test_gen.py      # Layer 4: Test Generator（测试用例生成）
-│   ├── agent_validation.py    # Layer 4: Evolution Validation（100次随机+收敛+Reviewer）
-│   ├── agent_stress.py        # Layer 4: Evolution Stress Test（长期稳定性+退化测试）
-│   ├── agent_knowledge.py     # Layer 5: Knowledge Layer（TaskClassifier+TaskEmbedding+ClusterLearning）
-│   ├── agent_knowledge_confidence.py # Layer 5: Knowledge Confidence（知识置信度计算）
-│   ├── agent_generalization.py # Layer 5: Knowledge Generalization（知识泛化验证）
-│   ├── agent_causal_chain.py  # Layer 5: Causal Chain（因果链闭环验证）
-│   ├── agent_meta_knowledge.py # Layer 5: Meta-Knowledge Transfer（元知识迁移）
-│   ├── agent_param_importance.py # Layer 5: Parameter Importance Ranking + StrategySchema
-│   ├── agent_cost_aware.py    # Layer 5: Cost-Aware Evolution（收益/成本感知+UCB）
-│   ├── agent_task_taxonomy.py # Layer 5: Task Taxonomy（任务分类+MetaLearningDB）
-│   ├── agent_knowledge_validation.py # Layer 5: Knowledge Validation（知识分化验证）
-│   └── sanyan/                 # Sanyan 语言实现（Agent DSL）
-│       ├── agent.san           # Agent 核心逻辑（决策函数、记忆、追踪）
-│       ├── agent_policy.san    # 纯数据策略（配置、阈值、映射规则）
-│       ├── decision.san        # 决策核心（信任感知规则匹配）
-│       ├── memory.json         # Agent 记忆持久化
-│       └── runtime_v2/         # V2 运行时
-│           ├── village_game.san
-│           ├── npc_game.san
-│           └── ...
+├── agent_system/              # Agent 系统（运行时 + 自更新闭环 + Sanyan DSL）
+│   ├── run_agent.py           # Agent CLI 入口（交互/单次/自主/沙箱/进化）
+│   ├── run_self_update.py     # 自更新闭环 CLI（挖掘→隔离编辑→oracle→分支由人合并）
+│   ├── agent_loop.py          # 自主循环（文件监控+连续循环+健康监控）
+│   ├── agent_runtime.py       # 主运行时（工具注册/约束限额/子系统协调）
+│   ├── loop.py                # LLM 多轮主循环（时间预算/徘徊顶推/哨兵/停机如实）
+│   ├── loop_policy.py         # 循环策略（UR 退化/上下文判定）
+│   ├── agent_llm_handler.py   # LLM 调用（9 家提供商）+ 工具解析（五级兜底）
+│   ├── agent_tools.py         # 工具层（read/replace/replace_lines/run_test 等纯函数）
+│   ├── agent_core.py          # 基础类（SymbolTable/MemoryStore/ProjectGraph）
+│   ├── self_update.py         # SelfUpdateLoop：worktree 隔离→fail-closed oracle→分支/回滚
+│   ├── task_mining.py         # 任务挖掘（failing_test/todo/long_function）
+│   ├── contracts.py           # ToolResult / LLMProvider 类型契约
+│   ├── registry.py            # LazyRegistry 能力懒加载
+│   ├── paths.py / store.py    # 数据目录统一（AGENT_DATA_DIR）/ 单一 agent.db
+│   ├── config.py              # AgentConfig（agent_policy.san 热重载）
+│   ├── agent_domain.py        # 领域知识层（LLM 动态生成 + SQLite 缓存）
+│   ├── agent_rules.py         # 规则引擎（200+ 规则）
+│   ├── template_manager.py    # 模板管理器（11 个模板库） + templates/
+│   ├── ast_parser.py          # AST 解析器（精准上下文）
+│   ├── ur_monitor.py          # UR 退化检测
+│   ├── …                      # 30+ 能力插件（假设/进化/学习/协作/观测/知识层，懒加载）
+│   ├── sanyan/                # Sanyan 语言实现（Agent DSL）
+│   │   ├── agent.san          # Agent 核心逻辑（决策函数、记忆、追踪）
+│   │   ├── agent_policy.san   # 纯数据策略（配置、阈值、映射规则）
+│   │   ├── decision.san       # 决策核心（信任感知规则匹配）
+│   │   └── runtime_v2/        # V2 运行时（village_game.san / npc_game.san / …）
+│   ├── README.md / README_EN.md            # Agent 文档（中/英）
+│   ├── agent_operations.md / _en.md        # 操作手册（中/英）
+│   └── REFACTOR_PLAN.md       # 北极星路线（P0-P5 进度日志 + S0-S6 前瞻规划）
 ├── sugar/                     # 糖语法转换器
 │   ├── __init__.py
 │   ├── errors.py

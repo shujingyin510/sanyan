@@ -270,6 +270,19 @@ sanyan/
 │   ├── runtime.c              # C runtime library
 │   └── type_mapping.py        # Type mapping & runtime function specs
 ├── ops/                       # Built-in operations (30 modules)
+├── agent_system/              # Agent system (runtime + self-update loop + Sanyan DSL)
+│   ├── run_agent.py           # Agent CLI (interactive / one-shot / autonomous / sandbox)
+│   ├── run_self_update.py     # Self-update CLI (mine task → isolated edit → oracle → branch for human merge)
+│   ├── agent_runtime.py       # Main runtime (tool registry / constraints / coordination)
+│   ├── loop.py                # LLM main loop (time budget / wander nudge / sentinel / honest stop)
+│   ├── agent_llm_handler.py   # LLM calls (9 providers) + tool parsing (5-level fallback)
+│   ├── agent_tools.py         # Tool layer (read/replace/replace_lines/run_test, pure functions)
+│   ├── self_update.py         # SelfUpdateLoop: worktree isolation → fail-closed oracle → branch/rollback
+│   ├── task_mining.py         # Task mining (failing_test / todo / long_function)
+│   ├── contracts.py / registry.py / paths.py / store.py   # Typed seams / lazy registry / data dir / agent.db
+│   ├── …                      # 30+ capability plugins (hypothesis/evolution/learning/knowledge, lazy-loaded)
+│   ├── sanyan/                # Sanyan-side DSL (agent.san / agent_policy.san / decision.san / runtime_v2/)
+│   └── REFACTOR_PLAN.md       # North-star roadmap (P0-P5 progress log + S0-S6 forward plan)
 ├── lsp/                       # Language server protocol
 ├── csrc/                      # C VM (52 instructions, with #include preprocessing)
 │   ├── runtime.c              # VM implementation

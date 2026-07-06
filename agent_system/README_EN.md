@@ -9,19 +9,23 @@
 ## Quick Start
 
 ```bash
-set SANYAN_API_KEY=sk-your-key
+set SANYAN_API_KEY=sk-your-key     # key lives in env only, never in source
 
-# Single question
-python -X utf8 run_agent.py "analyze run_agent.py"
+# Single question (from repo root)
+python -X utf8 agent_system/run_agent.py "analyze run_agent.py"
 # → ⚠ >50行: init_evaluator, run_once, main, _analyze_file
 
 # Autonomous (read → modify → test → fix → loop)
-python -X utf8 run_agent.py "fix _test_verify.py so tests pass" --auto
+python -X utf8 agent_system/run_agent.py "fix _test_verify.py so tests pass" --auto
 # → [AFFIRM]→真 ●●● [0.81] → fixed
 
 # Dry-run (preview only)
-python -X utf8 run_agent.py "replace v0.3 with v0.4" --dry-run
+python -X utf8 agent_system/run_agent.py "replace v0.3 with v0.4" --dry-run
 # → [干跑] would replace in AGENTS.md
+
+# Self-update loop (agent edits this repo in an isolated worktree; oracle gates;
+# accepted work becomes a branch for HUMAN merge — never auto-merged)
+python -X utf8 agent_system/run_self_update.py --pick ternary_match --attempts 4
 ```
 
 ---
@@ -83,17 +87,29 @@ User Task
 | `agent_hypothesis.py` | Multi-hypothesis + diversity control + tournament + failure classification + adaptive threshold | P2+P3+P4+P8 |
 | `agent_resource.py` | Unified resource management + semantic cache + observability + cost prediction + replay | P5+P7+P10+P11 |
 | `agent_runtime.py` | V5 runtime (full Phase 0/1/2 integration) | — |
-| `agent_tools.py` | Tool layer (12 pure functions, zero dependencies) | — |
+| `agent_tools.py` | Tool layer (pure functions, zero dependencies) | — |
 | `agent_policy.san` | Policy config (model / thresholds / rules, hot-reload) | — |
+| `loop.py` | LLM main loop (time budget, wander-nudge, LLM sentinel, honest stop reasons) | P3 |
+| `self_update.py` | `SelfUpdateLoop`: worktree isolation → fail-closed oracle → branch/rollback; oracle factories (static shrink gauntlet / pytest baseline / differential) | P1-P3 |
+| `run_self_update.py` | Self-update CLI: task mining → retry with classified corrective feedback → autopsy logging | P2-P3 |
+| `task_mining.py` | Task mining (failing_test / todo / long_function with static block hints) | P2 |
+| `contracts.py` / `registry.py` / `paths.py` / `store.py` | Typed seams / lazy capability registry / unified data dir (`AGENT_DATA_DIR`) / single `agent.db` | Phase 0-2 |
 
 ## Test Coverage
 
-| Module | Test File | Count |
-|--------|-----------|-------|
-| Agent decisions | `test_agent.py` | 31 |
-| AgentRuntime V5 | `test_agent_runtime.py` | 39 |
-| Agent V5 new modules | `test_agent_v5.py` | 158 |
-| **Total** | | **228** |
+| Scope | Test File |
+|--------|-----------|
+| Decision engine / ternary propagation | `test_agent.py` |
+| Runtime (tool parsing / constraints) | `test_agent_runtime.py` |
+| V5 modules (decompose / hypothesis / resource) | `test_agent_v5.py` |
+| LLM main loop (budget / nudge / sentinel) | `test_loop.py` |
+| Self-update loop (isolation / rollback) | `test_self_update.py` |
+| Oracle static gauntlet | `test_shrink_oracle.py` |
+| Self-update CLI (retry / feedback / autopsy) | `test_selfupdate_cli.py` |
+| Task mining | `test_task_mining.py` |
+| Learning store | `test_learning_store.py` |
+
+Agent-line total: **321 tests** (2026-07-06; full repo suite 2554 passed via `pytest tests/`).
 
 ## Tools
 
@@ -103,7 +119,8 @@ User Task
 | `find_symbol` | Symbol definition + references | `symbol_name` |
 | `read_file` | Read file with line range | `path\|start\|end` |
 | `search_code` | Global keyword search | `keyword` |
-| `replace_in_file` | Single file replace | `path\|old\|new` |
+| `replace_in_file` | Single file replace (closest-match hint on miss) | `path\|old\|new` |
+| `replace_lines` | Replace by line range (no verbatim copying needed) | `path\|start\|end\|new` |
 | `replace_all` | Batch cross-file replace | `pattern\|old\|new` |
 | `write_file` | Write file | `path\|content` |
 | `list_files` | List files recursively | `pattern` |
@@ -114,13 +131,31 @@ User Task
 ## CLI
 
 ```bash
-python -X utf8 run_agent.py "task"              # Single-shot (V3 engine)
-python -X utf8 run_agent.py                      # Interactive (V5 engine)
-python -X utf8 run_agent.py "task" --auto        # Autonomous
-python -X utf8 run_agent.py "task" --dry-run     # Read-only preview
-python -X utf8 run_agent.py "task" --report      # Task report
-python -X utf8 run_agent.py "task" --rounds 5    # Max rounds
-python -X utf8 run_agent.py --list-tasks          # Task history
+python -X utf8 agent_system/run_agent.py "task"           # Single-shot (V3 engine)
+python -X utf8 agent_system/run_agent.py                  # Interactive (V5 engine)
+python -X utf8 agent_system/run_agent.py "task" --auto    # Autonomous
+python -X utf8 agent_system/run_agent.py "task" --dry-run # Read-only preview
+python -X utf8 agent_system/run_agent.py "task" --report  # Task report
+python -X utf8 agent_system/run_agent.py "task" --rounds 5 # Max rounds
+python -X utf8 agent_system/run_agent.py --list-tasks     # Task history
+```
+
+## Self-Update Loop (north star)
+
+The agent edits this very repo inside an **isolated git worktree**; a fail-closed oracle
+stack gates every candidate. Accepted → a `self-update/<name>-<ts>` branch for **human
+merge** (never auto-merged); rejected → full rollback, zero residue. Oracle order (each
+gate short-circuits, static gates are millisecond-level): function-must-shrink →
+nested-def / paste-dump diagnosis → scope-aware name resolvability → line-conservation
+("move, don't rewrite") → full pytest baseline (with failing test names) → differential
+consistency. Every rejection is classified into corrective feedback for the next attempt
+(up to two lessons carried). See [REFACTOR_PLAN.md](REFACTOR_PLAN.md) for the P0-P5
+progress log and the S0-S6 forward roadmap (maintained as a handoff-grade document).
+
+```bash
+python -X utf8 agent_system/run_self_update.py --list
+python -X utf8 agent_system/run_self_update.py --pick ternary_match --attempts 4
+# EXIT: 0=candidate accepted (branch printed)  1=all attempts rejected  2=--pick missed
 ```
 
 ## Setup
@@ -131,7 +166,7 @@ python -X utf8 run_agent.py --list-tasks          # Task history
 设 最大轮次 = 10
 ```
 
-Supports 7 providers: DeepSeek, OpenAI, Qwen, Gemini, MIMO, TokenPlan, Ollama.
+Supports 9 providers: DeepSeek, OpenAI, Anthropic, Gemini, Qwen, GLM, Moonshot, SiliconFlow, OpenRouter.
 
 ## Ternary Display
 
@@ -144,7 +179,7 @@ Supports 7 providers: DeepSeek, OpenAI, Qwen, Gemini, MIMO, TokenPlan, Ollama.
 ## Village Observer
 
 ```bash
-python -X utf8 run_village_observe.py --days=5
+python -X utf8 examples/run_village_observe.py --days=5
 ```
 
 NPC life + LLM dialogue + TernaryEngine trust tracking + SVG charts.
