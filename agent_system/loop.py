@@ -75,6 +75,10 @@ def run_legacy(rt, task, max_rounds, dry_run):
     t_start = _time.time()
     llm_consecutive_fails = 0
     step_duration_last = 0.0
+    nudged = False
+    # 停机原因如实上报：旧实现所有 break 都落到"已达N轮"——0706 实跑三次面板全谎报
+    # （实际分别死于 900s 预算、UR 退化×2），尸检被误导两回。
+    stop = ''
     rt.memory['failures'] = rt.memory.get('failures', 0)
 
     for rnd in range(1, max_rounds + 1):
@@ -82,6 +86,7 @@ def run_legacy(rt, task, max_rounds, dry_run):
         if rnd >= 2:
             recent = [str(h.get('result', ''))[:80] for h in rt.memory.get('history', [])[-4:] if 'result' in h]
             if results_degenerate(recent):
+                stop = f'连续{len(recent)}轮相同输出，退化停止'
                 print(f'  [UR] 连续{len(recent)}轮相同输出 → 退化，强制停止')
                 break
 
@@ -95,23 +100,32 @@ def run_legacy(rt, task, max_rounds, dry_run):
             budget = 420  # 环境值损坏 → 回默认，护杀不失效
         total_elapsed = _time.time() - t_start
         if total_elapsed > budget:
+            stop = f'总执行时间超过{budget}秒'
             print(f'  [TIMEOUT] 总执行时间超过{budget}秒，强制退出')
             rt.memory['failures'] += 1
             break
         if rnd > 1 and step_duration_last > 60:
+            stop = f'单步耗时{step_duration_last:.0f}秒超限'
             print(f'  [TIMEOUT] 单步耗时{step_duration_last:.0f}秒，强制退出')
             rt.memory['failures'] += 1
             break
 
         # ── 徘徊顶推（自更新场景，一次性）──
         # 0705 第二轮实录：预算修好后模型 15 轮全在读/搜索（同一段 read_file 反复读了
-        # 三遍），一次编辑不做。过半仍零改动就顶推一把：停止阅读、现在动手。
-        if rnd == max_rounds // 2 + 1 and os.environ.get('SANYAN_REQUIRE_EDIT') and not rt.memory.get('modified'):
+        # 三遍），一次编辑不做。轮次过半**或时间过半**仍零改动就顶推一把（0706 实录：
+        # 代理风暴下轮次走得慢，固定第 8 轮常来不及——预算先烧完）。
+        if (
+            not nudged
+            and os.environ.get('SANYAN_REQUIRE_EDIT')
+            and not rt.memory.get('modified')
+            and (rnd > max_rounds // 2 or total_elapsed > budget / 2)
+        ):
+            nudged = True
             print('  [UR] 过半仍零改动 → 顶推：停止阅读，现在动手改文件')
             ctx = rt._build_context(
-                f'已用掉一半轮次但还没有任何文件修改。停止继续阅读/搜索——你已经看过目标代码了。'
+                f'已用掉一半预算但还没有任何文件修改。停止继续阅读/搜索——你已经看过目标代码了。'
                 f'现在就用 replace_lines 或 replace_in_file 对目标文件做出第一处修改'
-                f'（小步即可，外部会验证）。原任务：{task}',
+                f'（任务书若给了候选块行区间，直接对它动手；小步即可，外部会验证）。原任务：{task}',
                 'init',
             )
 
@@ -122,11 +136,18 @@ def run_legacy(rt, task, max_rounds, dry_run):
         # ── LLM 调用 ──
         try:
             raw = rt._llm_call(ctx)
+            if isinstance(raw, str) and raw.startswith('error|'):
+                # 句柄级彻底失败以哨兵串返回（error|LLM调用失败(3次重试)…），不是模型输出。
+                # 曾被当普通文本流进解析：变成幻影 error"工具"烧轮，重复错误文案还把 UR
+                # 退化检测毒成早夭（0706 实录 UR=0.45/0.47 在 r5-6 强停、顶推没活到）。
+                # 转异常走下方既有失败路径：计连败、快中止、不进 llm_outputs。
+                raise RuntimeError(raw[6:][:160] or 'LLM调用失败')
             # ═══ UR 退化检测：在 LLM 文本输出上计算 ═══
             llm_history = rt.memory.setdefault('llm_outputs', [])
             llm_history.append(str(raw)[:200])  # 取前200字符
             ur = llm_output_ur(llm_history)
             if ur is not None:
+                stop = f'LLM输出退化 (UR={ur:.2f})'
                 print(f'  [UR] LLM输出退化 (UR={ur:.2f})，强制停止')
                 rt.memory['failures'] += 1
                 break
@@ -134,6 +155,7 @@ def run_legacy(rt, task, max_rounds, dry_run):
             llm_consecutive_fails += 1
             print(f'  [LLM] 调用失败 (r={rnd}): {e}')
             if llm_consecutive_fails >= 3:
+                stop = f'LLM连续{llm_consecutive_fails}次调用失败'
                 print(f'  [LLM] 连续{llm_consecutive_fails}次调用失败，退出')
                 rt.memory['failures'] += 1
                 break
@@ -152,6 +174,7 @@ def run_legacy(rt, task, max_rounds, dry_run):
         if rt._fail_closed(tool, params, dry_run):
             continue
         if rt._constraint_violation(tool):
+            stop = f'约束违规停止（{tool}）'
             break
         result = ''
         if tool in rt.tools:
@@ -184,6 +207,7 @@ def run_legacy(rt, task, max_rounds, dry_run):
             rt.tool_selector.record_outcome(task, tool, trit == 1, step_duration)
 
             if gate['action'] == 'block':
+                stop = f'三态门阻断: {gate.get("reason", "")}'
                 break
             if tool in ('write_file', 'replace_in_file', 'replace_lines', 'replace_all') and cog == 'AFFIRM':
                 # 只在本步认知为 AFFIRM（真落盘：已替换/已写入）时记改动。失败的替换
@@ -233,4 +257,4 @@ def run_legacy(rt, task, max_rounds, dry_run):
                 ctx = rt._reflect(f'测试失败:\n{str(result)[:500]}', ctx)
                 continue
         ctx = rt._build_context(params, tool, result)
-    return {'answer': f'已达{max_rounds}轮', 'memory': rt.memory}
+    return {'answer': stop or f'已达{max_rounds}轮', 'memory': rt.memory}

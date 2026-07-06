@@ -84,7 +84,7 @@ def test_generated_rule_with_zero_modification_falls_through_to_loop():
     rule = types.SimpleNamespace(name='garbage-rule', steps=[], validation=None)
     rt = _RuleGenRt(rule)
     r = run_legacy(rt, '重构某函数', 3, dry_run=False)
-    assert r['answer'] == '已达3轮'  # 进了 LLM 循环（此处假 LLM 连败退出），而非规则结果
+    assert r['answer'] == 'LLM连续3次调用失败'  # 进了 LLM 循环（假 LLM 连败退出，停机原因如实）
     assert '按规则' not in r['answer']
     assert rt.memory['modified'] == []
 
@@ -102,7 +102,7 @@ def test_skip_rule_gen_env_bypasses_generation(monkeypatch):
     rt = _RuleGenRt(types.SimpleNamespace(name='x', steps=[], validation=None))
     rt.rule_engine.generate_rule = _boom
     r = run_legacy(rt, '重构某函数', 3, dry_run=False)
-    assert r['answer'] == '已达3轮'  # 未触发 _boom，直接进循环（假 LLM 连败退出）
+    assert r['answer'] == 'LLM连续3次调用失败'  # 未触发 _boom，直接进循环（假 LLM 连败退出）
 
 
 def test_generated_rule_with_dict_args_does_not_crash():
@@ -117,7 +117,7 @@ def test_generated_rule_with_dict_args_does_not_crash():
     )
     rt = _RuleGenRt(rule, tools={'read_file': lambda p, d: f'content of {p}'})
     r = run_legacy(rt, '重构某函数', 3, dry_run=False)
-    assert r['answer'] == '已达3轮'  # 不崩溃, 零改动回退循环（假LLM连败退出）
+    assert r['answer'] == 'LLM连续3次调用失败'  # 不崩溃, 零改动回退循环（假LLM连败退出）
 
 
 def test_generated_rule_with_real_modification_returns_rule_result():
@@ -273,9 +273,35 @@ def test_loop_time_budget_env_tunable(monkeypatch):
     monkeypatch.delenv('SANYAN_REQUIRE_EDIT', raising=False)
     monkeypatch.setenv('SANYAN_LOOP_TIME_BUDGET', '-1')
     rt = _LoopRt(script=[('done', '答案')])
-    run_legacy(rt, '任务', 6, dry_run=False)
+    r = run_legacy(rt, '任务', 6, dry_run=False)
     assert rt.memory['failures'] == 1
     assert len(rt._script) == 1  # 脚本没被消费 → 没进过 LLM 轮
+    assert '总执行时间超过' in r['answer']  # 停机原因如实（不再谎报"已达6轮"）
+
+
+def test_llm_error_sentinel_counts_as_failure(monkeypatch):
+    # 0706 实录：LLM 句柄彻底失败返回哨兵串 error|LLM调用失败(3次重试)…，曾被当普通
+    # 文本流进解析——幻影 error"工具"烧轮、重复错误文案把 UR 退化检测毒成 r5-6 早夭。
+    # 现在转异常走既有失败路径：计连败、三次即快中止、不进 llm_outputs/history。
+    from agent_system.loop import run_legacy
+
+    monkeypatch.delenv('SANYAN_REQUIRE_EDIT', raising=False)
+    rt = _LoopRt(script=['error|LLM调用失败(3次重试): TimeoutError'])  # 耗尽后重复 → 三连败
+    r = run_legacy(rt, '任务', 8, dry_run=False)
+    assert r['answer'] == 'LLM连续3次调用失败'  # 快中止 + 停机原因如实（不再谎报"已达8轮"）
+    assert rt.memory.get('llm_outputs', []) == []  # 哨兵不进 UR 历史，不再毒退化检测
+    assert rt.memory['history'] == []  # 无幻影 error 工具轮
+    assert rt.memory['failures'] == 1
+
+
+def test_llm_error_sentinel_single_flake_recovers(monkeypatch):
+    # 单次抖动不致命：哨兵一次 → 计连败 1，下一轮成功即复位，任务照常收工
+    from agent_system.loop import run_legacy
+
+    monkeypatch.delenv('SANYAN_REQUIRE_EDIT', raising=False)
+    rt = _LoopRt(script=['error|LLM调用失败(3次重试): flake', ('done', '答案')])
+    r = run_legacy(rt, '问个问题', 8, dry_run=False)
+    assert r['answer'] == '答案'  # 哨兵一次不致命，下一轮成功照常收工（连败计数已复位）
 
 
 def test_loop_time_budget_garbage_falls_back(monkeypatch):
