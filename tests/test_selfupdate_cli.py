@@ -68,7 +68,9 @@ def test_build_retry_feedback_classifies():
     assert '辅助函数' in fb and '定义' in fb
     assert '逻辑严格等价' in rsu.build_retry_feedback('失败数 3 > 基线 0；失败用例: test_a')
     assert '原样保留' in rsu.build_retry_feedback('big 重写而非搬运：2 行原始语句消失（守恒检查）: ...')
-    assert '抽成模块级辅助函数' in rsu.build_retry_feedback('big 未变短: 94 行 ≥ 基线 94 行')
+    fb2 = rsu.build_retry_feedback('big 未变短: 94 行 ≥ 基线 94 行', hints='L326-399（循环块，74行）')
+    assert '两步都要做完' in fb2 and 'L326-399' in fb2  # 两步点名 + 候选块随纠偏（0706 第四轮：只做第一步）
+    assert '两步都要做完' in rsu.build_retry_feedback('big 未变短: 94 行 ≥ 基线 94 行')  # 无 hints 也成句
     assert '上一次尝试被拒' in rsu.build_retry_feedback('莫名其妙的原因')  # 兜底也不丢信息
 
 

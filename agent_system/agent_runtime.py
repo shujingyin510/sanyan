@@ -619,12 +619,21 @@ class AgentRuntime:
         return f'{ctx}\n\n[反馈] {error_info}\n请修正方案后重试。'
 
     def _constraint_violation(self, tool):
-        """Constraints: 同工具限5次，同文件修改限5个"""
+        """Constraints: 同工具限5次（SANYAN_TOOL_REPEAT_LIMIT 可调），同文件修改限5个。
+
+        0706 第四轮实跑：重构 94 行函数要读 2-3 窗、改完还得自检，read_file 全程 5 次
+        根本不够——尝试 1 成功插入辅助函数后正是死在这上面（第二步替换没机会做）。
+        自更新 CLI 放宽到 10；默认仍 5（交互式短任务的防空转口径不变）。
+        """
         if not tool:
             return False
+        try:
+            limit = int(os.environ.get('SANYAN_TOOL_REPEAT_LIMIT', '5'))
+        except ValueError:
+            limit = 5  # 环境值损坏 → 回默认，防空转不失效
         sc = self.memory.setdefault('same_tool_count', {})
         count = sc.get(tool, 0)
-        if count >= 5:
+        if count >= limit:
             print(f'[约束] {tool}已用{count}次，超限')
             return True
         sc[tool] = count + 1  # 通过后才计数

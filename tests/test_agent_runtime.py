@@ -199,6 +199,20 @@ class TestAgentRuntime(unittest.TestCase):
         result = self.rt._constraint_violation('read_file')  # 第6次触发
         self.assertTrue(result)
 
+    def test_constraint_limit_env_tunable(self):
+        # 0706 第四轮实录：read_file 全程限 5 次对"读 2-3 窗 + 改后自检"的重构任务不够，
+        # 尝试 1 成功插入辅助函数后正死于此。SANYAN_TOOL_REPEAT_LIMIT 可调（自更新设 10）。
+        import unittest.mock as mock
+
+        self.rt.memory = {'same_tool_count': {}, 'modified': [], 'history': []}
+        with mock.patch.dict(os.environ, {'SANYAN_TOOL_REPEAT_LIMIT': '2'}):
+            self.assertFalse(self.rt._constraint_violation('read_file'))  # 第1次
+            self.assertFalse(self.rt._constraint_violation('read_file'))  # 第2次
+            self.assertTrue(self.rt._constraint_violation('read_file'))  # 第3次触发（限2）
+        self.rt.memory = {'same_tool_count': {}, 'modified': [], 'history': []}
+        with mock.patch.dict(os.environ, {'SANYAN_TOOL_REPEAT_LIMIT': '坏值'}):
+            self.assertFalse(self.rt._constraint_violation('read_file'))  # 损坏回默认5，不炸
+
     def test_constraint_ok(self):
         self.rt.memory = {'same_tool_count': {}, 'modified': [], 'history': []}
         result = self.rt._constraint_violation('read_file')  # 第6次触发

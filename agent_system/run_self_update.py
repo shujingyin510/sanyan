@@ -55,12 +55,13 @@ def pick_task(tasks, key: str):
     return None
 
 
-def build_retry_feedback(reason: str) -> str:
+def build_retry_feedback(reason: str, hints: str = '') -> str:
     """把上次拒绝原因转成给下一次 agent 的定向纠偏提示，塞回任务书首。
 
     --attempts 的重试此前是 N 次冷启动，每次都不知道上次为啥挂；可 reject_hook 已把
     失败用例名/被拒 diff 落了盘。弱模型缺的往往就是『有人告诉它错在哪』——把最近一次
     拒绝原因连同分类纠偏喂回，把盲目重试变成迭代修正（零额外成本，只串上下文）。
+    `hints` 为挖掘时静态标出的候选块行区间（有则并入"未变短"纠偏，指名对哪段动手）。
     """
     if '无改动' in reason:
         tip = '这次务必真正改文件（replace_in_file / replace_lines / write_file），别在 run_shell 里空转数行。'
@@ -80,7 +81,13 @@ def build_retry_feedback(reason: str) -> str:
             '（分支条件、返回值一字不差），只做结构拆分，别顺手改逻辑。'
         )
     elif '未变短' in reason:
-        tip = '目标函数没真变短。把最大的一整块（循环体/分支体）抽成模块级辅助函数并调用，别只挪几行。'
+        # 0706 第四轮实录：模型只做了第一步（插入辅助函数），没做第二步（替换原块）——
+        # 函数一行没短。两步都点名，且指名候选块。
+        extra = f'优先对候选块 {hints} 动手。' if hints else ''
+        tip = (
+            '两步都要做完：第一步把候选块整块搬成模块级辅助函数；第二步用 replace_lines 把'
+            f'原函数里那段原块替换成对辅助函数的调用——只加辅助函数、不替换原块，函数不会变短。{extra}'
+        )
     else:
         tip = '针对上面的原因修正后再试。'
     return f'⚠ 上一次尝试被拒，原因：{reason[:300]}\n本次纠偏：{tip}\n\n'
@@ -190,6 +197,9 @@ def main(argv=None) -> int:
     # 循环总预算放宽到 900s：0705 三连实跑证明代理抖动时默认 420s 会把 agent 掐死在
     # 编辑前（6 次 LLM 超时、零编辑调用、3/3 无改动拒）。--agent-timeout 子进程硬杀兜底。
     os.environ['SANYAN_LOOP_TIME_BUDGET'] = '900'
+    # 同工具限额放宽到 10：0706 第四轮实跑，重构 94 行函数读 2-3 窗+改后自检，read_file
+    # 全程 5 次不够——尝试 1 成功插入辅助函数后正死于此，第二步替换没机会做。
+    os.environ['SANYAN_TOOL_REPEAT_LIMIT'] = '10'
     log_path = os.path.join(tempfile.gettempdir(), f'sanyan-su-agent-{time.strftime("%Y%m%d-%H%M%S")}.log')
     print(f'agent 日志: {log_path}')
     loop = SelfUpdateLoop(
@@ -215,7 +225,8 @@ def main(argv=None) -> int:
             print(f'✓ oracle 通过，产出分支: {result.branch}（请人工审查后合并）')
             return 0
         print(f'✗ 已回滚: {result.reason}')
-        feedback = build_retry_feedback(result.reason)  # 只带最近一次，避免任务书越滚越长
+        # 只带最近一次，避免任务书越滚越长；候选块行区间并入纠偏（指名对哪段动手）
+        feedback = build_retry_feedback(result.reason, hints=picked.hints if picked is not None else '')
         t = tail_file(log_path)
         if t:
             print(f'—— agent 日志尾 ——\n{t}')
