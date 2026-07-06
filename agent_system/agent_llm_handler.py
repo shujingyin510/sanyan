@@ -17,6 +17,18 @@ from typing import Optional, Tuple
 from agent_system.config import AgentConfig
 
 
+def _flat_arg(v) -> str:
+    """dict-args 摊平时单值转串：列表按行拼接，不 repr。
+
+    0706 第五轮实录：模型把 replace_lines 的 new 给成 JSON 数组（逐行列表），旧实现
+    str() 出 `['def _process_ternary_loop(evalu…` 这样的列表字面量当代码写入——守卫按
+    语法错误拦回（UNCERT），但一次完整的两步替换编辑就此报废。数组语义就是"多行"。
+    """
+    if isinstance(v, list):
+        return '\n'.join(str(x) for x in v)
+    return str(v)
+
+
 class LLMHandler:
     """LLM 调用和工具解析"""
 
@@ -298,7 +310,7 @@ class LLMHandler:
                                     # 特殊处理 write_file 的 content 参数
                                     if tool == 'write_file' and 'content' in args:
                                         path = args.get('path', '')
-                                        content = args['content']
+                                        content = _flat_arg(args['content'])
                                         return tool, f'{path}|{content}'
 
                                     ordered = []
@@ -320,12 +332,12 @@ class LLMHandler:
                                         ),
                                     ):
                                         if key in args:
-                                            ordered.append(str(args[key]))
+                                            ordered.append(_flat_arg(args[key]))
                                     if ordered:
                                         return tool, '|'.join(ordered)
                                     # 键名全不在序里：按模型给出的顺序拼值兜底——
                                     # 整包 JSON dump 会被工具当参数原样执行（run_shell 必败）
-                                    return tool, '|'.join(str(v) for v in args.values())
+                                    return tool, '|'.join(_flat_arg(v) for v in args.values())
                                 return tool, ''
                         except (_json.JSONDecodeError, KeyError):
                             pass

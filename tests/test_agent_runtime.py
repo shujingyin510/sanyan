@@ -192,6 +192,22 @@ class TestAgentRuntime(unittest.TestCase):
         self.assertEqual(tool, 'replace_lines')
         self.assertEqual(params, 'x.py|10|20|CODE')
 
+    def test_parse_tool_list_args_join_lines(self):
+        # 0706 第五轮实录：模型把 new 给成 JSON 数组（逐行列表），旧实现 str() 出
+        # `['def _f(...` 列表字面量当代码写入——守卫拦回，一次完整两步替换编辑报废。
+        # 数组语义就是"多行"：按行拼接。
+        raw = '{"tool":"replace_lines","args":{"path":"x.py","start":1,"end":2,"new":["def _f():","    return 1"]}}'
+        tool, params = self.rt._parse_tool(raw)
+        self.assertEqual(tool, 'replace_lines')
+        self.assertEqual(params, 'x.py|1|2|def _f():\n    return 1')
+
+    def test_parse_tool_write_file_list_content(self):
+        # write_file 的 content 数组同样按行拼接
+        raw = '{"tool":"write_file","args":{"path":"y.py","content":["a = 1","b = 2"]}}'
+        tool, params = self.rt._parse_tool(raw)
+        self.assertEqual(tool, 'write_file')
+        self.assertEqual(params, 'y.py|a = 1\nb = 2')
+
     def test_constraint_violation(self):
         self.rt.memory = {'same_tool_count': {}, 'modified': [], 'history': []}
         for i in range(5):

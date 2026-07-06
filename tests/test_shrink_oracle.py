@@ -196,6 +196,42 @@ def test_no_baseline_source_skips_conservation(tmp_path):
     assert make_shrink_oracle('mod.py', 'big', 10)(wd).ok
 
 
+_PLAIN_BASELINE = 'def big(x):\n    y = x + 1\n    z = y * 2\n    return z\n'
+
+
+def test_nested_def_diagnosed_when_not_shrunk(tmp_path):
+    # 0706 第五轮尝试 1 回归钉：两步都做了，但辅助函数嵌套在原函数体内 → 反而变长。
+    # 拒绝理由点名病灶（基线无嵌套时才提示），纠偏才有的放矢。
+    new = (
+        'def big(x):\n'
+        '    def _helper(x):\n'
+        '        y = x + 1\n'
+        '        z = y * 2\n'
+        '        return z\n'
+        '\n'
+        '    return _helper(x)\n'
+    )
+    wd = _write(tmp_path, new)
+    v = make_shrink_oracle('mod.py', 'big', 4, baseline_source=_PLAIN_BASELINE)(wd)
+    assert not v.ok and '未变短' in v.reason and '嵌套在目标函数内部' in v.reason
+
+
+def test_nested_def_hint_suppressed_without_baseline(tmp_path):
+    # 无基线（不知道原本有没有嵌套）→ 只报未变短，不给可能失真的病灶提示
+    new = 'def big(x):\n    def _h():\n        return 1\n\n    return _h() + x\n'
+    wd = _write(tmp_path, new)
+    v = make_shrink_oracle('mod.py', 'big', 4)(wd)
+    assert not v.ok and '未变短' in v.reason and '嵌套' not in v.reason
+
+
+def test_nested_def_hint_suppressed_when_baseline_had_nested(tmp_path):
+    # 基线本就有嵌套 def → 不把既有结构误报成本次病灶
+    baseline = 'def big(x):\n    def _old():\n        return 1\n\n    return _old() + x\n'
+    wd = _write(tmp_path, baseline)  # 新版原样（等长 → 未变短）
+    v = make_shrink_oracle('mod.py', 'big', 5, baseline_source=baseline)(wd)
+    assert not v.ok and '未变短' in v.reason and '嵌套' not in v.reason
+
+
 def test_pick_task_by_substring():
     tasks = [
         MinedTask('long_function', 'a/x.py', 1, 'huge_fn', detail='100 行'),

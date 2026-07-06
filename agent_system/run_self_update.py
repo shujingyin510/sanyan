@@ -41,9 +41,11 @@ from agent_system.self_update import (  # noqa: E402
 _RUNBOOK = (
     ' 用 read_file 查看、replace_in_file 小步修改（每次 old 控制在 30 行内）；'
     '只搬不改：原函数的每一行原样搬进辅助函数或留在原地，不得改写/删除任何语句、'
-    '校验条件或异常类型（外部会逐行核对）；不要自己运行完整测试套件、不要用 run_shell '
-    '数行数/量函数长度，也不要用 run_shell/sed 读文件——读文件一律 read_file（外部会验证'
-    '与度量，空转只会烧光轮次）；改完用 done 结束。'
+    '校验条件或异常类型（外部会逐行核对）；辅助函数定义在与原函数平级的位置'
+    '（模块级或同一类里），不要嵌套在原函数体内——嵌套定义会让原函数更长；'
+    '不要自己运行完整测试套件、不要用 run_shell 数行数/量函数长度，也不要用 '
+    'run_shell/sed 读文件——读文件一律 read_file（外部会验证与度量，空转只会烧光轮次）；'
+    '改完用 done 结束。'
 )
 
 
@@ -55,42 +57,59 @@ def pick_task(tasks, key: str):
     return None
 
 
-def build_retry_feedback(reason: str, hints: str = '') -> str:
+def classify_tip(reason: str, hints: str = '') -> str:
+    """按拒绝原因分类出对症纠偏提示（`build_retry_feedback` 的判案核心，可单独复用）。
+
+    `hints` 为挖掘时静态标出的候选块行区间（有则并入"未变短"纠偏，指名对哪段动手）。
+    """
+    if '无改动' in reason:
+        return '这次务必真正改文件（replace_in_file / replace_lines / write_file），别在 run_shell 里空转数行。'
+    if '嵌套在目标函数内部' in reason:
+        # 0706 第五轮尝试 1：两步都做了，但辅助函数嵌套在原函数体内 → 94→99 反而变长
+        return (
+            '你把辅助函数定义在了原函数体内（嵌套 def），原函数反而变长。把辅助函数整体'
+            '搬到与原函数平级的位置（模块级或同一类里再定义一个方法），原函数里只留调用。'
+        )
+    if '解析不到的名字' in reason or 'NameError' in reason:
+        return (
+            '你抽取了辅助函数却没定义它。这次分两步都落到文件：先用 write_file/replace 把这个'
+            '辅助函数的完整定义加进模块（模块级、平级于原函数），再在原函数里调用它。'
+        )
+    if '重写而非搬运' in reason or '守恒检查' in reason:
+        return (
+            '你改写了原有语句而不是搬运。上面列出的原始行必须原样保留（搬进辅助函数即可）——'
+            '不要改校验条件、异常类型、返回值或文案，只做纯粹的整块搬移 + 调用替换。'
+        )
+    if '失败用例' in reason or '失败数' in reason or '收集/执行错误' in reason:
+        return (
+            '你的改动跑挂了上面列出的测试，说明行为变了。回到目标函数，保持逻辑严格等价'
+            '（分支条件、返回值一字不差），只做结构拆分，别顺手改逻辑。'
+        )
+    if '未变短' in reason:
+        # 0706 第四轮实录：模型只做了第一步（插入辅助函数），没做第二步（替换原块）——
+        # 函数一行没短。两步都点名，且指名候选块。
+        extra = f'优先对候选块 {hints} 动手。' if hints else ''
+        return (
+            '两步都要做完：第一步把候选块整块搬成模块级辅助函数；第二步用 replace_lines 把'
+            f'原函数里那段原块替换成对辅助函数的调用——只加辅助函数、不替换原块，函数不会变短。{extra}'
+        )
+    return '针对上面的原因修正后再试。'
+
+
+def build_retry_feedback(reason: str, hints: str = '', earlier_tip: str = '') -> str:
     """把上次拒绝原因转成给下一次 agent 的定向纠偏提示，塞回任务书首。
 
     --attempts 的重试此前是 N 次冷启动，每次都不知道上次为啥挂；可 reject_hook 已把
     失败用例名/被拒 diff 落了盘。弱模型缺的往往就是『有人告诉它错在哪』——把最近一次
     拒绝原因连同分类纠偏喂回，把盲目重试变成迭代修正（零额外成本，只串上下文）。
-    `hints` 为挖掘时静态标出的候选块行区间（有则并入"未变短"纠偏，指名对哪段动手）。
+    `earlier_tip` 为更早尝试的纠偏（0706 第五轮实录：尝试 1 教训"两步都做完"被尝试 2
+    的"无改动"顶掉，尝试 3 便重蹈只做第一步——单课链在中间尝试换死因时丢课，故最多带两课）。
     """
-    if '无改动' in reason:
-        tip = '这次务必真正改文件（replace_in_file / replace_lines / write_file），别在 run_shell 里空转数行。'
-    elif '解析不到的名字' in reason or 'NameError' in reason:
-        tip = (
-            '你抽取了辅助函数却没定义它。这次分两步都落到文件：先用 write_file/replace 把这个'
-            '辅助函数的完整定义加进模块（模块级、平级于原函数），再在原函数里调用它。'
-        )
-    elif '重写而非搬运' in reason or '守恒检查' in reason:
-        tip = (
-            '你改写了原有语句而不是搬运。上面列出的原始行必须原样保留（搬进辅助函数即可）——'
-            '不要改校验条件、异常类型、返回值或文案，只做纯粹的整块搬移 + 调用替换。'
-        )
-    elif '失败用例' in reason or '失败数' in reason or '收集/执行错误' in reason:
-        tip = (
-            '你的改动跑挂了上面列出的测试，说明行为变了。回到目标函数，保持逻辑严格等价'
-            '（分支条件、返回值一字不差），只做结构拆分，别顺手改逻辑。'
-        )
-    elif '未变短' in reason:
-        # 0706 第四轮实录：模型只做了第一步（插入辅助函数），没做第二步（替换原块）——
-        # 函数一行没短。两步都点名，且指名候选块。
-        extra = f'优先对候选块 {hints} 动手。' if hints else ''
-        tip = (
-            '两步都要做完：第一步把候选块整块搬成模块级辅助函数；第二步用 replace_lines 把'
-            f'原函数里那段原块替换成对辅助函数的调用——只加辅助函数、不替换原块，函数不会变短。{extra}'
-        )
-    else:
-        tip = '针对上面的原因修正后再试。'
-    return f'⚠ 上一次尝试被拒，原因：{reason[:300]}\n本次纠偏：{tip}\n\n'
+    tip = classify_tip(reason, hints)
+    block = f'⚠ 上一次尝试被拒，原因：{reason[:300]}\n本次纠偏：{tip}\n'
+    if earlier_tip and earlier_tip != tip:
+        block += f'⚠ 更早尝试的教训仍有效：{earlier_tip}\n'
+    return block + '\n'
 
 
 def _git_out(wt: str, *args: str) -> str:
@@ -215,6 +234,7 @@ def main(argv=None) -> int:
         ),
     )
     feedback = ''  # 上一次拒绝的纠偏提示，喂回下一次任务书首（带记忆重试）
+    earlier_tip = ''  # 更早尝试的纠偏（最多带两课：中间尝试换死因时不丢前课）
     for attempt in range(1, max(args.attempts, 1) + 1):
         if args.attempts > 1:
             print(f'—— 尝试 {attempt}/{args.attempts} ——')
@@ -225,8 +245,10 @@ def main(argv=None) -> int:
             print(f'✓ oracle 通过，产出分支: {result.branch}（请人工审查后合并）')
             return 0
         print(f'✗ 已回滚: {result.reason}')
-        # 只带最近一次，避免任务书越滚越长；候选块行区间并入纠偏（指名对哪段动手）
-        feedback = build_retry_feedback(result.reason, hints=picked.hints if picked is not None else '')
+        # 最近一课 + 上一课（若不同），避免任务书越滚越长；候选块行区间并入纠偏
+        task_hints = picked.hints if picked is not None else ''
+        feedback = build_retry_feedback(result.reason, hints=task_hints, earlier_tip=earlier_tip)
+        earlier_tip = classify_tip(result.reason, hints=task_hints)
         t = tail_file(log_path)
         if t:
             print(f'—— agent 日志尾 ——\n{t}')

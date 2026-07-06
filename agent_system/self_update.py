@@ -348,6 +348,13 @@ def make_differential_oracle(
 # ── P3：任务感知 oracle ──────────────────────────────────────────────────────
 
 
+def _has_nested_def(fns: Sequence[ast.AST]) -> bool:
+    """任一目标函数体内是否嵌套定义了别的函数（抽取搬进函数内部 → 目标反而变长）。"""
+    return any(
+        isinstance(m, (ast.FunctionDef, ast.AsyncFunctionDef)) and m is not fn for fn in fns for m in ast.walk(fn)
+    )
+
+
 def _bound_names(node: ast.AST) -> set[str]:
     """单个节点直接产生的名字绑定（只认绑定形态，不管作用域——作用域由调用方划定）。"""
     names: set[str] = set()
@@ -504,6 +511,20 @@ def make_shrink_oracle(
       体每一行都该在新文件里原样存活（缩进不计），消失的行按名列出，喂给带记忆重试。
     """
     conserve = _function_body_lines(baseline_source, func_name) if baseline_source else []
+    # 基线是否本就有嵌套 def：未知（无基线/解析失败）按"有"处理——病灶提示宁缺毋滥
+    baseline_nested = True
+    if baseline_source:
+        try:
+            btree = ast.parse(baseline_source)
+            baseline_nested = _has_nested_def(
+                [
+                    n
+                    for n in ast.walk(btree)
+                    if isinstance(n, (ast.FunctionDef, ast.AsyncFunctionDef)) and n.name == func_name
+                ]
+            )
+        except (SyntaxError, ValueError):
+            pass
 
     def oracle(workdir: str) -> OracleVerdict:
         fp = os.path.join(workdir, rel_path)
@@ -513,16 +534,21 @@ def make_shrink_oracle(
             tree = ast.parse(src)
         except (SyntaxError, ValueError, OSError) as e:
             return OracleVerdict(False, f'目标文件不可解析（fail-closed）: {e}')
-        spans = [
-            (getattr(n, 'end_lineno', None) or n.lineno) - n.lineno + 1
-            for n in ast.walk(tree)
-            if isinstance(n, (ast.FunctionDef, ast.AsyncFunctionDef)) and n.name == func_name
+        fns = [
+            n for n in ast.walk(tree) if isinstance(n, (ast.FunctionDef, ast.AsyncFunctionDef)) and n.name == func_name
         ]
-        if not spans:
+        if not fns:
             return OracleVerdict(False, f'目标函数 {func_name} 消失（fail-closed：任务要求行为不变、保留原名）')
+        spans = [(getattr(n, 'end_lineno', None) or n.lineno) - n.lineno + 1 for n in fns]
         span = max(spans)  # 同名多处取最长（保守）
         if span >= baseline_span:
-            return OracleVerdict(False, f'{func_name} 未变短: {span} 行 ≥ 基线 {baseline_span} 行', {'span': span})
+            # 嵌套 def 诊断：P2 首跑与 0706 第五轮尝试 1 同型死法——辅助函数嵌套定义在
+            # 目标函数体内，目标反而变长。点名病灶，纠偏才有的放矢（否则模型只知道"没变短"）。
+            nested = not baseline_nested and _has_nested_def(fns)
+            hint = '；辅助函数嵌套在目标函数内部——须定义在与原函数平级处才可能变短' if nested else ''
+            return OracleVerdict(
+                False, f'{func_name} 未变短: {span} 行 ≥ 基线 {baseline_span} 行{hint}', {'span': span}
+            )
         missing = _unresolved_calls_in_function(tree, func_name)
         if missing:
             names = ', '.join(missing[:3])

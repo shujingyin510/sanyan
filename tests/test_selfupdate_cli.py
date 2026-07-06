@@ -72,6 +72,21 @@ def test_build_retry_feedback_classifies():
     assert '两步都要做完' in fb2 and 'L326-399' in fb2  # 两步点名 + 候选块随纠偏（0706 第四轮：只做第一步）
     assert '两步都要做完' in rsu.build_retry_feedback('big 未变短: 94 行 ≥ 基线 94 行')  # 无 hints 也成句
     assert '上一次尝试被拒' in rsu.build_retry_feedback('莫名其妙的原因')  # 兜底也不丢信息
+    # 嵌套 def 病灶（0706 第五轮尝试 1）→ 指名"平级"
+    assert '平级' in rsu.classify_tip(
+        'big 未变短: 99 行 ≥ 基线 94 行；辅助函数嵌套在目标函数内部——须定义在与原函数平级处才可能变短'
+    )
+
+
+def test_build_retry_feedback_carries_two_lessons():
+    # 0706 第五轮实录：尝试 1 的"两步都做完"被尝试 2 的"无改动"顶掉，尝试 3 重蹈覆辙。
+    # 最多带两课：最近一课 + 更早一课（不同才带，相同去重）。
+    early = rsu.classify_tip('big 未变短: 94 行 ≥ 基线 94 行')
+    fb = rsu.build_retry_feedback('无改动（edit_fn 未产生 diff）', earlier_tip=early)
+    assert '真正改文件' in fb and '更早尝试的教训仍有效' in fb and '两步都要做完' in fb
+    same = rsu.classify_tip('无改动（edit_fn 未产生 diff）')
+    fb2 = rsu.build_retry_feedback('无改动（edit_fn 未产生 diff）', earlier_tip=same)
+    assert '更早尝试的教训' not in fb2  # 同课去重，任务书不膨胀
 
 
 def test_retry_threads_feedback_into_next_prompt(monkeypatch):
