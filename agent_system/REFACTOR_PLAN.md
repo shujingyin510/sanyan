@@ -653,3 +653,243 @@ python -X utf8 -m pytest tests/test_contracts.py tests/test_agent_v5.py -q
   是当日头号税**——每个"调用失败"轮烧 ~360s，900s 预算实际只剩 4-6 个有效轮；风暴下模型输出质量同步
   崩坏（大粘贴即样本）。**暂停实跑，待代理恢复**（重启 Clash / 关开 TUN；也可能是供应商对连跑限流，
   间隔冷却亦有效）。机械面已无已知欠账：下一个平稳窗口的实跑即是模型真实水平的干净读数。
+
+---
+
+## 前瞻规划（2026-07-06 定稿）—— P3 收官 → P4 元循环 → 常态化
+
+**本节按"交接文档"标准落笔：下一位接手者（人或 AI）读完本节 + 上面的进度日志，
+不需要问任何人就能继续创作。** 按依赖顺序编号 S0-S6；每步给「做什么 / 为什么 /
+触发条件 / 实现位置与接口 / 守护测试落点 / 完成判据」。
+
+### 交接快照（动手前必读）
+
+**北极星与红线（不可动摇）**
+- 终局目标：agent 能**安全迭代自己的代码**（P4 元循环），人只做最终合并裁决。
+- 红线①：oracle 必须在 agent 写权限之外——`tests/`、`agent_system/self_update.py`、
+  `agent_system/run_self_update.py`、`agent_system/task_mining.py`、`scripts/preflight.py`
+  是"考官域"，agent 不得改判自己的考官（S4 之前靠任务书文字约束，S4 起机械化）。
+- 红线②：一切修改都在**临时 git worktree**（从 HEAD 建、放仓库外 tempdir）里发生；
+  过 oracle → 留 `self-update/<名>-<时间戳>` 分支**由人合并**，绝不自动 merge；
+  被拒 → 回滚删净（worktree+分支零残留，22 次尝试实测无一例外）。
+- `tests/test_deadloop.py` 永不进 pytest 收集（`tests/conftest.py` 的 `collect_ignore`
+  守着，别动）。提交规范：中文信息、结尾 Co-Authored-By 尾注、**未经用户要求绝不 push**、
+  提交前全量 CI。用户已明示暂不换模型（`SANYAN_MODEL` 通道保留，S6 做对照实验时再议）。
+
+**一键命令**
+```bash
+# 实跑（仓库根执行；需环境变量 SANYAN_API_KEY，密钥绝不写进源码/仓库）
+python -X utf8 agent_system/run_self_update.py --pick ternary_match --attempts 4
+#   EXIT 0=有候选被接受(打印分支名)  1=尝试耗尽全拒  2=--pick 未命中(先 --list 看榜)
+# 跑前检查：git status 必须干净、无残留 self-update/* 分支、git worktree list 只有主树
+# 全量 CI（提交前必跑）——注意 pytest 必须限定 tests/（裸 pytest 会撞 csrc/ 的 torch/numpy）
+ruff check . && ruff format --check . && mypy .
+python -X utf8 scripts/preflight.py --quick        # ALL CHECKS PASSED 10/12 (2 quick-skip) 为绿
+python -X utf8 -m pytest tests/ -q                 # 基线 2554 passed / 4 skipped
+#   skip 数随 gcc 是否在 PATH 漂 4-6、passed 数 ±2 属环境浮动，0 failed 才是硬指标
+```
+
+**关键文件地图（谁负责什么）**
+- `agent_system/self_update.py` —— 核心闭环。`SelfUpdateLoop.run(task_name, edit_fn)`：
+  建 worktree → `edit_fn(wt)` → `git add -A` + `commit_excludes` 把副产物（learned_styles.md、
+  agent*.db）reset 出暂存 → 无 diff 拒 → commit → oracle → 接受留分支/拒绝走
+  `reject_hook(wt, reason)`（尸检窗口，异常被吞不挡回滚）→ 回滚。oracle 工厂：
+  `make_shrink_oracle(rel_path, func_name, baseline_span, baseline_source=)`（静态四连闸：
+  span 变短 → 嵌套 def/大粘贴诊断 → 引用可解析（作用域感知 `_unresolved_calls_in_function`）
+  → 守恒检查（`_function_body_lines`，原函数体每行必须存活）——全毫秒级，置组合首位）；
+  `make_pytest_oracle(baseline_failed, timeout=)`（失败数≤基线 + `failing_test_names` 进理由）；
+  `make_differential_oracle()`；`combine_oracles([...])` 依序短路。
+- `agent_system/run_self_update.py` —— CLI。挖掘 → `pick_task` 子串选靶 → 任务书 =
+  `picked.prompt()` + `_RUNBOOK`（实战指引：只搬不改/平级定义/先定义后替换/别 shell 读文件）
+  → 设 `SANYAN_SKIP_RULE_GEN=1`、`SANYAN_REQUIRE_EDIT=1`、`SANYAN_LOOP_TIME_BUDGET=900`、
+  `SANYAN_TOOL_REPEAT_LIMIT=10`（经子进程继承）→ `--attempts` 循环。
+  纠偏：`classify_tip(reason, hints)` 七类对症（对照表见下）；`build_retry_feedback(reason,
+  hints, earlier_tip)` 两课链（最近一课+更早一课，同课去重）。`make_reject_diff_dumper`
+  回滚前把被拒 patch+stat 追进 agent 日志。
+- `agent_system/loop.py` —— agent 主循环 `run_legacy(rt, task, max_rounds, dry_run)`。
+  轮顶依序：结果退化检测 → 时间预算护杀（`SANYAN_LOOP_TIME_BUDGET`，损坏值回 420）→
+  单步超时 → 徘徊顶推（`SANYAN_REQUIRE_EDIT` 且零改动且轮次>一半或耗时>预算一半，一次性，
+  文案点明先定义后替换）→ 上下文压缩 → LLM 调用（`error|` 哨兵串转 RuntimeError 走连败
+  计数，三连快中止，不进 llm_outputs）→ 解析 → 工具执行（`cog=='AFFIRM'` 才记 modified）→
+  done 分支（REQUIRE_EDIT 下零改动 done 顶回至多 2 次）。所有 break 落 `stop` 真实原因，
+  return `stop or '已达N轮'`——面板不说谎。
+- `agent_system/agent_llm_handler.py` —— `llm_call`（3 重试，彻底失败返回 `error|LLM调用失败…`
+  哨兵串——是给上层识别的契约，别改成 raise，其它调用方按字符串消费）；`parse_tool`
+  五级解析：JSON 括号计数（`_TOOL_ARG_ORDER` 按工具拍平 dict 参数，`_flat_arg` 列表按行拼）
+  → 管道格式 → done → 关键词启发式（**只对短单行**）→ 单 token 原样 / 多词散文返 None
+  （loop 有优雅重提示）。
+- `agent_system/agent_runtime.py` —— `_constraint_violation`（同工具限额
+  `SANYAN_TOOL_REPEAT_LIMIT` 默认 5）；`_parse_tool`/`_llm_call` 薄委托。
+- `agent_system/task_mining.py` —— `mine_all(root, pytest_output=)` 产 MinedTask
+  （failing_test > todo > long_function 排序）；`mine_long_functions` 默认**不截断**
+  （曾因 limit=30 让靶子随无关代码增长蒸发）；`MinedTask.hints` 是静态标注的候选块行区间
+  （如 "L326-399（循环块，74行）"），已接进任务书与纠偏。
+- 守护测试地图：`tests/test_self_update.py`（闭环机制/排除/回滚）、`tests/test_shrink_oracle.py`
+  （静态四连闸全家）、`tests/test_selfupdate_cli.py`（CLI/纠偏/两课/尸检）、`tests/test_loop.py`
+  （主循环：`_LoopRt` 脚本化假件底座——新循环行为测试都长在它上面）、`tests/test_agent_runtime.py`
+  （parse_tool 全形态/约束限额）、`tests/test_task_mining.py`。
+
+**环境变量总表**
+| 变量 | 谁设 | 语义 |
+| --- | --- | --- |
+| `SANYAN_API_KEY` | 用户 | LLM 密钥，只走环境，绝不入库 |
+| `SANYAN_MODEL` / `SANYAN_PROVIDER` | 用户 | 换模型/供应商通道（S6 对照实验）|
+| `SANYAN_SKIP_RULE_GEN` | CLI 自动=1 | 跳过规则生成前奏（省 2-4 次 LLM 调用）|
+| `SANYAN_REQUIRE_EDIT` | CLI 自动=1 | 启用零改动 done 顶回 + 徘徊顶推 |
+| `SANYAN_LOOP_TIME_BUDGET` | CLI 自动=900 | loop 总预算秒（默认 420；子进程硬杀 1800s 兜底）|
+| `SANYAN_TOOL_REPEAT_LIMIT` | CLI 自动=10 | 同工具调用上限（默认 5）|
+| `AGENT_DATA_DIR` | 测试 | agent 持久化数据隔离目录（learned_styles/agent.db 认它）|
+
+**环境坑（全部实测，先信这个再排障）**
+- Clash 代理 `127.0.0.1:7890`：agent 超时事件 **≤6 次/轮=正常噪音；≥20 次=风暴**——该轮
+  读数作废（模型输出质量同步崩坏，大粘贴即风暴产物），暂停实跑等恢复（重启 Clash/关开 TUN，
+  或供应商限流冷却）。探针 `curl -x 127.0.0.1:7890 -sI -m 8 https://api.anthropic.com`
+  0.3s 返回=当下健康，**但只代表当下**（0706 五轮全是探针健康、跑中风暴）。
+- gcc 是否在 PATH 漂移 → pytest skip 4-6 / passed ±2 浮动，非回归；0 failed 才算数。
+- `.md` 提交时 CRLF→LF warning 正常（.gitattributes 约定）。
+- Windows `time.time()` 粒度粗：时间类测试用 `-1` 当"立即超时"，别用 `0`（首轮 elapsed
+  可恰为 0.0）。
+- CLI stdout 重定向到文件有块缓冲：后台跑时 `EXIT=$?` 用 `>>` 追加进同一日志再读。
+- 后台实跑期间**不要 commit**：每次尝试的 worktree 从当时 HEAD 建，中途提交会让同轮
+  尝试跑在不同代码上，实验作废。
+
+**尸检工作流（每轮跑完照此判读）**
+1. CLI 日志（scratchpad）看各尝试拒绝原因：`oracle#0` 前缀=静态闸毙（毫秒级，理由已点名
+   病灶）；`oracle#1`=pytest 毙（带失败用例名）；`无改动`=徘徊/空转。
+2. agent 日志在 `%TEMP%/sanyan-su-agent-<时间戳>.log`（CLI 起跑时打印路径）：
+   `grep -c "TimeoutError|SSL"` 定噪音级别 → `grep "工具=replace|工具=write"` 看是否触及
+   编辑 → `grep 顶推` 看顶推触发及其后 2-3 轮是否动手 → 拒绝时自动追加的
+   `=== 被拒改动尸检 ===` 段（patch 前、stat 后）看改成了什么样。
+3. 新死法出现 → 照三件套模式扩展：**毫秒级拦截（shrink oracle 加诊断）+ 点名病灶（拒绝
+   理由带修复方向）+ 对症纠偏（`classify_tip` 加分支）**，各配回归钉。
+
+**死法↔反制对照表（22 次尝试实测；`classify_tip` 的分支即此表）**
+| 死法（实例轮次） | 毫秒拦截 | 对症纠偏 |
+| --- | --- | --- |
+| 零改动徘徊/空转（多轮） | 无 diff 拒 | "务必真改文件" + 循环内顶推 |
+| 只做第一步：插 helper 不替换（0706 四轮A1/七轮A1） | span 未变短 | "两步都要做完" + 候选块行区间 |
+| 只做第二步：替换却没定义（0704A2/0706 六轮A1） | 引用可解析（作用域感知） | "先定义再调用，两步都落文件" |
+| 两步齐做但嵌套 def（P2 首跑/0706 五轮A1） | 未变短 + 嵌套诊断 | "搬到与原函数平级" |
+| 重写而非搬运：改校验/换异常（0705 二轮A3） | 守恒检查点名消失行 | "这些行原样保留" |
+| 大粘贴 +390/-0（0706 七轮A3，风暴产物） | 未变短 + 净增超体量诊断 | "整个改动只需两笔" |
+| 挂测试：行为变了（进 pytest 的候选） | pytest + 失败用例名 | "保持逻辑严格等价" |
+
+---
+
+### S0 平稳窗口读数（当前阻塞项，其余步骤的分流阀）
+
+- **做什么**：代理恢复后跑 2-3 轮 `--pick ternary_match --attempts 4`，读干净环境下的真实
+  成功率。有效读数口径：超时 ≤6/轮；风暴轮作废重跑。每轮跑完按上面的尸检工作流判读并把
+  结果追进本文件进度日志（沿用既有格式：轮次/超时数/各尝试死因/候选与否）。
+- **为什么**：0704–0706 的 22 次尝试全部带环境噪音，模型真实水平从未被干净测量；机械欠账
+  已清零，继续改代码没有已知目标——先测量再决策。
+- **触发**：用户确认代理恢复，或探针健康 + 首轮超时 ≤6。
+- **完成判据**：首个被接受分支出现（→ S1）；或 2-3 轮干净读数仍 0 接受（→ S2）。
+
+### S1 首胜处理流程（触发：首个 accepted 分支出现）
+
+- **做什么**：① `git show <branch>` 人工审 diff——守恒/引用/变短已被静态背书，人只审语义
+  合理性与命名品位；② 在分支上跑全量 CI（四件套 + `pytest tests/`）；③ 合并（普通 merge，
+  保留分支名里的时间戳信息于 merge message）；④ CHANGELOG 记账（沿用 v3.5x 格式，作为
+  "首个 agent 自产合并"里程碑条目）；⑤ **同任务再跑 3-5 轮**，把接受率基线写进本文件
+  （后续 S2/S5/换模型全部用它做对照）。
+- **注意**：接受的分支 diff 里不应有 learned_styles/agent.db（`commit_excludes` 已排除，
+  审查时顺手确认）；若分支落后 main 多个提交，先 rebase 到 main 再跑 CI（worktree 建自
+  当时 HEAD，与现 HEAD 可能有距离）。
+- **完成判据**：合并完成 + 接受率基线数字写进本文件进度日志。
+
+### S2 候选淘汰赛（P3 完全体；触发：S0 干净读数 2-3 轮仍 0 接受，或要直接提吞吐）
+
+- **做什么**：一任务 N 候选取优，失败教训跨候选累积。
+- **实现位置与接口**（`agent_system/self_update.py` 尾部新增，不动 `SelfUpdateLoop` 本体）：
+  ```python
+  def run_tournament(loop, task_name, edit_fn_factory, n, *, breaker=2) -> UpdateResult:
+      """n 个候选串行赛（代理/供应商是瓶颈，并行只会加剧限流）。
+      edit_fn_factory(k: int, feedback: str) -> edit_fn   # k 从 1 起；feedback 为
+      前面所有候选拒绝原因经 classify_tip 去重合并的多课提示（把抽签变爬山）。
+      首个 accepted 即返；全败返回"信息量最大"的一次拒绝（优先带病灶诊断的）。
+      breaker: 连续 breaker 个候选零编辑调用 → 判风暴断路，中止本批（防对风暴烧预算）。
+      """
+  ```
+  CLI 侧 `--candidates N`（与 `--attempts` 互斥，N≥2 走淘汰赛路径）；`edit_fn_factory` 由
+  现有 `make_agent_edit_fn(prompt+feedback, ...)` 包一层即得；"零编辑调用"判据复用
+  agent 日志 grep 或让 `SelfUpdateLoop.run` 把"无改动"原因回传（已有）计数。
+- **守护测试落点**：`tests/test_self_update.py` 用假 edit_fn 钉三条——首过即停不烧后续、
+  全败返回最优拒绝理由、断路器在连续零改动时中止；`tests/test_selfupdate_cli.py` 钉
+  `--candidates` 接线与 feedback 逐候选累积。
+- **完成判据**：同预算下接受率 > 顺序 `--attempts`（用 S1 基线对照）。
+
+### S3 failing_test 任务类激活（触发：真实失败测试出现；平时休眠）
+
+- **做什么**：CI 红时 `pytest tests/ -q > fail.log; python -X utf8 agent_system/run_self_update.py
+  --pytest-log fail.log`（挖掘器把 FAILED/ERROR 排最高优先）。需补两件：
+  ① `make_target_green_oracle(test_id, *, timeout)`——先单跑 `pytest <test_id>` 判**由红转绿**，
+  再复用 `make_pytest_oracle` 判全量不退化（组合首位放转绿判定，失败最常见、先短路）；
+  CLI 在 `picked.kind == 'failing_test'` 分支接线（现在该分支只有通用 oracle）。
+  ② 任务书模板：把失败输出关键片段（assert 行/异常类型）截进 prompt 帮模型定位——
+  `MinedTask.detail` 已存失败摘要，核对截断长度即可。
+- **为什么**：修失败测试是弱模型最友好的任务类（改动局部、oracle 天然二值、无结构性
+  要求），也是自更新体系第一个真实生产价值出口。
+- **守护测试落点**：`tests/test_shrink_oracle.py` 旁新增 `test_target_green_oracle.py`：
+  假 runner 注入（红→绿放行 / 仍红拒 / 全量退化拒）。
+- **完成判据**：一次真实红测被 agent 修绿并人工合并。
+
+### S4 oracle 域写保护（P4 前置硬闸；可随时做，P4 前必须做）
+
+- **做什么**：红线①机械化 + P5 密钥闸提前落地。
+- **实现位置与接口**（`agent_system/self_update.py`）：
+  ```python
+  PROTECTED_PATHS = ('tests/', 'agent_system/self_update.py', 'agent_system/run_self_update.py',
+                     'agent_system/task_mining.py', 'scripts/preflight.py')
+  # SelfUpdateLoop.run 第 2 步 commit 之后、oracle 之前：
+  #   touched = git show --name-only --format= HEAD  (在 worktree 里)
+  #   任一命中 PROTECTED_PATHS 前缀 → _reject('触碰考官域: <路径>（红线①，fail-closed）')
+  #   diff 文本含 SANYAN_API_KEY 字面量或新增 os.environ['SANYAN_API_KEY']= 写入 → 同拒
+  ```
+  为什么放 commit 后：复用现成 `_git('show', ...)`，且尸检钩子仍能拿到完整 diff。
+  注意保护检查**必须在 oracle 之前**——pytest oracle 防不住"把测试改成恒过"（改了 tests/
+  再跑 tests/ 是循环论证）。
+- **守护测试落点**：`tests/test_self_update.py` mini 仓库里写 `tests/x.py` → 必拒；写密钥
+  字面量 → 必拒；正常 ops/ 改动 → 不受影响。
+- **完成判据**：单测全绿 + 一次实跑演示"触碰 tests/ 的候选被当场拒、理由点名红线①"。
+
+### S5 P4 元循环首战（触发：S1 完成、long_function 接受率 ≥ ~30%、S4 已上线）
+
+- **做什么**：挖掘目标指向 `agent_system/` 自己。首个目标建议 `agent_system/loop.py` 的
+  `run_legacy`（220 行，挖掘榜 #6）——属 agent 代码但**非考官域**（S4 保护清单不含 loop.py，
+  这是有意的：loop 是"选手"，self_update/oracle 才是"考官"）。跑法与 S0 完全一致，只是
+  `--pick run_legacy`；oracle 栈自动生效（S4 域保护 + shrink 四连闸 + 全量 pytest——
+  `tests/test_loop.py` 的 `_LoopRt` 假件用例正是改后 agent 的行为回归——+ 差分）。
+  产出分支仍由人合并（红线②在 P4 不放松）。
+- **风险与对策**：agent 改 loop.py 改坏顶推/纠偏等自更新依赖 → 该分支上的 test_loop 会红
+  （oracle 拦）；改动语义微妙难审 → 人工审查时对照本文件"关键文件地图"里 run_legacy 的
+  轮顶顺序清单逐项核。
+- **为什么**：北极星本体。它不是新工程——是"S0-S4 的能力指向自身"，所以门槛设在接受率
+  而非代码量。
+- **完成判据**：agent 产出的 agent 代码分支被人工合并，合并后自更新闭环全量回归绿。
+
+### S6 常态化（触发：S1 后即可与 S2-S5 并行）
+
+- **做什么**：
+  ① **夜间自动跑**：定时任务（Windows 计划任务或 Claude Code 的 loop/schedule）——起跑前
+  探针，健康才跑、风暴跳过；每晚 1-2 轮攒统计；跑前 `git status` 必须干净（脏树直接跳过
+  并记日志，绝不 stash 用户工作）。
+  ② **结果聚合** `scripts/su_stats.py`：输入 agent 日志目录，按启动时间戳分轮输出
+  `轮次 | 尝试数 | 超时数 | 编辑调用数 | 各尝试死因(拒绝理由首行) | 是否接受`；死因分类
+  直接复用拒绝理由里的关键词（与 classify_tip 同一套词表，保持一处定义）。0706 的手工
+  grep 原型见进度日志。
+  ③ **模型对照通道**：同任务 `SANYAN_MODEL`/`SANYAN_PROVIDER` A/B（换模型与否用户拍板；
+  既有数据表明模型是时间表头号变量——换强模型预计整体估期÷2~3）。
+- **完成判据**：连续一周无人值守跑出周报级统计（接受率曲线成为 S2/S5 触发仪表盘）。
+
+### 长期（S6 之后，按需）
+
+- **todo 任务类**：挖掘已产出（`mine_todos`），oracle 需按 TODO 语义逐条定制——最难泛化，
+  排最后；先挑"TODO: 补测试"这类 oracle 天然可判（新测试文件存在且绿）的子类试点。
+- **跨文件重构**：守恒检查扩到多文件（`baseline_source` 变映射：路径→内容；消失行判定
+  改为"在任一新文件存活"）；引用可解析需理解 import 图——工程量大，等单文件任务类
+  接受率稳定后再议。
+- **P5 深化**：密钥闸已在 S4 落地；余项为 agent 工具面权限收敛（run_shell 白名单化——
+  实测模型爱用 shell 读文件/数行数，白名单 `python -X utf8 -m pytest` 等少数命令即可）
+  与审计日志（每个被接受分支附 oracle 判定全记录——`OracleVerdict.report` 已有结构，
+  落盘即可）。待 P4 稳定后按实际风险排。
