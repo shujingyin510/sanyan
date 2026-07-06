@@ -46,6 +46,17 @@ def test_mine_long_functions(tmp_path):
     assert tasks[0].kind == 'long_function' and tasks[0].line == 1
 
 
+def test_mine_long_functions_uncapped_by_default(tmp_path):
+    # 0705 实录回归钉：旧默认 limit=30 让排 31 名开外的 --pick 靶子凭空蒸发——
+    # 任务身份随无关改动漂移（新增代码把别的函数喂长，既有目标就出榜）。默认全量。
+    for i in range(33):
+        body = '\n'.join(f'    x{j} = {j}' for j in range(85 + i))
+        (tmp_path / f'm{i}.py').write_text(f'def fn{i}():\n{body}\n', encoding='utf-8')
+    tasks = mine_long_functions(str(tmp_path), max_lines=80)
+    assert len(tasks) == 33  # 不截断
+    assert mine_long_functions(str(tmp_path), max_lines=80, limit=5)[4].title  # 显式 limit 仍可用
+
+
 def test_long_function_hints_static_plan(tmp_path):
     # P3：挖掘时静态列出函数体的候选提取块（行区间），任务书降维成"按方案执行"
     if_body = '\n'.join(f'        y{i} = {i}' for i in range(10))

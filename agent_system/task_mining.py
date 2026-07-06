@@ -16,7 +16,7 @@ import os
 import re
 import tokenize
 from dataclasses import dataclass
-from typing import Iterator, List, Sequence, Tuple
+from typing import Iterator, List, Optional, Sequence, Tuple
 
 SKIP_DIRS = {
     '.git',
@@ -138,8 +138,13 @@ def _block_hints(node, min_span: int = 8, top: int = 5) -> str:
     return '、'.join(out[:top])
 
 
-def mine_long_functions(root: str, *, max_lines: int = 80, limit: int = 30) -> List[MinedTask]:
-    """AST 扫描超长 Python 函数（重构候选），按长度降序。"""
+def mine_long_functions(root: str, *, max_lines: int = 80, limit: Optional[int] = None) -> List[MinedTask]:
+    """AST 扫描超长 Python 函数（重构候选），按长度降序。
+
+    默认不截断：旧默认 limit=30 曾让 `--pick` 的靶子凭空消失——代码库一长（0705 实录：
+    新增的 loop/oracle 代码把别的函数喂过了 94 行），排 31 名开外的既有目标就从挖掘
+    结果里蒸发，任务身份随无关改动漂移。展示层要截自己切（CLI 已 `[:30]`）。
+    """
     tasks: List[MinedTask] = []
     for fp in _walk_files(root, ('.py',)):
         rel = os.path.relpath(fp, root)
@@ -158,7 +163,7 @@ def mine_long_functions(root: str, *, max_lines: int = 80, limit: int = 30) -> L
                         )
                     )
     tasks.sort(key=lambda t: -int(t.detail.split()[0]))
-    return tasks[:limit]
+    return tasks[:limit] if limit is not None else tasks
 
 
 def mine_all(root: str, *, pytest_output: str = '', max_lines: int = 80) -> List[MinedTask]:
