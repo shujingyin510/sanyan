@@ -23,6 +23,7 @@ import subprocess
 import sys
 import tempfile
 import time
+from collections import Counter
 from dataclasses import dataclass, field
 from typing import Callable, List, Optional, Sequence
 
@@ -511,6 +512,12 @@ def make_shrink_oracle(
       体每一行都该在新文件里原样存活（缩进不计），消失的行按名列出，喂给带记忆重试。
     """
     conserve = _function_body_lines(baseline_source, func_name) if baseline_source else []
+    # 0707 第十三轮：守恒曾用集合成员判定（ln not in new_lines）——重复行只要留一份
+    # 副本就有"不在场证明"（ternary_match 内 `matched = False` ×3、conf 比较阶梯 ×4，
+    # 压缩改写 +19/-32 静态四闸全过、打进 pytest 才被拒；行为等价的改写更会被直接
+    # 接受，违反"只搬不改"契约）。改按**整文件行计数**：纯搬运不改变任何一行的出现
+    # 次数，删掉任何一份重复立即出现亏空。
+    base_counts: Counter = Counter(ln.strip() for ln in baseline_source.splitlines()) if baseline_source else Counter()
     baseline_total_lines = len(baseline_source.splitlines()) if baseline_source else 0
     # 基线是否本就有嵌套 def：未知（无基线/解析失败）按"有"处理——病灶提示宁缺毋滥
     baseline_nested = True
@@ -565,10 +572,14 @@ def make_shrink_oracle(
                 {'span': span, 'unresolved': missing},
             )
         if conserve:
-            new_lines = {ln.strip() for ln in src.splitlines()}
-            lost = [ln for ln in conserve if ln not in new_lines]
+            new_counts = Counter(ln.strip() for ln in src.splitlines())
+            lost: List[str] = []
+            for ln in dict.fromkeys(conserve):  # 去重保序；亏空按次数计
+                deficit = base_counts[ln] - new_counts[ln]
+                if deficit > 0:
+                    lost.extend([ln] * deficit)
             if lost:
-                shown = ' ⏎ '.join(lost[:3])
+                shown = ' ⏎ '.join(dict.fromkeys(lost[:3]))
                 return OracleVerdict(
                     False,
                     f'{func_name} 重写而非搬运：{len(lost)} 行原始语句消失（守恒检查）: {shown}',

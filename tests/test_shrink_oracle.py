@@ -196,6 +196,70 @@ def test_no_baseline_source_skips_conservation(tmp_path):
     assert make_shrink_oracle('mod.py', 'big', 10)(wd).ok
 
 
+_DUP_BASELINE = (
+    'class C:\n'
+    '    @staticmethod\n'
+    '    def big(evaluator, args):\n'
+    '        matched = False\n'
+    '        for a in args:\n'
+    '            if evaluator.check(a):\n'
+    '                matched = True\n'
+    '            else:\n'
+    '                matched = False\n'
+    '        val = evaluator.eval(args[0])\n'
+    '        return matched and val\n'
+)
+
+
+def test_deleted_duplicate_line_rejected(tmp_path):
+    # 0707 第十三轮回归钉：守恒曾用集合成员判定——重复行留一份副本即有"不在场证明"
+    # （ternary_match 内 matched = False ×3，压缩改写静态全过打进 pytest）。
+    # 按整文件行计数后：删掉任何一份重复立即出现亏空，毫秒拒。
+    new = (
+        'def _impl(evaluator, args):\n'
+        '    matched = False\n'
+        '    for a in args:\n'
+        '        if evaluator.check(a):\n'
+        '            matched = True\n'
+        '    val = evaluator.eval(args[0])\n'
+        '    return matched and val\n'
+        '\n'
+        '\n'
+        'class C:\n'
+        '    @staticmethod\n'
+        '    def big(evaluator, args):\n'
+        '        return _impl(evaluator, args)\n'
+    )
+    wd = _write(tmp_path, new)
+    v = make_shrink_oracle('mod.py', 'big', 10, baseline_source=_DUP_BASELINE)(wd)
+    assert not v.ok and '重写而非搬运' in v.reason
+    assert 'matched = False' in v.reason  # 亏空的正是被压缩掉的那份重复行
+
+
+def test_true_move_with_duplicates_passes(tmp_path):
+    # 两份重复原样搬进辅助函数 → 整文件计数不变，守恒放行
+    new = (
+        'def _impl(evaluator, args):\n'
+        '    matched = False\n'
+        '    for a in args:\n'
+        '        if evaluator.check(a):\n'
+        '            matched = True\n'
+        '        else:\n'
+        '            matched = False\n'
+        '    val = evaluator.eval(args[0])\n'
+        '    return matched and val\n'
+        '\n'
+        '\n'
+        'class C:\n'
+        '    @staticmethod\n'
+        '    def big(evaluator, args):\n'
+        '        return _impl(evaluator, args)\n'
+    )
+    wd = _write(tmp_path, new)
+    v = make_shrink_oracle('mod.py', 'big', 10, baseline_source=_DUP_BASELINE)(wd)
+    assert v.ok, v.reason
+
+
 _PLAIN_BASELINE = 'def big(x):\n    y = x + 1\n    z = y * 2\n    return z\n'
 
 
