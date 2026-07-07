@@ -588,3 +588,82 @@ def make_shrink_oracle(
         return OracleVerdict(True, f'{func_name}: {baseline_span} → {span} 行', {'span': span})
 
     return oracle
+
+
+def _reject_info_score(reason: str) -> int:
+    """拒绝理由的信息量评分——淘汰赛全败时返回给调用方『信息量最大』的那次。
+
+    带病灶诊断的拒绝（守恒/解析不到/失败用例）能直接指导下一批候选；
+    "无改动"零信息（环境噪音或纯徘徊），排最末。
+    """
+    for kw, score in (
+        ('失败用例', 6),  # 打进 pytest 层：离接受最近
+        ('守恒检查', 5),
+        ('解析不到', 5),
+        ('疑似整段重复粘贴', 4),
+        ('嵌套', 4),
+        ('未变短', 3),
+        ('无改动', 1),
+    ):
+        if kw in reason:
+            return score
+    return 2
+
+
+def run_tournament(
+    loop,
+    task_name: str,
+    edit_fn_factory,
+    n: int,
+    *,
+    breaker: int = 2,
+    tip_fn=None,
+    on_candidate=None,
+) -> UpdateResult:
+    """S2 候选淘汰赛：一任务 n 候选串行赛，失败教训跨候选去重累积。
+
+    串行而非并行：代理/供应商是瓶颈，并行只会加剧限流（0706 风暴五连实证）。
+    `edit_fn_factory(k, feedback) -> edit_fn`——k 从 1 起；feedback 为此前所有候选
+    拒绝原因经 `tip_fn`（CLI 侧传 classify_tip）转换并**去重合并**的多课提示，比
+    --attempts 带记忆重试的"最多两课"更完整——把抽签变爬山。
+    首个 accepted 立即返回（不烧后续候选）；全败返回信息量最大的一次拒绝
+    （`_reject_info_score`，带病灶诊断优先）。
+    breaker：连续 breaker 个候选零编辑 → 判环境风暴断路，中止本批（第十三轮前的
+    风暴实测：零编辑是风暴的标志死法，继续投候选纯烧预算）。
+    on_candidate(k, result)：每个候选结束后的观测钩子（CLI 打进度），异常不阻断赛程。
+    """
+    tips: List[str] = []
+    best: Optional[UpdateResult] = None
+    zero_streak = 0
+    for k in range(1, n + 1):
+        feedback = '\n'.join(dict.fromkeys(t for t in tips if t))
+        result = loop.run(task_name, edit_fn_factory(k, feedback))
+        if on_candidate is not None:
+            try:
+                on_candidate(k, result)
+            except Exception:
+                pass  # 观测钩子绝不阻断赛程
+        if result.accepted:
+            return result
+        reason = result.reason or ''
+        tip = str(tip_fn(reason) if tip_fn is not None else reason).strip()
+        if tip:
+            tips.append(tip)
+        if best is None or _reject_info_score(reason) > _reject_info_score(best.reason):
+            best = result
+        if '无改动' in reason:
+            zero_streak += 1
+            if zero_streak >= breaker:
+                return UpdateResult(
+                    False,
+                    None,
+                    f'断路：连续 {zero_streak} 个候选零编辑（疑似代理风暴/环境异常），'
+                    f'淘汰赛中止于 {k}/{n}；此前最有信息量的拒绝：{best.reason[:200]}',
+                    {'breaker': zero_streak, 'candidates_run': k, 'best_reason': best.reason},
+                )
+        else:
+            zero_streak = 0
+    if best is None:  # n < 1：没跑任何候选
+        return UpdateResult(False, None, '淘汰赛未运行任何候选（n < 1）')
+    best.report.setdefault('candidates_run', n)
+    return best

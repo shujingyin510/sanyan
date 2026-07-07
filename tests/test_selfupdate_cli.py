@@ -185,3 +185,11 @@ def test_reject_diff_dumper_skips_without_selfupdate_commit(tmp_path):
     log = str(tmp_path / 'agent.log')
     rsu.make_reject_diff_dumper(log)(repo, '原因')
     assert not os.path.exists(log)
+
+
+def test_candidates_attempts_mutually_exclusive():
+    # --candidates 与 --attempts 互斥（淘汰赛自带跨候选教训累积）——parse 后立即拦，
+    # 不触发挖掘/oracle/loop 任何重活
+    import agent_system.run_self_update as rsu
+
+    assert rsu.main(['--candidates', '2', '--attempts', '3']) == 2

@@ -34,6 +34,7 @@ from agent_system.self_update import (  # noqa: E402
     make_differential_oracle,
     make_pytest_oracle,
     make_shrink_oracle,
+    run_tournament,
     tail_file,
 )
 
@@ -172,7 +173,17 @@ def main(argv=None) -> int:
     parser.add_argument(
         '--attempts', type=int, default=1, help='最多尝试次数（P3：弱模型方差靠重试摊薄，首个过 oracle 即停）'
     )
+    parser.add_argument(
+        '--candidates',
+        type=int,
+        default=0,
+        help='S2 淘汰赛：一任务 N 候选串行赛（N≥2，与 --attempts 互斥）——教训跨候选'
+        '去重累积、首个过 oracle 即停、连续零编辑断路',
+    )
     args = parser.parse_args(argv)
+    if args.candidates >= 2 and args.attempts > 1:
+        print('--candidates 与 --attempts 互斥（淘汰赛自带跨候选教训累积，不需要再叠带记忆重试）')
+        return 2
 
     log_text = ''
     if args.pytest_log:
@@ -242,6 +253,43 @@ def main(argv=None) -> int:
             'agent_system/agent_state.db',
         ),
     )
+    task_hints = picked.hints if picked is not None else ''
+
+    # ── S2 候选淘汰赛（--candidates N ≥ 2）──
+    # 第十三轮定论：模型已能产出"静态完美"的候选（两步齐做+净变短打进 pytest），
+    # 差在忠实搬运/行为等价——同噪音下单轮方差极大（2/4 vs 0/4），N 候选取优摊方差，
+    # 教训跨候选去重累积（比带记忆重试的"最多两课"更完整），把抽签变爬山。
+    if args.candidates >= 2:
+
+        def edit_fn_factory(k: int, feedback: str):
+            print(f'—— 候选 {k}/{args.candidates} ——')
+            fb = ''
+            if feedback:
+                print('  [S2] 已合并此前候选教训（去重多课）')
+                fb = f'⚠ 此前候选均被拒。教训（去重累积，全部仍有效）：\n{feedback}\n\n'
+            return make_agent_edit_fn(fb + prompt, timeout=args.agent_timeout, log_path=log_path)
+
+        def on_candidate(k: int, result) -> None:
+            if not result.accepted:
+                print(f'✗ 候选 {k} 已回滚: {result.reason}')
+                t = tail_file(log_path)
+                if t:
+                    print(f'—— agent 日志尾 ——\n{t}')
+
+        result = run_tournament(
+            loop,
+            name,
+            edit_fn_factory,
+            args.candidates,
+            tip_fn=lambda r: classify_tip(r, hints=task_hints),
+            on_candidate=on_candidate,
+        )
+        if result.accepted:
+            print(f'✓ oracle 通过，产出分支: {result.branch}（请人工审查后合并）')
+            return 0
+        print(f'✗ 淘汰赛全败: {result.reason}')
+        return 1
+
     feedback = ''  # 上一次拒绝的纠偏提示，喂回下一次任务书首（带记忆重试）
     earlier_tip = ''  # 更早尝试的纠偏（最多带两课：中间尝试换死因时不丢前课）
     for attempt in range(1, max(args.attempts, 1) + 1):
@@ -255,7 +303,6 @@ def main(argv=None) -> int:
             return 0
         print(f'✗ 已回滚: {result.reason}')
         # 最近一课 + 上一课（若不同），避免任务书越滚越长；候选块行区间并入纠偏
-        task_hints = picked.hints if picked is not None else ''
         feedback = build_retry_feedback(result.reason, hints=task_hints, earlier_tip=earlier_tip)
         earlier_tip = classify_tip(result.reason, hints=task_hints)
         t = tail_file(log_path)

@@ -11,6 +11,7 @@ from types import SimpleNamespace
 from agent_system.self_update import (
     OracleVerdict,
     SelfUpdateLoop,
+    UpdateResult,
     make_agent_edit_fn,
     make_differential_oracle,
     make_pytest_oracle,
@@ -260,3 +261,103 @@ def test_differential_oracle_gates_and_fail_closed():
 
     v = make_differential_oracle(verifier_factory=boom)('.')
     assert not v.ok and 'fail-closed' in v.reason
+
+
+# ── S2 候选淘汰赛（0707 第十三轮定论后动工）──────────────────────────────
+
+
+class _TourneyLoop:
+    """假 loop：按脚本吐 UpdateResult，记录消费个数。"""
+
+    def __init__(self, results):
+        self._results = list(results)
+        self.runs = 0
+
+    def run(self, name, edit_fn):
+        self.runs += 1
+        return self._results.pop(0)
+
+
+def _factory_recorder(seen):
+    def factory(k, feedback):
+        seen.append((k, feedback))
+        return lambda wt: None
+
+    return factory
+
+
+def test_tournament_stops_on_first_accept():
+    # 首个 accepted 立即返回，不烧后续候选
+    from agent_system.self_update import run_tournament
+
+    loop = _TourneyLoop(
+        [
+            UpdateResult(False, None, 'big 未变短: 12 行 ≥ 基线 10 行'),
+            UpdateResult(True, 'self-update/x-1', 'ok'),
+            UpdateResult(False, None, '不该被消费'),
+        ]
+    )
+    seen = []
+    r = run_tournament(loop, 't', _factory_recorder(seen), 3)
+    assert r.accepted and r.branch == 'self-update/x-1'
+    assert loop.runs == 2  # 第三个候选没跑
+    assert seen[0] == (1, '')  # 首个候选无教训
+
+
+def test_tournament_returns_most_informative_reject():
+    # 全败返回信息量最大的拒绝：守恒/解析类 > 未变短 > 无改动
+    from agent_system.self_update import run_tournament
+
+    loop = _TourneyLoop(
+        [
+            UpdateResult(False, None, '无改动（edit_fn 未产生 diff）'),
+            UpdateResult(False, None, 'big 重写而非搬运：2 行原始语句消失（守恒检查）: x'),
+            UpdateResult(False, None, 'big 未变短: 12 行 ≥ 基线 10 行'),
+        ]
+    )
+    r = run_tournament(loop, 't', _factory_recorder([]), 3)
+    assert not r.accepted and '守恒检查' in r.reason
+    assert r.report['candidates_run'] == 3
+
+
+def test_tournament_breaker_on_consecutive_zero_edit():
+    # 连续 breaker 个候选零编辑 → 判风暴断路，不再投入后续候选
+    from agent_system.self_update import run_tournament
+
+    loop = _TourneyLoop(
+        [
+            UpdateResult(False, None, '无改动（edit_fn 未产生 diff）'),
+            UpdateResult(False, None, '无改动（edit_fn 未产生 diff）'),
+            UpdateResult(False, None, '不该被消费'),
+        ]
+    )
+    r = run_tournament(loop, 't', _factory_recorder([]), 3, breaker=2)
+    assert not r.accepted and '断路' in r.reason and '疑似代理风暴' in r.reason
+    assert loop.runs == 2
+
+
+def test_tournament_feedback_dedups_across_candidates():
+    # 教训跨候选去重累积：相同拒因只留一课，不同拒因逐条追加（把抽签变爬山）
+    from agent_system.self_update import run_tournament
+
+    loop = _TourneyLoop(
+        [
+            UpdateResult(False, None, 'big 未变短: 12 行 ≥ 基线 10 行'),
+            UpdateResult(False, None, 'big 未变短: 12 行 ≥ 基线 10 行'),
+            UpdateResult(False, None, 'big 重写而非搬运：2 行原始语句消失（守恒检查）: x'),
+            UpdateResult(False, None, '无改动（edit_fn 未产生 diff）'),
+        ]
+    )
+    seen = []
+    tips = {'未变短': '两步都要做完', '守恒': '这些行原样保留'}
+
+    def tip_fn(reason):
+        for k, v in tips.items():
+            if k in reason:
+                return v
+        return ''
+
+    run_tournament(loop, 't', _factory_recorder(seen), 4, breaker=99, tip_fn=tip_fn)
+    assert seen[1][1] == '两步都要做完'
+    assert seen[2][1] == '两步都要做完'  # 相同教训不重复
+    assert seen[3][1] == '两步都要做完\n这些行原样保留'  # 新教训追加，旧课不丢
