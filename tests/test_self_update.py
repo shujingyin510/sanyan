@@ -332,7 +332,7 @@ def test_tournament_breaker_on_consecutive_zero_edit():
         ]
     )
     r = run_tournament(loop, 't', _factory_recorder([]), 3, breaker=2)
-    assert not r.accepted and '断路' in r.reason and '疑似代理风暴' in r.reason
+    assert not r.accepted and '断路' in r.reason and '零编辑' in r.reason
     assert loop.runs == 2
 
 

@@ -398,6 +398,33 @@ def test_read_budget_no_warning_when_plenty_left(monkeypatch):
     assert rt.memory['history'][0]['result'] == '1│x'  # 余额充足不加噪
 
 
+def test_shared_exploration_warning_covers_tool_rotation(monkeypatch):
+    # 0707 第十四轮：read_file 逼近限额就轮换 analyze/search_code 继续读，单工具限额
+    # 被规避、顽固徘徊烧满 15 轮——零编辑下所有读类调用共担警告，换工具不再是出路
+    from agent_system.loop import run_legacy
+
+    monkeypatch.setenv('SANYAN_REQUIRE_EDIT', '1')
+    monkeypatch.setenv('SANYAN_TOOL_REPEAT_LIMIT', '10')
+    script = [
+        ('read_file', 'a.py|1|5'),
+        ('analyze', 'a.py'),
+        ('search_code', 'foo'),
+        ('read_file', 'a.py|6|5'),
+        ('analyze', 'b.py'),
+        ('search_code', 'bar'),  # 第 6 次读类调用：共担警告应现身（same_tool_count 均未近限）
+    ]
+    tools = {
+        'read_file': lambda p, d: f'内容 {p}',
+        'analyze': lambda p, d: f'分析 {p}',
+        'search_code': lambda p, d: f'命中 {p}',
+    }
+    rt = _LoopRt(script=script, tools=tools)
+    run_legacy(rt, '重构某函数', 6, dry_run=False)
+    assert not rt.memory['history'][4]['result'].startswith('⚠')  # 第 5 次读（此前 4 次）尚不警告
+    assert rt.memory['history'][5]['result'].startswith('⚠ 已连续探索 6 次仍零编辑')
+    assert '命中 bar' in rt.memory['history'][5]['result']  # 原始结果仍完整在警告之后
+
+
 def test_step2_nudge_after_first_edit(monkeypatch):
     # 0707 第十一轮：模型首次把第一步做对（replace_lines 按行号插入类级辅助函数），
     # 随后回到通读模式烧光读额——首笔改动落盘的下一轮立即顶推补另一笔。

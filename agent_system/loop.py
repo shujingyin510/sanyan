@@ -231,17 +231,35 @@ def run_legacy(rt, task, max_rounds, dry_run):
             # 顶推被无视）。余额告罄的警告直接写进读结果**头部**（带内）——工具结果是模型
             # 下一轮注意力最高的位置，放头部防长读数在上下文注入的 4500 截断里吞掉尾部；
             # 放在 ternary.step 之后，不污染本步三态判定。
-            if os.environ.get('SANYAN_REQUIRE_EDIT') and tool == 'read_file':
+            if os.environ.get('SANYAN_REQUIRE_EDIT') and tool in (
+                'read_file',
+                'analyze',
+                'search_code',
+                'find_symbol',
+                'list_files',
+            ):
+                warn = ''
                 used = rt.memory.get('same_tool_count', {}).get('read_file', 0)
                 try:
                     repeat_limit = int(os.environ.get('SANYAN_TOOL_REPEAT_LIMIT', '5'))
                 except ValueError:
                     repeat_limit = 5
-                if used >= repeat_limit - 3:
-                    result = (
+                if tool == 'read_file' and used >= repeat_limit - 3:
+                    warn = (
                         f'⚠ read_file 已用 {used}/{repeat_limit} 次，用完即强制停止——'
-                        f'立即用 replace_lines(路径|起|止|新文本) 完成修改。\n{result}'
+                        f'立即用 replace_lines(路径|起|止|新文本) 完成修改。'
                     )
+                elif not rt.memory.get('modified') and reads_used >= 5:
+                    # 0707 第十四轮（首个淘汰赛）：读额警告教会模型换工具——read_file 逼近
+                    # 限额就轮换 analyze/search_code 继续读，单工具限额被规避，顽固徘徊型
+                    # 在干净窗口烧满 15 轮（31 次 LLM 调用零编辑）。零编辑下所有读类调用
+                    # 共担警告：换工具不再是出路。
+                    warn = (
+                        f'⚠ 已连续探索 {reads_used + 1} 次仍零编辑——换读类工具不会有新信息，'
+                        f'立即用 replace_lines(路径|起|止|新文本) 动手修改。'
+                    )
+                if warn:
+                    result = f'{warn}\n{result}'
             rt.memory['history'].append(
                 {
                     'tool': tool,

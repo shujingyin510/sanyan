@@ -281,6 +281,10 @@ def main(argv=None) -> int:
             name,
             edit_fn_factory,
             args.candidates,
+            # 0707 第十四轮：干净窗口下顽固徘徊型两连零编辑是真实分布（非风暴），
+            # breaker=2 会误杀后续候选（第十三轮的晚转化候选 r13 才动手）——CLI 放 3；
+            # 真风暴照样三连兜住。库默认仍 2（短赛程/测试口径）。
+            breaker=3,
             tip_fn=lambda r: classify_tip(r, hints=task_hints),
             on_candidate=on_candidate,
         )

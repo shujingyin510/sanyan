@@ -654,11 +654,14 @@ def run_tournament(
         if '无改动' in reason:
             zero_streak += 1
             if zero_streak >= breaker:
+                # 0707 第十四轮实证：干净窗口下顽固徘徊也会连出零编辑——归因两写，
+                # 不再断言风暴（噪音计数见 agent 日志，尸检时区分）。
                 return UpdateResult(
                     False,
                     None,
-                    f'断路：连续 {zero_streak} 个候选零编辑（疑似代理风暴/环境异常），'
-                    f'淘汰赛中止于 {k}/{n}；此前最有信息量的拒绝：{best.reason[:200]}',
+                    f'断路：连续 {zero_streak} 个候选零编辑（环境风暴或顽固徘徊——'
+                    f'本窗口继续投候选性价比为负），淘汰赛中止于 {k}/{n}；'
+                    f'此前最有信息量的拒绝：{best.reason[:200]}',
                     {'breaker': zero_streak, 'candidates_run': k, 'best_reason': best.reason},
                 )
         else:
