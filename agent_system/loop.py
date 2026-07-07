@@ -145,14 +145,17 @@ def run_legacy(rt, task, max_rounds, dry_run):
         # 0707 第十一轮：模型首次经 replace_lines 按行号把 70 行辅助函数插到类级正确
         # 位置（第一步 ✓），随后却回到通读模式找替换目标、烧光读额而死。十一轮 38 次
         # 尝试"两步齐做+位置正确"仍未出现——第一步落盘的瞬间就把第二步推到脸上。
+        # 0707 第十二轮：模型两次首笔后即 done 谎报完成，且尝试 4 是**先替换后定义**
+        # （替换完就 done，幻觉 helper 已定义）——文案不预设顺序，两种缺笔都点名。
         if not step2_nudged and os.environ.get('SANYAN_REQUIRE_EDIT') and rt.memory.get('modified'):
             step2_nudged = True
-            print('  [UR] 首笔改动已落盘 → 顶推第二步：立即替换原块为调用')
+            print('  [UR] 首笔改动已落盘 → 顶推补另一笔（两步任务）')
             ctx = rt._build_context(
-                f'第一步已完成（文件已有改动）。立即做第二步：用 replace_lines 把任务书候选块'
-                f'（原函数里的那段原代码）整段替换成对刚插入的辅助函数的一行调用——替换后原函数'
-                f'必须明显变短。行号以你最近一次带 "N│" 的读数为准，不要重新通读文件；'
-                f'替换完成后 done。原任务：{task}',
+                f'已落盘一笔改动——本任务需要两笔：①辅助函数完整定义（与原函数平级）'
+                f'②原块整段替换成对它的一行调用。立即补另一笔：刚才若是①，用 replace_lines '
+                f'把候选块替换成调用；刚才若是②，把辅助函数完整定义插入到与原函数平级处。'
+                f'行号以最近一次带 "N│" 的读数为准，不要重新通读文件；两笔都完成后 done。'
+                f'原任务：{task}',
                 'init',
             )
 
@@ -285,6 +288,23 @@ def run_legacy(rt, task, max_rounds, dry_run):
                     )
                     continue
                 print('  [UR] done 连续零改动顶回仍无进展 → 停止（交回上层判定）')
+            elif os.environ.get('SANYAN_REQUIRE_EDIT') and len(rt.memory.get('modified', [])) == 1:
+                # 0707 第十二轮：模型两次只落一笔就 done 谎报完成（插入 helper 后 done /
+                # 替换原块后 done——后者还幻觉 helper 已定义）。两步任务单笔即 done 顶回
+                # 一次点名缺笔；再 done 则放行交 oracle 判定（模型可能真用一笔做完两事，
+                # 或顶回无效——oracle 会点名精确病灶，带记忆重试传给下一轮）。
+                rt.memory['single_edit_done'] = rt.memory.get('single_edit_done', 0) + 1
+                if rt.memory['single_edit_done'] <= 1:
+                    print('  [UR] done 但只落一笔改动 → 顶回：两步任务缺另一笔')
+                    ctx = rt._build_context(
+                        '你只做了一笔改动就 done——本任务需要两笔：①辅助函数完整定义（与原函数'
+                        '平级）②原块整段替换成对它的一行调用。判断刚才那笔是①还是②，用 '
+                        'replace_lines 把缺的那笔补上；若确认一笔已同时完成两件事，再次 done。',
+                        tool,
+                        result,
+                    )
+                    continue
+                print('  [UR] 单笔改动 done 顶回后仍未补第二笔 → 放行交 oracle 判定')
             elif rnd == 1:
                 # 通用兜底：首轮就 done 往往无实质进展，观察一轮
                 print('  [UR] 首轮done → 可能无实质进展，继续观察')

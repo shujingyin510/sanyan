@@ -400,16 +400,49 @@ def test_read_budget_no_warning_when_plenty_left(monkeypatch):
 
 def test_step2_nudge_after_first_edit(monkeypatch):
     # 0707 第十一轮：模型首次把第一步做对（replace_lines 按行号插入类级辅助函数），
-    # 随后回到通读模式烧光读额——首笔改动落盘的下一轮立即顶推第二步
+    # 随后回到通读模式烧光读额——首笔改动落盘的下一轮立即顶推补另一笔。
+    # 文案不预设顺序（第十二轮实录：尝试 4 先替换后定义，"做第二步"文案不对症）。
     from agent_system.loop import run_legacy
 
     monkeypatch.setenv('SANYAN_REQUIRE_EDIT', '1')
-    script = [('replace_in_file', 'a.py|old|new'), ('read_file', 'a.py|1|5'), ('done', '完')]
+    script = [('replace_in_file', 'a.py|old|new'), ('read_file', 'a.py|1|5'), ('read_file', 'a.py|6|5')]
     rt = _LoopRt(
         script=script,
         tools={'replace_in_file': lambda p, d: '已替换 1 处', 'read_file': lambda p, d: '内容'},
     )
-    run_legacy(rt, '重构某函数', 6, dry_run=False)
-    nudges = [a for a in rt.ctx_calls if '立即做第二步' in str(a[0])]
+    run_legacy(rt, '重构某函数', 4, dry_run=False)
+    nudges = [a for a in rt.ctx_calls if '补另一笔' in str(a[0])]
     assert len(nudges) == 1  # 恰好一次；徘徊顶推（零改动前提）未触发
     assert not [a for a in rt.ctx_calls if '停止继续阅读' in str(a[0])]
+
+
+def test_done_with_single_edit_pushed_back_once(monkeypatch):
+    # 0707 第十二轮：模型两次只落一笔就 done 谎报完成（插入后 done / 替换后 done）——
+    # 单笔 done 顶回一次点名缺笔；补上第二笔后 done 正常放行
+    from agent_system.loop import run_legacy
+
+    monkeypatch.setenv('SANYAN_REQUIRE_EDIT', '1')
+    script = [
+        ('replace_in_file', 'a.py|old|new'),
+        ('done', '完成'),
+        ('replace_in_file', 'a.py|块|调用()'),
+        ('done', '两笔齐'),
+    ]
+    rt = _LoopRt(script=script, tools={'replace_in_file': lambda p, d: '已替换 1 处'})
+    r = run_legacy(rt, '重构某函数', 8, dry_run=False)
+    assert r['answer'] == '两笔齐'
+    assert rt.memory['single_edit_done'] == 1
+    assert len([a for a in rt.ctx_calls if '只做了一笔改动' in str(a[0])]) == 1
+
+
+def test_done_with_single_edit_released_on_second_done(monkeypatch):
+    # 顶回一次后仍坚持 done → 放行交 oracle 判定（模型可能真用一笔做完两事；
+    # 若确实缺笔，oracle 点名精确病灶、带记忆重试传下一轮）
+    from agent_system.loop import run_legacy
+
+    monkeypatch.setenv('SANYAN_REQUIRE_EDIT', '1')
+    script = [('replace_in_file', 'a.py|old|new'), ('done', '完成'), ('done', '还是完成')]
+    rt = _LoopRt(script=script, tools={'replace_in_file': lambda p, d: '已替换 1 处'})
+    r = run_legacy(rt, '重构某函数', 8, dry_run=False)
+    assert r['answer'] == '还是完成'
+    assert rt.memory['single_edit_done'] == 2
