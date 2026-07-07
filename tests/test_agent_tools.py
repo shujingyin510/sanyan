@@ -20,16 +20,16 @@ def test_range_count_semantics(tmp_path):
     # 第三段 < 起始行 → 行数语义：308|100 = 第308行起100行
     p = _mk(tmp_path)
     out = _read_file_direct_simple(f'{p}|308|100')
-    assert out.startswith('line308\n')
-    assert 'line407' in out and 'line408' not in out
+    assert out.startswith('308│line308\n')
+    assert '407│line407' in out and 'line408' not in out
 
 
 def test_range_end_semantics(tmp_path):
     # 第三段 > 起始行 → 结束行语义：308|320 = 第308~320行
     p = _mk(tmp_path)
     out = _read_file_direct_simple(f'{p}|308|320')
-    assert out.startswith('line308\n')
-    assert 'line320' in out and 'line321' not in out
+    assert out.startswith('308│line308\n')
+    assert '320│line320' in out and 'line321' not in out
 
 
 def test_range_start_beyond_eof_reports(tmp_path):
@@ -39,7 +39,16 @@ def test_range_start_beyond_eof_reports(tmp_path):
     assert '超界' in out and '共10行' in out
 
 
+def test_range_line_numbers_are_absolute(tmp_path):
+    # 0707 第九轮实录：范围读无行号，模型两次原话抱怨"没显示具体行号"，
+    # 顶推推荐的 replace_lines 要坐标而工具不给——行号必须是文件绝对行号
+    p = _mk(tmp_path, n=20)
+    out = _read_file_direct_simple(f'{p}|5|3')
+    assert out == '5│line5\n6│line6\n7│line7\n'
+
+
 def test_whole_file_default(tmp_path):
+    # 全文件读保持无行号（行号只在范围读时给，坐标语义与 起始行|行数 绑定）
     p = _mk(tmp_path, n=5)
     out = _read_file_direct_simple(p)
     assert out.startswith('line1\n') and 'line5' in out
@@ -105,3 +114,38 @@ def test_replace_lines_bad_range(tmp_path):
     p, _ = _mk_py(tmp_path)
     assert '行区间无效' in _replace_lines_direct(f'{p}|5|99|x = 1')
     assert '格式' in _replace_lines_direct(f'{p}|2|3')
+
+
+# ── 0707 第九轮：行号前缀剥除（read_file 带行号后，模型会把 "N│" 抄进 old/new）──
+
+
+def test_replace_strips_copied_lineno_prefixes(tmp_path):
+    # old 原文未命中但剥掉 N│ 前缀后命中 → 自动剥除（old 与 new 同剥），结果注明
+    from agent_system.agent_tools import _replace_in_file_direct
+
+    p, _ = _mk_py(tmp_path)
+    out = _replace_in_file_direct(f'{p}|2│    a = 1|2│    a = 2')
+    assert '已替换' in out and '行号前缀已剥除' in out
+    assert open(p, encoding='utf-8').read() == 'def foo():\n    a = 2\n    return a\n'
+
+
+def test_replace_verbatim_hit_never_strips(tmp_path):
+    # 原文直接命中时不做任何剥除——文件里真实存在的 "N│" 内容不被误伤
+    from agent_system.agent_tools import _replace_in_file_direct
+
+    src = "def foo():\n    s = '3│x'\n    return s\n"
+    p = tmp_path / 'm.py'
+    p.write_text(src, encoding='utf-8')
+    out = _replace_in_file_direct(f"{p}|    s = '3│x'|    s = '3│y'")
+    assert '已替换' in out and '剥除' not in out
+    assert "'3│y'" in open(p, encoding='utf-8').read()
+
+
+def test_replace_lines_strips_lineno_prefixes_in_new(tmp_path):
+    # 模型把带行号的 read_file 输出整段抄来当 new —— 前缀剥掉后落盘
+    from agent_system.agent_tools import _replace_lines_direct
+
+    p, _ = _mk_py(tmp_path)
+    out = _replace_lines_direct(f'{p}|2|3|2│    b = 2\\n3│    return b')
+    assert '已替换' in out
+    assert open(p, encoding='utf-8').read() == 'def foo():\n    b = 2\n    return b\n'

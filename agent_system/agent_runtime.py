@@ -585,15 +585,19 @@ class AgentRuntime:
             if reads >= 2 and not self.memory.get('modified'):
                 parts.append(
                     '提示: 探索已充分，现在进入修改阶段——立即提交修改：'
-                    '优先 replace_lines(path,start,end,new)（按行号整段替换，无需逐字抄原文）；'
-                    '或 replace_in_file(path,old,new)（old 必须逐字复制含缩进）。'
+                    '优先 replace_lines(path,start,end,new)——read_file 范围读的输出'
+                    '每行带 "N│" 行号，直接用它定位，无需逐字抄原文；'
+                    '或 replace_in_file(path,old,new)（old 必须逐字复制含缩进，勿含行号前缀）。'
                     '每次改动控制在 30 行以内，大改动分多次小步完成'
-                    '（如先在函数前插入辅助函数，再整段替换函数体）。不要再调用读类工具。'
+                    '（如先在函数前插入辅助函数，再整段替换函数体）。'
+                    # 0707 第九轮实录：硬禁读 + 行号已滚出上下文 = 模型凭记忆猜 old 串
+                    # 或散文空转烧光预算——留一条有界出口。
+                    '若目标行号已不在上下文，允许再读一次目标区间拿行号，随后立即动手。'
                 )
-            # 800 字符看不全一个待重构函数，replace_in_file 需要精确旧文本 → 放宽到 4000
-            # 与 read_file 工具上限对齐（范围读一个 94 行函数 ~3.3k 字符须完整透传；
-            # 任务+历史+结果 ≈ 4.6k < 7000，超限由 context_too_large/压缩兜底）
-            parts.append(f'工具 [{tool}] 结果:\n{str(result)[:4000]}')
+            # 800 字符看不全一个待重构函数，replace_in_file 需要精确旧文本 → 放宽到 4500
+            # 与 read_file 工具上限对齐（范围读一个 94 行函数 ~3.3k 字符+行号前缀须完整
+            # 透传；任务+历史+结果 ≈ 5.1k < 7000，超限由 context_too_large/压缩兜底）
+            parts.append(f'工具 [{tool}] 结果:\n{str(result)[:4500]}')
 
         # 注入已修改文件
         if self.memory.get('modified'):

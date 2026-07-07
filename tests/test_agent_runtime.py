@@ -153,6 +153,24 @@ class TestAgentRuntime(unittest.TestCase):
         tool, _ = self.rt._parse_tool(prose)
         self.assertIsNone(tool)
 
+    def test_parse_tool_prose_with_pipe_returns_none(self):
+        # 0707 第九轮 r8 实录：散文里引用旧调用（"参数=308|95"），#2 管道兜底对任意
+        # 含 | 文本生效且抢在散文护栏之前——整段思维链被劈成幻影工具名白烧一轮。
+        # 首段不像工具名（长/含空格/多行）就不按管道劈，落到 #4 的 None 优雅重提示。
+        prose = (
+            '我们被要求重构 ternary_match 函数。\n'
+            '上次 read_file 是 read_file(ops/control_ops.py 参数=308|95)，'
+            '给了我整个函数内容，但没显示具体行号。'
+        )
+        tool, _ = self.rt._parse_tool(prose)
+        self.assertIsNone(tool)
+
+    def test_parse_tool_pipe_multi_field_still_works(self):
+        # 护栏不误伤真管道格式：首段是短单 token 工具名，其余字段原样透传
+        tool, params = self.rt._parse_tool('replace_in_file|x.py|old|new')
+        self.assertEqual(tool, 'replace_in_file')
+        self.assertEqual(params, 'x.py|old|new')
+
     def test_parse_tool_short_keyword_line_still_analyze(self):
         # 短单行含关键词仍走启发式（保留原有救援能力，只是不再吞散文）
         tool, params = self.rt._parse_tool('查看函数结构')

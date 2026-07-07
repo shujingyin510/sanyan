@@ -343,10 +343,15 @@ class LLMHandler:
                             pass
                         break
 
-        # 2: fallback pipe format
+        # 2: fallback pipe format——仅当首段像工具名（短单token无换行）才按管道劈。
+        # 原版对任意含 | 文本生效：0707 第九轮 r8 实录，思维链散文里引用旧调用
+        # "参数=308|95"，整段散文被劈成幻影工具名白烧一轮（#3/#4 层都有护栏，
+        # 唯独本层裸奔且抢在它们前面）；散文应落到 #4 的 None 优雅重提示。
         if '|' in raw:
-            parts = raw.split('|', 1)
-            return parts[0].strip(), parts[1].strip() if len(parts) > 1 else ''
+            head, rest = raw.split('|', 1)
+            head = head.strip()
+            if head and '\n' not in head and len(head) <= 30 and head == head.split()[0]:
+                return head, rest.strip()
 
         if raw.startswith('done'):
             return 'done', raw.split('|', 1)[1] if '|' in raw else ''

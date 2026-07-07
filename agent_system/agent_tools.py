@@ -4,8 +4,19 @@ import ast as _ast_mod
 import difflib as _difflib
 import os
 import glob as _glob
+import re as _re
 import subprocess as _sp
 import time as _time
+
+# 0707 第九轮实录：read_file 范围读输出行号（N│），坐标供 replace_lines 用；
+# 弱模型把带行号的文本原样抄进 old/new 时按此模式剥除——U+2502 紧跟行首数字
+# 在真实 Python 代码里几乎不可能出现，剥除安全。
+_LINENO_PREFIX = _re.compile(r'(?m)^[ \t]{0,6}\d{1,6}│')
+
+
+def _strip_lineno_prefixes(text):
+    return _LINENO_PREFIX.sub('', text)
+
 
 # ====== Tool 包装函数 ======
 
@@ -149,9 +160,15 @@ def _read_file_direct_simple(params):
             if start > total:
                 return f'(空: 文件共{total}行, 起始行{start}超界)'
             all_lines = all_lines[start - 1 : min(end, total) if end else total]
-        content = ''.join(all_lines)
-        # 4000: 94行级函数(~3.3k字符)须完整可见, replace_in_file 需要精确旧文本
-        return content[:4000] + (f'\n...(共{total}行)' if len(content) > 4000 else '')
+            # 0707 第九轮实录：范围读不带行号，模型两次原话抱怨"没显示具体行号"——
+            # 顶推推荐的 replace_lines 按行号操作，工具却不给坐标，模型只能凭记忆
+            # 构造 old 串（r9 未找到）或散文空转烧光预算。行号仅定位，抄进 old/new
+            # 会被 _strip_lineno_prefixes 剥掉。
+            content = ''.join(f'{start + i}│{line}' for i, line in enumerate(all_lines))
+        else:
+            content = ''.join(all_lines)
+        # 4500: 94行级函数(~3.3k字符)+行号前缀须完整可见, replace_in_file 需要精确旧文本
+        return content[:4500] + (f'\n...(共{total}行)' if len(content) > 4500 else '')
     except Exception as e:
         return f'读文件错误: {e}'
 
@@ -187,14 +204,22 @@ def _replace_in_file_direct(params, dry_run=False):
     try:
         content = open(path, encoding='utf-8').read()
         count = content.count(old)
+        note = ''
         if count == 0:
-            hint = _closest_snippet(content, old)
-            return f'未找到 "{old[:40]}"' + (f'；文件中最接近的原文是:\n{hint}' if hint else '')
+            # 模型把 read_file 的行号前缀（N│）连同代码抄进了 old——剥掉再试一次；
+            # 命中才剥 new（同一份复制粘贴的证据），原文直接命中则两者都不动。
+            stripped = _strip_lineno_prefixes(old)
+            if stripped != old and content.count(stripped) > 0:
+                old, new, count = stripped, _strip_lineno_prefixes(new), content.count(stripped)
+                note = '（old/new 中的行号前缀已剥除——行号仅是 read_file 的显示，不在文件里）'
+            else:
+                hint = _closest_snippet(content, old)
+                return f'未找到 "{old[:40]}"' + (f'；文件中最接近的原文是:\n{hint}' if hint else '')
         open(path, 'w', encoding='utf-8').write(content.replace(old, new))
         err = _check_py_syntax_or_revert(path, content)
         if err:
             return err
-        return f'已替换 {count} 处'
+        return f'已替换 {count} 处{note}'
     except Exception as e:
         return f'替换错误: {e}'
 
@@ -213,7 +238,8 @@ def _replace_lines_direct(params, dry_run=False):
         start, end = int(parts[1]), int(parts[2])
     except ValueError:
         return '格式: 路径|起始行|结束行|新文本（行号须为整数）'
-    new_text = parts[3].replace('\\n', '\n')
+    # 模型常把带行号的 read_file 输出整段抄来当新文本——行号前缀不属于文件内容
+    new_text = _strip_lineno_prefixes(parts[3].replace('\\n', '\n'))
     if dry_run:
         return f'[干跑] {path}: L{start}-{end}'
     try:
