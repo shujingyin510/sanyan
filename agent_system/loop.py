@@ -146,15 +146,6 @@ def run_legacy(rt, task, max_rounds, dry_run):
                 # 退化检测毒成早夭（0706 实录 UR=0.45/0.47 在 r5-6 强停、顶推没活到）。
                 # 转异常走下方既有失败路径：计连败、快中止、不进 llm_outputs。
                 raise RuntimeError(raw[6:][:160] or 'LLM调用失败')
-            # ═══ UR 退化检测：在 LLM 文本输出上计算 ═══
-            llm_history = rt.memory.setdefault('llm_outputs', [])
-            llm_history.append(str(raw)[:200])  # 取前200字符
-            ur = llm_output_ur(llm_history)
-            if ur is not None:
-                stop = f'LLM输出退化 (UR={ur:.2f})'
-                print(f'  [UR] LLM输出退化 (UR={ur:.2f})，强制停止')
-                rt.memory['failures'] += 1
-                break
         except Exception as e:
             llm_consecutive_fails += 1
             print(f'  [LLM] 调用失败 (r={rnd}): {e}')
@@ -171,6 +162,22 @@ def run_legacy(rt, task, max_rounds, dry_run):
         if tool is None:
             rt.memory['failures'] += 1
             print(f'  [PARSE] LLM返回格式错误 (r={rnd}): {str(raw)[:100]}')
+            # ═══ UR 退化检测：只喂"解析不出工具调用"的输出 ═══
+            # 0707 第十轮实录（首个全零超时窗口）：原实现把每轮 raw 全喂进去、在累积
+            # token 上算独特率——模板化 JSON 工具调用只有参数在变，重复 token 逐轮堆积，
+            # UR 单调衰减到第 4 条输出必然跌破 0.5：四次尝试全在 UR≈0.47 被误杀（参数
+            # 各异的正常探索，r3-r8 即死，顶推都没活到——模型行为越规矩死得越快）。
+            # 真工具调用的打转由 results_degenerate（3 连同结果）+ 同工具限额守着；
+            # 本检测回归本职：兜"解析不出工具调用的重复胡言"（不进 history，
+            # results_degenerate 看不见的那种）。
+            llm_history = rt.memory.setdefault('llm_outputs', [])
+            llm_history.append(str(raw)[:200])  # 取前200字符
+            ur = llm_output_ur(llm_history)
+            if ur is not None:
+                stop = f'LLM输出退化 (UR={ur:.2f})'
+                print(f'  [UR] LLM输出退化 (UR={ur:.2f})，强制停止')
+                rt.memory['failures'] += 1
+                break
             continue
 
         print(f'  [r{rnd}] 工具={tool} 参数={str(params)[:60]}')

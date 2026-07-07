@@ -313,3 +313,44 @@ def test_loop_time_budget_garbage_falls_back(monkeypatch):
     rt = _LoopRt(script=[('done', ''), ('done', '答案')])
     r = run_legacy(rt, '问个问题', 6, dry_run=False)
     assert r['answer'] == '答案'
+
+
+# ── UR 退化检测只喂解析失败的输出（0707 第十轮回敲）──
+
+
+def test_ur_ignores_healthy_tool_calls(monkeypatch):
+    # 0707 第十轮实录（首个全零超时窗口）：模板化工具调用只有参数在变，累积 UR 单调
+    # 衰减，第 4 条必然跌破 0.5——参数各异的正常探索 4/4 全灭于 UR≈0.47，顶推没活到。
+    # 解析成功的输出不得进 UR 历史；轮数自然耗尽，停机原因不得是"输出退化"。
+    from agent_system.loop import run_legacy
+
+    monkeypatch.delenv('SANYAN_REQUIRE_EDIT', raising=False)
+    monkeypatch.delenv('SANYAN_LOOP_TIME_BUDGET', raising=False)
+    script = [('read_file', f'a.py|{300 + i}|10') for i in range(6)]  # 参数各异的持续探索
+    rt = _LoopRt(script=script, tools={'read_file': lambda p, d: f'内容 {p}'})
+    r = run_legacy(rt, '重构某函数', 6, dry_run=False)
+    assert rt.memory.get('llm_outputs', []) == []  # 可解析输出不进 UR 历史
+    assert '退化' not in r['answer']  # 不再被误杀（自然跑满：已达6轮）
+
+
+class _BabbleRt(_LoopRt):
+    """字符串脚本项解析为 None（模拟解析不出工具调用的散文/胡言）。"""
+
+    def _parse_tool(self, raw):
+        if isinstance(raw, str):
+            return (None, '')
+        return raw
+
+
+def test_ur_still_kills_repeated_babble(monkeypatch):
+    # 本职不丢：重复胡言（解析不出工具调用、不进 history，results_degenerate 看不见）
+    # 攒满 4 条低独特率即强停——这正是 UR 检测存在的理由
+    from agent_system.loop import run_legacy
+
+    monkeypatch.delenv('SANYAN_REQUIRE_EDIT', raising=False)
+    monkeypatch.delenv('SANYAN_LOOP_TIME_BUDGET', raising=False)
+    babble = '我们需要先理解 ternary_match 函数的整体结构，然后决定如何提取辅助函数，再考虑替换方案。' * 3
+    rt = _BabbleRt(script=[babble] * 4)
+    r = run_legacy(rt, '重构某函数', 8, dry_run=False)
+    assert 'LLM输出退化' in r['answer']  # 第 4 条重复胡言触发强停
+    assert len(rt.memory['llm_outputs']) == 4  # 胡言全部进了 UR 历史
