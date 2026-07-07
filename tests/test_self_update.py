@@ -361,3 +361,57 @@ def test_tournament_feedback_dedups_across_candidates():
     assert seen[1][1] == '两步都要做完'
     assert seen[2][1] == '两步都要做完'  # 相同教训不重复
     assert seen[3][1] == '两步都要做完\n这些行原样保留'  # 新教训追加，旧课不丢
+
+
+# ── S4 考官域写保护 + P5 密钥闸（红线①机械化）──────────────────────────────
+
+
+def _write_edit_nested(relpath, content):
+    def edit(wt):
+        p = os.path.join(wt, relpath)
+        os.makedirs(os.path.dirname(p), exist_ok=True)
+        with open(p, 'w', encoding='utf-8') as f:
+            f.write(content)
+
+    return edit
+
+
+def test_examiner_domain_write_rejected_before_oracle(tmp_path):
+    # 触碰 tests/ 的候选必拒且**先于 oracle**（oracle 恒过也拦）——pytest oracle
+    # 防不住"把测试改成恒过"（循环论证）；拒绝理由点名红线①与命中路径
+    repo = _init_repo(tmp_path / 'repo')
+    oracle_calls = []
+
+    def oracle(wt):
+        oracle_calls.append(wt)
+        return OracleVerdict(True, '恒过')
+
+    loop = SelfUpdateLoop(str(repo), oracle=oracle)
+    res = loop.run('evil', _write_edit_nested('tests/x.py', 'def test_always_pass():\n    assert True\n'))
+    assert not res.accepted and '考官域' in res.reason and '红线①' in res.reason and 'tests/x.py' in res.reason
+    assert oracle_calls == []  # 保护检查在 oracle 之前短路
+    assert 'self-update/evil' not in _branches(repo)  # 整体回滚
+
+
+def test_oracle_file_write_rejected(tmp_path):
+    # 改判考官本体（self_update.py）同拒
+    repo = _init_repo(tmp_path / 'repo')
+    loop = SelfUpdateLoop(str(repo), oracle=lambda wt: OracleVerdict(True))
+    res = loop.run('evil2', _write_edit_nested('agent_system/self_update.py', 'HACKED = True\n'))
+    assert not res.accepted and '考官域' in res.reason
+
+
+def test_secret_literal_in_added_lines_rejected(tmp_path):
+    # 新增行注入密钥环境写入 → P5 密钥闸拒
+    repo = _init_repo(tmp_path / 'repo')
+    loop = SelfUpdateLoop(str(repo), oracle=lambda wt: OracleVerdict(True))
+    res = loop.run('leak', _write_edit('code.py', "import os\nos.environ['SANYAN_API_KEY'] = 'sk-abcdefghijklmnop'\n"))
+    assert not res.accepted and '密钥' in res.reason
+
+
+def test_normal_change_unaffected_by_protection(tmp_path):
+    # 常规文件改动不受保护闸影响，照常走 oracle 接受
+    repo = _init_repo(tmp_path / 'repo')
+    loop = SelfUpdateLoop(str(repo), oracle=lambda wt: OracleVerdict(True, 'ok'))
+    res = loop.run('normal', _write_edit('code.py', 'x = 2\n'))
+    assert res.accepted and res.branch in _branches(repo)

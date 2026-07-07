@@ -37,6 +37,24 @@ class OracleVerdict:
     report: dict = field(default_factory=dict)
 
 
+# ── S4 红线①机械化：考官域写保护 ─────────────────────────────────────────────
+# agent 不得改判自己的考官——若 agent 能改 tests/ 或 oracle 代码，"把测试改成恒过"
+# 与"修好代码"在 oracle 眼里无法区分（循环论证）。任务书文字约束防得了诚实的弱模型，
+# 防不了幻觉；此处按 git 路径前缀机械拒绝（git 输出恒为正斜杠）。
+PROTECTED_PATHS = (
+    'tests/',
+    'agent_system/self_update.py',
+    'agent_system/run_self_update.py',
+    'agent_system/task_mining.py',
+    'scripts/preflight.py',
+)
+
+# P5 密钥闸提前落地：新增行里出现密钥环境名或供应商密钥样式字面量即拒。
+# 只扫 diff 的新增行（+ 开头）——上下文行提及 SANYAN_API_KEY（如编辑 LLM 句柄邻近
+# 代码）不误伤。
+_SECRET_KEY_RE = re.compile(r'SANYAN_API_KEY|sk-[A-Za-z0-9]{16,}')
+
+
 @dataclass
 class UpdateResult:
     accepted: bool
@@ -110,6 +128,23 @@ class SelfUpdateLoop:
             if not self._git('diff', '--cached', '--stat', cwd=wt).stdout.strip():
                 return self._reject(holder, wt, branch, '无改动（edit_fn 未产生 diff）')
             self._git('commit', '-m', f'self-update: {task_name}', cwd=wt)
+
+            # 2.5 红线①机械化（S4）+ P5 密钥闸——必须在 oracle 之前：pytest oracle
+            # 防不住"把测试改成恒过"（改了 tests/ 再跑 tests/ 是循环论证）。放 commit
+            # 之后：复用现成 _git('show')，且尸检钩子仍能拿到完整 diff。
+            touched = self._git('show', '--name-only', '--format=', 'HEAD', cwd=wt).stdout
+            hit = next(
+                (p.strip() for p in touched.splitlines() if p.strip().replace('\\', '/').startswith(PROTECTED_PATHS)),
+                '',
+            )
+            if hit:
+                return self._reject(holder, wt, branch, f'触碰考官域: {hit}（红线①，fail-closed）')
+            patch = self._git('show', 'HEAD', '--no-color', '--format=', cwd=wt).stdout
+            added = (ln for ln in patch.splitlines() if ln.startswith('+') and not ln.startswith('+++'))
+            if any(_SECRET_KEY_RE.search(ln) for ln in added):
+                return self._reject(
+                    holder, wt, branch, '新增内容涉及密钥（SANYAN_API_KEY/密钥样式字面量）——P5 密钥闸，fail-closed'
+                )
 
             # 3. fail-closed oracle：异常一律判拒绝
             try:
