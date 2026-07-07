@@ -193,3 +193,14 @@ def test_candidates_attempts_mutually_exclusive():
     import agent_system.run_self_update as rsu
 
     assert rsu.main(['--candidates', '2', '--attempts', '3']) == 2
+
+
+def test_agent_env_never_enables_ffi():
+    # RFC docs/ffi_plan.md §3.6-3 绊线钉：自更新闭环的环境准备**不得**设 SANYAN_FFI——
+    # py调 本质是任意代码执行，agent 子进程里 FFI 恒为关；未来任务确需开启，须人工
+    # 显式设置并把风险记录写入 REFACTOR_PLAN（届时更新本钉）。
+    import inspect
+
+    import agent_system.run_self_update as rsu
+
+    assert 'SANYAN_FFI' not in inspect.getsource(rsu)

@@ -224,6 +224,20 @@ def _unwrap(evaluator, args):
 
     val = evaluator.eval(args[0])
 
+    # FFI 三态信封（含 '判' 键的字典，docs/ffi_plan.md §2.3）：判定通道与载荷通道分离
+    # ——判=真 → 返回载荷 '值'；判=假 → 抛 '错'；判=可能 → 默认值（无则抛）。
+    # 裸 TritValue 行为不变（下方既有路径是回归钉）。
+    if isinstance(val, dict) and '判' in val:
+        j = val['判']
+        ji = j.to_int() if isinstance(j, TritValue) else int(j)
+        if ji == 1:
+            return val.get('值')
+        if ji == -1:
+            raise SanyanRuntimeError(f'解包失败: {val.get("错") or "信封为假"}')
+        if len(args) >= 2:
+            return evaluator.eval(args[1])
+        raise SanyanRuntimeError(f'解包失败: 信封为可能 ({val.get("错") or "无错误信息"})')
+
     if not isinstance(val, TritValue):
         return val
 
@@ -246,6 +260,12 @@ def _unwrap_or(evaluator, args):
 
     val = evaluator.eval(args[0])
     default = evaluator.eval(args[1])
+
+    # FFI 三态信封：判=真 → 载荷 '值'；否则默认值（与裸 TritValue 的宽松语义对齐）
+    if isinstance(val, dict) and '判' in val:
+        j = val['判']
+        ji = j.to_int() if isinstance(j, TritValue) else int(j)
+        return val.get('值') if ji == 1 else default
 
     if not isinstance(val, TritValue):
         return val
