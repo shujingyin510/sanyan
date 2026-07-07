@@ -354,3 +354,62 @@ def test_ur_still_kills_repeated_babble(monkeypatch):
     r = run_legacy(rt, '重构某函数', 8, dry_run=False)
     assert 'LLM输出退化' in r['answer']  # 第 4 条重复胡言触发强停
     assert len(rt.memory['llm_outputs']) == 4  # 胡言全部进了 UR 历史
+
+
+# ── 0707 第十一轮回敲：读循环早顶推 / 带内读额警告 / 第二步顶推 ──
+
+
+def test_nudge_fires_early_on_read_loop(monkeypatch):
+    # 纯读循环在 r8 轮次触发前已烧掉 7-8/10 读额——读满 5 次仍零改动即按行为顶推，
+    # 不再等轮次/时间过半
+    from agent_system.loop import run_legacy
+
+    monkeypatch.setenv('SANYAN_REQUIRE_EDIT', '1')
+    monkeypatch.delenv('SANYAN_LOOP_TIME_BUDGET', raising=False)
+    script = [('read_file', f'a.py|{300 + i}|10') for i in range(8)]  # 参数各异，轮次远未过半
+    rt = _LoopRt(script=script, tools={'read_file': lambda p, d: f'内容 {p}'})
+    run_legacy(rt, '重构某函数', 15, dry_run=False)
+    nudges = [a for a in rt.ctx_calls if '停止继续阅读' in str(a[0])]
+    assert len(nudges) == 1  # 第 5 次读后（r6 顶推），15//2=7 的轮次触发线还没到
+
+
+def test_read_budget_warning_prepended_near_limit(monkeypatch):
+    # 读额告罄的警告写进读结果头部（带内）——上下文顶推被无视时，工具结果是模型
+    # 注意力最高的位置；头部防 4500 截断吞尾
+    from agent_system.loop import run_legacy
+
+    monkeypatch.setenv('SANYAN_REQUIRE_EDIT', '1')
+    monkeypatch.setenv('SANYAN_TOOL_REPEAT_LIMIT', '10')
+    rt = _LoopRt(script=[('read_file', 'a.py|1|5'), ('done', '完')], tools={'read_file': lambda p, d: '1│x'})
+    rt.memory['same_tool_count'] = {'read_file': 7}  # 已到 limit-3 档
+    run_legacy(rt, '重构某函数', 6, dry_run=False)
+    rec = rt.memory['history'][0]['result']
+    assert rec.startswith('⚠ read_file 已用 7/10 次') and rec.endswith('1│x')
+
+
+def test_read_budget_no_warning_when_plenty_left(monkeypatch):
+    from agent_system.loop import run_legacy
+
+    monkeypatch.setenv('SANYAN_REQUIRE_EDIT', '1')
+    monkeypatch.setenv('SANYAN_TOOL_REPEAT_LIMIT', '10')
+    rt = _LoopRt(script=[('read_file', 'a.py|1|5'), ('done', '完')], tools={'read_file': lambda p, d: '1│x'})
+    rt.memory['same_tool_count'] = {'read_file': 2}
+    run_legacy(rt, '重构某函数', 6, dry_run=False)
+    assert rt.memory['history'][0]['result'] == '1│x'  # 余额充足不加噪
+
+
+def test_step2_nudge_after_first_edit(monkeypatch):
+    # 0707 第十一轮：模型首次把第一步做对（replace_lines 按行号插入类级辅助函数），
+    # 随后回到通读模式烧光读额——首笔改动落盘的下一轮立即顶推第二步
+    from agent_system.loop import run_legacy
+
+    monkeypatch.setenv('SANYAN_REQUIRE_EDIT', '1')
+    script = [('replace_in_file', 'a.py|old|new'), ('read_file', 'a.py|1|5'), ('done', '完')]
+    rt = _LoopRt(
+        script=script,
+        tools={'replace_in_file': lambda p, d: '已替换 1 处', 'read_file': lambda p, d: '内容'},
+    )
+    run_legacy(rt, '重构某函数', 6, dry_run=False)
+    nudges = [a for a in rt.ctx_calls if '立即做第二步' in str(a[0])]
+    assert len(nudges) == 1  # 恰好一次；徘徊顶推（零改动前提）未触发
+    assert not [a for a in rt.ctx_calls if '停止继续阅读' in str(a[0])]

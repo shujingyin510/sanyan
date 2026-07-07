@@ -76,6 +76,7 @@ def run_legacy(rt, task, max_rounds, dry_run):
     llm_consecutive_fails = 0
     step_duration_last = 0.0
     nudged = False
+    step2_nudged = False
     # 停机原因如实上报：旧实现所有 break 都落到"已达N轮"——0706 实跑三次面板全谎报
     # （实际分别死于 900s 预算、UR 退化×2），尸检被误导两回。
     stop = ''
@@ -114,11 +115,18 @@ def run_legacy(rt, task, max_rounds, dry_run):
         # 0705 第二轮实录：预算修好后模型 15 轮全在读/搜索（同一段 read_file 反复读了
         # 三遍），一次编辑不做。轮次过半**或时间过半**仍零改动就顶推一把（0706 实录：
         # 代理风暴下轮次走得慢，固定第 8 轮常来不及——预算先烧完）。
+        # 0707 第十一轮：读满 5 次仍零改动也顶推——纯读循环在 r8 轮次触发前已烧掉
+        # 7-8/10 读额，顶推后余额不够完成两步；按行为触发把顶推提到读额过半处。
+        reads_used = sum(
+            1
+            for h in rt.memory.get('history', [])
+            if h.get('tool') in ('read_file', 'analyze', 'search_code', 'find_symbol', 'list_files')
+        )
         if (
             not nudged
             and os.environ.get('SANYAN_REQUIRE_EDIT')
             and not rt.memory.get('modified')
-            and (rnd > max_rounds // 2 or total_elapsed > budget / 2)
+            and (rnd > max_rounds // 2 or total_elapsed > budget / 2 or reads_used >= 5)
         ):
             nudged = True
             print('  [UR] 过半仍零改动 → 顶推：停止阅读，现在动手改文件')
@@ -130,6 +138,21 @@ def run_legacy(rt, task, max_rounds, dry_run):
                 f'第二步再把原块替换成对它的调用。优先用 replace_lines(路径|起|止|新文本) 按行号'
                 f'整段替换——read_file 范围读输出带 "N│" 行号，无需逐字抄原文。'
                 f'小步即可，外部会验证。原任务：{task}',
+                'init',
+            )
+
+        # ── 第二步顶推（自更新场景，一次性）──
+        # 0707 第十一轮：模型首次经 replace_lines 按行号把 70 行辅助函数插到类级正确
+        # 位置（第一步 ✓），随后却回到通读模式找替换目标、烧光读额而死。十一轮 38 次
+        # 尝试"两步齐做+位置正确"仍未出现——第一步落盘的瞬间就把第二步推到脸上。
+        if not step2_nudged and os.environ.get('SANYAN_REQUIRE_EDIT') and rt.memory.get('modified'):
+            step2_nudged = True
+            print('  [UR] 首笔改动已落盘 → 顶推第二步：立即替换原块为调用')
+            ctx = rt._build_context(
+                f'第一步已完成（文件已有改动）。立即做第二步：用 replace_lines 把任务书候选块'
+                f'（原函数里的那段原代码）整段替换成对刚插入的辅助函数的一行调用——替换后原函数'
+                f'必须明显变短。行号以你最近一次带 "N│" 的读数为准，不要重新通读文件；'
+                f'替换完成后 done。原任务：{task}',
                 'init',
             )
 
@@ -201,6 +224,21 @@ def run_legacy(rt, task, max_rounds, dry_run):
 
             trit, conf, gate, cog = rt.ternary.step(tool, result)
             print(f'  [{cog}]→{rt.ternary.trit_display(trit, conf)}')
+            # 0707 第十一轮：读额成为新绑定瓶颈（三次尝试死于 read_file 超限，上下文里的
+            # 顶推被无视）。余额告罄的警告直接写进读结果**头部**（带内）——工具结果是模型
+            # 下一轮注意力最高的位置，放头部防长读数在上下文注入的 4500 截断里吞掉尾部；
+            # 放在 ternary.step 之后，不污染本步三态判定。
+            if os.environ.get('SANYAN_REQUIRE_EDIT') and tool == 'read_file':
+                used = rt.memory.get('same_tool_count', {}).get('read_file', 0)
+                try:
+                    repeat_limit = int(os.environ.get('SANYAN_TOOL_REPEAT_LIMIT', '5'))
+                except ValueError:
+                    repeat_limit = 5
+                if used >= repeat_limit - 3:
+                    result = (
+                        f'⚠ read_file 已用 {used}/{repeat_limit} 次，用完即强制停止——'
+                        f'立即用 replace_lines(路径|起|止|新文本) 完成修改。\n{result}'
+                    )
             rt.memory['history'].append(
                 {
                     'tool': tool,
