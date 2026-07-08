@@ -43,7 +43,7 @@ ruff check . && ruff format --check . && mypy . && python -X utf8 scripts/prefli
 
 ## 汇编器（Agent 写字节码用）
 
-> **重要**：汇编器允许 Agent 直接写 Sanyan 字节码程序。语法和陷阱见 → [`docs/asm_guide.md`](docs/asm_guide.md)
+> **重要**：汇编器允许 Agent 直接写 Sanyan 字节码程序。语法和陷阱见 → [`docs/asm_guide.md`](asm_guide.md)
 
 ```bash
 python asm.py program.sasm -o program.bin     # 汇编

@@ -183,7 +183,7 @@ http写(url, 数据, headers)
 | 完整语法 | 本文档 §1 |
 | 命令速查 | 本文档 §2 |
 | 错误说明 | 本文档 §3 |
-| 项目架构 | [ARCHITECTURE.md](../ARCHITECTURE.md) |
+| 项目架构 | [ARCHITECTURE.md](ARCHITECTURE.md) |
 | LLVM 编译 | [docs/llvm.md](llvm.md) |
 | 三值逻辑论证 | [docs/ternary-logic.md](ternary-logic.md) |
 | 三值 vs 二值对比 | [docs/ternary-logic.md](ternary-logic.md) |

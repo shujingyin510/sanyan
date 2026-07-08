@@ -6,7 +6,7 @@
 
 > **Tri-State Cognitive Framework** — The evolution from ternary language to Knowledge Runtime. Core contribution: a verifiable self-improving Agent knowledge system proving the causal chain Knowledge → Calibration → Selection → Success.
 
-[中文版](README_archive.md) | [Operations Manual](../agent_system/agent_operations_en.md)
+[中文版](docs/README_archive.md) | [Operations Manual](agent_system/agent_operations_en.md)
 
 ---
 
@@ -20,7 +20,7 @@
 - **Function Reference Fix**: Function names can be correctly passed as values
 - **Known Limitations**: Closure as function argument requires rewrite to variable call
 
-See [CHANGELOG](../CHANGELOG.md)
+See [CHANGELOG](CHANGELOG.md)
 
 ---
 
@@ -183,7 +183,7 @@ See [CHANGELOG.md](CHANGELOG.md) for the full version history.
 
 ### Agent: Readable Decision DSL (v5)
 
-> See [agent_system/README.md](../agent_system/README.md) — v5 architecture, three-phase design, patch catalog.
+> See [agent_system/README.md](agent_system/README.md) — v5 architecture, three-phase design, patch catalog.
 
 | Feature | Description |
 |---|---|

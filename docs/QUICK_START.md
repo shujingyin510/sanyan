@@ -76,6 +76,6 @@ The ternary gating caught GPT-2's repetition ("and and and...") at token ~12, wh
 ## Next Steps
 
 - [Full results](RESULTS.md) — all benchmark tables
-- [Research report](docs/research/ternary_gating_report.md) — methodology and analysis
+- [Research report](research/ternary_gating_report.md) — methodology and analysis
 - [Qwen2.5 validation](csrc/qwen25_bench.py) — zero false positive check
-- [Architecture](docs/architecture.md) — system design
+- [Architecture](ARCHITECTURE.md) — system design

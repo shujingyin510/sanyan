@@ -58,6 +58,9 @@ py-modules = [
     "sanfmt", "doc_sync",
 ]
 
+[tool.setuptools.package-data]
+language = ["*.json"]
+
 [tool.ruff]
 line-length = 120
 target-version = "py312"

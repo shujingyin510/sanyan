@@ -135,7 +135,7 @@ analysis:       42.5% → direct
 - **API 健康检测** — 超时 ≠ 宕机；二态聚合会触发误告警
 - **游戏 NPC** — 犹豫是合法行为；二态需要额外状态变量
 
-详见 [为什么是三进制](docs/ternary-logic.md)。
+详见 [为什么是三进制](ternary-logic.md)。
 
 ---
 

@@ -6,7 +6,7 @@
 
 > **三态认知框架** — 从三进制语言到 Knowledge Runtime 的演进。核心贡献：构建了一个可验证的自改进 Agent 知识系统，并通过合成模拟演示了 Knowledge → Calibration → Selection → Success 的机制链路（机制演示，非真实任务实测）。
 
-[English](README_EN_archive.md)
+[English](docs/README_EN_archive.md)
 
 ---
 
@@ -20,7 +20,7 @@
 - **函数引用修复**：函数名可正确作为值传递
 - **已知限制**：闭包作为参数需改写为变量调用
 
-详见 [CHANGELOG](../CHANGELOG.md)
+详见 [CHANGELOG](CHANGELOG.md)
 
 ---
 
@@ -504,7 +504,7 @@ tests/
 
 ### Agent 可读决策 DSL
 
-> 详见 [agent_system/README.md](../agent_system/README.md) — v5 架构、四阶段设计、补丁目录。
+> 详见 [agent_system/README.md](agent_system/README.md) — v5 架构、四阶段设计、补丁目录。
 
 | 特性 | 说明 |
 |---|---|
@@ -1054,7 +1054,7 @@ Layer 0: Frozen Core（冰冻核心，不可修改）
 
 本项目由 1 位工程师 + AI 协作完成。架构设计、核心算法、调试方向均由人主导，AI 负责具体代码实现。
 
-> 📖 [三言 —— 一个人的编程语言](愿景故事.md) — 项目愿景故事
+> 📖 [三言 —— 一个人的编程语言](docs/愿景故事.md) — 项目愿景故事
 
 ## License
 

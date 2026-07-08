@@ -51,7 +51,7 @@ Sanyan's native three-valued logic (`true` / `maybe` / `false`) is not a gimmick
 - **API health checks** — timeout ≠ down; binary aggregation triggers false alerts
 - **Game NPCs** — hesitation is a legitimate behavior; binary needs extra state variables
 
-See [Why Ternary](docs/ternary-logic.md) for the full comparison.
+See [Why Ternary](ternary-logic.md) for the full comparison.
 
 ---
 
@@ -194,7 +194,7 @@ Register virtual devices, read/write sensors with ternary values. Perfect for sm
 | **Package Manager** | `install("pkg")` / `list_packages()` / `load_package("pkg")` |
 | **IoT Abstraction** | `register_device`/`write`/`read`/`query`/`context` sensor/actuator operations |
 
-See [CHANGELOG.md](CHANGELOG.md) for the full version history.
+See [CHANGELOG.md](../CHANGELOG.md) for the full version history.
 
 ---
 
