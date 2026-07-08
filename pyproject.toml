@@ -53,7 +53,7 @@ dev = [
 sanyan = "sanyan.cli:main"
 
 [tool.setuptools]
-packages = ["sanyan", "ops", "sugar", "lsp", "llvmgen", "core", "compiler", "vm", "repl", "utils"]
+packages = ["sanyan", "ops", "sugar", "lsp", "llvmgen", "core", "compiler", "vm", "repl", "utils", "language"]
 py-modules = [
     "sanfmt", "doc_sync",
 ]
