@@ -16,6 +16,7 @@ void *openf(const char *path);
 double scale(double v, float k);
 unsigned long long big(unsigned long long n);
 void ping(void);
+struct Point mk_point(int x, int y);
 
 /* 阶段 1 拒绝面 */
 int logf_style(const char *fmt, ...);

@@ -333,6 +333,7 @@ def _init_ops() -> None:
     import ops.web_ops  # noqa: F401
     import ops.data_pipeline_ops  # noqa: F401
     import ops.py_bridge_ops  # noqa: F401  — FFI 层 A（SANYAN_FFI 未开时为报假桩）
+    import ops.c_ffi_ops  # noqa: F401  — FFI 层 B 在线半（同一门控）
 
 
 class SanyanEvaluator(SanyanRuntime):

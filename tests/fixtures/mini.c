@@ -9,5 +9,6 @@ void *openf(const char *path) { return (void *)0; } /* 恒 NULL：err=null_ret �
 double scale(double v, float k) { return v * k; }
 unsigned long long big(unsigned long long n) { return n + 1; }
 void ping(void) {}
+struct Point mk_point(int x, int y) { struct Point p; p.x = x; p.y = y; return p; }
 int logf_style(const char *fmt, ...) { return 0; }
 int apply(int (*f)(int), int v) { return f(v); }

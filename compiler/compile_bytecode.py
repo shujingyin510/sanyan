@@ -57,7 +57,7 @@ def _fold_constants(node):
     return folded
 
 
-_FFI_OPS = ('py导入', 'py取', 'py调', 'py项', 'py列', 'py释', 'c载入', 'c调')
+_FFI_OPS = ('py导入', 'py取', 'py调', 'py项', 'py列', 'py释', 'c载入', 'c调', 'c释')
 
 
 def _find_ffi_op(node) -> str | None:

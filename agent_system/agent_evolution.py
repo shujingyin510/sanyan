@@ -194,7 +194,7 @@ class DifferentialVerifier:
 
     # FFI 算子名（docs/ffi_plan.md §3.7）：含 FFI 的程序不进差分——外调有 IO/非确定性，
     # 解释器 vs VM 一致性对它无定义。跳过必须可见（skipped_ffi 计数），不许静默缩水。
-    _FFI_OPS = ('py导入', 'py调', 'py取', 'py项', 'py列', 'py释', 'c载入', 'c调')
+    _FFI_OPS = ('py导入', 'py调', 'py取', 'py项', 'py列', 'py释', 'c载入', 'c调', 'c释')
 
     def verify_consistency(self, test_cases: List[Dict] = None) -> Dict:
         """验证多后端一致性。用例一致 = 全部后端成功 且 输出完全相同（fail-closed）。"""
