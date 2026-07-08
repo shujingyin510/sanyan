@@ -83,8 +83,16 @@ class TestMutexOps(unittest.TestCase):
         self.env = SanyanEvaluator()
 
     def test_lock_create(self):
+        # 锁名 = eval 后的字符串（不含引号）——先前 isinstance-str 直用字面量含引号，
+        # 且变量无法用（对抗探针 0708 修复；见 test_lock_with_variable）
         result = self.env.eval(['锁', '"my_lock"'])
-        self.assertEqual(result, '"my_lock"')
+        self.assertEqual(result, 'my_lock')
+
+    def test_lock_with_variable(self):
+        # 回归钉：锁必须能配合变量使用（此前 (锁住 变量) 把符号名当锁名，永远"未定义的锁"）
+        self.env.eval(['设', 'l', ['锁', '"a"']])
+        self.assertEqual(self.env.eval(['锁住', 'l']).to_int(), 1)
+        self.assertEqual(self.env.eval(['开锁', 'l']).to_int(), 0)
 
     def test_lock_no_name(self):
         with self.assertRaises(SanyanSyntaxError):

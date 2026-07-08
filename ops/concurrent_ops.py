@@ -62,11 +62,25 @@ def delayed_run(evaluator, args):
     return evaluator.eval(fn_node)
 
 
+def _lock_name(evaluator, arg) -> str:
+    """锁名 = eval 参数后的字符串——统一支持字面量与变量（对抗探针 0708 修复）。
+
+    先前用 `arg if isinstance(arg, str) else eval(arg)`：**变量引用在 AST 里也是 str**，
+    被当字面量符号名直用而非 eval 成其值——`(锁住 变量)` 永远查不到锁（用了符号名 'l'
+    而非变量值 'a'），锁无法配合变量使用；且字面量 args 含引号使锁名带引号。统一 eval：
+    字面量 eval 得字符串（不含引号），变量 eval 得其值，两条路径一致。
+    """
+    val = evaluator.eval(arg)
+    if isinstance(val, TritValue) and val.is_string():
+        return val.to_payload()
+    return str(val)
+
+
 def mutex_lock(evaluator, args):
-    """锁(名称) — 创建或获取一个命名互斥锁，返回锁对象"""
+    """锁(名称) — 创建或获取一个命名互斥锁，返回锁名"""
     if not args:
         raise SanyanSyntaxError('锁 需要一个名称参数')
-    name = args[0] if isinstance(args[0], str) else str(evaluator.eval(args[0]))
+    name = _lock_name(evaluator, args[0])
     with _ConcurrentContext._lock:
         if name not in _ConcurrentContext._mutexes:
             _ConcurrentContext._mutexes[name] = threading.Lock()
@@ -77,7 +91,7 @@ def mutex_acquire(evaluator, args):
     """锁住(名称) — 获取锁（阻塞直到可用）"""
     if not args:
         raise SanyanSyntaxError('锁住 需要一个锁名称')
-    name = args[0] if isinstance(args[0], str) else str(evaluator.eval(args[0]))
+    name = _lock_name(evaluator, args[0])
     m = _ConcurrentContext._mutexes.get(name)
     if m is None:
         raise SanyanRuntimeError(f'未定义的锁: {name}')
@@ -89,7 +103,7 @@ def mutex_release(evaluator, args):
     """开锁(名称) — 释放锁"""
     if not args:
         raise SanyanSyntaxError('开锁 需要一个锁名称')
-    name = args[0] if isinstance(args[0], str) else str(evaluator.eval(args[0]))
+    name = _lock_name(evaluator, args[0])
     m = _ConcurrentContext._mutexes.get(name)
     if m is None:
         raise SanyanRuntimeError(f'未定义的锁: {name}')
