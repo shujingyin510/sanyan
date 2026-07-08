@@ -8,7 +8,12 @@
 > 12 测试含 gcc 活体 8 项）。编译路径显式报错已落地（VM 模式打印 `[FFI]` 后回退求值
 > 器）；手册 §20 + 双语 README 已加。**桩经 `导入` 端到端已收口**（07-08：
 > import_module 记模块目录，c载入 相对路径按其解析——三件套同目录从任意处导入即用）。
-> **余项**：语法糖（#6 待定夺）、M4-LLVM extern（§4.6）、M5 安全收口清单复核。实现偏差见开放问题 #7/#8；pycparser 为可选开发依赖（ffi-gen extra）。
+> **M4-LLVM extern（07-08）已落地**：`llvmgen/ffi_extern.py` 发射 declare 直呼，同一 C 库
+> 双后端产出一致（RFC §4.6 差分角落回纳）；整数族类型面，f32/cstr/ptr/struct 编译期显式拒。
+> **M5 安全收口（07-08）已复核**：§3.6 四条款全部有实现+守护钉——①默认关（`_gate`）②沙箱可禁
+> （层 A/B 各有注册钉）③agent 隔离绊线（test_selfupdate_cli）④密钥面（手册 §20 明示 + 句柄跨
+> `序列化` fail-closed 拒，补齐 §3.5 空账）。**余项**：语法糖（#6 待定夺，非必需）；实现偏差见
+> 开放问题 #7/#8；pycparser 为可选开发依赖（ffi-gen extra）。**FFI 主线 M1-M5 全线完成。**
 > 一句话：**AST 买到的是语法，贵的是语义**——Python 走进程内运行时桥（宿主白送），
 > C 走"声明层 AST 导入"（pycparser 只解析 .h 签名，运行时 ctypes / 编译期 LLVM extern
 > 双后端共用一份 manifest）；TypeScript 无限期缓议（无运行时协同、类型系统无处可接）。

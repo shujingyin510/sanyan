@@ -56,6 +56,10 @@ def _serialize_op(evaluator, args):
     if len(args) != 1:
         raise SanyanSyntaxError('序列化 需要一个参数')
     val = evaluator.eval(args[0])
+    # FFI 句柄跨序列化无意义（RFC docs/ffi_plan.md §3.5：进程级 id，反序列化到别处
+    # 是悬垂引用）——fail-closed 拒，不把内部 id 静默写进字符串。
+    if isinstance(val, dict) and ('__py_handle__' in val or '__c_ptr__' in val or '__c_lib__' in val):
+        raise SanyanSyntaxError('序列化 不支持 FFI 句柄（进程级引用，跨序列化无意义）')
     if not isinstance(val, TritValue):
         return str(val)
     symbols = {1: '+', 0: '0', -1: '-'}

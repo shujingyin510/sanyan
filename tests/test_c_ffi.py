@@ -197,3 +197,19 @@ def test_live_generated_stub_via_import(tmp_path):
         result = env.eval(form)
     val = result.to_int() if hasattr(result, 'to_int') else result
     assert val == 5  # 桩→manifest(模块目录解析)→c载入→c调 全链路
+
+
+def test_c_ops_registered_and_sandboxable():
+    # M5 安全收口钉：层 B 三算子经 registry 注册（沙箱机制自动可禁，与层 A 同口径）
+    from core import sandbox
+    from core.values import SanyanRuntimeError
+    from ops.registry import has_op
+
+    for name in ('c载入', 'c调', 'c释'):
+        assert has_op(name), name
+    try:
+        sandbox.restrict(ops=['c调'])
+        with pytest.raises(SanyanRuntimeError, match='沙箱'):
+            sandbox.check_op('c调')
+    finally:
+        sandbox.unblock()

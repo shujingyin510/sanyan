@@ -278,3 +278,17 @@ def test_real_evaluator_gate_off_is_teachable(monkeypatch):
     (form,) = parse_program(tokenize('(解包 (py导入 "json"))'), '')
     with pytest.raises(SanyanRuntimeError, match='FFI 未启用'):
         env.eval(form)
+
+
+# ── M5 安全收口：句柄跨序列化 fail-closed（RFC §3.5/§3.6-4）──────────────────
+
+
+def test_serialize_rejects_ffi_handles():
+    # 句柄是进程级 id，反序列化到别处即悬垂——序列化必须 fail-closed 拒，
+    # 不把内部 id 静默写进字符串（此前 dict 走 str(val) 会泄漏 id）
+    from core.values import SanyanSyntaxError
+    from ops.ternary_time_ops import _serialize_op
+
+    for h in ({'__py_handle__': 7}, {'__c_ptr__': 3, 'addr': 4096}, {'__c_lib__': 1, 'lib': 'mini'}):
+        with pytest.raises(SanyanSyntaxError, match='FFI 句柄'):
+            _serialize_op(_EV, [h])
