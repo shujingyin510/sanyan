@@ -1158,3 +1158,17 @@ S5/S6 吸收进本节奏（su_stats 即 S6 的统计件）。
   **待有预算时**以 `--staged` vs 单发做 A/B（每次实跑必须带假设，此为第一个排队假设）。
 - **主线切换（用户指示）**：agent 线暂停烧钱，转 FFI 跨语言导入调试（M2：编译路径显式报错/
   真实库冒烟加固/手册章）。
+
+**进度（2026-07-08 傍晚）—— FFI 主线（用户指示）：M2 收口 + M3 离线半 + M4-ctypes 全部落地：**
+
+- **M2 收口（`44437ea`）**：编译路径显式报错（VM 模式 `[FFI]` 提示后回退求值器，--eval 不留错缓存，
+  字符串数据不误伤）+ 真实求值器全链路钉 + 手册 §20 外语互操作章 + 双语 README 特性行。
+- **M3 离线半（`bb83782`）**：`scripts/c_bind_gen.py`——C 头声明层 → manifest(.ffi.json) + 三言桩(.san)；
+  变参标注/函数指针等进 skipped 清单（fail-closed 可审）；err 惯例不推断默认 null 人审补注；
+  桩用真实 sugar 语法且解析可钉；pycparser 列可选开发依赖（运行时零依赖不破）。跳过语法糖直上 C
+  （C 侧靠生成桩+既有模块系统，无需新语法——RFC #6 留后定夺）。
+- **M4-ctypes（`4ef7702`）**：`ops/c_ffi_ops.py` c载入/c调/c释——manifest 驱动签名与 err 四惯例
+  （null/null_ret/neg_ret/errno），struct 按值字典往返，**gcc 活体 8 项端到端全绿**（int/float/uint64/
+  UTF-8 串/void/结构体/惯例生效/句柄释放）。三 FFI 名单（编译器/差分）同步补 c释。
+- 守护累计 +24（层 A 26 + 生成器 8 + 运行时 12），全量 2636 passed / 0 failed。**余项**：桩经 `导入`
+  的端到端集成（manifest 相对路径语义待定）、M4-LLVM extern、M5 安全收口——见 RFC 状态行。
