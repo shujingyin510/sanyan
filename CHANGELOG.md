@@ -2,6 +2,39 @@
 
 ---
 
+## [v3.56.1] — 2026-07-08
+
+> **健壮性对抗周 + FFI 库层糖收尾。把语言当黑盒喂畸形/极端输入三轮（解析容错 / 运行时深水区 / 编码 + 并发），钓出并修 6 个"畸形输入裸穿透/崩溃/静默错误"缺陷，固化 54 项健壮性契约——任何畸形输入只能有三种结局：正常求值、清晰 `SanyanError`、内置上限兜住，绝不裸 Python 异常穿透、进程崩溃或无限挂起，并由 CI 守护。FFI 补库层糖（`stdlib/ffi.san`，结掉 RFC 语法糖开放问题）；顺带修掉对抗发现的锁 API 子系统 bug。**
+
+### ⭐ Highlights
+
+- **对抗性健壮性契约（`tests/test_adversarial.py`，54 项）**：双前端（S 表达式 + 糖语法）+ 运行时 + 编码 + 并发，覆盖解析容错 / 数值边界 / 求值失控 / 容器越界 / 类型错配 / 深递归 / 超深嵌套 / Unicode / 大整数——**契约立死并进 CI**：以后任何回归破坏边界健壮性会被当场抓住
+- **六个"裸穿透/崩溃/静默"缺陷全修**（详见 Bug Fixes）：畸形数字 `1.2.3` → `ValueError` / 糖语法未闭合 → 纯 `SyntaxError` 漏出家族 / 糖语法超深嵌套 → `RecursionError` 裸崩 / 运行时深嵌套 `eval` → `RecursionError` 裸崩 / 大整数显示 → `ValueError` / 并发任务异常静默吞成 0
+- **底子经受住检验**：压过的 ~50 类边界里，除零、越界、类型错配、递归无基例、参数多传/少传、高阶传非函数、**整个编码层（Unicode 按码点 / null 字节 / emoji ZWJ / 1M 字符串 / 代理对子串）**——约 40 类本就优雅处理，fail-closed 哲学真实兑现
+- **FFI 库层糖（`stdlib/ffi.san`）**：`库/成员/元素/调用0-3/方法0-2` 便利函数把 `解包(py算子(...))` 样板收进来，别名点号访问（`ffi.方法1(j, "dumps", 字典("a",1))`）；**零解析器改动**、可逆、失败即抛——结掉 RFC 语法糖开放问题 #6（评估：语法层关键字只覆盖失败即抛的直路、藏了三态信封卖点、C 侧本就靠生成桩不需新语法）
+
+### Bug Fixes
+
+- **S 表达式畸形数字裸穿透**：`(加 1.2.3 0)` 的 `1.2.3` 作为值走 `_eval_dot_symbol`，`obj, attr = symbol.split('.')` 对多点符号解包裸 `ValueError`——改 `split('.', 1)`，数字开头畸形给清晰"无法解析数字字面量"，多级点当设备名找不到；全角冒号分支同修
+- **糖语法未闭合抛纯 `SyntaxError`**：`SugarErrorReporter.raise_if_any` 抛 Python 内置 `SyntaxError`，`catch SanyanError` 漏网——改抛 `SanyanSyntaxError`（继承 `SyntaxError`，反向兼容既有捕获点）
+- **糖语法超深嵌套裸崩**：递归下降对 3000 层嵌套 `RecursionError` 裸崩（S 表达式前端能包住）——`parse_code` 捕获转 `SanyanSyntaxError: 嵌套过深`
+- **运行时深嵌套 `eval` 裸崩**：深列表 ~1000 层解析通过但 `eval` 深度求值裸 `RecursionError`（"死亡区间"：太浅正常、太深被解析器兜住、中间地带 eval 裸崩），深相等 `same` 同理——`eval` **整个体内联 `try`**（不增每层递归帧数，CPython zero-cost）捕获转 `SanyanError`；不主动限深、不降低合法递归能力（一度用 wrapper 分层砍半递归深度卡死自举，已纠正）
+- **大整数显示裸 `ValueError`**：`2^100000`（30103 位）超 Python `int→str` 4300 位限制——`format_value` 捕获给清晰位数信息，不崩、不污染全局限制
+- **并发任务异常静默吞成 0**：`_spawn_thread` 在子线程 re-raise 异常（子线程异常不传播、`results[idx]` 留 `None`、被主线程默认成 `TritValue(0)`）——`(并发 (除 1 0) ...)` 得 `[0, ...]`，除零静默变合法值 0（比裸崩更隐蔽）；修为写可见错误标记，与 `并行块` 一致，消除 stderr 噪音
+- **锁 API 变量不可用 + 名含引号**：`锁/锁住/开锁` 用 `arg if isinstance(arg, str) else eval` 提取锁名，但变量引用在 AST 里也是 `str`，被当字面量符号名直用——`(锁住 变量)` 永远"未定义的锁"，锁无法配合变量使用；统一 `eval` 提取锁名（字面量与变量一致、不含引号）
+
+### Metrics
+
+| 指标 | 值 |
+| --- | --- |
+| pytest（`tests/`） | 2705 passed / 0 failed / ~5 skipped（passed ±2 / skip 随 gcc 漂移，0 failed 为硬指标）|
+| 健壮性契约 | 54 项（双前端 + 运行时 + 编码 + 并发），对抗探针三轮固化 |
+| ruff check / format | 0 问题 / 已格式化 |
+| mypy | 0 问题 |
+| 已知未修 | 2 个 LLVM 后端 bug（词法字符串编译后无限循环 / 非 Windows 全角解析差异）——需 llc/clang 工具链或非 Windows 平台复现验证，属实验性后端成熟度，docs/llvm.md 已记录、有回退路径不阻塞自举 |
+
+---
+
 ## [v3.56.0] — 2026-07-08
 
 > **FFI 全线落地周（⚗️ 实验性）+ 实验策略 v2 转向。外语互操作从 RFC 到能用：Python 进程内桥（六算子+三态信封）、C 声明导入（c_bind_gen 生成器 → manifest+三言桩 → ctypes 运行时 → LLVM extern 双后端），同一 C 库在解释器与原生编译下产出一致——差分角落回纳达成。agent 线按预算指示冻结前完成 25 轮总账：失败数据库结构化 92 条实跑记录并当天产出四条硬规律（含推翻自己前一天的错误排除结论），拆步执行器落地待 A/B。**
