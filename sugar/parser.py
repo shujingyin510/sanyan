@@ -366,6 +366,8 @@ class _Parser:
         cases = []
         while self.peek() and self.peek().value != '}':
             cases.append(self.parse_expression())
+            if self.peek() and self.peek().value == ':':
+                self.advance()
             cases.append(self.parse_block())
         self._expect('}')
         return ['judge', val] + cases
