@@ -15,6 +15,7 @@ from core.values import (
     SrcNode,
     SanyanError,
     SanyanNameError,
+    SanyanRuntimeError,
     SanyanSyntaxError,
     SanyanTypeError,
 )
@@ -427,36 +428,43 @@ class SanyanEvaluator(SanyanRuntime):
         - list → 区分：首元素为字符串 → AST 代码节点求值；否则 → 数据列表直接返回
         - int/float → 包装为 TritValue
         - str → 符号解析或字面量（保持原始 Python 类型以兼容现有 ops）
+
+        对抗探针 0708：整个体包 try，深嵌套数据/表达式的 RecursionError 捕获转清晰
+        SanyanError，不裸栈溢出崩。**内联 try 不增每层递归帧数**（CPython zero-cost，
+        wrapper 分层会砍半递归深度、卡死自举），也不主动限深、不降低合法递归能力。
         """
-        # SrcNode 和 list 都需要走 _eval_list
-        if isinstance(node, list):
-            if len(node) == 0:
+        try:
+            # SrcNode 和 list 都需要走 _eval_list
+            if isinstance(node, list):
+                if len(node) == 0:
+                    return node
+                first = node[0]
+                if type(first) is not str:
+                    return node
+                if self._is_numeric_string(first):
+                    return node
+                return self._eval_list(node)
+            if type(node) is str:
+                return self._eval_str(node)
+            if type(node) is int:
+                # 缓存常用整数值
+                cache = SanyanEvaluator._TRIT_CACHE
+                if node in cache:
+                    return cache[node]
+                tv = TritValue(node)
+                if -100 <= node <= 100:
+                    cache[node] = tv
+                return tv
+            if type(node) is float:
+                return TritValue(node)
+            if type(node) is dict:
                 return node
-            first = node[0]
-            if type(first) is not str:
+            # TritValue/FunctionValue/ModuleValue 等自定义类型
+            if isinstance(node, (TritValue, ArrayValue, FunctionValue, ModuleValue)):
                 return node
-            if self._is_numeric_string(first):
-                return node
-            return self._eval_list(node)
-        if type(node) is str:
-            return self._eval_str(node)
-        if type(node) is int:
-            # 缓存常用整数值
-            cache = SanyanEvaluator._TRIT_CACHE
-            if node in cache:
-                return cache[node]
-            tv = TritValue(node)
-            if -100 <= node <= 100:
-                cache[node] = tv
-            return tv
-        if type(node) is float:
-            return TritValue(node)
-        if type(node) is dict:
             return node
-        # TritValue/FunctionValue/ModuleValue 等自定义类型
-        if isinstance(node, (TritValue, ArrayValue, FunctionValue, ModuleValue)):
-            return node
-        return node
+        except RecursionError:
+            raise SanyanRuntimeError('求值嵌套过深：数据/表达式递归栈溢出（防裸崩）') from None
 
     def _eval_list(self, node: list) -> Any:
         """求值列表形式的表达式（函数调用、操作等）。"""

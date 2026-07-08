@@ -147,3 +147,37 @@ def test_sugar_deep_nesting_no_crash():
     # 定向钉：超深嵌套包成 SanyanSyntaxError，不 RecursionError 裸崩
     with pytest.raises(SanyanError, match='嵌套过深'):
         _run_sugar(_SUGAR_DEEP)
+
+
+# ── 运行时深水区（对抗探针 0708 第二轮：深嵌套 eval 递归 / 深相等 / 大整数显示）──
+#     解析能过但 eval 阶段的深递归此前裸 RecursionError 崩（"死亡区间"：太浅正常、
+#     太深被解析器兜住、中间地带 eval 裸崩）；大整数十进制显示裸 ValueError。
+
+_RT_DEEP = '(列表 ' * 1000 + '1' + ')' * 1000  # eval 阶段深嵌套（解析通过、求值递归）
+
+_RUNTIME_GRACEFUL = [
+    _RT_DEEP,  # 深嵌套列表构造（eval 递归，曾裸 RecursionError）
+    '(same ' + _RT_DEEP + ' ' + _RT_DEEP + ')',  # 深相等（先 eval 深参数，同一守护）
+    '(输出 (幂 2 100000))',  # 大整数显示（曾裸 ValueError）
+    '(幂 2 50000)',  # 大数计算（内部大整数）
+    '(定义 f (n) (若 (等于 n 0) 0 (加 1 (f (减 n 1))))) (f 400)',  # 超命令递归上限
+]
+
+
+@pytest.mark.parametrize('src', _RUNTIME_GRACEFUL, ids=range(len(_RUNTIME_GRACEFUL)))
+def test_runtime_deepwater_never_crash(src):
+    try:
+        _run(src)
+    except SanyanError:
+        pass  # 清晰错误 = 合格；裸 RecursionError/ValueError 会传播 → 失败
+
+
+def test_deep_nested_eval_caught_not_crash():
+    # 定向钉：深嵌套数据的 eval 递归包成 SanyanError，不裸 RecursionError 崩
+    with pytest.raises(SanyanError, match='求值嵌套过深'):
+        _run(_RT_DEEP)
+
+
+def test_big_int_display_no_bare_valueerror():
+    # 大整数十进制显示不裸 ValueError（给清晰位数信息）——不抛即合格
+    _run('(输出 (幂 2 100000))')

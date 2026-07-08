@@ -44,7 +44,12 @@ class IOOps:
                 return s
             if val.is_float():
                 return f'{val.to_float()}（三进制: {val.symbol}）'
-            return f'{val.to_int()}（三进制: {val.symbol}）'
+            # 超大整数的十进制转换受 Python int→str 位数上限保护（对抗探针 0708：
+            # 2^100000 曾裸 ValueError 穿透）——捕获给清晰位数信息，不崩、不改全局限制。
+            try:
+                return f'{val.to_int()}（三进制: {val.symbol}）'
+            except ValueError:
+                return f'<大整数：约 {val.to_int().bit_length()} 位二进制，十进制过长不予显示>'
         else:
             return str(val)
 
