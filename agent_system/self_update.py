@@ -611,7 +611,8 @@ def make_shrink_oracle(
                 ):
                     hint = (
                         f'；注意 {missing[0]} 定义在类 {cls.name} 里——类方法裸名调用必然 NameError：'
-                        f'要么把它搬到模块级（顶格、类外），要么改用 {cls.name}.{missing[0]}(...) 限定调用'
+                        f'最小修复是改用 {cls.name}.{missing[0]}(...) 限定调用，'
+                        f'或把它搬到模块级（顶格、类外）'
                     )
                     break
             return OracleVerdict(
