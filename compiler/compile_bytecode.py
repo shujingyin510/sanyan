@@ -149,7 +149,7 @@ def compile_source(source: str, output_path: str, vars_table: dict | None = None
     if not export_names:
         fixed = []
         for s in ast[1:]:
-            if isinstance(s, list) and s[0] == 'export':
+            if isinstance(s, list) and s and s[0] == 'export':
                 for n in s[1:]:
                     if n != '导出':
                         export_names.append(n)
