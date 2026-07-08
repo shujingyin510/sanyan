@@ -601,9 +601,22 @@ def make_shrink_oracle(
         missing = _unresolved_calls_in_function(tree, func_name)
         if missing:
             names = ', '.join(missing[:3])
+            # 0708 第十六轮：两个候选把辅助函数定义在**类里**、又用裸名调用——旧文案
+            # "没真正定义/导入"误导（明明定义了，病在调用形式），候选 2 收到候选 1 的
+            # 教训后原样重蹈。名字若绑定在某个类体里，点名真正的两条出路。
+            hint = ''
+            for cls in ast.walk(tree):
+                if isinstance(cls, ast.ClassDef) and any(
+                    isinstance(m, (ast.FunctionDef, ast.AsyncFunctionDef)) and m.name == missing[0] for m in cls.body
+                ):
+                    hint = (
+                        f'；注意 {missing[0]} 定义在类 {cls.name} 里——类方法裸名调用必然 NameError：'
+                        f'要么把它搬到模块级（顶格、类外），要么改用 {cls.name}.{missing[0]}(...) 限定调用'
+                    )
+                    break
             return OracleVerdict(
                 False,
-                f'{func_name} 调用了模块内解析不到的名字: {names}（fail-closed：抽取的辅助函数没真正定义/导入）',
+                f'{func_name} 调用了模块内解析不到的名字: {names}（fail-closed：抽取的辅助函数没真正定义/导入{hint}）',
                 {'span': span, 'unresolved': missing},
             )
         if conserve:

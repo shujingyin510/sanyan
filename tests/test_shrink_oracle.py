@@ -236,6 +236,27 @@ def test_deleted_duplicate_line_rejected(tmp_path):
     assert 'matched = False' in v.reason  # 亏空的正是被压缩掉的那份重复行
 
 
+def test_class_method_bare_call_diagnosis_names_call_form(tmp_path):
+    # 0708 第十六轮回归钉：辅助函数定义在类里、裸名调用——旧文案"没真正定义/导入"
+    # 误导（明明定义了，病在调用形式），候选 2 拿着候选 1 的教训原样重蹈。
+    # 诊断必须点名类与两条出路（搬模块级 / 类名.名字(...) 限定调用）。
+    new = (
+        'class C:\n'
+        '    @staticmethod\n'
+        '    def big(evaluator, args):\n'
+        '        return _impl(evaluator, args)\n'
+        '\n'
+        '    @staticmethod\n'
+        '    def _impl(evaluator, args):\n'
+        '        val = evaluator.eval(args[0])\n'
+        '        return val\n'
+    )
+    wd = _write(tmp_path, new)
+    v = make_shrink_oracle('mod.py', 'big', 10)(wd)
+    assert not v.ok and '解析不到的名字' in v.reason
+    assert '定义在类 C 里' in v.reason and 'C._impl(...)' in v.reason and '模块级' in v.reason
+
+
 def test_true_move_with_duplicates_passes(tmp_path):
     # 两份重复原样搬进辅助函数 → 整文件计数不变，守恒放行
     new = (

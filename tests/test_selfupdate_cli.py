@@ -204,3 +204,12 @@ def test_agent_env_never_enables_ffi():
     import agent_system.run_self_update as rsu
 
     assert 'SANYAN_FFI' not in inspect.getsource(rsu)
+
+
+def test_unresolved_tip_names_both_escape_routes():
+    # 0708 第十六轮：解析不到的纠偏须点名两条出路（模块级 / 类名.限定调用）——
+    # 旧文案"你没定义它"不对症，候选拿着教训原样重蹈
+    import agent_system.run_self_update as rsu
+
+    tip = rsu.classify_tip('big 调用了模块内解析不到的名字: _impl（fail-closed：…）')
+    assert '模块级' in tip and '类名.辅助函数名' in tip
