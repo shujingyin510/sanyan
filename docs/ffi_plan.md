@@ -6,9 +6,9 @@
 > （pycparser 声明导入 → manifest+桩，err 默认 null 人审补注，8 测试）+
 > `ops/c_ffi_ops.py`（c载入/c调/c释 ctypes 运行时，err 四惯例，struct 按值字典往返，
 > 12 测试含 gcc 活体 8 项）。编译路径显式报错已落地（VM 模式打印 `[FFI]` 后回退求值
-> 器）；手册 §20 + 双语 README 已加。**余项**：桩经 `导入` 的端到端集成（manifest
-> 相对路径语义待定）、语法糖（#6 待定夺）、M4-LLVM extern（§4.6）、M5 安全收口清单
-> 复核。实现偏差见开放问题 #7/#8；pycparser 为可选开发依赖（ffi-gen extra）。
+> 器）；手册 §20 + 双语 README 已加。**桩经 `导入` 端到端已收口**（07-08：
+> import_module 记模块目录，c载入 相对路径按其解析——三件套同目录从任意处导入即用）。
+> **余项**：语法糖（#6 待定夺）、M4-LLVM extern（§4.6）、M5 安全收口清单复核。实现偏差见开放问题 #7/#8；pycparser 为可选开发依赖（ffi-gen extra）。
 > 一句话：**AST 买到的是语法，贵的是语义**——Python 走进程内运行时桥（宿主白送），
 > C 走"声明层 AST 导入"（pycparser 只解析 .h 签名，运行时 ctypes / 编译期 LLVM extern
 > 双后端共用一份 manifest）；TypeScript 无限期缓议（无运行时协同、类型系统无处可接）。
