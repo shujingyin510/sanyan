@@ -641,6 +641,11 @@ def parse_code(code: str, skin_mgr=None) -> tuple[Any, list[str]]:
                 elif internal_op:
                     tok.value = internal_op
 
-    ast, comments = parse_tokens(tokens, reporter, code)
+    # 递归下降对超深嵌套会耗尽 Python 栈——包成清晰语法错误，不裸 RecursionError 崩
+    # （对抗探针 0708：糖前端 3000 层嵌套曾裸崩，S 表达式前端已包住，这里对齐）。
+    try:
+        ast, comments = parse_tokens(tokens, reporter, code)
+    except RecursionError:
+        raise SanyanSyntaxError('嵌套过深：源码结构层数超过解析器上限') from None
     reporter.raise_if_any()
     return ast, comments

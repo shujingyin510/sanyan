@@ -243,7 +243,8 @@ def _eval_symbol(evaluator: Any, symbol: str) -> Any:  # pragma: no cover — �
     if '.' in symbol:
         return _eval_dot_symbol(evaluator, symbol)
     if '：' in symbol:
-        obj, attr = symbol.split('：')
+        # split 一次：多个全角冒号不再裸 ValueError 穿透（对抗探针 0708）
+        obj, attr = symbol.split('：', 1)
         return _eval_symbol(evaluator, obj + '.' + attr)
     if evaluator.context_object is not None:
         return _eval_context_symbol(evaluator, symbol)
@@ -251,8 +252,16 @@ def _eval_symbol(evaluator: Any, symbol: str) -> Any:  # pragma: no cover — �
 
 
 def _eval_dot_symbol(evaluator: Any, symbol: str) -> Any:  # pragma: no cover — 通过 wrapper 间接覆盖
-    """解析 对象.属性 形式的 IoT 设备访问"""
-    obj, attr = symbol.split('.')
+    """解析 对象.属性 形式的 IoT 设备访问。
+
+    健壮性（对抗探针 0708）：symbol 含多个点时 `obj, attr = split('.')` 曾裸
+    ValueError 穿透（畸形数字 `1.2.3`、多级 `a.b.c` 作为参数值时）——改 split 一次，
+    畸形数字字面量给清晰语法错误，多级点当设备名找不到而非崩。
+    """
+    obj, attr = symbol.split('.', 1)
+    # 数字开头且含点又走到这里 = 畸形数字字面量（合法浮点在词法层已处理）
+    if obj[:1].isdigit() or (obj[:1] == '-' and obj[1:2].isdigit()):
+        raise SanyanSyntaxError(f'无法解析数字字面量: {symbol}')
     if obj in evaluator.actuators:
         val = TritValue.from_string(attr)
         evaluator.actuators[obj] = val

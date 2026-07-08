@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from core.values import SanyanSyntaxError
+
 
 class SugarError:
     def __init__(self, line: int, col: int, message: str) -> None:
@@ -46,5 +48,8 @@ class SugarErrorReporter:
         return ''
 
     def raise_if_any(self) -> None:
+        # 抛 SanyanSyntaxError（继承 Python SyntaxError，反向兼容既有 catch SyntaxError
+        # 的调用点）——统一进 SanyanError 家族，糖语法的语法错误不再从 catch SanyanError
+        # 漏网（对抗探针 0708：此前裸 SyntaxError 与 S 表达式前端不一致）。
         if self.errors:
-            raise SyntaxError(str(self.errors[0]))
+            raise SanyanSyntaxError(str(self.errors[0]))
