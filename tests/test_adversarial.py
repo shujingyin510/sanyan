@@ -181,3 +181,35 @@ def test_deep_nested_eval_caught_not_crash():
 def test_big_int_display_no_bare_valueerror():
     # 大整数十进制显示不裸 ValueError（给清晰位数信息）——不抛即合格
     _run('(输出 (幂 2 100000))')
+
+
+# ── 编码/Unicode 深水区 + 并发异常语义（对抗探针 0708 第三轮）──────────────────
+#     编码层全部本就优雅（Unicode 按码点/null 字节/超长串）——钉住防回归；
+#     并发任务异常此前静默吞成 0（子线程 re-raise 丢失结果、主线程默认 0），已修为可见标记。
+
+_NUL = chr(0)  # 源文件不放字面 null 字节
+
+
+def test_unicode_by_codepoint_and_null_bytes():
+    assert _run(f'(length "a{_NUL}b")').to_int() == 3  # null 字节不破坏计数
+    assert _run('(length "𝕏𝕐𝕑")').to_int() == 3  # 4 字节 UTF-8 按码点（非 UTF-16 单元）
+    assert _run('(length "👨‍👩‍👧")').to_int() == 5  # emoji ZWJ 族按码点
+    assert _run('(substring "𝕏𝕐𝕑" 0 2)')  # 代理对区间子串不崩
+    assert _run(f'(替换 "a{_NUL}b" "{_NUL}" "X")')  # null 字节替换不崩
+
+
+def test_million_char_string_no_crash():
+    # 2^20 = 1M 字符串构造 + 操作不崩
+    assert _run('(定义 f (s n) (若 (等于 n 0) s (f (连接 s s) (减 n 1)))) (length (f "xy" 20))').to_int() == 2097152
+
+
+def test_concurrent_task_exception_not_silent():
+    # 除零任务结果必须是可见错误标记，不是静默 0（此前 [0, 2]，0 混淆成合法返回值）
+    r = repr(_run('(并发 (除 1 0) (加 1 1))'))
+    assert '并发执行错误' in r  # 失败任务可见标记
+    assert '2' in r  # 成功任务正常
+
+
+def test_parallel_task_exception_marked():
+    r = repr(_run('(并行块 (除 1 0))'))
+    assert '错误' in r  # 并行块同样标记错误，不崩

@@ -16,10 +16,12 @@ class _ConcurrentContext:
 def _spawn_thread(evaluator, fn_node, results, idx):
     try:
         results[idx] = evaluator.eval(fn_node)
-    except SanyanRuntimeError:
-        raise
     except Exception as e:
-        raise SanyanRuntimeError(f'并发执行错误: {e}') from e
+        # 任务异常写进结果槽为可见错误标记（对抗探针 0708）——先前在子线程 re-raise，
+        # 而子线程异常不传播到主线程：只打印 traceback 到 stderr、results[idx] 留 None、
+        # 被主线程默认成 TritValue(0)，失败任务静默成合法值 0（除零→0 混进结果）。
+        # 改为写错误字符串（与 并行块 的错误标记一致，不静默、不裸崩、无 stderr 噪音）。
+        results[idx] = TritValue(f'并发执行错误: {e}')
 
 
 def concurrent_run(evaluator, args):
