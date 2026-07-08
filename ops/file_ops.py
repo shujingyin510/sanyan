@@ -450,6 +450,10 @@ class FileOps:
         from core.evaluator import SanyanEvaluator
 
         module_env = SanyanEvaluator(skin_manager=evaluator.skin_manager)
+        # 模块目录随模块求值器走：模块体内的相对资源路径（如 FFI 桩的 manifest
+        # `c载入("mini.ffi.json")`）按模块所在目录解析——否则全落在 CWD 上，
+        # 从别处导入生成桩必失败。嵌套导入各自的新 env 各带各的目录。
+        module_env._module_dir = os.path.dirname(abs_path)
         ast = _parse_code(code, module_env)
 
         # 收集导出声明

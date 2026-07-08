@@ -107,6 +107,12 @@ def _c_load(evaluator: Any, args: list) -> dict:
         raise SanyanSyntaxError('c载入 需要一个参数（manifest 路径）')
     global _next_id
     path = _to_python(evaluator.eval(args[0]))
+    # 相对路径解析序：CWD → 当前模块目录（import_module 设 _module_dir）——
+    # 生成桩里的 `c载入("mini.ffi.json")` 从任意处 导入 都能找到与桩同目录的 manifest
+    if isinstance(path, str) and not os.path.isabs(path) and not os.path.exists(path):
+        mod_dir = getattr(evaluator, '_module_dir', '')
+        if mod_dir and os.path.exists(os.path.join(mod_dir, path)):
+            path = os.path.join(mod_dir, path)
     try:
         with open(path, encoding='utf-8') as f:
             manifest = json.load(f)

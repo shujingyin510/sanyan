@@ -148,3 +148,52 @@ def test_live_release_idempotent(lib_handle):
     h = cf._c_call(_EV, [lib_handle, 'openf', 'x'])['值']  # null_ret 判假但值仍是句柄形状
     assert cf._c_release(_EV, [h]).to_int() == 1
     assert cf._c_release(_EV, [h]).to_int() == 1  # 幂等
+
+
+@pytestmark_live
+def test_live_generated_stub_via_import(tmp_path):
+    # 终极验收：c_bind_gen 产物（桩+manifest+库）放一个目录，真实求值器从**别处**
+    # `导入` 桩后裸名直调 C——验证 _module_dir 相对路径解析（此前 manifest 只认 CWD）
+    r = subprocess.run(
+        [
+            sys.executable,
+            '-X',
+            'utf8',
+            'scripts/c_bind_gen.py',
+            os.path.join(_FIX_DIR, 'mini.h'),
+            '--lib',
+            'mini',
+            '--no-preprocess',
+            '-o',
+            str(tmp_path),
+        ],
+        capture_output=True,
+        text=True,
+        encoding='utf-8',
+        errors='replace',
+        timeout=60,
+    )
+    assert r.returncode == 0, r.stderr
+    ext = 'dll' if sys.platform.startswith('win') else ('dylib' if sys.platform == 'darwin' else 'so')
+    binary = tmp_path / (f'mini.{ext}' if ext == 'dll' else f'libmini.{ext}')
+    rc = subprocess.run(
+        [_GCC, '-shared', '-o', str(binary), os.path.join(_FIX_DIR, 'mini.c'), '-I', _FIX_DIR]
+        + ([] if sys.platform.startswith('win') else ['-fPIC']),
+        capture_output=True,
+        text=True,
+        timeout=120,
+    )
+    assert rc.returncode == 0, rc.stderr
+
+    from core.evaluator import SanyanEvaluator
+    from core.lexer import tokenize
+    from core.parser import parse_program
+
+    env = SanyanEvaluator()
+    stub = str(tmp_path / 'mini.san').replace(chr(92), '/')
+    src = f'(导入 "{stub}")\n(add 2 3)'
+    result = None
+    for form in parse_program(tokenize(src), src):
+        result = env.eval(form)
+    val = result.to_int() if hasattr(result, 'to_int') else result
+    assert val == 5  # 桩→manifest(模块目录解析)→c载入→c调 全链路
