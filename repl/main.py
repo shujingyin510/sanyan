@@ -264,7 +264,11 @@ def main():
 
             try:
                 compile_san(filepath, bin_path)
-            except Exception:
+            except Exception as exc:
+                # FFI 程序编译期显式报错（docs/ffi_plan.md §1）：回退可用但绝不静默——
+                # 打印原因让后端能力边界可见（差分口径已单独排除 FFI 用例）
+                if '仅解释器路径支持' in str(exc):
+                    print(f'[FFI] {exc}——本次回退 Python 求值器执行')
                 use_eval = True  # 编译失败回退求值器
 
         if not use_eval:

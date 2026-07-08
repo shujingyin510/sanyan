@@ -227,3 +227,54 @@ def test_differential_skips_ffi_cases_visibly():
     v = DifferentialVerifier()
     report = v.verify_consistency([{'input': '(输出 (py导入 "json"))', 'expected': ''}])
     assert report['total'] == 0 and report['skipped_ffi'] == 1  # 不进差分且计数可见
+
+
+# ── §1 后端矩阵：编译路径显式报错（M2）──────────────────────────────────────
+
+
+def test_compiler_rejects_ffi_ops_explicitly(tmp_path):
+    # 字节码/LLVM 后端没有进程内 Python 运行时——编译期显式报错，绝不静默吞掉
+    from compiler.compile_bytecode import compile_source
+    from core.values import SanyanSyntaxError
+
+    with pytest.raises(SanyanSyntaxError, match='仅解释器路径支持'):
+        compile_source('(输出 (解包 (py导入 "json")))', str(tmp_path / 'x.bin'))
+
+
+def test_compiler_allows_ffi_name_as_string_data(tmp_path):
+    # 只查算子位（列表头）：字符串数据里出现 "py导入" 不误伤
+    from compiler.compile_bytecode import compile_source
+
+    ok, size, _ = compile_source('(输出 "py导入 是算子名")', str(tmp_path / 'y.bin'))
+    assert (ok.to_int() if hasattr(ok, 'to_int') else ok) == 1  # 编译器返回 TritValue
+    assert (size.to_int() if hasattr(size, 'to_int') else size) > 0
+
+
+# ── 真实求值器全链路（注册表/分派/解包互操作，不走子进程）───────────────────
+
+
+def test_real_evaluator_end_to_end_json():
+    from core.evaluator import SanyanEvaluator
+    from core.lexer import tokenize
+    from core.parser import parse_program
+
+    env = SanyanEvaluator()
+    src = '(设 j (解包 (py导入 "json")))\n(设 d (解包 (py取 j "dumps")))\n(解包 (py调 d (字典 "a" 1)))'
+    result = None
+    for form in parse_program(tokenize(src), src):
+        result = env.eval(form)
+    assert result == '{"a": 1}'
+
+
+def test_real_evaluator_gate_off_is_teachable(monkeypatch):
+    # 未开 SANYAN_FFI：解包信封给出可读安全拒绝（教学一致性），不是裸 traceback
+    from core.evaluator import SanyanEvaluator
+    from core.lexer import tokenize
+    from core.parser import parse_program
+    from core.values import SanyanRuntimeError
+
+    monkeypatch.delenv('SANYAN_FFI', raising=False)
+    env = SanyanEvaluator()
+    (form,) = parse_program(tokenize('(解包 (py导入 "json"))'), '')
+    with pytest.raises(SanyanRuntimeError, match='FFI 未启用'):
+        env.eval(form)

@@ -57,6 +57,21 @@ def _fold_constants(node):
     return folded
 
 
+_FFI_OPS = ('py导入', 'py取', 'py调', 'py项', 'py列', 'py释', 'c载入', 'c调')
+
+
+def _find_ffi_op(node) -> str | None:
+    """在 AST 里找算子位（列表头）上的 FFI 操作名；找不到返回 None。"""
+    if isinstance(node, list) and node:
+        if isinstance(node[0], str) and node[0] in _FFI_OPS:
+            return node[0]
+        for child in node:
+            hit = _find_ffi_op(child)
+            if hit:
+                return hit
+    return None
+
+
 def compile_source(source: str, output_path: str, vars_table: dict | None = None) -> list:
     """编译源码字符串为 .bin 文件。返回 [成功, 代码大小, 变量数]。"""
     from core.preprocess import preprocess_includes
@@ -121,6 +136,15 @@ def compile_source(source: str, output_path: str, vars_table: dict | None = None
         raise SanyanSyntaxError('解析失败，请检查语法（支持 sugar 和 S-表达式两种语法）')
 
     ast = sugar_ast
+    # FFI 后端矩阵（docs/ffi_plan.md §1）：Python 桥是**进程内**运行时能力，字节码 VM/
+    # LLVM 后端没有这个运行时——编译期显式报错，绝不静默吞掉（只查算子位/表头，
+    # 字符串数据里出现 "py导入" 不误伤）。repl 主流程捕获此错并回退求值器（带打印）。
+    ffi_op = _find_ffi_op(ast)
+    if ffi_op:
+        raise SanyanSyntaxError(
+            f'{ffi_op} 仅解释器路径支持（--eval）——FFI 是进程内 Python 桥，'
+            f'字节码/LLVM 后端无此运行时（docs/ffi_plan.md §1 后端矩阵）'
+        )
     # 自动提取 sugar AST 中的 (export ...) / (导出 ...) 节点
     if not export_names:
         fixed = []

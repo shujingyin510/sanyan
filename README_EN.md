@@ -137,6 +137,7 @@ Register virtual devices, read/write sensors with ternary values. Perfect for sm
 | **Higher-Order Functions** | `map`/`filter`/`reduce`/`sort`/`reverse`/`unique`/`sum`/`join` |
 | **Lambda** | `λ(x) { x * 2 }` or `function(x) { x * 2 }` |
 | **Module System** | `import("path")`, `export name1 name2`, nested package import |
+| **FFI ⚗️ experimental** | In-process Python bridge (`py导入`/`py调`, six ops); every foreign call returns a **tri-state envelope** (verdict/payload/error separated); opt-in via `SANYAN_FFI=1`, interpreter path only — see manual §20 and `docs/ffi_plan.md` |
 | **Line Comments** | `//` (halfwidth), `／／` (fullwidth), `#` — three comment syntaxes |
 
 ### Bytecode VM
