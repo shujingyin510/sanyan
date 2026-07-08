@@ -29,7 +29,13 @@ def _find_llc() -> str | None:
     return find_llc()
 
 
-def build(input_path: str, output_path: str | None = None, run: bool = False) -> str:
+def build(
+    input_path: str,
+    output_path: str | None = None,
+    run: bool = False,
+    ffi_manifests: tuple = (),
+    link_libs: tuple = (),
+) -> str:
     """编译 .san 文件为可执行文件。"""
     name = os.path.splitext(os.path.basename(input_path))[0]
     if output_path is None:
@@ -49,7 +55,7 @@ def build(input_path: str, output_path: str | None = None, run: bool = False) ->
     print(f'[2/3] 编译 {input_path} → LLVM IR → .o ...')
     with open(input_path, 'r', encoding='utf-8') as f:
         source = f.read()
-    ir_text, _cg = compile_source(source, name)
+    ir_text, _cg = compile_source(source, name, ffi_manifests=ffi_manifests)
 
     ir_path = os.path.join(tempfile.gettempdir(), f'{name}.ll')
     obj_path = os.path.join(tempfile.gettempdir(), f'{name}.o')
@@ -108,7 +114,11 @@ def build(input_path: str, output_path: str | None = None, run: bool = False) ->
 
     # 3. 链接
     print(f'[3/3] 链接 → {output_path} ...')
-    subprocess.run([cc, obj_path, rt_obj, '-o', output_path, '-lm'], check=True)
+    # link_libs：FFI 库文件路径或 -l 旗标（M4-LLVM），位于对象之后、-lm 之前。
+    # Windows 须挂 winhttp（runtime.c 的 http_get 用 WinHTTP——此前本机 llc 缺席，
+    # 链接步从未被走到，欠账 0708 由 FFI native 测试首次暴露）。
+    sys_libs = ['-lwinhttp'] if sys.platform == 'win32' else []
+    subprocess.run([cc, obj_path, rt_obj, *link_libs, '-o', output_path, '-lm', *sys_libs], check=True)
 
     # 清理
     os.unlink(ir_path)

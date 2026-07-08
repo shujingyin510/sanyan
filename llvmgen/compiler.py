@@ -179,12 +179,12 @@ def _parse_c_s_expr(source: str) -> list | None:
     return None
 
 
-def compile_source(source: str, module_name: str = 'main') -> tuple[str, 'CodegenContext']:
-    """编译三言源码，返回 (ir_text, codegen_context)。"""
+def compile_source(source: str, module_name: str = 'main', ffi_manifests: tuple = ()) -> tuple[str, 'CodegenContext']:
+    """编译三言源码，返回 (ir_text, codegen_context)。ffi_manifests: FFI extern 表来源。"""
     ast = _parse_source(source)
     if not isinstance(ast, list):
         raise SyntaxError(f'解析结果不是列表: {type(ast)}')
-    cg = compile_top_level(ast, module_name)
+    cg = compile_top_level(ast, module_name, ffi_manifests=ffi_manifests)
     return cg.verify(), cg
 
 

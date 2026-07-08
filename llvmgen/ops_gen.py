@@ -405,6 +405,15 @@ def _compile_node_inner(node, cg: CodegenContext) -> ir.Value | None:
         result = cg.builder.call(cg._funcs[resolved_op], arg_vals, name=f'call_{op}')
         _maybe_unwind(cg)
         return result
+    # ── FFI extern 直呼（M4-LLVM，manifest 驱动——docs/ffi_plan.md §4.6）：
+    # sanyan 函数查完才轮到 extern 表，同名 sanyan 定义优先（影子规则显式化）
+    ffi_externs = getattr(cg, '_ffi_externs', None)
+    if ffi_externs and resolved_op in ffi_externs:
+        from llvmgen.ffi_extern import emit_ffi_call
+
+        result = emit_ffi_call(cg, ffi_externs[resolved_op], args, compile_node)
+        _maybe_unwind(cg)
+        return result
     # 单元素列表 → 变量引用（排除字符串字面量）
     if isinstance(node, list) and len(node) == 1 and isinstance(node[0], str):
         if not (node[0].startswith('"') or node[0].startswith("'")):

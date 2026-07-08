@@ -251,8 +251,15 @@ def _make_bootstrap_harness(cg: CodegenContext):
 # ── 顶层编译入口 ──
 
 
-def compile_top_level(ast_nodes: list, module_name: str = 'main', module_prefix: str = '') -> CodegenContext:
+def compile_top_level(
+    ast_nodes: list, module_name: str = 'main', module_prefix: str = '', ffi_manifests: tuple = ()
+) -> CodegenContext:
     cg = CodegenContext(module_name, module_prefix=module_prefix)
+    if ffi_manifests:
+        # FFI extern 表（M4-LLVM）：manifest 函数在调用分派末端可解析为 declare 直呼
+        from llvmgen.ffi_extern import load_ffi_manifests
+
+        cg._ffi_externs = load_ffi_manifests(ffi_manifests)
     _compile_in_context(ast_nodes, cg)
     return cg
 
