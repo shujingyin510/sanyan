@@ -415,3 +415,66 @@ def test_normal_change_unaffected_by_protection(tmp_path):
     loop = SelfUpdateLoop(str(repo), oracle=lambda wt: OracleVerdict(True, 'ok'))
     res = loop.run('normal', _write_edit('code.py', 'x = 2\n'))
     assert res.accepted and res.branch in _branches(repo)
+
+
+# ── 拆步流程（实验策略 v2：固定两步计划 + 阶段间静态检查）──────────────────
+
+
+def test_staged_edit_runs_stages_in_order(tmp_path):
+    # 两阶段按序执行于同一 worktree；阶段检查通过则继续
+    from agent_system.self_update import make_staged_edit_fn
+
+    calls = []
+
+    def fake_runner(cmd, **kw):
+        calls.append(cmd[5])  # prompt 位于命令第 6 位
+        (tmp_path / f'stage{len(calls)}.txt').write_text('x', encoding='utf-8')
+        return SimpleNamespace(returncode=0, stdout='', stderr='')
+
+    def check_a(wt):
+        return '' if (tmp_path / 'stage1.txt').exists() else '阶段A产物缺失'
+
+    fn = make_staged_edit_fn([('步1', check_a), ('步2', None)], runner=fake_runner)
+    fn(str(tmp_path))
+    assert calls == ['步1', '步2']
+
+
+def test_staged_edit_aborts_on_failed_check(tmp_path):
+    # 阶段检查不过 → 抛异常（外层按 edit_fn 异常整体回滚），阶段 B 不烧调用
+    import pytest
+
+    from agent_system.self_update import make_staged_edit_fn
+
+    calls = []
+
+    def fake_runner(cmd, **kw):
+        calls.append(cmd[5])
+        return SimpleNamespace(returncode=0, stdout='', stderr='')
+
+    fn = make_staged_edit_fn([('步1', lambda wt: 'helper 未定义'), ('步2', None)], runner=fake_runner)
+    with pytest.raises(RuntimeError, match='阶段1/2未达标'):
+        fn(str(tmp_path))
+    assert calls == ['步1']  # 阶段 B 没跑
+
+
+def test_def_exists_check(tmp_path):
+    from agent_system.self_update import make_def_exists_check
+
+    (tmp_path / 'm.py').write_text('def _f_block(x):\n    return x\n', encoding='utf-8')
+    assert make_def_exists_check('m.py', '_f_block')(str(tmp_path)) == ''
+    assert '未找到 _nope' in make_def_exists_check('m.py', '_nope')(str(tmp_path))
+    (tmp_path / 'bad.py').write_text('def broken(:\n', encoding='utf-8')
+    assert '不可解析' in make_def_exists_check('bad.py', '_f_block')(str(tmp_path))
+
+
+def test_build_stage_plans_shape():
+    # 计划模板：两步、各一动作、步1带 def 检查、行区间与 helper 名进任务书
+    import agent_system.run_self_update as rsu
+
+    plans = rsu.build_stage_plans('ops/control_ops.py', 'ternary_match', 'L326-399（循环块，74行）')
+    assert len(plans) == 2
+    (pa, ca), (pb, cb) = plans
+    assert '只插入' in pa and '_ternary_match_block' in pa and 'L326-399' in pa and '不要替换原块' in pa
+    assert '只替换' in pb and '_ternary_match_block' in pb and 'L326-399' in pb
+    assert '类名._ternary_match_block' in pb  # 调用形式占位指引（0705/0716 类内裸名死法的预防）
+    assert ca is not None and cb is None

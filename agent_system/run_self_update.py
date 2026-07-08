@@ -16,6 +16,7 @@ AND pytest 全量基线（--baseline，默认 0 失败）AND 差分一致性（-
 
 import argparse
 import os
+import re
 import subprocess
 import sys
 import tempfile
@@ -31,9 +32,11 @@ from agent_system.self_update import (  # noqa: E402
     SelfUpdateLoop,
     combine_oracles,
     make_agent_edit_fn,
+    make_def_exists_check,
     make_differential_oracle,
     make_pytest_oracle,
     make_shrink_oracle,
+    make_staged_edit_fn,
     run_tournament,
     tail_file,
 )
@@ -111,6 +114,40 @@ def classify_tip(reason: str, hints: str = '') -> str:
     return '针对上面的原因修正后再试。'
 
 
+_STAGE_TOOLING = (
+    ' 用 read_file 查看（范围读 路径|起始行|行数，输出每行带 "N│" 行号）；'
+    '改动优先 replace_lines(路径|起始行|结束行|新文本) 按行号整段替换。'
+    '只做这一件事，做完立即 done——不要做任务之外的任何修改。'
+)
+
+
+def build_stage_plans(path: str, func: str, hints: str) -> list:
+    """长函数重构的固定两步计划（Planner=挖掘器模板，零 LLM 成本零幻觉）。
+
+    实验策略 v2 / TODO-DAG 退化版：每阶段一动作 + 独立约束 + 阶段间静态检查。
+    失败库量化的病根：模型把两步当二选一（两步完整率 0/88）——拆开后每次调用
+    只承担一个决策。返回 [(prompt, check), ...] 供 make_staged_edit_fn。
+    """
+    helper = f'_{func}_block'
+    m = re.search(r'L(\d+)-(\d+)', hints or '')
+    span = f'L{m.group(1)}-{m.group(2)}' if m else '任务书候选块'
+    stage_a = (
+        f'【第 1/2 步·只插入】在 {path} 里新增辅助函数 {helper}：与 {func} 同级'
+        f'（若 {func} 是类方法则加 @staticmethod、放在 {func} 之后同级缩进）。'
+        f'函数体 = {func} 内 {span} 那段代码逐行原样搬入（只搬不改：不得改写/删除任何语句、'
+        f'校验条件、异常类型或返回值），签名带上这段代码用到的外部变量。'
+        f'本步不要动 {func} 本体、不要替换原块。' + _STAGE_TOOLING
+    )
+    stage_b = (
+        f'【第 2/2 步·只替换】{path} 里已有刚插入的辅助函数 {helper}。'
+        f'现在把 {func} 函数体内 {span} 那段原代码整段替换成对 {helper} 的调用'
+        f'（{func} 若是类方法则写 类名.{helper}(...)，传入原块用到的变量，'
+        f'并保持返回语义与原来逐字一致——原块外的行一律不动）。'
+        f'替换后 {func} 应明显变短。' + _STAGE_TOOLING
+    )
+    return [(stage_a, make_def_exists_check(path, helper)), (stage_b, None)]
+
+
 def build_retry_feedback(reason: str, hints: str = '', earlier_tip: str = '') -> str:
     """把上次拒绝原因转成给下一次 agent 的定向纠偏提示，塞回任务书首。
 
@@ -184,6 +221,12 @@ def main(argv=None) -> int:
         default=0,
         help='S2 淘汰赛：一任务 N 候选串行赛（N≥2，与 --attempts 互斥）——教训跨候选'
         '去重累积、首个过 oracle 即停、连续零编辑断路',
+    )
+    parser.add_argument(
+        '--staged',
+        action='store_true',
+        help='拆步流程（实验策略 v2）：long_function 任务按固定两步计划执行'
+        '（步1只插入→阶段间静态检查→步2只替换），每次 LLM 调用只承担一个决策',
     )
     args = parser.parse_args(argv)
     if args.candidates >= 2 and args.attempts > 1:
@@ -260,6 +303,22 @@ def main(argv=None) -> int:
     )
     task_hints = picked.hints if picked is not None else ''
 
+    # ── 拆步流程（--staged，实验策略 v2）：固定两步计划替代单发两步任务 ──
+    staged_plans = None
+    if args.staged:
+        if picked is not None and picked.kind == 'long_function':
+            staged_plans = build_stage_plans(picked.path, picked.title, picked.hints)
+            print('  [staged] 固定两步计划已生成：步1只插入 → 阶段间静态检查 → 步2只替换')
+        else:
+            print('  [staged] 仅支持挖掘的 long_function 任务——本次回退单发模式')
+
+    def _make_edit(fb: str) -> Callable:
+        if staged_plans is not None:
+            # 纠偏提示注入每个阶段任务书首（阶段书都很短，两课提示不喧宾夺主）
+            stages = [(fb + p, c) for p, c in staged_plans]
+            return make_staged_edit_fn(stages, timeout=args.agent_timeout, log_path=log_path)
+        return make_agent_edit_fn(fb + prompt, timeout=args.agent_timeout, log_path=log_path)
+
     # ── S2 候选淘汰赛（--candidates N ≥ 2）──
     # 第十三轮定论：模型已能产出"静态完美"的候选（两步齐做+净变短打进 pytest），
     # 差在忠实搬运/行为等价——同噪音下单轮方差极大（2/4 vs 0/4），N 候选取优摊方差，
@@ -272,7 +331,7 @@ def main(argv=None) -> int:
             if feedback:
                 print('  [S2] 已合并此前候选教训（去重多课）')
                 fb = f'⚠ 此前候选均被拒。教训（去重累积，全部仍有效）：\n{feedback}\n\n'
-            return make_agent_edit_fn(fb + prompt, timeout=args.agent_timeout, log_path=log_path)
+            return _make_edit(fb)
 
         def on_candidate(k: int, result) -> None:
             if not result.accepted:
@@ -306,7 +365,7 @@ def main(argv=None) -> int:
             print(f'—— 尝试 {attempt}/{args.attempts} ——')
         if feedback:
             print('  [UR] 已把上次拒绝原因喂回本次任务书（带记忆重试）')
-        result = loop.run(name, make_agent_edit_fn(feedback + prompt, timeout=args.agent_timeout, log_path=log_path))
+        result = loop.run(name, _make_edit(feedback))
         if result.accepted:
             print(f'✓ oracle 通过，产出分支: {result.branch}（请人工审查后合并）')
             return 0

@@ -639,6 +639,58 @@ def make_shrink_oracle(
     return oracle
 
 
+def make_def_exists_check(rel_path: str, func_name: str) -> Callable[[str], str]:
+    """阶段间静态检查（毫秒级，fail-closed）：目标文件里存在 `func_name` 的 def。
+
+    拆步流程的 Reviewer 前哨：阶段 A（插入 helper）没落地就不放行阶段 B（替换调用）
+    ——"先替换会引用不存在的名字"这一死法在阶段间被拦，不烧阶段 B 的 LLM 调用。
+    返回空串 = 通过；非空 = 中止原因。
+    """
+
+    def check(wt: str) -> str:
+        fp = os.path.join(wt, rel_path)
+        try:
+            with open(fp, encoding='utf-8', errors='replace') as f:
+                tree = ast.parse(f.read())
+        except (OSError, SyntaxError, ValueError) as e:
+            return f'{rel_path} 不可解析: {e}'
+        for n in ast.walk(tree):
+            if isinstance(n, (ast.FunctionDef, ast.AsyncFunctionDef)) and n.name == func_name:
+                return ''
+        return f'未找到 {func_name} 的定义（阶段 A 需先把辅助函数完整落进文件）'
+
+    return check
+
+
+def make_staged_edit_fn(
+    stages: Sequence[tuple],
+    *,
+    timeout: int = 1800,
+    runner: Callable[..., subprocess.CompletedProcess] = _run_reaped,
+    log_path: str = '',
+) -> Callable[[str], None]:
+    """拆步执行器（实验策略 v2；TODO-DAG 的固定计划退化版）。
+
+    一个候选 = 同一 worktree 里按序跑 N 个**一动作**agent 阶段；每阶段后可选
+    毫秒级静态检查决定继续/中止——中止抛异常走既有整体回滚（fail-closed）。
+    假设（0708 失败库量化）：弱模型把"两步任务"当二选一（53% 纯插入 / 23% 纯替换，
+    两步完整率 0/88）——把顺序协调从模型侧挪到流程侧，每次调用只承担一个决策。
+    Planner=挖掘器的固定计划模板（零 LLM 成本、零幻觉），Editor=一次一动作，
+    Reviewer=阶段间静态检查 + 既有 oracle 栈。
+    `stages`: [(prompt, check_or_None), ...]，check(wt) → '' 或中止原因。
+    """
+
+    def edit_fn(wt: str) -> None:
+        for i, (prompt, check) in enumerate(stages, 1):
+            make_agent_edit_fn(prompt, timeout=timeout, runner=runner, log_path=log_path)(wt)
+            if check is not None:
+                err = check(wt)
+                if err:
+                    raise RuntimeError(f'阶段{i}/{len(stages)}未达标: {err}')
+
+    return edit_fn
+
+
 def _reject_info_score(reason: str) -> int:
     """拒绝理由的信息量评分——淘汰赛全败时返回给调用方『信息量最大』的那次。
 
