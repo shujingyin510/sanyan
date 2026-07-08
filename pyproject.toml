@@ -24,6 +24,7 @@ core = []  # 纯 Python，无外部依赖
 # ── 扩展功能层 ──
 sugar = []  # 糖语法解析器，仅依赖 values.SrcNode（内含于 core）
 vm = []     # 字节码 VM，零依赖（内含于 core）
+ffi-gen = ["pycparser>=2.21"]  # C 声明导入离线生成器（scripts/c_bind_gen.py）；运行时不需要
 llvmgen = ["llvmlite>=0.40.0"]  # LLVM 代码生成器
 
 # ── IDE 支持层 ──
