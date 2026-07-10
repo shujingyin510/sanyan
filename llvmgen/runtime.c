@@ -108,7 +108,7 @@ void *rt_str_concat(const void *a, const void *b) {
 }
 
 /* 字符串长度（字符数） */
-/* rt_str_len 已在 runtime_common.h 中定义 */
+/* rt_str_len 在 runtime_common.h 中定义 */
 
 /* 子串提取 [start, start+len) */
 void *rt_str_substr(const void *s, int32_t start, int32_t len) {
@@ -1783,3 +1783,13 @@ void *rt_module_call(void *mod_handle, void *func_name, void *arg_list) {
     }
     return _TAG_I(0);
 }
+
+/* ═══════════════════════════════════════════════════════════════
+   LLVM IR extern 可见性适配
+   
+   runtime_common.h 中 rt_str_len 等为 static inline（C VM 内部使用），
+   但 LLVM IR 通过 declare extern 引用这些符号。在文件末尾提供包装函数，
+   绕过 static 限制，使链接器能找到符号。
+   ═══════════════════════════════════════════════════════════════ */
+
+int32_t _llvm_rt_str_len(const void *s) { return _cstr_len(s); }

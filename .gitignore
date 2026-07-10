@@ -203,6 +203,7 @@ dist/
 *.o
 *.ll
 NUL
+nul
 # Compiled bytecode files (except stdlib)
 *.bin
 !stdlib/bytecode_compiler.bin

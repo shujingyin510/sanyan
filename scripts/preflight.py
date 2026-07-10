@@ -33,6 +33,34 @@ YELLOW = '\033[33m'
 RESET = '\033[0m'
 
 
+def _force_utf8_io() -> None:
+    """把 stdout/stderr 钉到 UTF-8，与运行 locale 解耦。
+
+    Windows 中文版控制台/管道默认代码页 936(GBK)，Python 拿它当
+    sys.stdout.encoding；打印状态符（如 ✓ = U+2713，GBK 无此码位）即
+    UnicodeEncodeError 直接崩。显式 reconfigure，errors='replace' 兜底。
+    """
+    for stream in (sys.stdout, sys.stderr):
+        reconfigure = getattr(stream, 'reconfigure', None)
+        if reconfigure is not None:
+            try:
+                reconfigure(encoding='utf-8', errors='replace')
+            except (ValueError, OSError):
+                pass
+
+
+def _run(cmd, **kwargs):
+    """subprocess.run 包装：强制以 UTF-8 解码子进程输出。
+
+    否则在 GBK 代码页下解码 UTF-8 子进程输出会抛 UnicodeDecodeError，
+    读取线程崩溃 → 捕获结果为 None → 下游 .strip() 报 AttributeError
+    （曾表现为 run_all 集成检查在 GBK 控制台伪失败）。errors='replace' 兜底。
+    """
+    kwargs.setdefault('encoding', 'utf-8')
+    kwargs.setdefault('errors', 'replace')
+    return subprocess.run(cmd, **kwargs)
+
+
 @dataclass
 class CheckResult:
     name: str
@@ -76,21 +104,19 @@ def check(name: str, fn: Callable, quick_skip: bool = False):
 
 
 def ruff_format():
-    r = subprocess.run(
-        [sys.executable, '-m', 'ruff', 'format', '--check', '.'], capture_output=True, text=True, cwd=str(ROOT)
-    )
+    r = _run([sys.executable, '-m', 'ruff', 'format', '--check', '.'], capture_output=True, text=True, cwd=str(ROOT))
     assert r.returncode == 0, f'ruff format: {r.stdout.splitlines()[-1] if r.stdout else r.stderr[:200]}'
     return 'OK'
 
 
 def ruff_check():
-    r = subprocess.run([sys.executable, '-m', 'ruff', 'check', '.'], capture_output=True, text=True, cwd=str(ROOT))
+    r = _run([sys.executable, '-m', 'ruff', 'check', '.'], capture_output=True, text=True, cwd=str(ROOT))
     assert r.returncode == 0, f'ruff check: {r.stdout.splitlines()[-1] if r.stdout else r.stderr[:200]}'
     return 'OK'
 
 
 def mypy_check():
-    r = subprocess.run([sys.executable, '-m', 'mypy', '.'], capture_output=True, text=True, cwd=str(ROOT))
+    r = _run([sys.executable, '-m', 'mypy', '.'], capture_output=True, text=True, cwd=str(ROOT))
     # mypy returns 0 even with notes, only fail on actual errors
     if 'error:' in (r.stdout + r.stderr):
         # Find the error line
@@ -136,7 +162,7 @@ def pytest_core():
         'tests/test_coverage_boost7.py',
         'tests/test_math_coverage.py',
     ]
-    r = subprocess.run(
+    r = _run(
         [sys.executable, '-X', 'utf8', '-m', 'pytest'] + test_files + ['-q'],
         capture_output=True,
         text=True,
@@ -154,7 +180,7 @@ def pytest_core():
 
 
 def pytest_self_host():
-    r = subprocess.run(
+    r = _run(
         [sys.executable, '-X', 'utf8', 'tests/test_self_host.py', '-q'],
         capture_output=True,
         text=True,
@@ -171,7 +197,7 @@ def pytest_self_host():
 
 
 def pytest_sugar_self_host():
-    r = subprocess.run(
+    r = _run(
         [sys.executable, '-X', 'utf8', 'tests/test_sugar_self_host.py', '-q'],
         capture_output=True,
         text=True,
@@ -282,7 +308,7 @@ def bin_consistency():
 
 def run_all_tests():
     """集成测试 (.san 文件)"""
-    r = subprocess.run(
+    r = _run(
         [sys.executable, '-X', 'utf8', 'tests/run_all.py'],
         capture_output=True,
         text=True,
@@ -305,7 +331,7 @@ def run_all_tests():
 
 def doc_sync_check():
     """文档一致性检查"""
-    r = subprocess.run(
+    r = _run(
         [sys.executable, '-X', 'utf8', 'scripts/doc_sync.py'],
         capture_output=True,
         text=True,
@@ -347,6 +373,7 @@ def bootstrap_level2():
 
 
 def main():
+    _force_utf8_io()
     quick = '--quick' in sys.argv
     lint_only = '--lint' in sys.argv
     test_only = '--test' in sys.argv

@@ -185,9 +185,70 @@ class TestBootstrapLevel3(unittest.TestCase):
     组合 Level 2 不动点验证 → 完整 Level 3 自举。
     """
 
+    # v3.56.2 可达新操作码差分电池：编译器 OP映射 能发出、且为值语义（非指针比较）、
+    # 两后端应当一致的程序。期望值在 Python VM（参考实现）上实测锚定。
+    # 覆盖 EQ/NE/LTE/NOT(0x11/0x12/0x16/0x17)、OR/AND(0x34/0x35)、
+    # STR_FIND/STARTSWITH/CONTAINS(0x36/0x38/0x39) + 既有算术/比较/字符串控制项。
+    _OPCODE_BATTERY = [
+        ('(输出 42)', '42'),
+        ('(输出 (加 2 3))', '5'),
+        ('(输出 (减 10 4))', '6'),
+        ('(输出 (乘 6 7))', '42'),
+        ('(输出 (大于 5 3))', '1'),
+        ('(输出 (小于 5 3))', '-1'),
+        ('(输出 (等于 5 5))', '1'),
+        ('(输出 (不等于 5 3))', '1'),
+        ('(输出 (不等于 5 5))', '-1'),
+        ('(输出 (大于等于 5 5))', '1'),
+        ('(输出 (小于等于 4 5))', '1'),
+        ('(输出 (非 1))', '-1'),
+        ('(输出 (非 -1))', '1'),
+        ('(输出 (或 -1 1))', '1'),
+        ('(输出 (且 1 1))', '1'),
+        ('(输出 (且 1 -1))', '-1'),
+        ('(输出 (连接 "ab" "cd"))', 'abcd'),
+        ('(输出 (取长 "hello"))', '5'),
+        ('(输出 (查找 "hello" "ll"))', '2'),
+        ('(输出 (查找 "hello" "z"))', '-1'),
+        ('(输出 (前缀 "hello" "he"))', '1'),
+        ('(输出 (前缀 "hello" "xy"))', '-1'),
+        ('(输出 (字符串包含 "hello" "ell"))', '1'),
+        ('(输出 (字符串包含 "hello" "zzz"))', '-1'),
+    ]
+
+    @staticmethod
+    def _run_pyvm(src):
+        """编译 src → .bin，用 Python VM 执行，返回 strip 后的 stdout。"""
+        import io
+        import tempfile
+
+        from compiler.compile_bytecode import compile_source
+        from vm import VM as PyVM
+
+        with tempfile.TemporaryDirectory() as td:
+            bin_path = os.path.join(td, 't.bin')
+            compile_source(src, bin_path)
+            old = sys.stdout
+            sys.stdout = io.StringIO()
+            try:
+                vm = PyVM.from_bin(bin_path)
+                vm.run()
+                return sys.stdout.getvalue().strip()
+            finally:
+                sys.stdout = old
+
+    def test_reachable_opcodes_pyvm(self):
+        """参考实现（Python VM）执行可达新操作码电池——全平台运行，锚定期望值。
+
+        这是种子 VM 差分测试的“黄金输出”来源：C/NASM 种子须与此逐项一致。
+        """
+        for src, expected in self._OPCODE_BATTERY:
+            with self.subTest(src=src):
+                self.assertEqual(self._run_pyvm(src), expected)
+
     @unittest.skipIf(sys.platform != 'linux', 'C VM 种子仅支持 Linux (syscall)，此平台跳过')
     def test_seed_vm_runs_bytecode(self):
-        """编译 C VM 种子，执行简单字节码验证正确性"""
+        """编译 C VM 种子，对整条操作码电池逐项与期望值差分。"""
         import subprocess
         import tempfile
 
@@ -233,39 +294,29 @@ class TestBootstrapLevel3(unittest.TestCase):
                     err_msg = str(result.stderr[:200])
             if not compiled:
                 self.skipTest(f'无法编译种子 VM (gcc/tcc 均失败)\nstderr: {err_msg[:300]}')
-            # 用 C VM 执行简单字节码程序
+            # 逐项：C 种子输出须等于期望值（即 Python VM 参考输出，见 test_reachable_opcodes_pyvm）
             from compiler.compile_bytecode import compile_source
-            from vm import VM as PyVM
 
-            src = '(输出 42)'
-            bin_path = os.path.join(tmpdir, 'test.bin')
-            compile_source(src, bin_path)
-
-            # C VM 输出
-            cvm = subprocess.run(
-                [seed_exe, bin_path],
-                capture_output=True,
-                text=True,
-                timeout=10,
-            )
-
-            # Python VM 输出（用于对比）
-            import io
-
-            old = sys.stdout
-            sys.stdout = io.StringIO()
-            vm = PyVM.from_bin(bin_path)
-            vm.run()
-            py_out = sys.stdout.getvalue().strip()
-            sys.stdout = old
-            cvm_out = cvm.stdout.strip()
-            cvm_err = cvm.stderr.strip()
-            self.assertEqual(
-                cvm.returncode,
-                0,
-                f'C VM 异常退出 rc={cvm.returncode} stderr={cvm_err[:200]}',
-            )
-            self.assertEqual(cvm_out, py_out, f'C VM 输出不匹配: CVM={cvm_out!r} PY={py_out!r} stderr={cvm_err[:100]}')
+            for src, expected in self._OPCODE_BATTERY:
+                with self.subTest(src=src):
+                    bin_path = os.path.join(tmpdir, 'test.bin')
+                    compile_source(src, bin_path)
+                    cvm = subprocess.run(
+                        [seed_exe, bin_path],
+                        capture_output=True,
+                        text=True,
+                        timeout=10,
+                    )
+                    self.assertEqual(
+                        cvm.returncode,
+                        0,
+                        f'C VM 异常退出 rc={cvm.returncode} src={src!r} stderr={cvm.stderr.strip()[:200]}',
+                    )
+                    self.assertEqual(
+                        cvm.stdout.strip(),
+                        expected,
+                        f'C VM 输出不符 src={src!r} 期望={expected!r} 实得={cvm.stdout.strip()!r}',
+                    )
 
     @unittest.skipIf(sys.platform != 'linux', 'C VM 种子仅支持 Linux')
     def test_seed_vm_size(self):

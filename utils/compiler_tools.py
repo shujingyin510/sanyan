@@ -23,12 +23,16 @@ def find_cc() -> str | None:
             return cc_env
 
     # 1. PATH 中查找
+    import shutil
+
     for cc in ['gcc', 'clang', 'cc']:
-        try:
-            subprocess.run([cc, '--version'], capture_output=True, timeout=5, check=False)
-            return cc
-        except (FileNotFoundError, subprocess.TimeoutExpired):
-            continue
+        full = shutil.which(cc)
+        if full and os.path.exists(full):
+            try:
+                subprocess.run([full, '--version'], capture_output=True, timeout=5, check=False)
+                return full
+            except (FileNotFoundError, subprocess.TimeoutExpired):
+                continue
 
     # 2. MSYS2_PATH 环境变量 + 自动探测 Windows MSYS2 路径
     if sys.platform == 'win32':
@@ -63,13 +67,17 @@ def find_llc() -> str | None:
         if llc_env and os.path.exists(llc_env):
             return llc_env
 
-    # 1. PATH 中查找
+    # 1. PATH 中查找（用 which/where 获取完整路径，MSYS2 bash 需要）
+    import shutil
+
     for llc in ['llc', 'llc.exe']:
-        try:
-            subprocess.run([llc, '--version'], capture_output=True, timeout=5, check=False)
-            return llc
-        except (FileNotFoundError, subprocess.TimeoutExpired):
-            continue
+        full = shutil.which(llc)
+        if full and os.path.exists(full):
+            try:
+                subprocess.run([full, '--version'], capture_output=True, timeout=5, check=False)
+                return full
+            except (FileNotFoundError, subprocess.TimeoutExpired):
+                continue
 
     # 2. MSYS2_PATH 环境变量 + 自动探测
     if sys.platform == 'win32':
@@ -129,6 +137,8 @@ def run_in_shell(cmd: str, timeout: int = 30, check: bool = True) -> subprocess.
             [bash, '-lc', cmd],
             capture_output=True,
             text=True,
+            encoding='utf-8',
+            errors='replace',
             timeout=timeout,
             check=check,
         )
@@ -138,6 +148,8 @@ def run_in_shell(cmd: str, timeout: int = 30, check: bool = True) -> subprocess.
         shell=True,
         capture_output=True,
         text=True,
+        encoding='utf-8',
+        errors='replace',
         timeout=timeout,
         check=check,
     )

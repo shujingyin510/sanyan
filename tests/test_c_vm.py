@@ -41,6 +41,8 @@ def _compile_and_run() -> tuple[bool, str]:
             [exe_path],
             capture_output=True,
             text=True,
+            encoding='utf-8',
+            errors='replace',
             timeout=30,
         )
         return result.returncode == 0, result.stdout + result.stderr
@@ -72,6 +74,8 @@ def _run_cvm(bin_path: str) -> str | None:
         [cvm_exe, bin_path, '--run'],
         capture_output=True,
         text=True,
+        encoding='utf-8',
+        errors='replace',
         timeout=10,
     )
     if result.returncode != 0:
@@ -139,6 +143,8 @@ class TestCVMCrossValidation(unittest.TestCase):
                         [self._cvm_exe, bin_path, '--run'],
                         capture_output=True,
                         text=True,
+                        encoding='utf-8',
+                        errors='replace',
                         timeout=10,
                     )
                     if res.returncode == 0:

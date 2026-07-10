@@ -3,7 +3,7 @@
  *
  * 设计目标:
  *   零外部依赖(不含 #include)、纯 Linux x86_64 syscall
- *   实现 bytecode_compiler.bin 所需的全部 35 个 opcode
+ *   实现 bytecode_compiler.bin 所需的全部 59 个 opcode + 扩展
  *   GCC 编译 -> ~7.5KB 原生二进制 -> 人工逐字节可审计
  *
  * 编译: gcc -nostdlib -Os -fno-builtin -lgcc sanyan_vm_seed.c -o sanyan_vm -s
@@ -177,10 +177,19 @@ static void vm_run() {
         case 0x05: b=pp(); ib=UNTAG(b); ps(TAG(ib?UNTAG(a)/ib:0)); break; /* DIV */
         case 0x06: b=pp(); ib=UNTAG(b); ps(TAG(ib?UNTAG(a)%ib:0)); break; /* MOD */
 
+        case 0x0B: /* JNZ — 2B offset, 栈顶≠0时跳 */
+            { s32 off=(s32)(s16)(cod[pc]|(cod[pc+1]<<8)); pc+=2;
+              if (UNTAG(pp())!=0) pc+=off; } break;
+        case 0x0F: pp(); ps(TAG(0)); break; /* IO_READ — seed: 返回0 */
+        case 0x10: pp(); pp(); break; /* IO_WRITE — seed: 空操作 */
+        case 0x11: b=pp(); a=pp(); ps(TAG(UNTAG(a)==UNTAG(b)?1:-1)); break; /* EQ */
+        case 0x12: b=pp(); a=pp(); ps(TAG(UNTAG(a)!=UNTAG(b)?1:-1)); break; /* NE */
         case 0x13: b=pp(); a=pp(); ps(TAG(UNTAG(a)>UNTAG(b)?1:-1)); break; /* GT  */
         case 0x14: b=pp(); a=pp(); ps(TAG(UNTAG(a)<UNTAG(b)?1:-1)); break; /* LT  */
-        case 0x15: b=pp(); a=pp(); ps(TAG(UNTAG(a)==UNTAG(b)?1:-1)); break; /* EQ  */
-        case 0x17: b=pp(); a=pp(); ps(TAG(UNTAG(a)>=UNTAG(b)?1:-1)); break; /* GTE */
+        case 0x15: b=pp(); a=pp(); ps(TAG(UNTAG(a)>=UNTAG(b)?1:-1)); break; /* GTE */
+        case 0x16: b=pp(); a=pp(); ps(TAG(UNTAG(a)<=UNTAG(b)?1:-1)); break; /* LTE */
+        case 0x17: a=pp(); { s32 v=UNTAG(a); ps(TAG(v==0?0:(v>0?-1:1))); } break; /* NOT */
+        case 0x18: pp(); break; /* WAIT — seed: 空操作 */
 
         case 0x19: b=pp(); a=pp(); ps(str_cat((Str*)a,(Str*)b)); break; /* CONCAT */
         case 0x1A: a=pp(); ps(TAG((s32)str_clen((Str*)a))); break; /* STRLEN */
@@ -211,6 +220,7 @@ static void vm_run() {
         case 0x21: a=pp(); ps(TAG(IS_INT(a)?1:-1)); break; /* IS_NUM */
         case 0x22: a=pp(); ps(TAG((!IS_INT(a)&&((Obj*)a)->t==T_STR)?1:-1)); break; /* IS_STR */
         case 0x23: a=pp(); ps(TAG((!IS_INT(a)&&((Obj*)a)->t==T_LIST)?1:-1)); break; /* IS_LIST */
+        case 0x24: b=pp(); a=pp(); ps(TAG(a==b?1:-1)); break; /* SAME */
 
         case 0x09: /* JMP — 2B signed offset */
             { s32 off=(s32)(s16)(cod[pc]|(cod[pc+1]<<8)); pc+=2; pc+=off; } break;
@@ -242,17 +252,85 @@ static void vm_run() {
                   if (val==0) buf[--p]='0';
                   else while (val>0) { buf[--p]=(u8)(48+(val%10)); val/=10; }
                   if (neg) buf[--p]='-';
-                  buf[--p]='
-';
+                  buf[--p]='\n';
                   SYS3(SYS_write, 1, (u64)(buf+p), (u64)(32-p));
               } } break;
 
+        case 0x2B: /* READ_FILE — 读文件为字符串 */
+            { void* pt=pp(); if(pt&&!IS_INT(pt)){ Str* sp=(Str*)pt;
+              s32 fd=(s32)SYS3(SYS_open,sp->data,0,0);
+              if(fd>=0){ u8 buf[4096]; s32 n=(s32)SYS3(SYS_read,fd,buf,4096);
+              if(n>0){ Str* s=halloc(8+n); s->t=T_STR; s->len=n;
+              for(u32 i=0;i<(u32)n;i++)s->data[i]=buf[i]; ps(s); }
+              else{ ps(str_from_u16((u8*)"",0)); } SYS1(SYS_close,fd); }
+              else{ ps(str_from_u16((u8*)"",0)); } } } break;
+        case 0x2C: /* WRITE_FILE — 写字符串到文件 */
+            { void* sv=pp(); void* pt=pp(); if(sv&&pt&&!IS_INT(sv)&&!IS_INT(pt)){
+              Str* s=(Str*)sv; Str* p=(Str*)pt;
+              s32 fd=(s32)SYS3(SYS_open, p->data, 66, 438);
+              if(fd>=0){ SYS3(SYS_write,fd,(u64)s->data,s->len); SYS1(SYS_close,fd); } } } break;
+        case 0x2E: /* IMPORT — seed: 返回假 */
+            { pp(); ps(TAG(0)); } break;
+        case 0x2F: /* CALL_EXT — seed: 弹出参数返回0 */
+            { u32 n=(u32)UNTAG(pp()); while(n--)pp(); ps(TAG(0)); } break;
         case 0x30: /* WRITE_BINARY — 弹 byte_list, path */
             { void* bl=pp(); void* pt=pp();
               if (bl&&pt&&!IS_INT(bl)&&!IS_INT(pt))
                   file_write((Str*)pt, (List*)bl); } break;
+        case 0x34: b=pp(); a=pp(); ps(TAG((UNTAG(a)>0||UNTAG(b)>0)?1:-1)); break; /* OR */
+        case 0x35: b=pp(); a=pp(); ps(TAG((UNTAG(a)>0&&UNTAG(b)>0)?1:-1)); break; /* AND */
+        case 0x36: /* STR_FIND */
+            { b=pp(); a=pp(); Str *hay=(Str*)a, *nee=(Str*)b; s32 r=-1;
+              if(hay->len>=nee->len){ u32 i,j;
+              for(i=0;i<=hay->len-nee->len;i++){ for(j=0;j<nee->len;j++)
+              if(hay->data[i+j]!=nee->data[j])break; if(j==nee->len){r=(s32)i;break;} } }
+              ps(TAG(r)); } break;
+        case 0x37: /* STR_TO_LIST — 字符串→字符列表 */
+            { a=pp(); Str* ss=(Str*)a; u32 nc=str_clen(ss);
+              List* l=list_new(nc); u32 bi=0,ci=0;
+              while(ci<nc&&bi<ss->len){ u8 ch=ss->data[bi];
+              u32 csz=(ch&0x80)?((ch&0xE0)==0xC0?2:(ch&0xF0)==0xE0?3:4):1;
+              Str* cs=halloc(8+csz); cs->t=T_STR; cs->len=csz;
+              for(u32 j=0;j<csz;j++)cs->data[j]=ss->data[bi+j];
+              l->items[ci]=cs; bi+=csz; ci++; } ps(l); } break;
+        case 0x38: /* STR_STARTSWITH */
+            { b=pp(); a=pp(); Str* s=(Str*)a; Str* p=(Str*)b; s32 r=0;
+              if(s->len>=p->len){ u32 i; for(i=0;i<p->len;i++)
+              if(s->data[i]!=p->data[i])break; if(i==p->len)r=1; }
+              ps(TAG(r?1:-1)); } break;
+        case 0x39: /* STR_CONTAINS */
+            { b=pp(); a=pp(); Str* s=(Str*)a; Str* sub=(Str*)b; s32 r=-1;
+              if(s->len>=sub->len){ u32 i,j;
+              for(i=0;i<=s->len-sub->len;i++){ for(j=0;j<sub->len;j++)
+              if(s->data[i+j]!=sub->data[j])break; if(j==sub->len){r=1;break;} } }
+              ps(TAG(r)); } break;
+        case 0x3A: a=pp(); ps(TAG((s32)((Dict*)a)->size)); break; /* DICT_LEN */
 
-        case 0x3F: /* CLOSURE */ { void* fn=pp(); u32 nc=(u32)UNTAG(pp()); void* cl=halloc(20+nc*8); *(u32*)cl=4; ((u32*)cl)[1]=(u32)(u64)fn; ((u32*)cl)[2]=nc; u32 j; for(j=0;j<nc;j++) ((void**)((u8*)cl+12))[j]=pp(); ps(cl); } break;
+        /* ── 位运算 (0x3B-0x48) ── */
+        case 0x3B: b=pp(); a=pp(); ps(TAG(UNTAG(a)&UNTAG(b))); break; /* BIT_AND */
+        case 0x3C: b=pp(); a=pp(); ps(TAG(UNTAG(a)|UNTAG(b))); break; /* BIT_OR */
+        case 0x3D: b=pp(); a=pp(); ps(TAG(UNTAG(a)^UNTAG(b))); break; /* BIT_XOR */
+        case 0x3E: a=pp(); ps(TAG(~UNTAG(a))); break; /* BIT_NOT */
+        case 0x3F: b=pp(); a=pp(); ps(TAG(UNTAG(a)<<UNTAG(b))); break; /* SHIFT_L */
+        case 0x40: b=pp(); a=pp(); ps(TAG(UNTAG(a)>>UNTAG(b))); break; /* SHIFT_R */
+        case 0x41: b=pp(); a=pp(); ps(TAG(UNTAG(a)|(1<<UNTAG(b)))); break; /* BIT_SET */
+        case 0x42: b=pp(); a=pp(); ps(TAG(UNTAG(a)&~(1<<UNTAG(b)))); break; /* BIT_CLR */
+        case 0x43: b=pp(); a=pp(); ps(TAG(UNTAG(a)^(1<<UNTAG(b)))); break; /* BIT_TGL */
+        case 0x44: b=pp(); a=pp(); ps(TAG((UNTAG(a)>>UNTAG(b))&1)); break; /* BIT_TST */
+        case 0x45: a=pp(); ps(TAG(UNTAG(a)&0xFF)); break; /* LO_BYTE */
+        case 0x46: a=pp(); ps(TAG((UNTAG(a)>>8)&0xFF)); break; /* HI_BYTE */
+        case 0x47: b=pp(); a=pp(); ps(TAG(((UNTAG(a)&0xFF)<<8)|(UNTAG(b)&0xFF))); break; /* MRG_BYT */
+        case 0x48: /* PUSH_FLOAT — seed: 跳过8字节推0 */
+            { pc+=8; ps(TAG(0)); } break;
+        /* ── 闭包 (0x4B-0x4C) ── */
+        case 0x4B: { void* fn=pp(); u32 nc=(u32)UNTAG(pp()); void* cl=halloc(20+nc*8); *(u32*)cl=4; ((u32*)cl)[1]=(u32)(u64)fn; ((u32*)cl)[2]=nc; u32 j; for(j=0;j<nc;j++) ((void**)((u8*)cl+12))[j]=pp(); ps(cl); } break;
+        case 0x4C: /* CALL_CLOSURE — seed简易: 当CALL处理 */
+            { a=pp(); void* cl=a; u32 ad=((u32*)cl)[1]; u32 nc2=((u32*)cl)[2];
+              if(ad&&csp<CD){
+                  cstk[csp].rpc=pc; cstk[csp].ssp=sp-(s32)nc2;
+                  for(u32 i=0;i<VM;i++) cstk[csp].sv[i]=var[i];
+                  csp++; pc=(u32)ad;
+              } } break;
         case 0xFF: halt=1; break; /* HALT */
         default: break; /* 未知 opcode: 安全跳过 */
         }

@@ -269,7 +269,7 @@ class BackendRunner:
                 exe_path = os.path.join(tempfile.gettempdir(), 'cvm_fuzz.exe')
                 src_posix = win_to_posix(runtime_src)
                 exe_posix = win_to_posix(exe_path)
-                comp = run_in_shell(f'gcc {src_posix} -o {exe_posix} -std=c99 -Wall', check=False)
+                comp = run_in_shell(f'gcc "{src_posix}" -o "{exe_posix}" -std=c99 -Wall', check=False)
                 if comp.returncode != 0:
                     BackendRunner._cvm_exe = None
                     return 'SKIP', f'C VM 编译失败: {comp.stderr[:200]}'
@@ -318,7 +318,7 @@ class BackendRunner:
                 exe_path = os.path.join(tempfile.gettempdir(), 'cvm_fuzz.exe')
                 src_posix = win_to_posix(runtime_src)
                 exe_posix = win_to_posix(exe_path)
-                comp = run_in_shell(f'gcc {src_posix} -o {exe_posix} -std=c99 -Wall', check=False)
+                comp = run_in_shell(f'gcc "{src_posix}" -o "{exe_posix}" -std=c99 -Wall', check=False)
                 if comp.returncode != 0:
                     BackendRunner._cvm_exe = None
                     return 'SKIP', f'C VM 编译失败: {comp.stderr[:200]}'
@@ -371,7 +371,7 @@ class BackendRunner:
                 rt_obj_path = os.path.join(tempfile.gettempdir(), 'llvm_runtime.o')
                 rt_posix = win_to_posix(rt_src)
                 rt_obj_posix = win_to_posix(rt_obj_path)
-                comp = run_in_shell(f'gcc -c {rt_posix} -o {rt_obj_posix} -std=c99 -O2', check=False, timeout=60)
+                comp = run_in_shell(f'gcc -c "{rt_posix}" -o "{rt_obj_posix}" -std=c99 -O2', check=False, timeout=60)
                 if comp.returncode != 0:
                     BackendRunner._llvm_rt_obj = None
                     return 'SKIP', f'runtime 编译失败: {comp.stderr[:200]}'
@@ -398,7 +398,9 @@ class BackendRunner:
                 ir_posix = win_to_posix(ir_path)
                 obj_posix = win_to_posix(obj_path)
                 llc_posix = win_to_posix(llc)
-                comp = run_in_shell(f'{llc_posix} {ir_posix} -filetype=obj -o {obj_posix}', check=False, timeout=30)
+                comp = run_in_shell(
+                    f'"{llc_posix}" "{ir_posix}" -filetype=obj -o "{obj_posix}"', check=False, timeout=30
+                )
                 if comp.returncode != 0:
                     return 'SKIP', f'llc 失败: {comp.stderr[:200]}'
 
@@ -409,7 +411,7 @@ class BackendRunner:
                 libs = '-lm'
                 if sys.platform == 'win32':
                     libs += ' -lwinhttp'
-                comp = run_in_shell(f'gcc {obj_p} {rt_p} -o {exe_p} {libs}', check=False, timeout=30)
+                comp = run_in_shell(f'gcc "{obj_p}" "{rt_p}" -o "{exe_p}" {libs}', check=False, timeout=30)
                 if comp.returncode != 0:
                     return 'SKIP', f'链接失败: {comp.stderr[:200]}'
 

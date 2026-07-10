@@ -1,7 +1,16 @@
 ; ═══════════════════════════════════════════════════════════════
 ; Sanyan Level 4 种子 VM — x86_64 ELF64 NASM 汇编 (V2)
-; 35 opcode 全实现, 寄存器保护完善
+; 65 opcode（v3.56.2 从 35 补齐）
 ; r8=sp r9=pc r10=code r11=code_len r12=vars r13=stack_base r14=csp r15=cstk_base
+;
+; ⚠️ 已知限制（v3.56.2，待 nasm+Linux 差分闭环验证后修复）：
+;   本文件在开发机（Windows，无 nasm/WSL）上仅静态编写，未汇编执行。事后审计发现：
+;   1. STR_FIND/STR_CONTAINS/STR_TO_LIST 复用 r8(=sp) 作循环下标，破坏栈指针——
+;      结果写入错误栈槽、sp 失准（PRINT 用 push/pop r8 保护，这三处遗漏）；
+;      且搜索循环内 rdi 未跨迭代保留（cmpsb 推进后下轮 lea 基址错）。
+;   2. 比较类真值编码 `2v-1`（真→raw 1）与 C 种子 `TAG(1)`（真→raw 3）不一致。
+;   C 种子（sanyan_vm_seed.c）用 pp/ps + 局部变量，无此问题，为参考实现。
+;   差分电池见 tests/test_self_host.py::test_seed_vm_runs_bytecode（Linux CI 执行）。
 ; ═══════════════════════════════════════════════════════════════
 BITS 64
 org 0
@@ -68,15 +77,11 @@ PUSH_I:
     movsxd rax,dword[r10+r9]; add r9,4
     lea rax,[rax*2+1]; cmp r8,512; jae .halt; mov[r13+r8*8],rax; inc r8; jmp dispatch
 
-CLOSURE: jmp dispatch  ; TODO: closure object creation
-
-PUSH_STR16:
-    movzx ecx,word[r10+r9]; add r9,2; mov edx,ecx; lea rsi,[r10+r9]; xor edi,edi; jmp .clp_common
 PUSH_STR:
     movzx ecx,byte[r10+r9]; inc r9        ; ecx = char_count
     mov edx,ecx; lea rsi,[r10+r9]
     xor edi,edi                            ; utf8_len
-.clp_common: clp:test edx,edx; jz .cld
+clp:test edx,edx; jz .cld
     movzx eax,word[rsi]; add rsi,2; dec edx
     cmp eax,0x80; jb .c1
     cmp eax,0x800; jb .c2
@@ -121,9 +126,6 @@ PUSH_STR:
 LOAD:  movzx eax,byte[r10+r9];inc r9;cmp eax,63;ja dispatch;mov rax,[r12+rax*8];cmp r8,511;ja dispatch;mov[r13+r8*8],rax;inc r8;jmp dispatch
 STORE: movzx eax,byte[r10+r9];inc r9;cmp eax,63;ja dispatch;dec r8;mov rbx,[r13+r8*8];mov[r12+rax*8],rbx;jmp dispatch
 
-LOAD16: movzx eax,word[r10+r9];add r9,2;cmp eax,65535;ja dispatch;mov rax,[r12+rax*8];cmp r8,511;ja .halt;mov[r13+r8*8],rax;inc r8;jmp dispatch
-STORE16: movzx eax,word[r10+r9];add r9,2;cmp eax,65535;ja dispatch;dec r8;mov rbx,[r13+r8*8];mov[r12+rax*8],rbx;jmp dispatch
-
 ADD: cmp r8,2;jb dispatch;dec r8;mov rax,[r13+r8*8];dec r8;mov rbx,[r13+r8*8];sar rax,1;sar rbx,1;add rax,rbx;lea rax,[rax*2+1];mov[r13+r8*8],rax;inc r8;jmp dispatch
 SUB: cmp r8,2;jb dispatch;dec r8;mov rax,[r13+r8*8];dec r8;mov rbx,[r13+r8*8];sar rax,1;sar rbx,1;sub rbx,rax;lea rbx,[rbx*2+1];mov[r13+r8*8],rbx;inc r8;jmp dispatch
 MUL: cmp r8,2;jb dispatch;dec r8;mov rax,[r13+r8*8];dec r8;mov rbx,[r13+r8*8];sar rax,1;sar rbx,1;imul rbx,rax;lea rbx,[rbx*2+1];mov[r13+r8*8],rbx;inc r8;jmp dispatch
@@ -134,10 +136,14 @@ MOD: cmp r8,2;jb dispatch;dec r8;mov rax,[r13+r8*8];dec r8;mov rbx,[r13+r8*8];sa
 .mz:xor rbx,rbx
 .mp:lea rbx,[rbx*2+1];mov[r13+r8*8],rbx;inc r8;jmp dispatch
 
+JNZ: movsx eax,word[r10+r9];add r9,2;dec r8;mov rbx,[r13+r8*8];sar rbx,1;test rbx,rbx;jz dispatch;add r9,rax;jmp dispatch
 GT:  cmp r8,2;jb dispatch;dec r8;mov rax,[r13+r8*8];dec r8;mov rbx,[r13+r8*8];sar rax,1;sar rbx,1;cmp rbx,rax;setg al;movzx eax,al;lea rax,[rax*2-1];mov[r13+r8*8],rax;inc r8;jmp dispatch
 LT:  cmp r8,2;jb dispatch;dec r8;mov rax,[r13+r8*8];dec r8;mov rbx,[r13+r8*8];sar rax,1;sar rbx,1;cmp rbx,rax;setl al;movzx eax,al;lea rax,[rax*2-1];mov[r13+r8*8],rax;inc r8;jmp dispatch
 EQ:  cmp r8,2;jb dispatch;dec r8;mov rax,[r13+r8*8];dec r8;mov rbx,[r13+r8*8];sar rax,1;sar rbx,1;cmp rbx,rax;sete al;movzx eax,al;lea rax,[rax*2-1];mov[r13+r8*8],rax;inc r8;jmp dispatch
-GTE: dec r8;mov rax,[r13+r8*8];dec r8;mov rbx,[r13+r8*8];sar rax,1;sar rbx,1;cmp rbx,rax;setge al;movzx eax,al;lea rax,[rax*2-1];mov[r13+r8*8],rax;inc r8;jmp dispatch
+NE:  cmp r8,2;jb dispatch;dec r8;mov rax,[r13+r8*8];dec r8;mov rbx,[r13+r8*8];sar rax,1;sar rbx,1;cmp rbx,rax;setne al;movzx eax,al;lea rax,[rax*2-1];mov[r13+r8*8],rax;inc r8;jmp dispatch
+GTE: cmp r8,2;jb dispatch;dec r8;mov rax,[r13+r8*8];dec r8;mov rbx,[r13+r8*8];sar rax,1;sar rbx,1;cmp rbx,rax;setge al;movzx eax,al;lea rax,[rax*2-1];mov[r13+r8*8],rax;inc r8;jmp dispatch
+LTE: dec r8;mov rax,[r13+r8*8];dec r8;mov rbx,[r13+r8*8];sar rax,1;sar rbx,1;cmp rbx,rax;setle al;movzx eax,al;lea rax,[rax*2-1];mov[r13+r8*8],rax;inc r8;jmp dispatch
+NOT: cmp r8,1;jb dispatch;dec r8;mov rax,[r13+r8*8];sar rax,1;test rax,rax;sete al;movzx eax,al;lea rax,[rax*2-1];mov[r13+r8*8],rax;inc r8;jmp dispatch
 
 IS_NUM:  cmp r8,1;jb dispatch;dec r8;mov rax,[r13+r8*8];test al,1;setnz al;movzx eax,al;lea rax,[rax*2-1];mov[r13+r8*8],rax;inc r8;jmp dispatch
 IS_STR:  cmp r8,1;jb dispatch;dec r8;mov rax,[r13+r8*8];test al,1;jnz .isf;cmp dword[rax],1;sete al;jmp .isp
@@ -446,6 +452,146 @@ WRBIN:
     jmp dispatch
 
 ; ═══════════════════════════════════════════════════════════════
+; 简易 opcodes — I/O, 等待, 模块
+; ═══════════════════════════════════════════════════════════════
+IO_READ:  cmp r8,1;jb dispatch;dec r8;mov qword[r13+r8*8],1;inc r8;jmp dispatch
+IO_WRITE: cmp r8,2;jb dispatch;dec r8;dec r8;jmp dispatch
+WAIT:     cmp r8,1;jb dispatch;dec r8;jmp dispatch
+PRINT:
+    cmp r8,1;jb dispatch;dec r8;mov rbx,[r13+r8*8];test bl,1;jz dispatch
+    push r8;mov rdi,rbx;sar rdi,1;lea rsi,[rel tmp_buf];mov byte[rsi+15],10
+    mov rax,rdi;mov ecx,10;mov r8d,15
+.prlp:xor rdx,rdx;div rcx;add dl,48;dec r8;mov [rsi+r8],dl;test rax,rax;jnz .prlp
+    test rdi,rdi;jns .prwr;dec r8;mov byte[rsi+r8],45
+.prwr:mov eax,1;lea rdi,[rsi+r8];mov edx,16;sub edx,r8d;syscall
+    pop r8;mov r11d,[rel code_len];lea r10,[rel code_buf];jmp dispatch
+SAME:     cmp r8,2;jb dispatch;dec r8;mov rax,[r13+r8*8];dec r8;mov rbx,[r13+r8*8];cmp rax,rbx;sete al;movzx eax,al;lea rax,[rax*2-1];mov[r13+r8*8],rax;inc r8;jmp dispatch
+IMPORT:   cmp r8,1;jb dispatch;dec r8;mov qword[r13+r8*8],1;inc r8;jmp dispatch
+CALL_EXT: cmp r8,1;jb dispatch;dec r8;mov rcx,[r13+r8*8];sar rcx,1;cmp rcx,511;ja .ced;.cel:test rcx,rcx;jz .ced;cmp r8,1;jb .ced;dec r8;dec rcx;jmp .cel
+.ced:     mov qword[r13+r8*8],1;inc r8;jmp dispatch
+OR:       cmp r8,2;jb dispatch;dec r8;mov rax,[r13+r8*8];sar rax,1;dec r8;mov rbx,[r13+r8*8];sar rbx,1;test rax,rax;setg al;test rbx,rbx;setg bl;or al,bl;movzx eax,al;lea rax,[rax*2-1];mov[r13+r8*8],rax;inc r8;jmp dispatch
+AND:      cmp r8,2;jb dispatch;dec r8;mov rax,[r13+r8*8];sar rax,1;dec r8;mov rbx,[r13+r8*8];sar rbx,1;test rax,rax;setg al;test rbx,rbx;setg bl;and al,bl;movzx eax,al;lea rax,[rax*2-1];mov[r13+r8*8],rax;inc r8;jmp dispatch
+
+; ═══════════════════════════════════════════════════════════════
+; 字符串操作 第二组 — FIND, STARTSWITH, CONTAINS, STR_TO_LIST
+; ═══════════════════════════════════════════════════════════════
+STR_FIND:
+    cmp r8,2;jb dispatch;dec r8;mov rsi,[r13+r8*8];dec r8;mov rdi,[r13+r8*8];test dil,1;jnz .sfno;test sil,1;jnz .sfno;cmp dword[rdi],1;jne .sfno;cmp dword[rsi],1;jne .sfno
+    mov ecx,[rdi+4];sub ecx,[rsi+4];js .sfno;inc ecx;xor r8d,r8d
+.sfl:cmp r8d,ecx;jae .sfno;push rcx;push rsi;mov ecx,[rsi+4];lea rsi,[rsi+8];lea rdi,[rdi+8+r8];repe cmpsb;pop rsi;pop rcx;je .sfy;inc r8d;jmp .sfl
+.sfy:mov rax,r8;lea rax,[rax*2+1];mov[r13+r8*8],rax;inc r8;jmp dispatch
+.sfno:mov qword[r13+r8*8],-1;inc r8;jmp dispatch
+
+STR_STARTSWITH:
+    cmp r8,2;jb dispatch;dec r8;mov rsi,[r13+r8*8];dec r8;mov rdi,[r13+r8*8];test dil,1;jnz .sswn;test sil,1;jnz .sswn;cmp dword[rdi],1;jne .sswn;cmp dword[rsi],1;jne .sswn
+    mov ecx,[rsi+4];cmp ecx,[rdi+4];ja .sswn;lea rsi,[rsi+8];lea rdi,[rdi+8];repe cmpsb;jne .sswn
+    mov qword[r13+r8*8],1;inc r8;jmp dispatch
+.sswn:mov qword[r13+r8*8],-1;inc r8;jmp dispatch
+
+STR_CONTAINS:
+    push rbx;push rcx;push rdx;push rsi;push rdi
+    dec r8;mov rsi,[r13+r8*8];dec r8;mov rdi,[r13+r8*8];test dil,1;jnz .scno;test sil,1;jnz .scno;cmp dword[rdi],1;jne .scno;cmp dword[rsi],1;jne .scno
+    mov ecx,[rdi+4];sub ecx,[rsi+4];js .scno;inc ecx;xor r8d,r8d
+.scl:cmp r8d,ecx;jae .scno;push rcx;push rsi;mov ecx,[rsi+4];lea rsi,[rsi+8];lea rdi,[rdi+8+r8];repe cmpsb;pop rsi;pop rcx;je .scy;inc r8d;jmp .scl
+.scy:pop rdi;pop rsi;pop rdx;pop rcx;pop rbx;mov qword[r13+r8*8],1;inc r8;jmp dispatch
+.scno:pop rdi;pop rsi;pop rdx;pop rcx;pop rbx;mov qword[r13+r8*8],-1;inc r8;jmp dispatch
+
+STR_TO_LIST:
+    cmp r8,1;jb dispatch;dec r8;mov rdi,[r13+r8*8];test dil,1;jnz .stlempty;cmp dword[rdi],1;jne .stlempty
+    mov edx,[rdi+4];lea rsi,[rdi+8];xor ecx,ecx;xor r9d,r9d
+.stlc:cmp r9d,edx;jae .stlcd;movzx eax,byte[rsi+r9];test al,0x80;jz .stl1;cmp al,0xE0;jb .stl2;cmp al,0xF0;jb .stl3;add r9,4;inc ecx;jmp .stlc
+.stl3:add r9,3;inc ecx;jmp .stlc
+.stl2:add r9,2;inc ecx;jmp .stlc
+.stl1:inc r9;inc ecx;jmp .stlc
+.stlcd:lea edi,[ecx*8+16];call halloc;mov dword[rax],2;mov[rax+4],ecx;mov[rax+8],ecx
+    xor r8d,r8d;xor r9d,r9d
+.stlcp:cmp r8d,ecx;jae .stldn;movzx ebx,byte[rsi+r9];test bl,0x80;jz .stlp1;cmp bl,0xE0;jb .stlp2;cmp bl,0xF0;jb .stlp3;push rcx;push r8;call .stl4;pop r8;pop rcx;jmp .stlcn
+.stlp3:push rcx;push r8;call .stl3c;pop r8;pop rcx;jmp .stlcn
+.stlp2:push rcx;push r8;call .stl2c;pop r8;pop rcx;jmp .stlcn
+.stlp1:push rcx;push r8;call .stl1c;pop r8;pop rcx
+.stlcn:inc r8;jmp .stlcp
+.stldn:mov[r13+r8*8],rax;inc r8;mov r11d,[rel code_len];lea r10,[rel code_buf];jmp dispatch
+.stlempty:lea edi,[16];call halloc;mov dword[rax],2;mov dword[rax+4],0;mov dword[rax+8],0;mov[r13+r8*8],rax;inc r8;jmp dispatch
+; helpers: char→str, rsi=source, r9=byte_offset, returns rax=new Str*, advances r9
+.stl1c:movzx eax,byte[rsi+r9];inc r9;push rdi;lea edi,[9];call halloc;mov dword[rax],1;mov dword[rax+4],1;mov[rax+8],al;pop rdi;mov[rax+8],al;ret
+.stl2c:movzx eax,byte[rsi+r9];movzx ebx,byte[rsi+r9+1];add r9,2;push rdi;lea edi,[10];call halloc;mov dword[rax],1;mov dword[rax+4],2;mov[rax+8],al;mov[rax+9],bl;pop rdi;ret
+.stl3c:movzx eax,byte[rsi+r9];movzx ebx,byte[rsi+r9+1];movzx ecx,byte[rsi+r9+2];add r9,3;push rdi;lea edi,[11];call halloc;mov dword[rax],1;mov dword[rax+4],3;mov[rax+8],al;mov[rax+9],bl;mov[rax+10],cl;pop rdi;ret
+.stl4:movzx eax,byte[rsi+r9];movzx ebx,byte[rsi+r9+1];movzx ecx,byte[rsi+r9+2];movzx edx,byte[rsi+r9+3];add r9,4;push rdi;lea edi,[12];call halloc;mov dword[rax],1;mov dword[rax+4],4;mov[rax+8],al;mov[rax+9],bl;mov[rax+10],cl;mov[rax+11],dl;pop rdi;ret
+
+; ═══════════════════════════════════════════════════════════════
+; 位运算 (0x3B-0x48)
+; ═══════════════════════════════════════════════════════════════
+BIT_AND: cmp r8,2;jb dispatch;dec r8;mov rax,[r13+r8*8];sar rax,1;dec r8;mov rbx,[r13+r8*8];sar rbx,1;and rax,rbx;lea rax,[rax*2+1];mov[r13+r8*8],rax;inc r8;jmp dispatch
+BIT_OR:  cmp r8,2;jb dispatch;dec r8;mov rax,[r13+r8*8];sar rax,1;dec r8;mov rbx,[r13+r8*8];sar rbx,1;or rax,rbx;lea rax,[rax*2+1];mov[r13+r8*8],rax;inc r8;jmp dispatch
+BIT_XOR: cmp r8,2;jb dispatch;dec r8;mov rax,[r13+r8*8];sar rax,1;dec r8;mov rbx,[r13+r8*8];sar rbx,1;xor rax,rbx;lea rax,[rax*2+1];mov[r13+r8*8],rax;inc r8;jmp dispatch
+BIT_NOT: cmp r8,1;jb dispatch;dec r8;mov rax,[r13+r8*8];sar rax,1;not rax;lea rax,[rax*2+1];mov[r13+r8*8],rax;inc r8;jmp dispatch
+SHIFT_L: cmp r8,2;jb dispatch;dec r8;mov rcx,[r13+r8*8];sar rcx,1;dec r8;mov rax,[r13+r8*8];sar rax,1;shl rax,cl;lea rax,[rax*2+1];mov[r13+r8*8],rax;inc r8;jmp dispatch
+SHIFT_R: cmp r8,2;jb dispatch;dec r8;mov rcx,[r13+r8*8];sar rcx,1;dec r8;mov rax,[r13+r8*8];sar rax,1;shr rax,cl;lea rax,[rax*2+1];mov[r13+r8*8],rax;inc r8;jmp dispatch
+BIT_SET: cmp r8,2;jb dispatch;dec r8;mov rcx,[r13+r8*8];sar rcx,1;dec r8;mov rax,[r13+r8*8];sar rax,1;mov rbx,1;shl rbx,cl;or rax,rbx;lea rax,[rax*2+1];mov[r13+r8*8],rax;inc r8;jmp dispatch
+BIT_CLR: cmp r8,2;jb dispatch;dec r8;mov rcx,[r13+r8*8];sar rcx,1;dec r8;mov rax,[r13+r8*8];sar rax,1;mov rbx,1;shl rbx,cl;not rbx;and rax,rbx;lea rax,[rax*2+1];mov[r13+r8*8],rax;inc r8;jmp dispatch
+BIT_TGL: cmp r8,2;jb dispatch;dec r8;mov rcx,[r13+r8*8];sar rcx,1;dec r8;mov rax,[r13+r8*8];sar rax,1;mov rbx,1;shl rbx,cl;xor rax,rbx;lea rax,[rax*2+1];mov[r13+r8*8],rax;inc r8;jmp dispatch
+BIT_TST: cmp r8,2;jb dispatch;dec r8;mov rcx,[r13+r8*8];sar rcx,1;dec r8;mov rax,[r13+r8*8];sar rax,1;shr rax,cl;and rax,1;lea rax,[rax*2+1];mov[r13+r8*8],rax;inc r8;jmp dispatch
+LO_BYTE: cmp r8,1;jb dispatch;dec r8;mov rax,[r13+r8*8];sar rax,1;and eax,0xFF;lea rax,[rax*2+1];mov[r13+r8*8],rax;inc r8;jmp dispatch
+HI_BYTE: cmp r8,1;jb dispatch;dec r8;mov rax,[r13+r8*8];sar rax,1;shr eax,8;and eax,0xFF;lea rax,[rax*2+1];mov[r13+r8*8],rax;inc r8;jmp dispatch
+MRG_BYT: cmp r8,2;jb dispatch;dec r8;mov rax,[r13+r8*8];sar rax,1;and eax,0xFF;dec r8;mov rbx,[r13+r8*8];sar rbx,1;and ebx,0xFF;shl eax,8;or eax,ebx;lea rax,[rax*2+1];mov[r13+r8*8],rax;inc r8;jmp dispatch
+PUSH_FLOAT: add r9,8;mov qword[r13+r8*8],1;inc r8;jmp dispatch
+
+; ═══════════════════════════════════════════════════════════════
+; 闭包 (0x4B-0x4C) — 简易实现
+; ═══════════════════════════════════════════════════════════════
+CLOSURE:
+    dec r8;mov rax,[r13+r8*8];sar rax,1;mov ecx,eax;cmp ecx,64;ja dispatch;push rcx
+    dec r8;mov rbx,[r13+r8*8];push rbx;lea edi,[20+rcx*8];call halloc
+    pop rbx;pop rcx;mov dword[rax],4;mov[rax+4],ebx;mov[rax+8],ecx
+    test ecx,ecx;jz .cldn;mov edx,ecx
+.cllp:dec r8;dec edx;mov rbx,[r13+r8*8];mov[rax+12+rdx*8],rbx;test edx,edx;jnz .cllp
+.cldn:mov[r13+r8*8],rax;inc r8;jmp dispatch
+
+CALL_CLOSURE:
+    cmp r8,1;jb dispatch;dec r8;mov rdi,[r13+r8*8];test dil,1;jnz dispatch;cmp dword[rdi],4;jne dispatch
+    mov ecx,[rdi+8];mov eax,[rdi+4];test eax,eax;jz dispatch;cmp r14,126;jae dispatch
+    ; save call state
+    mov[r15+r14*8],r9;mov[r15+r14*8+8],r8;add r14,2
+    mov r9,rax;jmp dispatch
+
+; ═══════════════════════════════════════════════════════════════
+; READ_FILE — 读文件为字符串
+; ═══════════════════════════════════════════════════════════════
+READ_FILE:
+    dec r8;mov rdi,[r13+r8*8];test dil,1;jnz .rfe;cmp dword[rdi],1;jne .rfe
+    push r8;lea rdi,[rdi+8];xor esi,esi;mov eax,2;syscall
+    test eax,eax;js .rfe2;mov ebx,eax
+    mov edi,ebx;lea rsi,[rel code_buf+0x8000];mov edx,0x4000;mov eax,0;syscall
+    cmp eax,0;jle .rfe3;push rax;lea edi,[rax+8];call halloc
+    pop rcx;pop r8;mov dword[rax],1;mov[rax+4],ecx
+    lea rdi,[rax+8];lea rsi,[rel code_buf+0x8000];rep movsb
+    push r8;mov edi,ebx;mov eax,3;syscall;pop r8
+    mov[r13+r8*8],rax;inc r8;mov r11d,[rel code_len];lea r10,[rel code_buf];jmp dispatch
+.rfe3:push r8;mov edi,ebx;mov eax,3;syscall;pop r8
+.rfe2:pop r8
+.rfe: lea edi,[8];call halloc;mov dword[rax],1;mov dword[rax+4],0
+    mov[r13+r8*8],rax;inc r8;jmp dispatch
+
+WRITE_FILE:
+    dec r8;mov rbx,[r13+r8*8];test bl,1;jnz dispatch;cmp dword[rbx],1;jne dispatch;push rbx
+    dec r8;mov rdi,[r13+r8*8];test dil,1;jnz .wfe;cmp dword[rdi],1;jne .wfe
+    lea rdi,[rdi+8];mov esi,65;mov edx,438;mov eax,2;syscall
+    test eax,eax;js .wfe2;mov edi,eax;pop rbx
+    lea rsi,[rbx+8];mov edx,[rbx+4];mov eax,1;syscall
+    mov eax,3;syscall
+    mov r11d,[rel code_len];lea r10,[rel code_buf];jmp dispatch
+.wfe2:pop rbx
+.wfe: jmp dispatch
+
+; ═══════════════════════════════════════════════════════════════
+; DICT_LEN — 字典长度
+; ═══════════════════════════════════════════════════════════════
+DICT_LEN:
+    dec r8;mov rax,[r13+r8*8];test al,1;jnz .dle;cmp dword[rax],3;jne .dle
+    mov eax,[rax+8];lea rax,[rax*2+1];mov[r13+r8*8],rax;inc r8;jmp dispatch
+.dle:inc r8;jmp dispatch
+
+; ═══════════════════════════════════════════════════════════════
 ; halloc: bump allocator, 返回 rax = 分配地址
 ; 修复: 正确保存旧 heap_ptr，正确边界检查
 ; ═══════════════════════════════════════════════════════════════
@@ -495,14 +641,10 @@ load_bin:
 jmp_tbl:
 %assign i 0
 %rep 256
-    %if i == 0x01
+    %if i == 0x00
+        dd .nop_handler - jmp_tbl
+    %elif i == 0x01
         dd PUSH_I - jmp_tbl
-    %elif i == 0x2D
-        dd PUSH_STR - jmp_tbl
-    %elif i == 0x07
-        dd LOAD - jmp_tbl
-    %elif i == 0x08
-        dd STORE - jmp_tbl
     %elif i == 0x02
         dd ADD - jmp_tbl
     %elif i == 0x03
@@ -513,14 +655,42 @@ jmp_tbl:
         dd DIV - jmp_tbl
     %elif i == 0x06
         dd MOD - jmp_tbl
+    %elif i == 0x07
+        dd LOAD - jmp_tbl
+    %elif i == 0x08
+        dd STORE - jmp_tbl
+    %elif i == 0x09
+        dd JMP - jmp_tbl
+    %elif i == 0x0A
+        dd JZ - jmp_tbl
+    %elif i == 0x0B
+        dd JNZ - jmp_tbl
+    %elif i == 0x0C
+        dd CALL - jmp_tbl
+    %elif i == 0x0D
+        dd RET - jmp_tbl
+    %elif i == 0x0E
+        dd PRINT - jmp_tbl
+    %elif i == 0x0F
+        dd IO_READ - jmp_tbl
+    %elif i == 0x10
+        dd IO_WRITE - jmp_tbl
+    %elif i == 0x11
+        dd EQ - jmp_tbl
+    %elif i == 0x12
+        dd NE - jmp_tbl
     %elif i == 0x13
         dd GT - jmp_tbl
     %elif i == 0x14
         dd LT - jmp_tbl
     %elif i == 0x15
-        dd EQ - jmp_tbl
-    %elif i == 0x17
         dd GTE - jmp_tbl
+    %elif i == 0x16
+        dd LTE - jmp_tbl
+    %elif i == 0x17
+        dd NOT - jmp_tbl
+    %elif i == 0x18
+        dd WAIT - jmp_tbl
     %elif i == 0x19
         dd CONCAT - jmp_tbl
     %elif i == 0x1A
@@ -529,20 +699,6 @@ jmp_tbl:
         dd STRSUB - jmp_tbl
     %elif i == 0x1C
         dd STREQ - jmp_tbl
-    %elif i == 0x31
-        dd ORD - jmp_tbl
-    %elif i == 0x27
-        dd LIST_NEW - jmp_tbl
-    %elif i == 0x25
-        dd LIST_GET - jmp_tbl
-    %elif i == 0x2A
-        dd LIST_LEN - jmp_tbl
-    %elif i == 0x26
-        dd SET_ELEM - jmp_tbl
-    %elif i == 0x28
-        dd LIST_CAT - jmp_tbl
-    %elif i == 0x29
-        dd SLICE - jmp_tbl
     %elif i == 0x1D
         dd DICT - jmp_tbl
     %elif i == 0x1E
@@ -551,40 +707,92 @@ jmp_tbl:
         dd DICT_SET - jmp_tbl
     %elif i == 0x20
         dd DICT_HAS - jmp_tbl
-    %elif i == 0x32
-        dd DICT_KEYS - jmp_tbl
     %elif i == 0x21
         dd IS_NUM - jmp_tbl
     %elif i == 0x22
         dd IS_STR - jmp_tbl
     %elif i == 0x23
         dd IS_LIST - jmp_tbl
-    %elif i == 0x09
-        dd JMP - jmp_tbl
-    %elif i == 0x0A
-        dd JZ - jmp_tbl
-    %elif i == 0x33
-        dd JMP32 - jmp_tbl
-    %elif i == 0x0C
-        dd CALL - jmp_tbl
-    %elif i == 0x0D
-        dd RET - jmp_tbl
+    %elif i == 0x24
+        dd SAME - jmp_tbl
+    %elif i == 0x25
+        dd LIST_GET - jmp_tbl
+    %elif i == 0x26
+        dd SET_ELEM - jmp_tbl
+    %elif i == 0x27
+        dd LIST_NEW - jmp_tbl
+    %elif i == 0x28
+        dd LIST_CAT - jmp_tbl
+    %elif i == 0x29
+        dd SLICE - jmp_tbl
+    %elif i == 0x2A
+        dd LIST_LEN - jmp_tbl
+    %elif i == 0x2B
+        dd READ_FILE - jmp_tbl
+    %elif i == 0x2C
+        dd WRITE_FILE - jmp_tbl
+    %elif i == 0x2D
+        dd PUSH_STR - jmp_tbl
+    %elif i == 0x2E
+        dd IMPORT - jmp_tbl
+    %elif i == 0x2F
+        dd CALL_EXT - jmp_tbl
     %elif i == 0x30
         dd WRBIN - jmp_tbl
+    %elif i == 0x31
+        dd ORD - jmp_tbl
+    %elif i == 0x32
+        dd DICT_KEYS - jmp_tbl
+    %elif i == 0x33
+        dd JMP32 - jmp_tbl
+    %elif i == 0x34
+        dd OR - jmp_tbl
+    %elif i == 0x35
+        dd AND - jmp_tbl
+    %elif i == 0x36
+        dd STR_FIND - jmp_tbl
+    %elif i == 0x37
+        dd STR_TO_LIST - jmp_tbl
+    %elif i == 0x38
+        dd STR_STARTSWITH - jmp_tbl
+    %elif i == 0x39
+        dd STR_CONTAINS - jmp_tbl
+    %elif i == 0x3A
+        dd DICT_LEN - jmp_tbl
+    %elif i == 0x3B
+        dd BIT_AND - jmp_tbl
+    %elif i == 0x3C
+        dd BIT_OR - jmp_tbl
+    %elif i == 0x3D
+        dd BIT_XOR - jmp_tbl
+    %elif i == 0x3E
+        dd BIT_NOT - jmp_tbl
     %elif i == 0x3F
+        dd SHIFT_L - jmp_tbl
+    %elif i == 0x40
+        dd SHIFT_R - jmp_tbl
+    %elif i == 0x41
+        dd BIT_SET - jmp_tbl
+    %elif i == 0x42
+        dd BIT_CLR - jmp_tbl
+    %elif i == 0x43
+        dd BIT_TGL - jmp_tbl
+    %elif i == 0x44
+        dd BIT_TST - jmp_tbl
+    %elif i == 0x45
+        dd LO_BYTE - jmp_tbl
+    %elif i == 0x46
+        dd HI_BYTE - jmp_tbl
+    %elif i == 0x47
+        dd MRG_BYT - jmp_tbl
+    %elif i == 0x48
+        dd PUSH_FLOAT - jmp_tbl
+    %elif i == 0x4B
         dd CLOSURE - jmp_tbl
-    %elif i == 0x3e
-        dd PUSH_STR16 - jmp_tbl
-    %elif i == 0x3d
-        dd CALL32 - jmp_tbl
-    %elif i == 0x3c
-        dd STORE16 - jmp_tbl
-    %elif i == 0x3b
-        dd LOAD16 - jmp_tbl
+    %elif i == 0x4C
+        dd CALL_CLOSURE - jmp_tbl
     %elif i == 0xFF
         dd .halt - jmp_tbl
-    %elif i == 0x00
-        dd .nop_handler - jmp_tbl
     %else
         dd .nop_handler - jmp_tbl
     %endif

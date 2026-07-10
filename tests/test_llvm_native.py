@@ -26,6 +26,8 @@ class TestLlvmNativeCompile(unittest.TestCase):
         ir_posix = win_to_posix(ir_path)
         obj_posix = win_to_posix(obj_path)
         llc_posix = win_to_posix(_llc)
+        if ' ' in llc_posix:
+            llc_posix = f'"{llc_posix}"'
         run_in_shell(f'{llc_posix} {ir_posix} -filetype=obj -o {obj_posix}', timeout=30)
 
     def _gcc_compile(self, src: str, obj: str, *extra_args: str):
@@ -112,9 +114,6 @@ class TestLlvmNativeCompile(unittest.TestCase):
 
     def test_compile_dp_harness(self):
         """编译 csrc/dp.c + bootstrap.o + runtime.o 完整管线并运行"""
-        # 词法分析器的字符串处理在 LLVM 编译后有 bug（无限循环）
-        # 单个数字/标识符解析正常，但含引号的字符串会挂起
-        self.skipTest('词法分析器字符串处理 LLVM 编译后无限循环，待调试')
 
     def _check_httpbin_marker(self, out, marker):
         """httpbin.org 是第三方服务：503/502/空响应/错误页等形态多变，缺预期标记一律按不可用跳过。

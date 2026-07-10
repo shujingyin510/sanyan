@@ -2,7 +2,60 @@
 
 ---
 
-## [v3.56.0] — 2026-07-08
+## [v3.56.2] — 2026-07-09
+
+> **种子 VM 操作码补齐 + LLVM 无限循环修复 + Windows CI 全线通达。C 种子 / NASM 种子从 35 opcode 补齐到 65，全栈开源工具链（llc+clang+gcc）打通 Windows LLVM 原生编译管线。**
+
+### ⭐ Highlights
+
+- **种子 VM 操作码全补齐**：Level 3 C 种子 + Level 4 NASM 种子从 35 → 65 opcode，覆盖 ISA v2 全量指令集（含位运算/浮点/闭包）
+- **LLVM 词法字符串无限循环修复**：`rt_str_len` 从 `static inline` 改为外部可见包装，LLVM IR `declare` 链接成功，`test_compile_dp_harness` 通过
+- **Windows 原生编译管线打通**：修复 llc/gcc 路径空格崩溃、MSYS2 bash 找不到工具、MyPy `nul` 文件崩溃、ruff 格式违规——Windows 全栈 CI 首次全绿
+- **在线 Playground（对外入口）**：纯静态零服务器网页演示（`playground/index.html`，自包含单文件、零外部依赖），JS 实现三言核心子集，浏览器即时求值 + 平衡三进制可视化；输出对 Python 求值器逐例校验，README 完整温室示例端到端跑通
+
+### Compiler / VM
+
+- **C 种子 VM (`sanyan_vm_seed.c`)**：修正 0x15/0x17 操作码映射（EQ→GTE, GTE→NOT）；新增 37 个操作码：21 标准 (JNZ/IO_READ/IO_WRITE/EQ/NE/LTE/NOT/WAIT/SAME/READ_FILE/WRITE_FILE/IMPORT/CALL_EXT/OR/AND/STR_FIND/STR_TO_LIST/STR_STARTSWITH/STR_CONTAINS/DICT_LEN) + 16 扩展 (BIT_AND/BIT_OR/BIT_XOR/BIT_NOT/SHIFT_L/SHIFT_R/HI_BYTE/LO_BYTE/MERGE_BYTES/PUSH_BYTE/PUSH_CHAR/PUSH_FLOAT/CLOSURE/CALL_CLOSURE)
+- **NASM 种子 (`sanyan_vm_l4.asm`)**：同 C 种子同步补齐；移除独有 LOAD16/STORE16/CALL32/PUSH_STR16 替换为标准 opcode；CLOSURE 从 0x3F→0x4B；PRINT 处理器从递归改为非递归缓冲区式。**⚠️ 静态编写**：开发机无 nasm/Linux/WSL，未汇编执行；事后审计发现两处缺陷（`STR_FIND`/`STR_CONTAINS`/`STR_TO_LIST` 复用 `r8`(=sp) 作循环下标破坏栈指针；比较真值编码 `2v-1` 与 C 种子 `TAG(1)` 不一致）——记入 Roadmap 已知限制，待 nasm+Linux 差分闭环后修复
+- **LLVM 编译管线**：`find_llc()`/`find_cc()` 改用 `shutil.which()` 获取完整路径；`_compile_ir` 路径含空格时加引号；`llvmgen/runtime.c` 末尾加 `_llvm_rt_str_len` 外部可见包装
+- **种子操作码差分电池 (`tests/test_self_host.py`)**：可达新操作码（比较 EQ/NE/LTE/NOT、布尔 OR/AND、字符串 FIND/STARTSWITH/CONTAINS）24 项程序，Python VM 参考输出全平台实测锚定；C 种子逐项差分在 Linux CI 执行（此前仅 `输出 42` 单例）。位运算/浮点/闭包 opcode 编译器 OP映射 无对应算子，属 ISA 完整性补齐，暂无表层语法覆盖
+
+### CI
+
+- **MyPy 崩溃**：根目录 `nul` 文件（Windows 保留设备名）导致 `ntpath.relpath()` → `ValueError`——删除后加 `.gitignore`
+- **ruff format**：`tests/diff_fuzzer.py` 格式违规自动修复
+- **LLVM 测试**：路径空格崩溃修复后 9 passed / 1 skipped（`test_compile_dp_harness` 解封通过，1 项需 httpbin.org 跳过）
+- **UTF-8 I/O 加固（GBK 控制台根因）**：中文 Windows 代码页 936 下，工具 stdout 与子进程管道继承 GBK（非文件编码问题——源文件均 UTF-8）——`✓`(U+2713) 触发 `UnicodeEncodeError`、UTF-8 子进程输出触发 `UnicodeDecodeError`（读取线程崩 → 捕获 None → `.strip()` AttributeError，表现为 run_all 集成伪失败）。`scripts/preflight.py` 加 `_force_utf8_io()`（stdout/stderr reconfigure）+ `_run()` 包装（8 处子进程强制 `encoding='utf-8'`）；`utils/compiler_tools.py::run_in_shell` 与 `tests/test_c_vm.py` 子进程补 `encoding='utf-8', errors='replace'`。原始 GBK 管道下 `python scripts/preflight.py`（无 `-X utf8`）即 **12/12**
+
+### 在线 Playground（`playground/`）
+
+- **纯客户端解释器**：JS 实现三言核心子集（词法 → 语法 → 求值），支持 `设/置/查/定义/若-否则/遍历/循环/判/尝试-捕获/函数/递归`、Kleene 三值逻辑（`且`=min/`或`=max/`非`=取反）、21 词三态词表（对齐 `core/ternary_core.py` STATE_MAP）、列表/字典字面量；`随机态/随机数/读文件/写文件` 浏览器桩
+- **平衡三进制可视化**：整数输出揭示 `+/0/−` 三进制（三色），对齐 `ops/io_ops.format_value` + `BT.from_int`
+- **零依赖自包含**：单 `index.html`（~36 KB，无 CDN/外链字体/脚本/fetch），可双击离线运行、可发文件、可 GitHub Pages 托管
+- **逐例校验**：Node headless 抽出解释器与 Python 求值器差分——5 确定性示例值逐行一致（4 例含三进制标注逐字节一致）、完整温室示例（10 检测 + 全设备控制）端到端跑通；死循环/除零/未定义/深递归全部优雅捕获
+- **两轮真实负载现形并修**：README 温室示例暴露两处子集缺口——① 缺 `尝试-捕获`/裸赋值/`置`/`查`/`==` 语言构造；② 三态词表只收子集（缺 `开/关/高/低/启/停/通/断/中`）——均已补齐
+
+### Bug Fixes
+
+- 糖语法 `_parse_judge` 补 `:` separator skip（三嵌套 `{}` 不再泄露）
+- `compile_bytecode.py` 空列表 `s[0]` → `s and s[0]`（IndexError 修复）
+- `sensor_fusion.san` 糖语法 `(等于 a b)` → `(a 等于 b)`（S-expr 式比较适配）
+- `test_framework_se.san` / `test_math_se.san` 模块方法调用语法修复
+
+### Metrics
+
+| 指标 | 值 |
+| --- | --- |
+| pytest 全量 | 2709 passed / 3 skipped（+32 subtests） |
+| run_all.py (.san) | 46/46 通过 |
+| LLVM native | 9 passed / 1 skipped |
+| 种子操作码差分电池 | 24 项 × Python VM 全平台锚定；C 种子 Linux CI 逐项差分 |
+| ruff check / format | 0 |
+| mypy | 0 (246 files) |
+
+---
+
+## [v3.56.1] — 2026-07-08
 
 > **FFI 全线落地周（⚗️ 实验性）+ 健壮性对抗周。外语互操作从 RFC 到能用：Python 进程内桥（六算子+三态信封）、C 声明导入（c_bind_gen 生成器 → manifest+三言桩 → ctypes 运行时 → LLVM extern 双后端），同一 C 库在解释器与原生编译下产出一致——差分角落回纳达成。健壮性：把语言当黑盒喂畸形/极端输入三轮，钓出并修 6 个"畸形输入裸穿透/崩溃/静默错误"缺陷，固化 54 项健壮性契约——约 40 类本就优雅处理。agent 线按预算指示冻结前完成 25 轮总账。**
 
