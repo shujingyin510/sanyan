@@ -18,7 +18,7 @@
 - **C 种子 VM (`sanyan_vm_seed.c`)**：修正 0x15/0x17 操作码映射（EQ→GTE, GTE→NOT）；新增 37 个操作码：21 标准 (JNZ/IO_READ/IO_WRITE/EQ/NE/LTE/NOT/WAIT/SAME/READ_FILE/WRITE_FILE/IMPORT/CALL_EXT/OR/AND/STR_FIND/STR_TO_LIST/STR_STARTSWITH/STR_CONTAINS/DICT_LEN) + 16 扩展 (BIT_AND/BIT_OR/BIT_XOR/BIT_NOT/SHIFT_L/SHIFT_R/HI_BYTE/LO_BYTE/MERGE_BYTES/PUSH_BYTE/PUSH_CHAR/PUSH_FLOAT/CLOSURE/CALL_CLOSURE)
 - **NASM 种子 (`sanyan_vm_l4.asm`)**：同 C 种子同步补齐；移除独有 LOAD16/STORE16/CALL32/PUSH_STR16 替换为标准 opcode；CLOSURE 从 0x3F→0x4B；PRINT 处理器从递归改为非递归缓冲区式。**⚠️ 静态编写**：开发机无 nasm/Linux/WSL，未汇编执行；事后审计发现两处缺陷（`STR_FIND`/`STR_CONTAINS`/`STR_TO_LIST` 复用 `r8`(=sp) 作循环下标破坏栈指针；比较真值编码 `2v-1` 与 C 种子 `TAG(1)` 不一致）——记入 Roadmap 已知限制，待 nasm+Linux 差分闭环后修复
 - **LLVM 编译管线**：`find_llc()`/`find_cc()` 改用 `shutil.which()` 获取完整路径；`_compile_ir` 路径含空格时加引号；`llvmgen/runtime.c` 末尾加 `_llvm_rt_str_len` 外部可见包装
-- **种子操作码差分电池 (`tests/test_self_host.py`)**：可达新操作码（比较 EQ/NE/LTE/NOT、布尔 OR/AND、字符串 FIND/STARTSWITH/CONTAINS）24 项程序，Python VM 参考输出全平台实测锚定；C 种子逐项差分在 Linux CI 执行（此前仅 `输出 42` 单例）。位运算/浮点/闭包 opcode 编译器 OP映射 无对应算子，属 ISA 完整性补齐，暂无表层语法覆盖
+- **种子操作码差分电池 (`tests/test_self_host.py`)**：可达新操作码（比较 EQ/NE/LTE/NOT、布尔 OR/AND、字符串 FIND/STARTSWITH/CONTAINS、除/余正数域）28 项程序，Python VM 参考输出全平台实测锚定；C 种子逐项差分在 Linux CI 执行（此前仅 `输出 42` 单例）。位运算/浮点/闭包 opcode 编译器 OP映射 无对应算子，属 ISA 完整性补齐，暂无表层语法覆盖
 
 ### CI
 
@@ -37,6 +37,8 @@
 
 ### Bug Fixes
 
+- **C 种子 `_start` 读 rsp 未定义行为（差分电池 CI 首跑 24 项全空的根因）**：`register u64 asm("rsp")` 局部变量 gcc 仅保证在 asm 操作数中生效，`-Os` 下序言先压栈 88 字节再执行读取 → argc 读到入口下方全零新栈页 → 走 stdin 分支零输出、rc=0。改为全局 asm 裸入口（`xor ebp; mov rsp,rdi; call _start_c`），修复前后均以 `-Os` 反汇编实证。老种子同构代码纯属侥幸未触发——电池上线首跑即现形
+- **C 种子 DIV/MOD 左操作数未弹栈（预存在缺陷）**：`case 0x05/0x06` 只弹 b、`a` 沿用上个 case 的遗留值——补 `a=pp()`；差分电池新增 除/余 4 项（仅正数域：截断除法两后端一致，负数域语义待定不收）
 - 糖语法 `_parse_judge` 补 `:` separator skip（三嵌套 `{}` 不再泄露）
 - `compile_bytecode.py` 空列表 `s[0]` → `s and s[0]`（IndexError 修复）
 - `sensor_fusion.san` 糖语法 `(等于 a b)` → `(a 等于 b)`（S-expr 式比较适配）
@@ -49,7 +51,7 @@
 | pytest 全量 | 2709 passed / 3 skipped（+32 subtests） |
 | run_all.py (.san) | 46/46 通过 |
 | LLVM native | 9 passed / 1 skipped |
-| 种子操作码差分电池 | 24 项 × Python VM 全平台锚定；C 种子 Linux CI 逐项差分 |
+| 种子操作码差分电池 | 28 项 × Python VM 全平台锚定；C 种子 Linux CI 逐项差分 |
 | ruff check / format | 0 |
 | mypy | 0 (246 files) |
 

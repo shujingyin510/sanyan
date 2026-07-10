@@ -174,8 +174,8 @@ static void vm_run() {
         case 0x02: b=pp(); a=pp(); ps(TAG(UNTAG(a)+UNTAG(b))); break; /* ADD */
         case 0x03: b=pp(); a=pp(); ps(TAG(UNTAG(a)-UNTAG(b))); break; /* SUB */
         case 0x04: b=pp(); a=pp(); ps(TAG(UNTAG(a)*UNTAG(b))); break; /* MUL */
-        case 0x05: b=pp(); ib=UNTAG(b); ps(TAG(ib?UNTAG(a)/ib:0)); break; /* DIV */
-        case 0x06: b=pp(); ib=UNTAG(b); ps(TAG(ib?UNTAG(a)%ib:0)); break; /* MOD */
+        case 0x05: b=pp(); a=pp(); ib=UNTAG(b); ps(TAG(ib?UNTAG(a)/ib:0)); break; /* DIV */
+        case 0x06: b=pp(); a=pp(); ib=UNTAG(b); ps(TAG(ib?UNTAG(a)%ib:0)); break; /* MOD */
 
         case 0x0B: /* JNZ — 2B offset, 栈顶≠0时跳 */
             { s32 off=(s32)(s16)(cod[pc]|(cod[pc+1]<<8)); pc+=2;
@@ -352,12 +352,15 @@ static s32 load(const char* p) {
 }
 
 /* ── _start: Linux 原生入口 ──
- *   栈布局: [argc(8B)] [argv[0](8B)] [argv[1](8B)] ...
- *   rsp 指向 argc */
-void _start() {
-    register u64 sp_reg asm("rsp");
-    s32 argc = *(s32*)(sp_reg);
-    char** argv = (char**)(sp_reg + 8);
+ *   进程入口栈布局: [argc(8B)] [argv[0](8B)] [argv[1](8B)] ...
+ *   不能在 C 函数体里用 register-asm 局部变量读 rsp——gcc 只保证它在
+ *   asm 操作数中生效；-Os 一旦在序言先动栈（如内联 load 的局部数组），
+ *   读到的就是入口下方的全零新栈页 → argc=0 走 stdin 分支 → 全程无输出
+ *   （v3.56.2 首次 CI 差分 24 项全空的根因）。
+ *   改为全局 asm 裸入口，把入口 rsp 作为第一参数显式传给 C。 */
+void _start_c(u64* sp0) {
+    s32 argc = (s32)sp0[0];
+    char** argv = (char**)(sp0 + 1);
 
     sp=0; pc=0; halt=0; csp=0;
 
@@ -373,3 +376,11 @@ void _start() {
 
     SYS1(SYS_exit, 0);
 }
+
+__asm__(
+    ".globl _start\n"
+    "_start:\n"
+    "    xorl %ebp, %ebp\n"
+    "    movq %rsp, %rdi\n"
+    "    call _start_c\n"
+);
