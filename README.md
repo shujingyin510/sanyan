@@ -1,24 +1,26 @@
-# 三态认知框架 Sanyan v3.56.1
+# 三态认知框架 Sanyan v3.56.2
 
 [![VS Code Extension](https://img.shields.io/badge/VS%20Code-%E8%AF%AD%E6%B3%95%E9%AB%98%E4%BA%AE-%23007ACC?logo=visualstudiocode)](sanyan-vscode/README.md)
 [![CI](https://github.com/shujingyin510/sanyan/actions/workflows/test.yml/badge.svg)](https://github.com/shujingyin510/sanyan/actions)
 [![PyPI](https://img.shields.io/pypi/v/ternary-engine?label=ternary-engine)](https://pypi.org/project/ternary-engine/)
+[![Playground](https://img.shields.io/badge/%E2%96%B6%20%E5%9C%A8%E7%BA%BF%E8%AF%95%E7%8E%A9-Playground-c0392b)](https://shujingyin510.github.io/sanyan/playground/)
 
 > **三态认知框架** — 从三进制语言到 Knowledge Runtime 的演进。核心贡献：构建了一个可验证的自改进 Agent 知识系统，并通过合成模拟演示了 Knowledge → Calibration → Selection → Success 的机制链路（机制演示，非真实任务实测）。
+
+**[▶ 在线试玩 Playground](https://shujingyin510.github.io/sanyan/playground/)** — 浏览器直接跑三言核心子集，零安装（离线可双击仓库内 [`playground/index.html`](playground/index.html)）
 
 [English](docs/README_EN_archive.md)
 
 ---
 
-## v3.50 更新摘要
+## v3.56.2 更新摘要
 
-### v3.50 (2026-07-01)
-- **闭包实现**：嵌套函数可访问外部变量、计数器闭包、独立实例、lambda 闭包
-- **字节码编译器自举修复**：数字优化、try/catch 索引、PUSH_STR 路径保护、跳出位置隔离
-- **Agent 架构重构**：LazyRegistry 懒加载、paths.py 统一、ToolResult、LLM seam
-- **Lint 全清**：ruff 0 errors、mypy 0 errors
-- **函数引用修复**：函数名可正确作为值传递
-- **已知限制**：闭包作为参数需改写为变量调用
+### v3.56.2 (2026-07-09)
+- **在线 Playground 上线**：纯静态零服务器单文件网页（`playground/`），浏览器即时运行三言核心子集 + 平衡三进制三色可视化；输出对 Python 参考求值器逐例差分校验 → [▶ 在线试玩](https://shujingyin510.github.io/sanyan/playground/)
+- **种子 VM 操作码补齐**：Level 3 C 种子 + Level 4 NASM 种子 35 → 65 opcode，覆盖 ISA v2 全量指令集（位运算/浮点/闭包）；新增 24 项种子操作码差分电池
+- **LLVM 词法字符串无限循环修复**：`rt_str_len` 加外部可见包装，LLVM 原生编译 9 passed / 1 skipped
+- **Windows 全栈 CI 首次全绿**：llc/gcc 路径空格、MSYS2 工具查找、MyPy `nul` 崩溃逐一修复
+- **UTF-8 I/O 加固**：中文 Windows（GBK 代码页）下 preflight 与子进程管道强制 UTF-8——原生控制台无需 `-X utf8` 即 12/12
 
 详见 [CHANGELOG](CHANGELOG.md)
 

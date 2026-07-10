@@ -1,24 +1,26 @@
-# Tri-State Cognitive Framework Sanyan v3.56.1
+# Tri-State Cognitive Framework Sanyan v3.56.2
 
 [![VS Code Extension](https://img.shields.io/badge/VS%20Code-Syntax%20Highlight-%23007ACC?logo=visualstudiocode)](sanyan-vscode/README.md)
 [![CI](https://github.com/shujingyin510/sanyan/actions/workflows/test.yml/badge.svg)](https://github.com/shujingyin510/sanyan/actions)
 [![PyPI](https://img.shields.io/pypi/v/ternary-engine?label=ternary-engine)](https://pypi.org/project/ternary-engine/)
+[![Playground](https://img.shields.io/badge/%E2%96%B6%20Try%20Online-Playground-c0392b)](https://shujingyin510.github.io/sanyan/playground/)
 
 > **Tri-State Cognitive Framework** — The evolution from ternary language to Knowledge Runtime. Core contribution: a verifiable self-improving Agent knowledge system proving the causal chain Knowledge → Calibration → Selection → Success.
+
+**[▶ Try Sanyan Online](https://shujingyin510.github.io/sanyan/playground/)** — run a core Sanyan subset right in your browser, zero install (offline: double-click [`playground/index.html`](playground/index.html))
 
 [中文版](docs/README_archive.md) | [Operations Manual](agent_system/agent_operations_en.md)
 
 ---
 
-## v3.50 Update Summary
+## v3.56.2 Update Summary
 
-### v3.50 (2026-07-01)
-- **Closure Implementation**: Nested functions can access outer variables, counter closures, independent instances, lambda closures
-- **Bytecode Compiler Bootstrap Fixes**: Number optimization, try/catch indexing, PUSH_STR path protection, break/continue isolation
-- **Agent Architecture Refactoring**: LazyRegistry, paths.py unification, ToolResult, LLM seam
-- **Lint Clean**: ruff 0 errors, mypy 0 errors
-- **Function Reference Fix**: Function names can be correctly passed as values
-- **Known Limitations**: Closure as function argument requires rewrite to variable call
+### v3.56.2 (2026-07-09)
+- **Online Playground launched**: pure-static, zero-server, single-file page (`playground/`) running a core Sanyan subset in the browser with tri-color balanced-ternary visualization; output validated example-by-example against the Python reference evaluator → [▶ Try Online](https://shujingyin510.github.io/sanyan/playground/)
+- **Seed VM opcode completion**: Level 3 C seed + Level 4 NASM seed 35 → 65 opcodes, full ISA v2 coverage (bitwise/float/closures); new 24-case seed opcode differential battery
+- **LLVM lexer string infinite-loop fix**: externally visible `rt_str_len` wrapper; LLVM native 9 passed / 1 skipped
+- **Windows full-stack CI green for the first time**: llc/gcc paths with spaces, MSYS2 tool lookup, MyPy `nul` crash all fixed
+- **UTF-8 I/O hardening**: preflight and subprocess pipes forced to UTF-8 on Chinese Windows (GBK code page) — 12/12 without `-X utf8`
 
 See [CHANGELOG](CHANGELOG.md)
 

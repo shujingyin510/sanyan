@@ -1,0 +1,778 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="description" content="三言 Sanyan —— 平衡三进制中文编程语言在线演示。纯客户端，零服务器，代码在你的浏览器里运行。">
+<meta name="color-scheme" content="light dark">
+<title>三言 · Sanyan Playground</title>
+<style>*,*::before,*::after{box-sizing:border-box}html{-webkit-text-size-adjust:100%}html,body{margin:0;padding:0;min-height:100%}img{max-width:100%}</style>
+</head>
+<body>
+<style>
+  /* ============ 主题令牌（宣纸 / 墨，双主题） ============ */
+  :root{
+    --bg:#e9e6dd; --bg2:#f3f1ea; --surface:#f6f4ee; --fg:#211d16; --muted:#6d6559;
+    --border:#d6d0c2; --border2:#c8c1b0; --accent:#b03a24; --accent-ink:#8f2f1d;
+    --tp:#2f8a66; --tz:#9a7d2e; --tn:#bf4128; --sel:#e4dcc7;
+    --shadow:0 1px 0 rgba(0,0,0,.04),0 10px 30px -18px rgba(40,30,20,.35);
+    --serif:"Songti SC","STSong","SimSun","Noto Serif SC",ui-serif,serif;
+    --sans:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei","Hiragino Sans GB",sans-serif;
+    --mono:"SF Mono","Cascadia Code","JetBrains Mono","Fira Code",Consolas,"Sarasa Mono SC","Microsoft YaHei Mono",monospace;
+  }
+  @media (prefers-color-scheme:dark){
+    :root{
+      --bg:#141109; --bg2:#1a1610; --surface:#1d1912; --fg:#ece5d5; --muted:#9a9081;
+      --border:#2f2a20; --border2:#3a342780; --accent:#d95b3f; --accent-ink:#e8735a;
+      --tp:#54b98d; --tz:#cba54f; --tn:#e06a4f; --sel:#33291a;
+      --shadow:0 1px 0 rgba(0,0,0,.3),0 18px 44px -22px rgba(0,0,0,.7);
+    }
+  }
+  :root[data-theme="dark"]{
+    --bg:#141109; --bg2:#1a1610; --surface:#1d1912; --fg:#ece5d5; --muted:#9a9081;
+    --border:#2f2a20; --border2:#3a3427; --accent:#d95b3f; --accent-ink:#e8735a;
+    --tp:#54b98d; --tz:#cba54f; --tn:#e06a4f; --sel:#33291a;
+    --shadow:0 1px 0 rgba(0,0,0,.3),0 18px 44px -22px rgba(0,0,0,.7);
+  }
+  :root[data-theme="light"]{
+    --bg:#e9e6dd; --bg2:#f3f1ea; --surface:#f6f4ee; --fg:#211d16; --muted:#6d6559;
+    --border:#d6d0c2; --border2:#c8c1b0; --accent:#b03a24; --accent-ink:#8f2f1d;
+    --tp:#2f8a66; --tz:#9a7d2e; --tn:#bf4128; --sel:#e4dcc7;
+    --shadow:0 1px 0 rgba(0,0,0,.04),0 10px 30px -18px rgba(40,30,20,.35);
+  }
+
+  *{box-sizing:border-box}
+  body{margin:0}
+  .wrap{
+    min-height:100%; background:
+      radial-gradient(120% 80% at 100% 0%, color-mix(in oklab, var(--accent) 5%, transparent), transparent 60%),
+      linear-gradient(var(--bg), var(--bg2));
+    color:var(--fg); font-family:var(--sans);
+    -webkit-font-smoothing:antialiased; line-height:1.55;
+    padding:clamp(16px,4vw,44px); max-width:1180px; margin:0 auto;
+  }
+  ::selection{background:var(--sel)}
+
+  /* ============ 报头 ============ */
+  .mast{display:flex; align-items:center; justify-content:space-between; gap:20px; flex-wrap:wrap}
+  .brand{display:flex; align-items:center; gap:18px; min-width:0}
+  .seal{
+    font-family:var(--serif); font-weight:600; font-size:clamp(30px,6vw,46px);
+    line-height:1; color:#fff; background:
+      linear-gradient(160deg, var(--accent), var(--accent-ink));
+    padding:.28em .2em .2em; border-radius:8px; letter-spacing:.06em;
+    box-shadow:inset 0 0 0 2px rgba(255,255,255,.14), var(--shadow);
+    writing-mode:vertical-rl; text-orientation:upright;
+  }
+  .brandtext h1{
+    font-family:var(--serif); font-weight:600; margin:0;
+    font-size:clamp(24px,4.6vw,36px); letter-spacing:.02em;
+  }
+  .brandtext h1 .en{font-family:var(--sans); font-weight:600; color:var(--muted); font-size:.5em; letter-spacing:.28em; text-transform:uppercase; margin-left:.5em}
+  .thesis{margin:.35em 0 0; color:var(--muted); font-size:clamp(13px,1.6vw,15px); max-width:52ch}
+  .toolbtn{
+    font-family:var(--sans); font-size:13px; color:var(--muted); background:transparent;
+    border:1px solid var(--border2); border-radius:999px; padding:7px 14px; cursor:pointer;
+    transition:color .15s, border-color .15s, background .15s;
+  }
+  .toolbtn:hover{color:var(--fg); border-color:var(--accent)}
+
+  /* ============ trit 图例 ============ */
+  .legend{
+    margin:clamp(18px,3vw,26px) 0 14px; display:flex; align-items:center; gap:16px; flex-wrap:wrap;
+    font-size:13.5px; color:var(--muted); border-top:1px solid var(--border); border-bottom:1px solid var(--border); padding:11px 2px;
+  }
+  .legend b{font-weight:600; color:var(--fg)}
+  .chip{display:inline-flex; align-items:center; gap:6px; font-family:var(--mono)}
+  .chip .g{font-weight:700; font-size:16px}
+  .tp{color:var(--tp)} .tz{color:var(--tz)} .tn{color:var(--tn)}
+
+  /* ============ 例子 ============ */
+  .examples{display:flex; gap:9px; flex-wrap:wrap; margin:16px 0 14px}
+  .ex{
+    font-family:var(--sans); font-size:13.5px; color:var(--fg); background:var(--surface);
+    border:1px solid var(--border2); border-radius:9px; padding:8px 14px; cursor:pointer;
+    transition:transform .12s, border-color .15s, color .15s; box-shadow:var(--shadow);
+  }
+  .ex:hover{border-color:var(--accent); transform:translateY(-1px)}
+  .ex.active{border-color:var(--accent); color:var(--accent); box-shadow:inset 0 0 0 1px var(--accent)}
+
+  /* ============ 面板 ============ */
+  .panes{display:grid; grid-template-columns:1fr 1fr; gap:16px; align-items:stretch}
+  @media (max-width:840px){ .panes{grid-template-columns:1fr} }
+  .pane{
+    background:var(--surface); border:1px solid var(--border); border-radius:14px;
+    overflow:hidden; box-shadow:var(--shadow); display:flex; flex-direction:column; min-height:340px;
+  }
+  .panehead{
+    display:flex; align-items:center; justify-content:space-between; gap:10px;
+    padding:11px 15px; border-bottom:1px solid var(--border);
+    font-size:12.5px; letter-spacing:.14em; text-transform:uppercase; color:var(--muted);
+    font-family:var(--sans);
+  }
+  .panehead .dot{display:inline-block; width:9px; height:9px; border-radius:50%; margin-right:8px; vertical-align:middle}
+  .runbtns{display:flex; gap:8px; text-transform:none; letter-spacing:0}
+  .run{
+    font-family:var(--sans); font-size:13px; font-weight:600; color:#fff; cursor:pointer;
+    background:linear-gradient(160deg,var(--accent),var(--accent-ink)); border:0; border-radius:8px;
+    padding:7px 16px; transition:filter .15s, transform .1s; box-shadow:var(--shadow);
+  }
+  .run:hover{filter:brightness(1.06)} .run:active{transform:translateY(1px)}
+  .ghost{
+    font-family:var(--sans); font-size:13px; color:var(--muted); background:transparent;
+    border:1px solid var(--border2); border-radius:8px; padding:7px 12px; cursor:pointer;
+  }
+  .ghost:hover{color:var(--fg); border-color:var(--accent)}
+
+  #code{
+    flex:1; width:100%; resize:vertical; border:0; outline:0; background:transparent; color:var(--fg);
+    font-family:var(--mono); font-size:14.5px; line-height:1.7; padding:16px 18px; tab-size:4;
+    min-height:280px; white-space:pre; overflow:auto;
+  }
+  .console{
+    flex:1; margin:0; padding:14px 18px; overflow:auto; font-family:var(--mono); font-size:14px;
+    line-height:1.75; min-height:280px; white-space:pre-wrap; word-break:break-word;
+  }
+  .oline{padding:1px 0; border-left:2px solid transparent; padding-left:12px; margin-left:-12px}
+  .oline .gutter{color:var(--border2); user-select:none; margin-right:12px}
+  .ann{color:var(--muted)}
+  .oline.err{color:var(--tn); border-left-color:var(--tn)}
+  .oline.meta{color:var(--muted); font-style:italic}
+  .empty{color:var(--muted); font-family:var(--sans); font-style:italic}
+
+  footer{margin:26px 2px 6px; color:var(--muted); font-size:13px; line-height:1.7}
+  footer a{color:var(--accent); text-decoration:none; border-bottom:1px solid color-mix(in oklab,var(--accent) 40%,transparent)}
+  footer a:hover{border-bottom-color:var(--accent)}
+
+  @media (prefers-reduced-motion:reduce){ *{transition:none!important} }
+</style>
+
+<div class="wrap">
+  <header class="mast">
+    <div class="brand">
+      <span class="seal" aria-hidden="true">三言</span>
+      <div class="brandtext">
+        <h1>三言<span class="en">sanyan</span></h1>
+        <p class="thesis">平衡三进制中文编程语言 — 自举编译器链 · 四后端 · 此刻就在你的浏览器里运行。</p>
+      </div>
+    </div>
+    <button class="toolbtn" id="theme" type="button">☯ 明 / 暗</button>
+  </header>
+
+  <div class="legend">
+    <b>看得见的三进制：</b>每个整数都揭示它的平衡三进制表示 ——
+    <span class="chip"><span class="g tp">+</span> 真&nbsp;(+1)</span>
+    <span class="chip"><span class="g tz">0</span> 可能&nbsp;(0)</span>
+    <span class="chip"><span class="g tn">−</span> 假&nbsp;(−1)</span>
+  </div>
+
+  <div class="examples" id="examples"></div>
+
+  <div class="panes">
+    <section class="pane">
+      <div class="panehead">
+        <span><span class="dot" style="background:var(--tp)"></span>源码 · sanyan</span>
+        <span class="runbtns">
+          <button class="ghost" id="clear" type="button">清空</button>
+          <button class="run" id="run" type="button">▶ 运行 <span style="opacity:.7;font-weight:400">⌘↵</span></button>
+        </span>
+      </div>
+      <textarea id="code" spellcheck="false" autocapitalize="off" autocomplete="off"></textarea>
+    </section>
+
+    <section class="pane">
+      <div class="panehead">
+        <span><span class="dot" style="background:var(--accent)"></span>输出</span>
+        <span id="status" style="text-transform:none;letter-spacing:0"></span>
+      </div>
+      <div class="console" id="out"></div>
+    </section>
+  </div>
+
+  <footer>
+    <p>此在线演示用 JavaScript 实现三言<strong>核心子集</strong>（设 / 定义 / 若–否则 / 遍历 / 循环 / 判 / 函数 / 递归 + 平衡三进制与 Kleene 三值逻辑）。所有内置示例输出已与仓库内 <em>Python 求值器</em>逐例比对一致（平衡三进制取规范最简形式）。完整语言 —— 自举编译器链（Level&nbsp;0–4）、字节码 VM、C&nbsp;/&nbsp;LLVM&nbsp;/&nbsp;NASM 四后端、AI 智能体系统 —— 见 <a href="https://github.com/shujingyin510/sanyan" target="_blank" rel="noopener">GitHub 仓库</a>。</p>
+  </footer>
+</div>
+
+<script>
+(function(){
+"use strict";
+
+/* ===================== 词法 ===================== */
+// 全角 → 半角（依 docs/sugar_grammar.md §1.1）
+const FW = {'（':'(','）':')','｛':'{','｝':'}','［':'[','］':']','＝':'=','＞':'>','＜':'<',
+  '＋':'+','－':'-','＊':'*','／':'/','％':'%','＾':'^','，':',','；':';','：':':','！':'!','。':'.','　':' '};
+function normalize(s){
+  let o='';
+  for(const ch of s){
+    const c=ch.charCodeAt(0);
+    if(FW[ch]!==undefined) o+=FW[ch];
+    else if(c>=0xFF10 && c<=0xFF19) o+=String.fromCharCode(c-0xFEE0); // 全角数字
+    else o+=ch;
+  }
+  return o;
+}
+const QUOTES={'"':'"',"'":"'",'「':'」','『':'』','“':'”','‘':'’'};
+const PUNCT=new Set(['(',')','{','}','[',']',',',';',':','.']);
+const OPCH=new Set(['+','-','*','/','%','^','>','<','=','!']);
+
+function tokenize(src){
+  const s=normalize(src); const toks=[]; let i=0, line=1;
+  const n=s.length;
+  while(i<n){
+    const c=s[i];
+    if(c==='\n'){line++;i++;continue;}
+    if(c===' '||c==='\t'||c==='\r'){i++;continue;}
+    // 注释
+    if(c==='#'|| (c==='/'&&s[i+1]==='/')){ while(i<n&&s[i]!=='\n')i++; continue; }
+    // 字符串
+    if(QUOTES[c]!==undefined){
+      const close=QUOTES[c]; let j=i+1, str='';
+      while(j<n && s[j]!==close){
+        if(s[j]==='\\'&&j+1<n){ const e=s[j+1]; str+= e==='n'?'\n':e==='t'?'\t':e; j+=2; }
+        else { str+=s[j]; j++; }
+      }
+      if(j>=n) throw perr('字符串未闭合',line);
+      toks.push({t:'str',v:str,line}); i=j+1; continue;
+    }
+    // 数字
+    if(c>='0'&&c<='9'){
+      let j=i, num='';
+      while(j<n && ((s[j]>='0'&&s[j]<='9')|| s[j]==='.')){ num+=s[j]; j++; }
+      toks.push({t:'num',v:parseFloat(num),line}); i=j; continue;
+    }
+    // 多字符运算符
+    if(OPCH.has(c)){
+      const two=s.slice(i,i+2);
+      if(['>=','<=','!=','!>','!<','=='].includes(two)){ toks.push({t:'op',v:two,line}); i+=2; continue; }
+      toks.push({t:'op',v:c,line}); i++; continue;
+    }
+    // 标点
+    if(PUNCT.has(c)){ toks.push({t:'punct',v:c,line}); i++; continue; }
+    // 词（中文/字母/数字/下划线的极大连续段，不含分隔符）
+    let j=i, w='';
+    while(j<n){
+      const ch=s[j];
+      if(ch===' '||ch==='\t'||ch==='\r'||ch==='\n') break;
+      if(QUOTES[ch]!==undefined||PUNCT.has(ch)||OPCH.has(ch)||ch==='#') break;
+      w+=ch; j++;
+    }
+    if(w===''){ i++; continue; }
+    toks.push({t:'word',v:w,line}); i=j;
+  }
+  toks.push({t:'eof',v:'',line});
+  return toks;
+}
+function perr(msg,line){ const e=new Error(msg); e.sanyan=true; e.line=line; return e; }
+
+/* ===================== 词表 ===================== */
+// 三态词表（对齐 core/ternary_core.py STATE_MAP）
+const TERNARY={'开':1,'高':1,'真':1,'亮':1,'启':1,'通':1,'有':1,'是':1,
+  '关':-1,'低':-1,'假':-1,'灭':-1,'停':-1,'断':-1,'无':-1,'否':-1,
+  '守':0,'中':0,'可能':0,'待':0,'未知':0};
+const WORDOP={'加':'add','减':'sub','乘':'mul','除':'div','余':'mod','幂':'pow',
+  '大于':'gt','小于':'lt','等于':'eq','不等于':'ne','大于等于':'gte','小于等于':'lte','不大于':'ngt','不小于':'nlt',
+  '且':'and','或':'or'};
+const SYMOP={'+':'add','-':'sub','*':'mul','/':'div','%':'mod','^':'pow',
+  '>':'gt','<':'lt','=':'eq','==':'eq','!=':'ne','>=':'gte','<=':'lte','!>':'ngt','!<':'nlt'};
+const PREC={or:6,and:8,eq:10,ne:10,gt:10,lt:10,gte:10,lte:10,ngt:10,nlt:10,add:20,sub:20,mul:30,div:30,mod:30,pow:40};
+const KW=new Set(['设','置','查','定义','若','再若','否则','遍历','循环','返回','跳出','继续','判','尝试','捕获','从','到','在']);
+
+/* ===================== 语法 ===================== */
+function parse(toks){
+  let p=0;
+  const peek=()=>toks[p];
+  const next=()=>toks[p++];
+  const atWord=w=> peek().t==='word'&&peek().v===w;
+  const atPunct=v=> peek().t==='punct'&&peek().v===v;
+  function expect(t,v){ const k=next(); if(k.t!==t||(v!==undefined&&k.v!==v)) throw perr(`期望 ${v||t}，得到 “${k.v}”`,k.line); return k; }
+
+  function binOpAt(){ // 返回当前 token 作为二元运算符的内部名，或 null
+    const k=peek();
+    if(k.t==='op'&&SYMOP[k.v]) return SYMOP[k.v];
+    if(k.t==='word'&&WORDOP[k.v]) return WORDOP[k.v];
+    return null;
+  }
+
+  function parseProgram(){ const b=[]; while(peek().t!=='eof') b.push(parseStmt()); return {t:'do',body:b}; }
+  function parseBlock(){
+    expect('punct','{'); const b=[];
+    while(!atPunct('}')){ if(peek().t==='eof') throw perr('块未闭合 }',peek().line); b.push(parseStmt()); }
+    expect('punct','}'); return {t:'do',body:b};
+  }
+  function parseStmt(){
+    const k=peek();
+    if(k.t==='word'){
+      switch(k.v){
+        case '设':   return parseSet();
+        case '置':   return parseSet(); // 设备写：置 名 = 值（等同赋值）
+        case '查':   next(); return {t:'query',e:parseExpr()};
+        case '定义': return parseFn();
+        case '若':   return parseIf();
+        case '遍历': return parseFor();
+        case '循环': return parseLoop();
+        case '判':   return parseJudge();
+        case '尝试': return parseTry();
+        case '返回': next(); return {t:'return',e:parseExpr()};
+        case '跳出': next(); return {t:'break'};
+        case '继续': next(); return {t:'continue'};
+      }
+      // 裸赋值：名 = 值（非关键字、非三态字面量，其后紧跟 =）
+      if(!KW.has(k.v)&&!(k.v in TERNARY)&&toks[p+1]&&toks[p+1].t==='op'&&toks[p+1].v==='='){
+        const name=next().v; next(); return {t:'set',name,e:parseExpr()};
+      }
+    }
+    return {t:'expr',e:parseExpr()};
+  }
+  function parseSet(){ next(); const name=expect('word').v; expect('op','='); return {t:'set',name,e:parseExpr()}; }
+  function parseTry(){
+    next(); const body=parseBlock(); let name=null, handler=null;
+    if(atWord('捕获')){ next(); if(atPunct('(')){ next(); name=expect('word').v; expect('punct',')'); } handler=parseBlock(); }
+    return {t:'try',body,name,handler};
+  }
+  function parseParams(){
+    expect('punct','('); const ps=[];
+    if(!atPunct(')')){ ps.push(expect('word').v); while(atPunct(',')){ next(); ps.push(expect('word').v);} }
+    expect('punct',')'); return ps;
+  }
+  function parseFn(){ next(); const name=expect('word').v; const params=parseParams(); const body=parseBlock(); return {t:'fn',name,params,body}; }
+  function parseIf(){
+    next(); expect('punct','('); const cond=parseExpr(); expect('punct',')'); const then=parseBlock();
+    const branches=[{cond,body:then}]; let els=null;
+    while(atWord('再若')){ next(); expect('punct','('); const c=parseExpr(); expect('punct',')'); branches.push({cond:c,body:parseBlock()}); }
+    if(atWord('否则')){ next(); els=parseBlock(); }
+    return {t:'if',branches,els};
+  }
+  function parseFor(){
+    next(); const v=expect('word').v;
+    if(atWord('从')){ next(); const a=parseExpr(); if(!atWord('到')) throw perr('遍历 缺少 “到”',peek().line); next(); const b=parseExpr(); return {t:'for',v,a,b,body:parseBlock()}; }
+    if(atWord('在')){ next(); const it=parseExpr(); return {t:'forin',v,it,body:parseBlock()}; }
+    throw perr('遍历 需 “从…到…” 或 “在…”',peek().line);
+  }
+  function parseLoop(){ next(); expect('punct','('); const cond=parseExpr(); expect('punct',')'); return {t:'loop',cond,body:parseBlock()}; }
+  function parseJudge(){
+    next(); const e=parseExpr(); expect('punct','{');
+    const arms={};
+    while(!atPunct('}')){
+      const lab=expect('word').v;
+      if(!(lab in TERNARY)) throw perr(`判 的分支标签须为 真/可能/假，得到 “${lab}”`,peek().line);
+      const s=TERNARY[lab]; arms[s]=parseBlock();
+    }
+    expect('punct','}');
+    return {t:'judge',e,arms};
+  }
+
+  // 表达式：优先级爬升
+  function parseExpr(minPrec=0){
+    let left=parseUnary();
+    while(true){
+      const op=binOpAt(); if(op===null) break;
+      const prec=PREC[op]; if(prec<minPrec) break;
+      next();
+      const right=parseExpr(prec+1); // 左结合
+      left={t:'bin',op,l:left,r:right};
+    }
+    return left;
+  }
+  function parseUnary(){
+    const k=peek();
+    if(k.t==='op'&&k.v==='-'){ next(); return {t:'un',op:'neg',e:parseUnary()}; }
+    if((k.t==='op'&&k.v==='!')||(k.t==='word'&&k.v==='非')){ next(); return {t:'un',op:'not',e:parseUnary()}; }
+    return parsePostfix();
+  }
+  function parsePostfix(){
+    let e=parsePrimary();
+    while(true){
+      if(atPunct('(')&&(e.t==='id')){ // 调用 IDENT(args)
+        next(); const args=[];
+        if(!atPunct(')')){ args.push(parseExpr()); while(atPunct(',')){ next(); args.push(parseExpr()); } }
+        expect('punct',')'); e={t:'call',name:e.name,args};
+      } else if(atPunct('[')){ next(); const idx=parseExpr(); expect('punct',']'); e={t:'index',e,idx}; }
+      else break;
+    }
+    return e;
+  }
+  function parsePrimary(){
+    const k=peek();
+    if(k.t==='num'){ next(); return {t:'num',v:k.v}; }
+    if(k.t==='str'){ next(); return {t:'str',v:k.v}; }
+    if(atPunct('(')){ next(); const e=parseExpr(); expect('punct',')'); return e; }
+    if(atPunct('[')){ next(); const items=[]; if(!atPunct(']')){ items.push(parseExpr()); while(atPunct(',')){ next(); items.push(parseExpr()); } } expect('punct',']'); return {t:'listlit',items}; }
+    if(atPunct('{')){ next(); const pairs=[];
+      if(!atPunct('}')){ pairs.push(parsePair()); while(atPunct(',')){ next(); pairs.push(parsePair()); } }
+      expect('punct','}'); return {t:'dictlit',pairs}; }
+    if(k.t==='word'){
+      if(k.v in TERNARY){ next(); return {t:'num',v:TERNARY[k.v]}; }
+      if(k.v==='函数'){ next(); const params=parseParams(); const body=parseBlock(); return {t:'lambda',params,body}; }
+      if(KW.has(k.v)) throw perr(`意外的关键字 “${k.v}”`,k.line);
+      next(); return {t:'id',name:k.v};
+    }
+    throw perr(`意外的记号 “${k.v}”`,k.line);
+  }
+  function parsePair(){ const key=parseExpr(); expect('punct',':'); const val=parseExpr(); return [key,val]; }
+
+  return parseProgram();
+}
+
+/* ===================== 平衡三进制 ===================== */
+function toBT(n){ // 依 core/ternary_core.py BT.from_int
+  n=Math.trunc(n);
+  if(n===0) return [0];
+  let a=Math.abs(n); const tr=[];
+  while(a!==0){ let r=a%3; a=Math.floor(a/3); if(r===2){ tr.push(-1); a+=1; } else tr.push(r); }
+  tr.reverse();
+  if(n<0) for(let k=0;k<tr.length;k++) tr[k]=-tr[k];
+  return tr;
+}
+const SYM={1:'+',0:'0',[-1]:'-'};
+function btStr(n){ return toBT(n).map(t=>SYM[t]).join(''); }
+
+/* ===================== 求值 ===================== */
+const MAXSTEPS=4_000_000;
+class Closure{ constructor(params,body,env){ this.params=params; this.body=body; this.env=env; } }
+const RET={}, BRK={}, CONT={};
+
+function makeEnv(parent){ return {vars:Object.create(null), parent}; }
+
+function isNum(v){ return typeof v==='number'; }
+function sign(v){ return v>0?1:(v<0?-1:0); }
+function truthy(v){ return isNum(v)?v>0:!!v; } // 若：>0 为真，其余（含 0/可能）走假支
+
+function run(src, emit){
+  const toks=tokenize(src);
+  const ast=parse(toks);
+  const env=makeEnv(null);
+  let steps=0;
+  const ret={v:undefined};
+
+  function evalNode(node){
+    if(++steps>MAXSTEPS) throw perr('执行步数超限（可能是死循环）');
+    switch(node.t){
+      case 'num': return node.v;
+      case 'str': return node.v;
+      case 'id': {
+        let e=env; // 用作用域链
+        const name=node.name;
+        for(let s=curEnv; s; s=s.parent){ if(name in s.vars) return s.vars[name]; }
+        throw perr(`未定义的名字：${name}`);
+      }
+      case 'listlit': return node.items.map(evalNode);
+      case 'un': {
+        const x=evalNode(node.e);
+        if(node.op==='neg'){ chkNum(x,'取负'); return -x; }
+        return -sign(x); // 非：Kleene 取反（非 可能 = 可能）
+      }
+      case 'bin': return evalBin(node.op, node.l, node.r);
+      case 'set': { const val=evalNode(node.e); let s=curEnv; while(s){ if(node.name in s.vars){ s.vars[node.name]=val; return val; } s=s.parent; } curEnv.vars[node.name]=val; return val; }
+      case 'query': { const v=evalNode(node.e); emit(fmt(v)); return v; }
+      case 'try': {
+        try{ evalBlock(node.body); }
+        catch(e){ if(e===RET||e===BRK||e===CONT) throw e;
+          const prev=curEnv; curEnv=makeEnv(curEnv);
+          if(node.name) curEnv.vars[node.name]=(e&&e.message)?e.message:String(e);
+          try{ if(node.handler) evalBlock(node.handler); } finally{ curEnv=prev; } }
+        return 0;
+      }
+      case 'dictlit': { const m=Object.create(null); for(const pr of node.pairs){ m[String(evalNode(pr[0]))]=evalNode(pr[1]); } return {__dict:m}; }
+      case 'fn': { curEnv.vars[node.name]=new Closure(node.params,node.body,curEnv); return 0; }
+      case 'lambda': return new Closure(node.params,node.body,curEnv);
+      case 'call': return evalCall(node);
+      case 'index': { const c=evalNode(node.e); const i=evalNode(node.idx); return getIndex(c,i); }
+      case 'do': { let last=0; for(const s of node.body){ last=evalNode(s); } return last; }
+      case 'expr': return evalNode(node.e);
+      case 'return': { ret.v = node.e?evalNode(node.e):0; throw RET; }
+      case 'break': throw BRK;
+      case 'continue': throw CONT;
+      case 'if': {
+        for(const br of node.branches){ if(truthy(evalNode(br.cond))) return evalBlock(br.body); }
+        return node.els?evalBlock(node.els):0;
+      }
+      case 'judge': {
+        const s=sign(evalNode(node.e));
+        const arm=node.arms[s];
+        return arm?evalBlock(arm):0;
+      }
+      case 'for': {
+        const a=Math.trunc(evalNode(node.a)), b=Math.trunc(evalNode(node.b));
+        for(let k=a;k<=b;k++){ curEnv.vars[node.v]=k; // 循环变量与体内赋值同落当前作用域（函数级）
+          try{ evalBlock(node.body); }catch(e){ if(e===BRK)break; if(e===CONT)continue; throw e; } }
+        return 0;
+      }
+      case 'forin': {
+        const seq=evalNode(node.it); const arr=Array.isArray(seq)?seq:(typeof seq==='string'?[...seq]:[]);
+        for(const item of arr){ curEnv.vars[node.v]=item;
+          try{ evalBlock(node.body); }catch(e){ if(e===BRK)break; if(e===CONT)continue; throw e; } }
+        return 0;
+      }
+      case 'loop': {
+        let guard=0;
+        while(truthy(evalNode(node.cond))){ if(++guard>1_000_000) throw perr('循环次数超限');
+          try{ evalBlock(node.body); }catch(e){ if(e===BRK)break; if(e===CONT)continue; throw e; } }
+        return 0;
+      }
+    }
+    throw perr('未知节点 '+node.t);
+  }
+  function evalBlock(block){ return evalNode(block); }
+
+  function chkNum(x,op){ if(!isNum(x)) throw perr(`运算 ${op} 需要数值`); }
+  function evalBin(op,ln,rn){
+    const a=evalNode(ln), b=evalNode(rn);
+    switch(op){
+      case 'and': return Math.min(sign(a),sign(b)); // Kleene
+      case 'or':  return Math.max(sign(a),sign(b));
+      case 'eq':  return equal(a,b)?1:-1;
+      case 'ne':  return equal(a,b)?-1:1;
+    }
+    chkNum(a,op); chkNum(b,op);
+    switch(op){
+      case 'add': return a+b;
+      case 'sub': return a-b;
+      case 'mul': return a*b;
+      case 'div': { if(b===0) throw perr('除以零'); const q=a/b; return (Number.isInteger(a)&&Number.isInteger(b)&&Number.isInteger(q))?q:q; }
+      case 'mod': { if(b===0) throw perr('对零取余'); return a-Math.trunc(a/b)*b; }
+      case 'pow': return Math.pow(a,b);
+      case 'gt':  return a>b?1:-1;
+      case 'lt':  return a<b?1:-1;
+      case 'gte': return a>=b?1:-1;
+      case 'lte': return a<=b?1:-1;
+      case 'ngt': return a>b?-1:1;
+      case 'nlt': return a<b?-1:1;
+    }
+    throw perr('未知运算符 '+op);
+  }
+  function equal(a,b){ if(isNum(a)&&isNum(b)) return a===b; return a===b; }
+  function getIndex(c,i){
+    if(c&&c.__dict){ const k=String(i); return (k in c.__dict)?c.__dict[k]:0; }
+    if(Array.isArray(c)) return c[((i%c.length)+c.length)%c.length];
+    if(typeof c==='string') return [...c][i];
+    throw perr('无法索引该值');
+  }
+
+  function evalCall(node){
+    const name=node.name;
+    // 用户函数优先
+    for(let s=curEnv; s; s=s.parent){ if(name in s.vars){ const f=s.vars[name]; if(f instanceof Closure) return applyClosure(f,node.args.map(evalNode)); } }
+    if(name in BUILTINS){ return BUILTINS[name](node.args.map(evalNode)); }
+    // 也许是被当函数调用的变量
+    for(let s=curEnv; s; s=s.parent){ if(name in s.vars){ const f=s.vars[name]; if(f instanceof Closure) return applyClosure(f,node.args.map(evalNode)); throw perr(`${name} 不是函数`);} }
+    throw perr(`未定义的函数：${name}`);
+  }
+  function applyClosure(f,args){
+    const prev=curEnv; const fenv=makeEnv(f.env);
+    f.params.forEach((p,idx)=> fenv.vars[p]= idx<args.length?args[idx]:0 );
+    curEnv=fenv;
+    try{ evalBlock(f.body); return 0; }
+    catch(e){ if(e===RET){ const v=ret.v; ret.v=undefined; return v; } throw e; }
+    finally{ curEnv=prev; }
+  }
+
+  let curEnv=env;
+
+  /* ---- 内置函数 ---- */
+  function asList(x){ return Array.isArray(x)?x:[x]; }
+  const BUILTINS={
+    '输出':(a)=>{ emit(fmt(a.length?a[0]:0)); return a.length?a[0]:0; },
+    'print':(a)=>BUILTINS['输出'](a),
+    '列表':(a)=>a.slice(), 'list':(a)=>a.slice(),
+    '连接':(a)=>a.map(toStr).join(''), 'concat':(a)=>a.map(toStr).join(''),
+    '取长':(a)=> (typeof a[0]==='string'?[...a[0]].length:asList(a[0]).length), 'length':(a)=>BUILTINS['取长'](a),
+    '表长':(a)=>asList(a[0]).length, 'list_len':(a)=>asList(a[0]).length,
+    '取':(a)=>getIndex(a[0],Math.trunc(a[1])), 'get':(a)=>getIndex(a[0],Math.trunc(a[1])),
+    '求和':(a)=>asList(a[0]).reduce((s,x)=>s+(isNum(x)?x:0),0), 'sum':(a)=>BUILTINS['求和'](a),
+    '最大值':(a)=>Math.max(...a.map(Number)), 'max':(a)=>Math.max(...a.map(Number)),
+    '最小值':(a)=>Math.min(...a.map(Number)), 'min':(a)=>Math.min(...a.map(Number)),
+    '绝对值':(a)=>Math.abs(a[0]), 'abs':(a)=>Math.abs(a[0]),
+    '平方根':(a)=>{ const r=Math.sqrt(a[0]); return Number.isInteger(r)?r:r; }, 'sqrt':(a)=>Math.sqrt(a[0]),
+    '幂':(a)=>Math.pow(a[0],a[1]), 'pow':(a)=>Math.pow(a[0],a[1]),
+    '同':(a)=> a[0]===a[1]?1:-1, 'same':(a)=>a[0]===a[1]?1:-1,
+    '查找':(a)=>{ const h=String(a[0]),ne=String(a[1]); return h.indexOf(ne); }, 'find':(a)=>BUILTINS['查找'](a),
+    '前缀':(a)=> String(a[0]).startsWith(String(a[1]))?1:-1, 'startswith':(a)=>BUILTINS['前缀'](a),
+    '字符串包含':(a)=> String(a[0]).includes(String(a[1]))?1:-1, 'str_contains':(a)=>BUILTINS['字符串包含'](a),
+    '大写':(a)=>String(a[0]).toUpperCase(), 'upper':(a)=>String(a[0]).toUpperCase(),
+    '小写':(a)=>String(a[0]).toLowerCase(), 'lower':(a)=>String(a[0]).toLowerCase(),
+    '反转':(a)=>{ if(typeof a[0]==='string') return [...a[0]].reverse().join(''); return asList(a[0]).slice().reverse(); }, 'reverse':(a)=>BUILTINS['反转'](a),
+    '排序':(a)=>asList(a[0]).slice().sort((x,y)=>x-y), 'sort':(a)=>BUILTINS['排序'](a),
+    '字符串':(a)=>toStr(a[0]), 'to_string':(a)=>toStr(a[0]),
+    // —— IoT / 随机 / 文件：浏览器演示桩（非确定，仅供跑通完整程序）——
+    '随机态':()=>[-1,0,1][Math.floor(Math.random()*3)], 'random_state':()=>[-1,0,1][Math.floor(Math.random()*3)],
+    '随机数':(a)=>{ const lo=Math.trunc(a[0]??0), hi=Math.trunc(a[1]??lo); return lo+Math.floor(Math.random()*(hi-lo+1)); }, 'random':(a)=>BUILTINS['随机数'](a),
+    '读':(a)=>a[0], 'read':(a)=>a[0],
+    '等待':()=>0, 'sleep':()=>0, 'wait':()=>0,
+    '读文件':()=>'', 'read_file':()=>'',
+    '写文件':()=>0, 'write_file':()=>0,
+    '当前时间':()=>Date.now(), 'time':()=>Date.now(),
+    '字典':()=>({__dict:Object.create(null)}), 'dict':()=>({__dict:Object.create(null)}),
+    '取键':(a)=>{ const d=a[0]; return (d&&d.__dict&&String(a[1]) in d.__dict)?d.__dict[String(a[1])]:0; }, 'get_key':(a)=>BUILTINS['取键'](a),
+    '置键':(a)=>{ const d=a[0]; if(d&&d.__dict) d.__dict[String(a[1])]=a[2]; return d; }, 'set_key':(a)=>BUILTINS['置键'](a),
+    '含键':(a)=>{ const d=a[0]; return (d&&d.__dict&&String(a[1]) in d.__dict)?1:-1; }, 'dict_contains':(a)=>BUILTINS['含键'](a),
+  };
+
+  // 执行
+  try{ evalNode(ast); }
+  catch(e){ if(e===RET||e===BRK||e===CONT){} else throw e; }
+}
+
+/* ===================== 格式化（对齐 ops/io_ops.format_value） ===================== */
+function esc(s){ return String(s).replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c])); }
+function tritHTML(sym){ return [...sym].map(c=>`<span class="${c==='+'?'tp':c==='-'?'tn':'tz'}">${c==='-'?'−':c}</span>`).join(''); }
+function toStr(v){ if(typeof v==='number') return String(v); if(Array.isArray(v)) return '['+v.map(toStr).join(', ')+']'; if(v&&v.__dict) return '{'+Object.keys(v.__dict).map(k=>k+': '+toStr(v.__dict[k])).join(', ')+'}'; if(v instanceof Closure) return '<函数>'; return String(v); }
+function fmt(v){
+  if(typeof v==='number'){
+    if(Number.isInteger(v)) return esc(String(v))+'<span class="ann">（三进制: </span>'+tritHTML(btStr(v))+'<span class="ann">）</span>';
+    return esc(String(v)); // 浮点：定点三进制从略
+  }
+  if(typeof v==='string') return esc(v);
+  if(Array.isArray(v)){
+    const parts=v.map(x=> typeof x==='number'?esc(String(x)):(typeof x==='string'?esc(x):'?'));
+    let base='['+parts.join(', ')+']';
+    const trits=v.map(x=> typeof x==='number'&&Number.isInteger(x)?btStr(x):'?');
+    if(trits.some(t=>t!=='?')) base+='<span class="ann">（三进制: </span>'+trits.map(t=>t==='?'?'<span class="ann">?</span>':tritHTML(t)).join('<span class="ann">, </span>')+'<span class="ann">）</span>';
+    return base;
+  }
+  if(v&&v.__dict) return esc(toStr(v));
+  if(v instanceof Closure) return '&lt;函数&gt;';
+  return esc(String(v));
+}
+
+/* ===================== 例子 ===================== */
+const EXAMPLES=[
+  {id:'ternary', name:'平衡三进制', code:
+`// 每个整数都揭示它的平衡三进制表示
+// + = 真(+1)   0 = 可能(0)   − = 假(−1)
+遍历 i 从 1 到 13 {
+    输出(i)
+}`},
+  {id:'judge', name:'三态分支 · 判', code:
+`// 三值逻辑：真 / 可能 / 假 —— 三言的立身之本
+定义 描述(x) {
+    判 x {
+        真 { 输出("正 · +1") }
+        可能 { 输出("守 ·  0") }
+        假 { 输出("负 · −1") }
+    }
+}
+
+描述(真)
+描述(可能)
+描述(假)
+
+// Kleene 三值逻辑：且=min  或=max  非=取反
+输出(真 且 可能)     // 可能
+输出(假 或 真)       // 真
+输出(非 可能)        // 可能`},
+  {id:'fib', name:'斐波那契', code:
+`定义 fib(n) {
+    若 (n <= 1) {
+        返回 n
+    } 否则 {
+        返回 fib(n - 1) + fib(n - 2)
+    }
+}
+
+遍历 i 从 0 到 10 {
+    输出(fib(i))
+}`},
+  {id:'fizzbuzz', name:'FizzBuzz', code:
+`输出("=== FizzBuzz ===")
+
+遍历 i 从 1 到 20 {
+    若 (i 余 15 等于 0) {
+        输出("FizzBuzz")
+    } 再若 (i 余 3 等于 0) {
+        输出("Fizz")
+    } 再若 (i 余 5 等于 0) {
+        输出("Buzz")
+    } 否则 {
+        输出(i)
+    }
+}`},
+  {id:'factorial', name:'阶乘', code:
+`定义 阶乘(n) {
+    若 (n <= 1) {
+        返回 1
+    } 否则 {
+        返回 n * 阶乘(n - 1)
+    }
+}
+
+遍历 n 从 1 到 8 {
+    输出(阶乘(n))
+}`},
+  {id:'iot', name:'IoT · 温室（三态传感器）', code:
+`// 三态传感器驱动设备 —— 随机模拟，每次运行都不同
+定义 描述 (值) {
+    判 值 {
+        真   { 返回("充足 +") }
+        可能 { 返回("不稳 0") }
+        假   { 返回("不足 −") }
+    }
+}
+
+遍历 次 从 1 到 5 {
+    设 光线 = 随机态()
+    置 补光灯 = 非 光线          // 光足则灭 / 光弱则亮 / 不稳则守
+    输出(连接("巡检 ", 次, " · 光线 ", 描述(光线), " · 补光灯态 ", 补光灯))
+}
+
+查 补光灯                        // 查询末次设备状态`},
+];
+
+/* ===================== UI ===================== */
+const $=s=>document.querySelector(s);
+const codeEl=$('#code'), outEl=$('#out'), statusEl=$('#status'), exWrap=$('#examples');
+
+EXAMPLES.forEach((ex,idx)=>{
+  const b=document.createElement('button'); b.className='ex'; b.textContent=ex.name; b.dataset.id=ex.id;
+  b.addEventListener('click',()=>{ loadExample(ex.id); });
+  exWrap.appendChild(b);
+});
+function loadExample(id){
+  const ex=EXAMPLES.find(e=>e.id===id); if(!ex)return;
+  codeEl.value=ex.code;
+  document.querySelectorAll('.ex').forEach(e=> e.classList.toggle('active', e.dataset.id===id));
+  execute();
+}
+
+function execute(){
+  outEl.innerHTML=''; let lines=0; const t0=performance.now();
+  const emit=(html)=>{
+    if(lines>=5000){ if(lines===5000){ addLine('… 输出过多，已截断','meta'); } lines++; return; }
+    const div=document.createElement('div'); div.className='oline';
+    div.innerHTML=`<span class="gutter">·</span>${html}`; outEl.appendChild(div); lines++;
+  };
+  try{
+    run(codeEl.value, emit);
+    const dt=(performance.now()-t0).toFixed(1);
+    if(lines===0){ const d=document.createElement('div'); d.className='empty'; d.textContent='（没有输出）'; outEl.appendChild(d); }
+    statusEl.textContent=`✓ ${lines} 行 · ${dt} ms`;
+    statusEl.style.color='var(--tp)';
+  }catch(e){
+    let msg=e && e.message ? e.message : String(e);
+    if(e instanceof RangeError || /call stack/i.test(msg)) msg='递归或嵌套过深（栈溢出）';
+    else if(!e || !e.sanyan) msg='错误：'+msg;
+    const where=e&&e.line?`（第 ${e.line} 行）`:'';
+    addLine(`✗ ${msg} ${where}`,'err');
+    statusEl.textContent='✗ 出错'; statusEl.style.color='var(--tn)';
+  }
+}
+function addLine(text,cls){ const d=document.createElement('div'); d.className='oline '+(cls||''); d.textContent=text; outEl.appendChild(d); }
+
+$('#run').addEventListener('click',execute);
+$('#clear').addEventListener('click',()=>{ codeEl.value=''; outEl.innerHTML=''; statusEl.textContent=''; document.querySelectorAll('.ex').forEach(e=>e.classList.remove('active')); codeEl.focus(); });
+codeEl.addEventListener('keydown',e=>{ if((e.metaKey||e.ctrlKey)&&e.key==='Enter'){ e.preventDefault(); execute(); } });
+
+// 主题切换（与查看器的 data-theme 机制一致）
+$('#theme').addEventListener('click',()=>{
+  const cur=document.documentElement.getAttribute('data-theme');
+  const sysDark=matchMedia('(prefers-color-scheme:dark)').matches;
+  const now=cur? cur : (sysDark?'dark':'light');
+  document.documentElement.setAttribute('data-theme', now==='dark'?'light':'dark');
+});
+
+loadExample('ternary');
+})();
+</script>
+
+</body>
+</html>
