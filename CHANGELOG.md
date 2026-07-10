@@ -39,6 +39,7 @@
 
 - **C 种子 `_start` 读 rsp 未定义行为（差分电池 CI 首跑 24 项全空的根因）**：`register u64 asm("rsp")` 局部变量 gcc 仅保证在 asm 操作数中生效，`-Os` 下序言先压栈 88 字节再执行读取 → argc 读到入口下方全零新栈页 → 走 stdin 分支零输出、rc=0。改为全局 asm 裸入口（`xor ebp; mov rsp,rdi; call _start_c`），修复前后均以 `-Os` 反汇编实证。老种子同构代码纯属侥幸未触发——电池上线首跑即现形
 - **C 种子 DIV/MOD 左操作数未弹栈（预存在缺陷）**：`case 0x05/0x06` 只弹 b、`a` 沿用上个 case 的遗留值——补 `a=pp()`；差分电池新增 除/余 4 项（仅正数域：截断除法两后端一致，负数域语义待定不收）
+- **C 种子 `sys6` 漏报 rcx/r11 clobber（预存在，电池 CI 第二轮 rc=1×28 现形）**：`syscall` 指令硬件行为即摧毁 rcx（返回地址）与 r11（RFLAGS），clobber 列表未申报——旧入口下 `sys6` 作为独立函数调用被 ABI 调用约定掩护；入口修复后 `-Os` 将 `load` 内联进 `_start_c`，gcc 把跨 syscall 存活值分配进 rcx/r11 → 参数损坏 → `load()<0` → `SYS_exit(1)`。反汇编实证补报后 syscall 近旁 rcx/r11 引用归零；入口 asm 块另补 `.text` 段指示防落入非执行段
 - **C 种子 PRINT 双缺陷（预存在，电池严格相等断言现形）**：① 整数路径原始输出 `"\n42\0"`——NUL 终止符计入 SYS_write 长度、换行写在值前——改为 `buf[31]='\n'` 结尾换行，与参考实现逐字节一致；② 字符串路径整个缺失（`if IS_INT` 无 else，`(输出 (连接 …))` 静默零输出）——补 T_STR 分支。老单例测试（包含式断言+仅整数）从未照出。验证走新建的 **Windows CRT 模拟 harness**（syscall 层换 CRT 模拟、vm_run 原样编译）：28/28 全过 + 多输出程序（整数/UTF-8 中文字符串/负数）与 Python VM 逐字节一致
 - 糖语法 `_parse_judge` 补 `:` separator skip（三嵌套 `{}` 不再泄露）
 - `compile_bytecode.py` 空列表 `s[0]` → `s and s[0]`（IndexError 修复）

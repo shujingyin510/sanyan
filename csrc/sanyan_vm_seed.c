@@ -30,9 +30,11 @@ typedef unsigned long long u64;
 /* ── syscall 包装 ── */
 static u64 sys6(u64 n, u64 a1, u64 a2, u64 a3, u64 a4, u64 a5, u64 a6) {
     u64 r;
+    /* syscall 指令本身摧毁 rcx(返回地址)/r11(RFLAGS)——必须申报，
+     * 否则 -Os 内联后 gcc 会把跨 syscall 存活值分配进这两个寄存器 */
     __asm__ volatile("movq %1,%%rax; movq %2,%%rdi; movq %3,%%rsi; movq %4,%%rdx; movq %5,%%r10; movq %6,%%r8; movq %7,%%r9; syscall; movq %%rax,%0"
         : "=r"(r) : "r"(n),"r"(a1),"r"(a2),"r"(a3),"r"(a4),"r"(a5),"r"(a6)
-        : "rax","rdi","rsi","rdx","r10","r8","r9","memory");
+        : "rax","rdi","rsi","rdx","r10","r8","r9","rcx","r11","memory");
     return r;
 }
 #define SYS3(n,a,b,c) sys6(n,(u64)(a),(u64)(b),(u64)(c),0,0,0)
@@ -383,6 +385,7 @@ void _start_c(u64* sp0) {
 }
 
 __asm__(
+    ".text\n"
     ".globl _start\n"
     "_start:\n"
     "    xorl %ebp, %ebp\n"
