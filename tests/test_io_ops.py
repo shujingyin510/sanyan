@@ -4,9 +4,13 @@ import os
 import sys
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+import io
 import unittest
+from contextlib import redirect_stdout
+from unittest import mock
 from core.evaluator import SanyanEvaluator
 from core.ternary_core import TritValue, ArrayValue
+from core.values import ModuleValue, SanyanSyntaxError, SanyanTypeError, SanyanValueError
 from ops.io_ops import IOOps
 
 
@@ -185,6 +189,133 @@ class TestDebugOps(unittest.TestCase):
             self.assertEqual(result.to_int(), 0)
         finally:
             sys.stdin = saved
+
+
+class TestFormatValueMore(unittest.TestCase):
+    """format_value 边缘分支。"""
+
+    def test_format_list_with_float_trit(self):
+        out = IOOps.format_value([TritValue(3.5), TritValue(1)])
+        self.assertIn('3.5', out)
+
+    def test_format_huge_int_guarded(self):
+        # 超大整数十进制转换触发 Python int→str 位数上限，应给位数信息而非崩溃
+        out = IOOps.format_value(TritValue(10**5000))
+        self.assertIn('大整数', out)
+
+
+class TestDebugTypeBranches(unittest.TestCase):
+    """debug 遍历各类型变量的分支。"""
+
+    def setUp(self):
+        self.env = SanyanEvaluator()
+
+    def _debug(self):
+        buf = io.StringIO()
+        with redirect_stdout(buf):
+            self.env.eval(['debug'])
+        return buf.getvalue()
+
+    def test_debug_list_dict_other(self):
+        self.env.eval(['set', 'lst', ['list', 1, 2]])
+        self.env.set_var('d', {'a': 1})
+        self.env.set_var('f', 3.14)  # 非 Trit/str/list/dict → else 分支
+        out = self._debug()
+        self.assertIn('列表', out)
+        self.assertIn('字典', out)
+
+    def test_debug_module_value(self):
+        self.env.set_var('m', ModuleValue({}, {}, set()))
+        self.assertIn('模块', self._debug())
+
+
+class TestBreakpointBranches(unittest.TestCase):
+    """_breakpoint 交互命令分支（mock input）。"""
+
+    def setUp(self):
+        self.env = SanyanEvaluator()
+
+    def test_breakpoint_all_commands(self):
+        seq = ['变量', '传感器', '执行器', '帮助', '设 y = 5', '继续']
+        buf = io.StringIO()
+        with redirect_stdout(buf), mock.patch('builtins.input', side_effect=seq):
+            r = self.env.eval(['debug', '"断点"'])
+        self.assertEqual(r.to_int(), 0)
+        self.assertIn('传感器', buf.getvalue())
+
+    def test_breakpoint_eof(self):
+        buf = io.StringIO()
+        with redirect_stdout(buf), mock.patch('builtins.input', side_effect=EOFError):
+            r = self.env.eval(['debug', '"断点"'])
+        self.assertEqual(r.to_int(), 0)
+
+
+class TestWaitTraceExplain(unittest.TestCase):
+    """wait / trace / explain 算子。"""
+
+    def setUp(self):
+        self.env = SanyanEvaluator()
+
+    def test_wait_ms(self):
+        self.assertEqual(self.env.eval(['wait', 1]).to_int(), 0)
+
+    def test_wait_trit_and_float(self):
+        self.assertEqual(self.env.eval(['wait', ['add', 1, 0]]).to_int(), 0)  # TritValue 分支
+        self.assertEqual(self.env.eval(['wait', 0.0]).to_int(), 0)  # float 分支
+
+    def test_wait_no_arg(self):
+        with self.assertRaises(SanyanSyntaxError):
+            self.env.eval(['wait'])
+
+    def test_wait_negative(self):
+        with self.assertRaises(SanyanValueError):
+            self.env.eval(['wait', -5])
+
+    def test_wait_wrong_type(self):
+        with self.assertRaises(SanyanTypeError):
+            self.env.eval(['wait', '"abc"'])
+
+    def test_trace(self):
+        buf = io.StringIO()
+        with redirect_stdout(buf):
+            self.assertEqual(self.env.eval(['trace', ['add', 1, 1]]).to_int(), 0)
+
+    def test_trace_no_args(self):
+        self.assertEqual(self.env.eval(['trace']).to_int(), 0)
+
+    def test_trace_low_confidence(self):
+        # 必须构造新实例（带 confidence 绕过小值缓存），切勿改 TritValue(1) 共享单例
+        lc = TritValue(1, confidence=0.5, source='test')
+        self.env.set_var('lc', lc)
+        buf = io.StringIO()
+        with redirect_stdout(buf):
+            self.env.eval(['trace', 'lc'])
+        self.assertIn('信度', buf.getvalue())
+
+    def test_explain_numeric(self):
+        buf = io.StringIO()
+        with redirect_stdout(buf):
+            r = self.env.eval(['explain', ['add', 1, 1]])
+        self.assertIsNotNone(r)
+        self.assertIn('置信度', buf.getvalue())
+
+    def test_explain_low_confidence_source(self):
+        lc = TritValue(1, confidence=0.3, source='sensor')
+        self.env.set_var('lc', lc)
+        buf = io.StringIO()
+        with redirect_stdout(buf):
+            self.env.eval(['explain', 'lc'])
+        out = buf.getvalue()
+        self.assertIn('来源', out)
+        self.assertIn('低信度', out)
+
+    def test_explain_non_trit(self):
+        buf = io.StringIO()
+        with redirect_stdout(buf):
+            self.assertEqual(self.env.eval(['explain', '"hi"']), 'hi')
+
+    def test_explain_no_args(self):
+        self.assertEqual(self.env.eval(['explain']).to_int(), 0)
 
 
 if __name__ == '__main__':

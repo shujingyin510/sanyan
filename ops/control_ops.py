@@ -9,6 +9,7 @@ from core.values import (
     SanyanSyntaxError,
     SanyanValueError,
 )
+from ops.capability import check_deadline
 from ops.list_ops import _as_list
 from ops.registry import register, register_alias
 
@@ -95,6 +96,7 @@ class ControlOps:
         result = TritValue(0)
         local_count = 0
         while local_count < evaluator.max_loop_steps:
+            check_deadline(evaluator)  # 限时看门狗（无约束帧时零成本早退）
             cond = evaluator.eval(args[0])
             if BT.to_int(cond.value) != 1:
                 break
@@ -118,6 +120,7 @@ class ControlOps:
         body = args[3:]
         result = TritValue(0)
         for i in range(start, end + 1):
+            check_deadline(evaluator)  # 限时看门狗
             evaluator.scope_vars[var_name] = TritValue(i)
             try:
                 for expr in body:

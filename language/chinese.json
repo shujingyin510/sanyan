@@ -111,6 +111,9 @@
     "to_json": "转JSON",
     "from_json": "解析JSON",
     "register_device": "注册设备",
+    "sensor_read": "读传感器",
+    "sensor_query": "查传感器",
+    "sensor_write": "写传感器",
     "write_binary": "写二进制"
   },
   "operators": {

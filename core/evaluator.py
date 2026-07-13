@@ -344,6 +344,8 @@ def _init_ops() -> None:
     import ops.data_pipeline_ops  # noqa: F401
     import ops.py_bridge_ops  # noqa: F401  — FFI 层 A（SANYAN_FFI 未开时为报假桩）
     import ops.c_ffi_ops  # noqa: F401  — FFI 层 B 在线半（同一门控）
+    import ops.planned_ops  # noqa: F401  — 规划关键字（置信度/清空/克隆/掩码/约束桩）
+    import ops.constraint_ops  # noqa: F401  — 能力层约束算子（任务/约束/能否，默认拒绝能力栈）
 
 
 class SanyanEvaluator(SanyanRuntime):

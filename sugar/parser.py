@@ -179,6 +179,8 @@ class _Parser:
             return self._parse_register_device()
         if kw == 'match':
             return self._parse_match()
+        if kw == '任务' or kw == 'task':
+            return self._parse_task()
 
         # 表达式语句
         expr = self.parse_expression()
@@ -203,6 +205,58 @@ class _Parser:
         cond = self.parse_expression()
         body = self.parse_block()
         return ['loop', cond, body]
+
+    def _parse_task(self):
+        """任务 名 { 约束 { 许 网; 禁 进程 } 体… } — 能力约束块糖语法。
+
+        产出 S-式 `['任务', '"名"', ['约束', ['许','网'], …], 体…]`，与 ops/constraint_ops
+        的结构解析对齐。约束子句**结构化读取**（关键字+单个能力类，不走表达式——`许 网`
+        会被 Pratt 解析成孤立的 `许`）。无 `约束` 块 → 默认拒绝空约束。
+        """
+        self.advance()  # 任务
+        label = '""'
+        if self.peek() and self.peek().value not in ('{', '（', '('):
+            name_tok = self.advance()
+            label = '"' + (name_tok.value if name_tok else '') + '"'
+        self._expect('{')
+        constraint = ['约束']
+        body = []
+        while self.peek() and self.peek().value != '}':
+            if self._kw(self.peek()) == '约束':
+                constraint = self._parse_constraint_block()
+            else:
+                s = self.parse_statement()
+                if s is not None:
+                    body.append(s)
+        self._expect('}')
+        return ['任务', label, constraint] + body
+
+    def _parse_constraint_block(self):
+        """约束 { 许 网; 只许 盘读; 禁 进程; 允许 可能; 限时(30) } → ['约束', [kw, cap], …]。
+
+        每条子句固定读「关键字 + 单个能力类」两 token——故换行/分号均可分隔，不串行。
+        """
+        self.advance()  # 约束
+        self._expect('{')
+        clauses: list = ['约束']
+        while self.peek() and self.peek().value != '}':
+            if self.peek().value == ';':
+                self.advance()
+                continue
+            kw_tok = self.advance()
+            kw = kw_tok.value if kw_tok else ''
+            if kw == '限时':
+                self._expect('(')
+                arg = self.advance()
+                self._expect(')')
+                clauses.append(['限时', arg.value if arg else '0'])
+            else:
+                cap = self.advance()
+                clauses.append([kw, cap.value if cap else ''])
+            if self.peek() and self.peek().value == ';':
+                self.advance()
+        self._expect('}')
+        return clauses
 
     def _parse_return(self):
         self.advance()

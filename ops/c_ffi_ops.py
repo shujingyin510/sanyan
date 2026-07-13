@@ -27,6 +27,7 @@ from typing import Any, Optional
 
 from core.ternary_core import TritValue
 from core.values import SanyanSyntaxError
+from ops.capability import register_self_guarded
 from ops.py_bridge_ops import _envelope, _fail, _gate, _to_python
 from ops.registry import register
 
@@ -100,7 +101,7 @@ def _resolve_ct(token: str, struct_types: dict):
 
 def _c_load(evaluator: Any, args: list) -> dict:
     """c载入(manifest路径) → 信封。二进制查找序：manifest 同目录 → 原名交给系统装载器。"""
-    denied = _gate()
+    denied = _gate(evaluator)
     if denied:
         return denied
     if len(args) != 1:
@@ -194,7 +195,7 @@ def _marshal_in(v: Any, token: str, struct_types: dict) -> Any:
 
 def _c_call(evaluator: Any, args: list) -> dict:
     """c调(库句柄, 函数名, 参数…) → 信封。签名/err 全由 manifest 驱动，不猜。"""
-    denied = _gate()
+    denied = _gate(evaluator)
     if denied:
         return denied
     if len(args) < 2:
@@ -237,3 +238,8 @@ def _c_release(evaluator: Any, args: list) -> TritValue:
 register('c载入', _c_load)
 register('c调', _c_call)
 register('c释', _c_release)
+
+# 能力面（c载入/c调）信封式：约束块内未 `许 外链` → 判假·因=约束（_gate 自理），分派处不抛。
+# c释 是清理算子（不设门、未标外链类），不登记。
+register_self_guarded('c载入')
+register_self_guarded('c调')

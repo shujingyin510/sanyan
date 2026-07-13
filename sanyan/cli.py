@@ -5,20 +5,47 @@
 
 import sys
 import os
+import re
 import argparse
 import subprocess as sp
+
+from sanyan import __version__
+
+try:
+    import rich  # noqa: F401
+
+    _HAS_RICH = True
+except ImportError:
+    _HAS_RICH = False
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 PYTHON = sys.executable
 UTF8 = '-X utf8'
-VERSION = 'v3.36.0'
+VERSION = f'v{__version__}'
 
 SYMBOL_OK = '[green]OK[/]'
 SYMBOL_FAIL = '[red]FAIL[/]'
 SYMBOL_RUN = '[cyan]>[/]'
 
 
+_MARKUP_RE = re.compile(r'\[/?[a-z][a-z0-9 _#]*\]|\[/\]')
+
+
+class _PlainConsole:
+    """rich 缺失时的降级控制台：打印时剥除 [markup] 标签。"""
+
+    @staticmethod
+    def print(*args, **kwargs):
+        if not args:
+            print()
+            return
+        for a in args:
+            print(_MARKUP_RE.sub('', a) if isinstance(a, str) else a)
+
+
 def _console():
+    if not _HAS_RICH:
+        return _PlainConsole()
     from rich.console import Console
 
     return Console(highlight=False)
@@ -162,10 +189,15 @@ def cmd_repl(args):
 
 
 def cmd_version(args):
+    c = _console()
+    if not _HAS_RICH:
+        c.print(f'三言 Sanyan  {VERSION}')
+        c.print(f'Python      {sys.version.split()[0]}')
+        c.print('GitHub      github.com/shujingyin510/sanyan')
+        return 0
     from rich.table import Table
     from rich.panel import Panel
 
-    c = _console()
     c.print()
     table = Table(show_header=False, box=None, padding=(0, 4))
     table.add_column(style='cyan')
@@ -175,6 +207,7 @@ def cmd_version(args):
     table.add_row('GitHub', 'github.com/shujingyin510/sanyan')
     c.print(Panel(table, border_style='cyan'))
     c.print()
+    return 0
 
 
 # ── 包管理 ──
@@ -256,27 +289,25 @@ def main():
     parser = _build_parser()
 
     if len(sys.argv) == 1:
-        from rich.console import Console
-        from rich.panel import Panel
-
-        c = Console(highlight=False)
-        c.print()
-        c.print(
-            Panel(
-                f'版本: {VERSION}\n'
-                f'定位: 编程语言 + 认知运行时 + 自主进化 Agent\n\n'
-                f'[bold]快速开始:[/]\n'
-                f'  sanyan repl                 [dim]交互式 REPL[/]\n'
-                f'  sanyan agent run "任务"     [dim]单次 Agent 提问[/]\n'
-                f'  sanyan agent evolve        [dim]Agent 自主改代码闭环[/]\n'
-                f'  sanyan agent chat          [dim]多轮对话[/]\n'
-                f'  sanyan compile demo.san    [dim]编译 .san → .bin[/]\n'
-                f'  sanyan --help              [dim]完整命令列表[/]',
-                title='三言 Sanyan',
-                border_style='cyan',
-                padding=(1, 2),
-            )
+        c = _console()
+        banner = (
+            f'版本: {VERSION}\n'
+            f'定位: 编程语言 + 认知运行时 + 自主进化 Agent\n\n'
+            f'[bold]快速开始:[/]\n'
+            f'  sanyan repl                 [dim]交互式 REPL[/]\n'
+            f'  sanyan agent run "任务"     [dim]单次 Agent 提问[/]\n'
+            f'  sanyan agent evolve        [dim]Agent 自主改代码闭环[/]\n'
+            f'  sanyan agent chat          [dim]多轮对话[/]\n'
+            f'  sanyan compile demo.san    [dim]编译 .san → .bin[/]\n'
+            f'  sanyan --help              [dim]完整命令列表[/]'
         )
+        c.print()
+        if _HAS_RICH:
+            from rich.panel import Panel
+
+            c.print(Panel(banner, title='三言 Sanyan', border_style='cyan', padding=(1, 2)))
+        else:
+            c.print(banner)
         c.print()
         return 0
 

@@ -41,6 +41,20 @@ def all_ops() -> list[str]:
     return list(_OP_DISPATCH.keys())
 
 
+def entry_names(name: str) -> list[str]:
+    """返回与 name 共享同一分派实现的所有注册名（含自身）。
+
+    沙箱按能力连坐封锁用：只封 'http读' 拦不住别名 'http_get'（同一实现，
+    不同名字）——按 (func, extra) 值相等聚合，同时覆盖 register_alias（共享
+    tuple）与重复 register（如 匹配3/ternary_match 各自 register 到同一函数、
+    tuple 内容相等但非同一对象）两种同族逃逸。extra 参与比较，故 eq/gt
+    （共享 _compare 但 extra 不同）不会被误并。"""
+    entry = _OP_DISPATCH.get(name)
+    if entry is None:
+        return [name]
+    return [k for k, v in _OP_DISPATCH.items() if v == entry]
+
+
 def clear() -> None:
     """清空注册表，主要用于测试隔离。"""
     _OP_DISPATCH.clear()

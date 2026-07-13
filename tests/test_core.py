@@ -1061,8 +1061,7 @@ class TestConstantFolding(unittest.TestCase):
         from core.eval_utils import propagated_confidence
         from core.ternary_core import TritValue
 
-        t = TritValue(1)
-        t.confidence = 0.5
+        t = TritValue(1, confidence=0.5)  # 构造新实例；勿改 TritValue(1) 共享单例（会全局污染 confidence）
         self.assertEqual(propagated_confidence(t, 42), 0.5)  # 混合 TritValue 和 raw
         self.assertEqual(propagated_confidence(42, 42), 1.0)  # 全 raw
 

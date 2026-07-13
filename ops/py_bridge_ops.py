@@ -31,6 +31,7 @@ from typing import Any
 
 from core.ternary_core import TritValue
 from core.values import SanyanSyntaxError
+from ops.capability import can, register_self_guarded
 from ops.registry import register
 
 # 句柄注册表：进程级强引用（防 GC）。上限防句柄泄漏把宿主内存拖死（RFC §3.5）。
@@ -40,19 +41,24 @@ _module_cache: dict[str, dict] = {}  # 模块名 → 信封（py导入 幂等）
 _next_id = 1
 
 
-def _envelope(trit: int, *, value: Any = None, err: str = '', conf: float = 1.0) -> dict:
-    return {'判': TritValue(trit, confidence=conf), '值': value, '错': err, '源': 'python'}
+def _envelope(trit: int, *, value: Any = None, err: str = '', conf: float = 1.0, reason: str = '') -> dict:
+    return {'判': TritValue(trit, confidence=conf), '值': value, '错': err, '源': 'python', '因': reason}
 
 
-def _fail(err: str, *, conf: float = 1.0, trit: int = -1) -> dict:
-    return _envelope(trit, err=err[:200], conf=conf)
+def _fail(err: str, *, conf: float = 1.0, trit: int = -1, reason: str = '') -> dict:
+    return _envelope(trit, err=err[:200], conf=conf, reason=reason)
 
 
-def _gate() -> dict | None:
-    """FFI 总开关：未显式开启一律信封报假（安全默认，RFC §3.6-1）。"""
-    if os.environ.get('SANYAN_FFI') == '1':
-        return None
-    return _fail('FFI 未启用（安全默认）：设 SANYAN_FFI=1 显式开启')
+def _gate(evaluator=None) -> dict | None:
+    """FFI 双闸：SANYAN_FFI 未开 → 因=门控；约束块内未 `许 外链` → 因=约束。
+
+    均信封报假不 raise（能力面契约；分派处对这些算子已登记自守卫，见 registry 尾）。
+    """
+    if os.environ.get('SANYAN_FFI') != '1':
+        return _fail('FFI 未启用（安全默认）：设 SANYAN_FFI=1 显式开启', reason='门控')
+    if evaluator is not None and not can(evaluator, '外链'):
+        return _fail('约束禁止: 外链（FFI）', reason='约束')
+    return None
 
 
 def _is_handle(v: Any) -> bool:
@@ -147,7 +153,7 @@ def _resolve(evaluator: Any, node: Any) -> Any:
 
 def _py_import(evaluator: Any, args: list) -> dict:
     """py导入(模块名) → 信封。importlib 进程内导入；同名幂等返回同句柄。"""
-    denied = _gate()
+    denied = _gate(evaluator)
     if denied:
         return denied
     if len(args) != 1:
@@ -171,7 +177,7 @@ def _py_import(evaluator: Any, args: list) -> dict:
 
 def _py_getattr(evaluator: Any, args: list) -> dict:
     """py取(句柄, 属性名) → 信封。getattr；结果按封送表转换（复杂对象→新句柄）。"""
-    denied = _gate()
+    denied = _gate(evaluator)
     if denied:
         return denied
     if len(args) != 2:
@@ -186,7 +192,7 @@ def _py_getattr(evaluator: Any, args: list) -> dict:
 
 def _py_call(evaluator: Any, args: list) -> dict:
     """py调(句柄, 参数…) → 信封。调用可调句柄；入参深转换，三言函数值拒（无回调）。"""
-    denied = _gate()
+    denied = _gate(evaluator)
     if denied:
         return denied
     if len(args) < 1:
@@ -205,7 +211,7 @@ def _py_call(evaluator: Any, args: list) -> dict:
 
 def _py_getitem(evaluator: Any, args: list) -> dict:
     """py项(句柄, 键) → 信封。obj[key]（下标语义，补 py取 的属性语义）。"""
-    denied = _gate()
+    denied = _gate(evaluator)
     if denied:
         return denied
     if len(args) != 2:
@@ -265,3 +271,8 @@ register('py项', _py_getitem)
 register('py列', _py_list_handles)
 register('py释', _py_release)
 register('信封判', _envelope_verdict)
+
+# 能力面四算子是信封式：约束块内未 `许 外链` → 判假·因=约束（_gate 自理），分派处不抛。
+# py列/py释 是惰性运维（不设门、未标外链类），不登记。
+for _op in ('py导入', 'py取', 'py调', 'py项'):
+    register_self_guarded(_op)

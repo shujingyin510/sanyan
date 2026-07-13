@@ -37,9 +37,12 @@ def run_tail_call(
     evaluator, params: list, tail_body: list, last_expr: Optional[list], op: str, args: list
 ) -> TritValue:
     """执行尾递归优化的函数调用"""
+    from ops.capability import check_deadline  # 惰性导入避免 core→ops 环
+
     max_iterations = evaluator.max_loop_steps * _TCO_LOOP_MULTIPLIER
     iteration = 0
     while iteration < max_iterations:
+        check_deadline(evaluator)  # 限时看门狗（递归也是跑飞向量）
         evaluator.push_scope()
         for param, value in zip(params, args):
             evaluator.set_var(param, value)

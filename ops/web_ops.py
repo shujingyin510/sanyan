@@ -2,9 +2,10 @@
 
 import json
 import time
+import urllib.parse
 from typing import Any, Callable, Dict, List, Optional, Tuple
 from core.ternary_core import TritValue
-from core.values import SanyanSyntaxError, SanyanTypeError
+from core.values import FunctionValue, SanyanSyntaxError, SanyanTypeError, call_function
 from ops.registry import register, register_alias
 
 
@@ -346,8 +347,41 @@ def _ternary_web_server(evaluator, args):
     return TernaryServer('127.0.0.1', port)
 
 
+def _decode_wire_path(raw_path: str) -> tuple:
+    """线上的原始 path → (解码路径, 查询字典)。
+
+    浏览器/客户端发来的是百分号编码 + 可能带 ?查询串 的原始路径——
+    中文路由（/问候/:名字）必须先解码才能匹配，查询串进 请求["查询"]。
+    （v3.57.0 册子冒烟现形：此前编码路径直接 404、查询串污染最后一段。）
+    """
+    raw, _, q = raw_path.partition('?')
+    path = urllib.parse.unquote(raw)
+    query = dict(urllib.parse.parse_qsl(q, keep_blank_values=True))
+    return path, query
+
+
+def _request_dict(req: TernaryRequest) -> dict:
+    """TernaryRequest → 三言侧请求字典（handler 的唯一入参）。"""
+    return {
+        '方法': req.method,
+        '路径': req.path,
+        '查询': dict(req.query),
+        '头': dict(req.headers),
+        '体': req.body,
+        '参数': dict(req.metadata.get('params', {})),
+    }
+
+
 def _ternary_web_route(evaluator, args):
-    """三态路由(server, 方法, 路径, 处理器) — 添加路由"""
+    """三态路由(server, 方法, 路径, 处理器) — 添加路由。
+
+    处理器三种形态：
+      1. 函数值（定义 的函数名 / λ）——每请求以 请求字典 为唯一实参调用，
+         字典含 方法/路径/查询/头/体/参数（:param 路径参数在 "参数" 键）；
+         零参函数则不传参。返回 字符串→text、字典→json（handle_request 映射）。
+      2. 裸名字（求值不出函数值时）——请求时按名调用，同样传 请求字典。
+      3. 其余（历史用法：任意表达式）——每请求求值一次，拿不到请求对象。
+    """
     if len(args) < 4:
         raise SanyanSyntaxError('三态路由 需要服务器、方法、路径和处理器')
     server = evaluator.eval(args[0])
@@ -359,8 +393,33 @@ def _ternary_web_route(evaluator, args):
     path = evaluator.eval(args[2])
     if isinstance(path, TritValue) and path.is_string():
         path = path.to_payload()
-    handler = args[3]  # 不求值，作为函数节点
-    server.router.add_route(str(method), str(path), lambda req, resp: evaluator.eval(handler))
+
+    handler_node = args[3]
+    pre = None
+    try:
+        pre = evaluator.eval(handler_node)
+    except Exception:
+        pre = None
+
+    if isinstance(pre, FunctionValue):
+
+        def _handler(req, resp, _fv=pre):
+            call_args = [_request_dict(req)] if _fv.params else []
+            return call_function(evaluator, _fv, call_args)
+
+    elif isinstance(handler_node, str) and not handler_node.startswith(('"', '“')):
+        # 裸名字（未能预求值成函数值）：请求时按名调用
+
+        def _handler(req, resp, _name=handler_node):
+            return call_function(evaluator, _name, [_request_dict(req)])
+
+    else:
+        # 历史用法兜底：每请求求值表达式（拿不到请求对象）
+
+        def _handler(req, resp, _node=handler_node):
+            return evaluator.eval(_node)
+
+    server.router.add_route(str(method), str(path), _handler)
     return server
 
 
@@ -385,7 +444,8 @@ def _ternary_web_listen(evaluator, args):
             self._handle('POST', body)
 
         def _handle(self, method, body=''):
-            response = server.handle_request(method, self.path, dict(self.headers), body)
+            path, query = _decode_wire_path(self.path)
+            response = server.handle_request(method, path, dict(self.headers), body, query)
             self.send_response(response.status)
             for key, value in response.headers.items():
                 self.send_header(key, value)

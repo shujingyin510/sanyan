@@ -1,0 +1,15 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+  "plugin": [
+    "oh-my-opencode@4.17.0",
+    "@statista-oss/opencode-workflow@0.1.1",
+    "opencode-ask@1.1.0",
+    "opencode-think-formatter@1.6.1",
+    "micode-beads@1.4.0",
+    "open-mem@0.14.2",
+    "@zcy2nn/agent-forge@1.4.0",
+    "opencode-dcp-dynamic-limits@0.1.1",
+    "opencode-deepseek-thinking-fix@0.2.5",
+    "opencode-shell-non-interactive-strategy@1.1.2"
+  ]
+}

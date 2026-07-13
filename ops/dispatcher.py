@@ -17,6 +17,7 @@ from core.values import (
 )
 from core.ternary_core import TritValue, ArrayValue
 from core.sandbox import check_op as _check_op, check_func as _check_func
+from ops.capability import check_dispatch as _check_cap
 
 # 哨兵：dispatch_op 用此值区分"未找到 op"和"op 返回了 None"
 _DISPATCH_NOT_FOUND = object()
@@ -45,6 +46,7 @@ def dispatch_op(evaluator: Any, internal: str, args: list) -> Any:
     支持缓存加速，未找到时返回 _DISPATCH_NOT_FOUND 哨兵。
     """
     _check_op(internal)
+    _check_cap(evaluator, internal)  # 能力约束层（块内默认拒绝；块外零成本早退）
     if internal in evaluator._op_cache:
         method, extra = evaluator._op_cache[internal]
     else:

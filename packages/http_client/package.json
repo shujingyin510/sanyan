@@ -1,7 +1,7 @@
 {
   "name": "http_client",
-  "version": "1.0.0",
-  "description": "HTTP 客户端 — GET/POST 请求、JSON 解析",
+  "version": "1.0.1",
+  "description": "HTTP 客户端 — GET/POST 请求、JSON 解析、三态信封（真实状态码/超时=可能）",
   "author": "三言团队",
   "license": "GPL-3.0",
   "keywords": ["http", "api", "json", "web"],

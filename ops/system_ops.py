@@ -9,6 +9,12 @@ from ops.registry import register, register_alias
 
 EXEC_TIMEOUT = 30
 
+# 安全门控变量：不允许从语言内部（设环境变量）翻越。
+# 否则 `设环境变量("SANYAN_NET","0")` 之类可在运行时自拆门控——门必须在
+# 语言语义之内不可触碰（约束方向研究「元能力自守恒律」的最小落地）。宿主层
+# （Python os.environ / 测试 monkeypatch / run_agent setenv）不走本算子，不受限。
+_PROTECTED_ENV = frozenset({'SANYAN_NET', 'SANYAN_NET_ALLOW_LOCAL', 'SANYAN_FFI'})
+
 
 def _arg_str(evaluator, a) -> str:
     """字符串参数提取：sugar 解析产物的字面量**带引号**（如 '"NAME"'），必须经 eval
@@ -50,6 +56,8 @@ def op_setenv(evaluator, args):
     if len(args) < 2:
         raise SanyanSyntaxError('设环境变量 需要 变量名 和 值')
     name = _arg_str(evaluator, args[0])
+    if name in _PROTECTED_ENV:
+        raise SanyanRuntimeError(f'设环境变量 禁止修改安全门控变量: {name}（能力边界不可从语言内部翻越）')
     val = _arg_str(evaluator, args[1])
     os.environ[name] = val
     return TritValue(0)

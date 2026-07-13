@@ -1,4 +1,4 @@
-# Tri-State Cognitive Framework Sanyan v3.56.2
+# Tri-State Cognitive Framework Sanyan v3.58.0
 
 [![VS Code Extension](https://img.shields.io/badge/VS%20Code-Syntax%20Highlight-%23007ACC?logo=visualstudiocode)](sanyan-vscode/README.md)
 [![CI](https://github.com/shujingyin510/sanyan/actions/workflows/test.yml/badge.svg)](https://github.com/shujingyin510/sanyan/actions)
@@ -140,6 +140,8 @@ Register virtual devices, read/write sensors with ternary values. Perfect for sm
 | **Lambda** | `λ(x) { x * 2 }` or `function(x) { x * 2 }` |
 | **Module System** | `import("path")`, `export name1 name2`, nested package import |
 | **FFI ⚗️ experimental** | In-process Python bridge (`py导入`/`py调`, six ops); every foreign call returns a **tri-state envelope** (verdict/payload/error separated); opt-in via `SANYAN_FFI=1`, interpreter path only — see manual §20 and `docs/ffi_plan.md` |
+| **Networking** | HTTP client `http读`/`http写`/`http请求` (tri-state envelope: **timeout = maybe**, real status codes) + ternary web server with routing/middleware; SSRF guard + `SANYAN_NET` gate; Chinese URLs/routes auto-encoded — usage guide `docs/network.md` |
+| **Capability Constraints ⚗️** | `任务 name { 约束 { 许 网; 禁 进程 } body }` — **default-deny** capability block (net/read/write/process/foreign, 5 classes), keywords `许`(grant)/`只许`(seal)/`禁`(deny)/`允许`(tolerate); **denial is a value** (verdict=false·因=constraint, flows as control not exceptions) + `能否("网")` query; monotonic nesting + concurrency inheritance; interpreter path only — usage guide `docs/constraint.md` |
 | **Line Comments** | `//` (halfwidth), `／／` (fullwidth), `#` — three comment syntaxes |
 
 ### Bytecode VM

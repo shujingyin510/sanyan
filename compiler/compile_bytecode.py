@@ -59,14 +59,35 @@ def _fold_constants(node):
 
 _FFI_OPS = ('py导入', 'py取', 'py调', 'py项', 'py列', 'py释', 'c载入', 'c调', 'c释')
 
+# 网络算子：字节码/种子 VM 的 65-opcode ISA 无网络指令，运行时也无外呼通道。
+# 含 ASCII 别名（registry 同名注册，绕过检测会落到深层未知算子错误——不许静默）。
+_NET_OPS = (
+    'http读',
+    'http写',
+    'http请求',
+    '三态Web服务器',
+    '三态路由',
+    '三态监听',
+    'http_get',
+    'http_post',
+    'http_request',
+    'ternary_web_server',
+    'ternary_web_route',
+    'ternary_web_listen',
+)
 
-def _find_ffi_op(node) -> str | None:
-    """在 AST 里找算子位（列表头）上的 FFI 操作名；找不到返回 None。"""
+
+# 能力约束算子：约束栈是求值器实例运行时特性（挂 _cap_stack），字节码/种子 VM 无此运行时。
+_CONSTRAINT_OPS = ('任务', '约束', '能否')
+
+
+def _find_op(node, ops) -> str | None:
+    """在 AST 里找算子位（列表头）上的指定操作名；找不到返回 None。"""
     if isinstance(node, list) and node:
-        if isinstance(node[0], str) and node[0] in _FFI_OPS:
+        if isinstance(node[0], str) and node[0] in ops:
             return node[0]
         for child in node:
-            hit = _find_ffi_op(child)
+            hit = _find_op(child, ops)
             if hit:
                 return hit
     return None
@@ -139,11 +160,26 @@ def compile_source(source: str, output_path: str, vars_table: dict | None = None
     # FFI 后端矩阵（docs/ffi_plan.md §1）：Python 桥是**进程内**运行时能力，字节码 VM/
     # LLVM 后端没有这个运行时——编译期显式报错，绝不静默吞掉（只查算子位/表头，
     # 字符串数据里出现 "py导入" 不误伤）。repl 主流程捕获此错并回退求值器（带打印）。
-    ffi_op = _find_ffi_op(ast)
+    ffi_op = _find_op(ast, _FFI_OPS)
     if ffi_op:
         raise SanyanSyntaxError(
             f'{ffi_op} 仅解释器路径支持（--eval）——FFI 是进程内 Python 桥，'
             f'字节码/LLVM 后端无此运行时（docs/ffi_plan.md §1 后端矩阵）'
+        )
+    # 网络后端矩阵（同 FFI 惯例，绝不静默）：字节码/种子 VM 无网络运行时；
+    # http读/http写 另有 LLVM 原生路径（WinHTTP）。repl 捕获此错回退求值器。
+    net_op = _find_op(ast, _NET_OPS)
+    if net_op:
+        raise SanyanSyntaxError(
+            f'{net_op} 仅解释器路径支持（--eval）——字节码/种子 VM 无网络运行时；'
+            f'http读/http写 另可走 LLVM 原生路径（WinHTTP），见 docs/manual.md 网络算子小节'
+        )
+    # 能力约束后端矩阵（同上惯例）：约束栈是求值器实例运行时特性，字节码/种子 VM 无此运行时。
+    cap_op = _find_op(ast, _CONSTRAINT_OPS)
+    if cap_op:
+        raise SanyanSyntaxError(
+            f'{cap_op} 仅解释器路径支持（--eval）——能力约束栈是求值器运行时特性，'
+            f'字节码/种子 VM 无此运行时（约束-方向研究 §D5 后端矩阵）'
         )
     # 自动提取 sugar AST 中的 (export ...) / (导出 ...) 节点
     if not export_names:

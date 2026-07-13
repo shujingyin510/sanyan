@@ -1,4 +1,4 @@
-# 三言 v3.56.2 语言手册
+# 三言 v3.58.0 语言手册
 
 > 面向开发者的完整参考：语法、命令速查、错误说明、文件操作、IoT、Agent 等
 
@@ -755,8 +755,9 @@ v3.7.1 起可用希腊字母 `λ` 替代 `函数`：
 | `url解码`               | `url解码(字符串)`                                   | URL 解码                             |
 | `unicode编码`           | `unicode编码(字符串)`                               | Unicode 编码                         |
 | `unicode解码`           | `unicode解码(字符串)`                               | Unicode 解码                         |
-| `http读`                 | `http读(URL)`                                       | HTTP GET 请求                        |
-| `http写`                 | `http写(URL, 数据)`                                 | HTTP POST 请求                       |
+| `http读`                 | `http读(URL)`                                       | HTTP GET，返回响应文本（失败抛错）   |
+| `http写`                 | `http写(URL, 数据, 头?)`                            | HTTP POST，返回响应文本（失败抛错）  |
+| `http请求`               | `http请求(方法, URL, 体?, 头?)`                     | 三态信封版 HTTP（判/状态码/响应头）  |
 | `沙箱`                  | `沙箱()`                                            | 创建沙箱环境                         |
 | `沙箱开`                | `沙箱开(沙箱)`                                      | 启动沙箱环境                         |
 
@@ -830,6 +831,76 @@ v3.7.1 起可用希腊字母 `λ` 替代 `函数`：
 文档版本: v3.37.0
  · 更新日期: 2026-06-14 · 语言: 三言 Sanyan
 
+
+## 19.x 网络算子（v3.57.0 收口）
+
+> 客户端 `http读`/`http写`/`http请求` + 服务器 `三态Web服务器`/`三态路由`/`三态监听`。
+> **完整使用册子（示例全部实测）：`docs/network.md`**。中文 URL/中文路由自动编解码。
+
+**门控与安全**：
+
+- `SANYAN_NET=0` 全局禁网——旧算子抛可读错误，`http请求` 信封报假。
+  （与 `SANYAN_FFI` 默认关不同：http 是先于门控发布的既有能力，默认开、显式关。）
+- SSRF 防护默认封锁 localhost/私网/保留地址、仅允许 http/https；
+  本机自测成环（如连本地 `三态Web服务器`、本地推理端点）设 `SANYAN_NET_ALLOW_LOCAL=1` 显式豁免。
+- 超时：默认 60s；作用域内设变量 `超时秒数` 可覆盖（三个客户端算子一致）。
+
+**三态信封（`http请求`）**：与 FFI 信封同构（§20.1，`信封判` 直接可用），
+额外携带 `状态码` 与 `响应头`。判 = 真(2xx/3xx) / 假(4xx/5xx、传输失败、被禁)
+/ **可能(超时——超时 ≠ 宕机)**。示例（实测）：
+
+```sanyan
+设 信封 = http请求("GET", "https://httpbin.org/get")
+设 判 = 信封判(信封)
+若 (判 == 真) {
+    输出(取键(信封, "值"))
+} 再若 (判 == 可能) {
+    输出("超时,稍后重试")
+} 否则 {
+    输出(连接("失败: ", 取键(信封, "错"), " 状态码=", 转字符串(取键(信封, "状态码"))))
+}
+```
+
+（注：`匹配3` 的糖语法尚未实现——仅 S-表达式 AST 路径可用，见 Roadmap 已知限制。）
+
+**Web 服务器**：`三态路由(服务器, 方法, 路径, 处理器)` 的处理器是普通函数，
+以**请求字典**为唯一实参（键：`方法/路径/查询/头/体/参数`，`:名字` 路径参数在
+`参数` 键）；返回 字符串→text、字典→JSON。零参函数不传参；
+传任意表达式则退回旧行为（每请求求值一次，拿不到请求对象）。
+
+**后端矩阵**：解释器路径全量；`http读`/`http写` 另有 LLVM 原生路径（WinHTTP）；
+字节码/种子 VM 无网络运行时——编译期显式报错，repl 自动回退求值器。
+stdlib：`stdlib/http.san`（薄封装）、`stdlib/network.san`（健康检查/重试，
+基于信封三态；真 TCP/UDP 需走 FFI `py导入("socket")`）。
+
+## 19.y 能力约束（`任务` / `约束`）⚗️ 实验性
+
+> 状态：能力层已落地（v3.58.0），仅**解释器路径**支持。三言的定位特性：**让不可信代码变成可以安全运行的代码**。同一份约束声明驱动运行时能力控制与三态失败语义。**完整使用册子见 `docs/constraint.md`**；设计与推翻条件见知识库 `约束-方向研究`。
+
+**心智模型**：`约束{}` 里默认**拒绝一切效果**——只有纯计算恒通；五能力类（`网`/`盘读`/`盘写`/`进程`/`外链`）不 `许` 即判假。四关键字对能力集做运算：
+
+| 关键词 | 语义 | 对能力集 |
+|---|---|---|
+| `许 X` | 加法授权 | 开一道门 |
+| `只许 X` | 封印域 | 能力宇宙=枚举集，域外不在场 |
+| `禁 X` | 绝对拒绝（不可逆，`禁`>`许`） | 挖不可覆盖的洞 |
+| `允许 可能` | 容忍轴（正交） | 容忍超时的可能，不作错 |
+
+```
+任务 导出数据 {
+    约束 { 许 盘读; 许 网; 禁 进程 }     // 默认拒绝地板上：开盘读、开网；进程硬禁
+    设 信封 = http请求("GET", "http://api.example.com/数据")
+    若 (信封判(信封) == 真) { 取键(信封, "值") } 否则 { "走本地缓存" }
+}
+```
+
+**违规是值,不是异常**：块内未 `许 网` 时，`http请求`（信封式）返回 **判=假、因=约束**（不抛），程序走 `否则` 分支——安全事件降维成控制流，全程无异常。直取式（`http读`/`读文件`）被禁则抛 `约束禁止: 网(http读)`（可 `尝试` 接）。`因` 封闭枚举 `约束|门控|超时|远端|传输`，程序据此分辨"管理员禁止"与"网络故障"。
+
+**探询**：`能否("网")` → 真/假（恒不返回可能——权限是解释器可判定的事实）。`若 (能否("网") == 真) { … } 否则 { 本地缓存() }`。
+
+**性质**：嵌套**单调收紧**（子块只能是父块的子集）；并发/异步子任务**继承** spawn 时的约束（线程不是逃逸口）；能力栈挂求值器实例（不跨实例污染）。**分层律**：`许/禁` 裸用是值层三值构造子（`许(x)→真`），只有在 `约束{}` 里才是能力声明——共享词汇、不共享运行时状态。
+
+**边界**：块级默认拒绝防的是 L0 事故/L1 越界；对抗级（L2）仍需子进程+OS 隔离（不承诺进程内防对抗）。糖 `任务名{约束{…}}` 仅解释器路径；字节码/种子 VM 编译期显式报错。**可判定性法则**：约束只描述能力边界、不描述业务规则（`周一才能联网` 违宪——业务条件用 `若` 包 `任务`）。
 
 ## 20. 外语互操作（FFI）⚗️ 实验性
 
@@ -905,3 +976,282 @@ Python→三言（返回方向）：`True/False/None → 真/假/可能`；数/�
 - `SANYAN_FFI=1` 才开启；`沙箱("py导入", …)` 可禁；含 FFI 的程序不进差分一致性口径。
 - 开启 FFI 即等于授予该 `.san` 程序任意代码执行能力（可读 `os.environ`）——
   **不给不受信来源的程序开 FFI**。
+
+## 21. 测试框架（`stdlib/test.san`）
+
+导入方式：`设 test = 导入("stdlib/test.san")`
+
+| 命令 | 语法 | 说明 |
+|------|------|------|
+| `断言真` / `assert_true` | `test.断言真(值)` | 断言值为真 |
+| `断言假` / `assert_false` | `test.断言假(值)` | 断言值为假 |
+| `断言相等` / `assert_equal` | `test.断言相等(实际, 期望)` | 断言两个值相等 |
+| `断言不等` / `assert_not_equal` | `test.断言不等(实际, 期望)` | 断言两个值不等 |
+| `断言相等列表` / `assert_list_equal` | `test.断言相等列表(实际, 期望)` | 断言两个列表逐元素相等 |
+| `断言包含` / `assert_contains` | `test.断言包含(容器, 元素)` | 断言容器包含元素 |
+| `断言接近` / `assert_approx` | `test.断言接近(实际, 期望, 误差)` | 断言浮点数接近 |
+| `断言错误` / `assert_error` | `test.断言错误(函数体)` | 断言函数体抛出异常 |
+| `测试套件` / `test_suite` | `test.测试套件("名称")` | 定义测试套件 |
+| `测试` / `test_case` | `test.测试("名称", 函数体)` | 定义测试用例 |
+| `设置前置` / `set_up` | `test.设置前置(函数体)` | 每个测试前执行 |
+| `设置后置` / `tear_down` | `test.设置后置(函数体)` | 每个测试后执行 |
+| `跳过测试` / `skip_test` | `test.跳过测试("名称")` | 跳过指定测试 |
+| `测试报告` / `test_report` | `test.测试报告()` | 输出测试报告 |
+
+### 示例
+
+```sanyan
+设 test = 导入("stdlib/test.san")
+
+test.测试套件("数学函数测试")
+
+test.测试("加法", 函数() {
+    test.断言相等(加(1, 2), 3)
+    test.断言相等(加(0, 0), 0)
+})
+
+test.测试("断言错误示例", 函数() {
+    test.断言错误(函数() {
+        返回(1 / 0)  // 除零触发 SanyanValueError
+    })
+})
+
+test.测试报告()
+```
+
+### 失败语义
+
+`_断言失败` 使用 `1 / 0`（除零触发 `SanyanValueError`），确保断言失败一定产生异常而非静默通过。
+
+## 22. 完整关键字索引（中英对照）
+
+以下为全部 500 个已注册操作的中文别名索引。英文操作名见 `ops/registry.py` 和 `language/english.json`。
+
+### 算术与数学
+
+| 中文 | 英文 | 中文 | 英文 |
+|------|------|------|------|
+| `加` | `add` | `减` | `sub` |
+| `乘` | `mul` | `除` | `div` |
+| `余` | `mod` | `幂` | `pow` |
+| `正弦` | `sin` | `余弦` | `cos` |
+| `正切` | `tan` | `对数` | `log` |
+| `常用对数` | `log10` | `平方根` | `sqrt` |
+| `绝对值` | `abs` | `向上取整` | `ceil` |
+| `向下取整` | `floor` | `四舍五入` | `round` |
+| `最大值` | `max` | `最小值` | `min` |
+| `求和` | `sum` | `均值` | `mean` |
+| `方差` | `variance` | `标准差` | `stdev` |
+| `中位数` | `median` | `乱序` | `shuffle` |
+| `选取` | `choice` | `随机` | `random` |
+| `随机整数` | `randint` | `随机字节` | `randbytes` |
+
+### 比较与逻辑
+
+| 中文 | 英文 | 中文 | 英文 |
+|------|------|------|------|
+| `等于` | `eq` | `不等于` | `ne` |
+| `大于` | `gt` | `小于` | `lt` |
+| `大等` | `gte` | `小等` | `lte` |
+| `不大于` | `nlt` | `不小于` | `ngt` |
+| `且` | `and` | `或` | `or` |
+| `非` | `not` | `同` | `same` |
+| `判` | `judge` | `匹配` | `match` |
+| `匹配3` | `match_confidence` | `匹配信度` | `ternary_match` |
+
+### 控制流
+
+| 中文 | 英文 | 中文 | 英文 |
+|------|------|------|------|
+| `若` | `if` | `循环` | `loop` |
+| `做` | `do` | `设` | `set` |
+| `定义` | `fn` | `函数` | `lambda` |
+| `返回` | `return` | `跳出` | `break` |
+| `继续` | `continue` | `尝试` | `try` |
+| `捕获` | `catch` | `遍历` | `for` |
+| `做直到` | `do_while` | `尝试链` | `try_chain` |
+| `延迟` | `delay` | `等待` | `wait` |
+| `执行` | `exec` | `退出` | `exit` |
+
+### 字符串与编码
+
+| 中文 | 英文 | 中文 | 英文 |
+|------|------|------|------|
+| `连接` | `concat` | `取长` | `len` |
+| `子串` | `substr` | `替换` | `replace` |
+| `分割` | `split` | `查找` | `find` |
+| `去空白` | `trim` | `大写` | `upper` |
+| `小写` | `lower` | `前缀` | `startswith` |
+| `后缀` | `endswith` | `字符` | `chr` |
+| `字符码` | `ord` | `字列` | `str_to_list` |
+| `合并` | `join` | `反转` | `reverse` |
+| `包含` | `contains` | `排序` | `sort` |
+| `去重` | `unique` | `计数` | `count` |
+| `转数字` | `to_number` | `转字符串` | `to_string` |
+| `unicode编码` | `unicode_escape` | `unicode解码` | `unicode_unescape` |
+| `url编码` | `url_encode` | `url解码` | `url_decode` |
+| `base64编码` | `base64_encode` | `base64解码` | `base64_decode` |
+| `转JSON` | `to_json` | `解析JSON` | `from_json` |
+
+### 容器操作
+
+| 中文 | 英文 | 中文 | 英文 |
+|------|------|------|------|
+| `列表` | `list` | `字典` | `dict` |
+| `取` | `get` | `置元素` | `set_element` |
+| `取键` | `get_key` | `置键` | `set_key` |
+| `含键` | `dict_contains` | `字典键列表` | `dict_keys` |
+| `表长` | `list_len` | `列表合` | `list_concat` |
+| `切片` | `slice` | `删除键` | `delete_key` |
+| `数组` | `array` | `组长` | `array_len` |
+| `数组列` | `array_to_list` | `结构体` | `struct` |
+| `枚举` | `enum` | `映射` | `map` |
+| `过滤` | `filter` | `归并` | `reduce` |
+| `存在` | `exists` | `索引` | `index_list` |
+| `二分查找` | `binary_search` | | |
+
+### 三态操作
+
+| 中文 | 英文 | 中文 | 英文 |
+|------|------|------|------|
+| `信念` | `belief` | `信念集` | `belief_set` |
+| `贝叶斯更新` | `bayes_update` | `检测冲突` | `detect_conflict` |
+| `冲突合并` | `conflict_merge` | `共识` | `consensus` |
+| `融合` | `fuse` | `表决` | `majority_vote` |
+| `置信度` | `assert_confidence` | `信度守卫` | `confidence_guard` |
+| `来源` | `source` | `来源链` | `source_chain` |
+| `衰减` | `decay` | `校准` | `calibrate` |
+| `量化` | `quantize` | `反量化` | `dequantize` |
+| `三态压缩` | `trit_compress` | `三态解压` | `trit_decompress` |
+| `三态列` | `trit_list` | `三态列长` | `trit_list_len` |
+| `三态映射` | `trit_list_map` | `三态字典` | `trit_dict` |
+| `三态取` | `trit_get` | `三态置` | `trit_set` |
+| `三态键` | `trit_key_get` | `三态置键` | `trit_key_set` |
+| `三态翻转` | `trit_flip` | `三态移位` | `trit_shift` |
+| `三态栈` | `ternary_stack` | `三态压栈` | `ternary_stack_push` |
+| `三态弹栈` | `ternary_stack_pop` | `三态栈长` | `ternary_stack_size` |
+| `三态队列` | `ternary_queue` | `三态入队` | `ternary_queue_enqueue` |
+| `三态出队` | `ternary_queue_dequeue` | `三态队长` | `ternary_queue_size` |
+| `三态集` | `ternary_set` | `三态集加` | `ternary_set_add` |
+| `三态集删` | `ternary_set_remove` | `三态集含` | `ternary_set_contains` |
+| `三态集并` | `ternary_set_union` | `三态集交` | `ternary_set_intersection` |
+| `三态集差` | `ternary_set_difference` | `三态集长` | `ternary_set_size` |
+| `三态图` | `ternary_graph` | `三态图加节点` | `ternary_graph_add_node` |
+| `三态图加边` | `ternary_graph_add_edge` | `三态图邻居` | `ternary_graph_neighbors` |
+| `三态图最短路` | `ternary_graph_shortest_path` | `三态图连通` | `ternary_graph_components` |
+| `三态数据` | `ternary_data` | `三态清洗` | `ternary_clean` |
+| `三态聚合` | `ternary_aggregate` | `三态验证` | `ternary_validate` |
+| `三态管线` | `ternary_pipeline` | `三态管线处理` | `ternary_pipeline_process` |
+| `三态Web服务器` | `ternary_web_server` | `三态路由` | `ternary_web_route` |
+| `三态监听` | `ternary_web_listen` | | |
+
+### 并发与同步
+
+| 中文 | 英文 | 中文 | 英文 |
+|------|------|------|------|
+| `并发` | `concurrent` | `并发融合` | `concurrent_fusion` |
+| `并发竞速` | `concurrent_race` | `并发全部` | `concurrent_all` |
+| `并行块` | `parallel` | `锁` | `lock` |
+| `锁住` | `lock_acquire` | `开锁` | `lock_release` |
+| `异步定义` | `async` | `异步完成` | `async_done` |
+| `异步取消` | `async_cancel` | `链` | `chain` |
+| `链断` | `chain_or_break` | `解包` | `unwrap` |
+| `或解` | `unwrap_or` | | |
+
+### IO 与文件
+
+| 中文 | 英文 | 中文 | 英文 |
+|------|------|------|------|
+| `输出` | `print` | `输入` | `input` |
+| `读文件` | `read_file` | `写文件` | `write_file` |
+| `读` | `read` | `置` | `write` |
+| `查` | `query` | `当前路径` | `cwd` |
+| `列出目录` | `listdir` | `是文件` | `isfile` |
+| `是目录` | `isdir` | `调试` | `debug` |
+| `计时` | `perf_counter` | `平台` | `platform` |
+| `进程号` | `pid` | `环境变量` | `getenv` |
+| `设环境变量` | `setenv` | `睡眠` | `sleep` |
+| `当前时间` | `timestamp` | `格式化时间` | `format_time` |
+
+### 位运算与进制
+
+| 中文 | 英文 | 中文 | 英文 |
+|------|------|------|------|
+| `位与` | `bit_and` | `位或` | `bit_or` |
+| `位非` | `bit_not` | `位异或` | `bit_xor` |
+| `左移` | `shift_left` | `右移` | `shift_right` |
+| `置位` | `bit_set` | `清位` | `bit_clear` |
+| `翻位` | `bit_toggle` | `测位` | `bit_test` |
+| `取字节` | `take_byte` | `取字` | `take_word` |
+| `低位字节` | `low_byte` | `高位字节` | `high_byte` |
+| `合并字节` | `merge_bytes` | `取位` | `digit` |
+| `转二进制` | `to_bin` | `转八进制` | `to_oct` |
+| `转十六进制` | `to_hex` | `解析二进制` | `parse_bin` |
+| `解析十六进制` | `parse_hex` | `三进制` | `ternary` |
+
+### 加密哈希
+
+| 中文 | 英文 | 中文 | 英文 |
+|------|------|------|------|
+| `md5` | `md5_hash` | `sha256` | `sha256_hash` |
+| `cross_entropy` | `cross_entropy` | `entropy` | `entropy` |
+
+### 网络与 HTTP
+
+| 中文 | 英文 | 中文 | 英文 |
+|------|------|------|------|
+| `http读` | `http_get` | `http写` | `http_post` |
+| `http请求` | `http_request` | | |
+
+### 正则表达式
+
+| 中文 | 英文 | 中文 | 英文 |
+|------|------|------|------|
+| `正则匹配` | `re_match` | `正则搜索` | `re_search` |
+| `正则查找` | `re_findall` | `正则替换` | `re_replace` |
+| `正则分割` | `re_split` | | |
+
+### 包管理
+
+| 中文 | 英文 | 中文 | 英文 |
+|------|------|------|------|
+| `安装` | `install` | `卸载` | `uninstall` |
+| `包列表` | `list_packages` | `加载包` | `load_package` |
+| `搜索` | `search` | `包信息` | `info` |
+| `包索引` | `check_updates` | `更新` | `update` |
+| `发布准备` | `publish_prepare` | | |
+
+### 数据库（SQLite）
+
+| 中文 | 英文 | 中文 | 英文 |
+|------|------|------|------|
+| `数据库打开` | `sqlite_open` | `数据库关闭` | `sqlite_close` |
+| `数据库执行` | `sqlite_exec` | `数据库查询` | `sqlite_query` |
+| `数据库插入` | `sqlite_insert` | `数据库更新` | `sqlite_update` |
+| `数据库删除` | `sqlite_delete` | `数据库计数` | `sqlite_count` |
+| `数据库表列表` | `sqlite_tables` | `数据库表结构` | `sqlite_schema` |
+
+### 宏系统
+
+| 中文 | 英文 | 中文 | 英文 |
+|------|------|------|------|
+| `定义宏` | `defmacro` | `展开宏` | `macro_expand` |
+| `宏列表` | `macro_list` | `取消宏` | `undefmacro` |
+
+### 安全与沙箱
+
+| 中文 | 英文 | 中文 | 英文 |
+|------|------|------|------|
+| `沙箱` | `sandbox` | `沙箱开` | `sandbox_unblock` |
+| `注册设备` | `register_device` | `导入` | `import` |
+| `导出` | `export` | `加载` | `load` |
+
+### FFI（外语互操作）⚗️
+
+| 中文 | 英文 | 中文 | 英文 |
+|------|------|------|------|
+| `py导入` | `py_import` | `py调` | `py_call` |
+| `py取` | `py_get` | `py项` | `py_item` |
+| `py列` | `py_list` | `py释` | `py_release` |
+| `信封判` | `envelope_judge` | `c载入` | `c_load` |
+| `c调` | `c_call` | `c释` | `c_release` |

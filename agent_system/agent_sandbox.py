@@ -163,7 +163,9 @@ class FileSystemGuard:
 class AgentSandbox:
     """Agent 沙箱：统一权限控制"""
 
-    def __init__(self, allowed_roots: List[str] = None, read_only: bool = False, network_allowed: bool = True):
+    # network_allowed 默认 False（v3.57.0 收口）：网络是白名单能力，需要联网的
+    # Agent 显式传 True——与 SANYAN_FFI 默认关、密钥只走环境 同一保守基调。
+    def __init__(self, allowed_roots: List[str] = None, read_only: bool = False, network_allowed: bool = False):
         self.command_filter = CommandFilter()
         self.fs_guard = FileSystemGuard(allowed_roots=allowed_roots)
         self.read_only = read_only

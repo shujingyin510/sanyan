@@ -1,0 +1,27 @@
+# 版本控制 / 缓存
+.git/
+.github/
+__pycache__/
+*.pyc
+*.pyo
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# 构建产物
+build/
+dist/
+*.egg-info/
+
+# 覆盖率
+.coverage
+coverage.xml
+htmlcov/
+
+# 开发/实验
+.omo/
+publish/
+tests/
+benchmarks/
+docs/
+sanyan-obsidian/

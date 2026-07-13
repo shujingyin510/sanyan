@@ -27,6 +27,9 @@ vm = []     # 字节码 VM，零依赖（内含于 core）
 ffi-gen = ["pycparser>=2.21"]  # C 声明导入离线生成器（scripts/c_bind_gen.py）；运行时不需要
 llvmgen = ["llvmlite>=0.40.0"]  # LLVM 代码生成器
 
+# ── CLI 工具层 ──
+cli = ["rich>=13.0"]  # sanyan 统一 CLI 的终端渲染（缺失时 CLI 自动降级为纯文本，见 sanyan/cli.py）
+
 # ── IDE 支持层 ──
 lsp = []  # LSP/DAP 协议层独立，分析层延迟加载 sugar/core
 
@@ -36,6 +39,7 @@ tools = []  # 格式化器/交叉编译器/doc_sync，全部零依赖
 # ── 完整版（默认安装所有功能）──
 all = [
     "sanyan[llvmgen]",
+    "sanyan[cli]",
 ]
 
 # ── 开发工具 ──
@@ -129,35 +133,4 @@ warn_return_any = true
 warn_unused_ignores = false
 disallow_untyped_defs = true
 
-[tool.coverage.run]
-source = ["."]
-omit = [
-    "tests/*",
-    "examples/*",
-    ".github/*",
-    "docs/*",
-    "build/*",
-    "lsp/*",
-    "repl/main.py",
-    "repl/repl.py",
-    "sanfmt.py",
-    "compiler/sanyancc.py",
-    "repl/gui.py",
-    "scripts/setup.py",
-    "sanyan/*",
-    "agent_system/*",
-    "scripts/preflight.py",
-    "agent_system/auto_verify.py",
-    "asm.py",
-    "disasm.py",
-    "verify.py",
-    "benchmarks/*",
-    "packages/*",
-    "csrc/*",
-]
-
-[tool.coverage.report]
-exclude_lines = ["pragma: no cover", "if __name__ == .__main__.:", "raise NotImplementedError"]
-show_missing = true
-skip_covered = true
-fail_under = 60
+# 覆盖率配置见 .coveragerc（单一真源；coverage.py 只读 .coveragerc，勿在此重复 [tool.coverage.*]）

@@ -53,6 +53,19 @@ class SanyanRuntimeError(RuntimeError, SanyanError):
     pass
 
 
+class SanyanConstraintDenied(SanyanRuntimeError):
+    """能力约束拒绝：`任务{约束{…}}` 块内调用了未授权的能力类，或超出 限时 预算。
+
+    因=约束（认知/权限分层律，D4）——恒为「假」，不是「可能」：解释器确定知道
+    「没资格」，非「不知道」。直取式算子抛此错；信封式算子将来捕获后转 判假·因=约束。
+
+    reason 携带 因（约束 / 超时）——给程序看，让 尝试/捕获 区分「无资格」与「超预算」。"""
+
+    def __init__(self, message: str = '', reason: str = '约束') -> None:
+        super().__init__(message)
+        self.reason = reason
+
+
 class SanyanKeyError(KeyError, SanyanError):
     pass
 

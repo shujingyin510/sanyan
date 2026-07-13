@@ -3,6 +3,7 @@
 import threading
 from core.ternary_core import TritValue, ArrayValue
 from core.values import SanyanSyntaxError, SanyanRuntimeError
+from ops.capability import capture_stack, install_stack
 from ops.registry import register, register_alias
 import concurrent.futures
 from typing import Any
@@ -32,9 +33,11 @@ def concurrent_run(evaluator, args):
 
     threads = []
     results = [None] * len(args)
+    snap = capture_stack(evaluator)  # E7：子求值器继承 spawn 时的约束
 
     for i, fn_node in enumerate(args):
         sub = SanyanEvaluator(max_loop_steps=evaluator.max_loop_steps)
+        install_stack(sub, snap)
         t = threading.Thread(target=_spawn_thread, args=(sub, fn_node, results, i))
         t.start()
         threads.append(t)
@@ -174,9 +177,11 @@ def concurrent_fusion(evaluator, args):
 
     threads = []
     results = [None] * len(args)
+    snap = capture_stack(evaluator)  # E7：子求值器继承 spawn 时的约束
 
     for i, fn_node in enumerate(args):
         sub = SanyanEvaluator(max_loop_steps=evaluator.max_loop_steps)
+        install_stack(sub, snap)
         t = threading.Thread(target=_spawn_thread, args=(sub, fn_node, results, i))
         t.start()
         threads.append(t)
@@ -287,6 +292,7 @@ register('开锁', mutex_release)
 register_alias('concurrent', '并发')
 register_alias('concurrent_fusion', '并发融合')
 register_alias('concurrent_race', '并发竞速')
+register_alias('竞速', '并发竞速')
 register_alias('concurrent_all', '并发全部')
 register_alias('delay', '延迟')
 register_alias('lock', '锁')
@@ -336,11 +342,13 @@ def async_define(evaluator, args):
 
     fn_node = args[0]
     pool = _get_thread_pool()
+    snap = capture_stack(evaluator)  # E7：spawn 时捕获（异步延迟执行时父可能已退出约束块）
 
     def _run():
         from core.evaluator import SanyanEvaluator
 
         sub = SanyanEvaluator(max_loop_steps=evaluator.max_loop_steps)
+        install_stack(sub, snap)
         # 复制作用域
         for scope in evaluator._scopes:
             for k, v in scope.items():
@@ -380,6 +388,7 @@ def async_parallel(evaluator, args):
 
     pool = _get_thread_pool()
     futures = []
+    snap = capture_stack(evaluator)  # E7：spawn 时捕获约束
 
     for expr in args:
 
@@ -387,6 +396,7 @@ def async_parallel(evaluator, args):
             from core.evaluator import SanyanEvaluator
 
             sub = SanyanEvaluator(max_loop_steps=evaluator.max_loop_steps)
+            install_stack(sub, snap)
             # 复制作用域
             for scope in evaluator._scopes:
                 for k, v in scope.items():

@@ -32,6 +32,15 @@ def _to_python(value):
     return value
 
 
+def _unquote(s: str) -> str:
+    """仅剥去成对的首尾包裹引号（"x"/'x' → x）；不误伤内部/结尾引号，
+    使 `WHERE 名 = 'x'` 这类以引号结尾的 SQL 片段保持完整。"""
+    s = str(s)
+    if len(s) >= 2 and s[0] == s[-1] and s[0] in ('"', "'"):
+        return s[1:-1]
+    return s
+
+
 def _get_conn(path: str) -> sqlite3.Connection:
     """获取或创建数据库连接"""
     # 去除引号
@@ -95,7 +104,7 @@ def _sqlite_exec(evaluator, args):
     if len(args) < 2:
         raise SanyanValueError('sqlite_exec 需要 2 个参数: 数据库路径, SQL语句')
     path = str(evaluator.eval(args[0])).strip('"').strip("'")
-    sql = str(evaluator.eval(args[1])).strip('"').strip("'")
+    sql = _unquote(str(evaluator.eval(args[1])))
     conn = _get_conn(path)
     try:
         cursor = conn.execute(sql)
@@ -114,7 +123,7 @@ def _sqlite_query(evaluator, args):
     if len(args) < 2:
         raise SanyanValueError('sqlite_query 需要 2 个参数: 数据库路径, SQL语句')
     path = str(evaluator.eval(args[0])).strip('"').strip("'")
-    sql = str(evaluator.eval(args[1])).strip('"').strip("'")
+    sql = _unquote(str(evaluator.eval(args[1])))
     conn = _get_conn(path)
     try:
         cursor = conn.execute(sql)
@@ -218,7 +227,7 @@ def _sqlite_update(evaluator, args):
     path = str(evaluator.eval(args[0])).strip('"').strip("'")
     table = str(evaluator.eval(args[1])).strip('"').strip("'")
     data = evaluator.eval(args[2])
-    where = str(evaluator.eval(args[3])).strip('"').strip("'")
+    where = _unquote(str(evaluator.eval(args[3])))
 
     if not isinstance(data, dict):
         raise SanyanTypeError(f'sqlite_update 的第3个参数必须是字典，得到: {type(data)}')
@@ -254,7 +263,7 @@ def _sqlite_delete(evaluator, args):
         raise SanyanValueError('sqlite_delete 需要 3 个参数: 数据库路径, 表名, WHERE条件')
     path = str(evaluator.eval(args[0])).strip('"').strip("'")
     table = str(evaluator.eval(args[1])).strip('"').strip("'")
-    where = str(evaluator.eval(args[2])).strip('"').strip("'")
+    where = _unquote(str(evaluator.eval(args[2])))
 
     sql = f'DELETE FROM {table} {where}'
 
