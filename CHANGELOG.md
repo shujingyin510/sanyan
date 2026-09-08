@@ -9,7 +9,8 @@
 ### 能力约束 · 第二阶段（表达力）
 - **`只许` 真封印落地**：从「塌缩成 `许`」升级为**封死上界**——`只许` 声明能力宇宙的闭集，封印后再 `许` 一个域外能力在**解析期即可判定报错**（`ops/constraint_ops.py`，区别于 `许` 的加法下界）；安全审查由此得到闭集保证而非仅下限。`tests/test_capability_stack.py` +5 项（33→38）
 - **`限时(n)` 看门狗落地**（单位**秒**）：`约束{限时 5}` 给任务套墙钟死线，循环/递归跑飞超预算 → 抛 `SanyanConstraintDenied·因=超时`（判假，约束失败），退帧干净、死线单调（嵌套取更紧）。`CapFrame` 加 `deadline` + `SanyanConstraintDenied` 加 `reason`（约束/超时程序可辨）+ `check_deadline` 挂 循环/遍历/尾递归 三处迭代点（无约束帧零成本早退）；直线代码不拦。`test_capability_stack.py` +7 项（38→45）
-- `允许` 仍为占位：容忍轴进帧语义待 TritValue 元通道，按 `TritValue 只演化一次` 等真实消费者驱动再动
+- **`若(可能)` 关卡落地（D8，`ops/control_ops.py:if_op` + `诊断()`）**：`可能`(trit 0) 作确定性条件 → 收集诊断（`诊断()` 可查）；**运行时不变**（仍按假 fall-through，collect-only、不打断、不自动打印，回归 568 项零破坏）。这给第四关键字 `允许` 造出真实消费者——`允许` 的抑制（给可能发通行证）从此**解锁为下一步**（需 TritValue 元通道演化，按 `只演化一次` bundle）。`tests/test_maybe_gate.py`（9 项）
+- `允许` 值层仍纯透传：其抑制语义待上述 TritValue 演化（`若(可能)` 关卡已作消费者，需求已证）
 - 顺手修 `tests/test_core.py` 一处 TritValue 单例污染（改共享 `TritValue(1)` 的 confidence → 跨文件顺序相关偶发失败），改用 `TritValue(1, confidence=…)` 新实例
 
 ### 修复

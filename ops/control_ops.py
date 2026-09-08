@@ -22,6 +22,10 @@ class ControlOps:
         if len(args) < 2:
             raise SanyanSyntaxError('if 需要条件和真分支')
         cond = evaluator.eval(args[0])
+        # D8 关卡：「可能」（trit 0）作为确定性条件未显式处理 → 收集诊断。
+        # 运行时不变（仍按假 fall-through）；未来 允许(x) 标记后在此跳过（待 TritValue 元通道）。
+        if isinstance(cond, TritValue) and cond.is_numeric() and not cond.is_float() and BT.to_int(cond.value) == 0:
+            evaluator._maybe_warnings.append('若: 条件求值为「可能」，未显式处理（默认按假分支）')
         if isinstance(cond, TritValue):
             cond_bool = BT.to_int(cond.value) == 1
         elif isinstance(cond, int):

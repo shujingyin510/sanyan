@@ -233,6 +233,14 @@ class IOOps:
         print('──────────────────')
         return result if result is not None else TritValue(0)
 
+    @staticmethod
+    def diagnostics_op(evaluator, args):
+        """诊断() — 返回本次执行收集的「可能」未处理诊断（若(可能) 关卡，D8）。
+
+        运行时收集：`若` 遇到求值为「可能」的条件即记一条（行为不变，默认按假分支）。
+        返回诊断字符串列表；空列表 = 本次无未处理的可能。"""
+        return list(getattr(evaluator, '_maybe_warnings', []))
+
 
 # 注册 IO 操作
 register('print', IOOps.output)
@@ -241,3 +249,4 @@ register('debug', IOOps.debug_op)
 register('wait', IOOps.wait_op)
 register('trace', IOOps.trace_op)
 register('explain', IOOps.explain_op)
+register('诊断', IOOps.diagnostics_op)

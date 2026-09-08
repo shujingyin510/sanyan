@@ -371,6 +371,7 @@ class SanyanEvaluator(SanyanRuntime):
         self._module_cache: Dict[str, Any] = {}
         self._import_stack: set = set()
         self._type_warnings: list = []  # 类型检查警告收集
+        self._maybe_warnings: list = []  # 「可能」作为条件未显式处理的诊断（若(可能) 关卡，D8）
         self._apply_fn: Any = None  # 缓存 dispatcher.apply
         self._check_types_fn: Any = None  # 缓存 type_checker.check_types
         self._source: str = ''  # 当前执行的源码（用于错误信息显示）
