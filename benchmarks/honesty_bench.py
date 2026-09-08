@@ -165,6 +165,8 @@ def _raw_llm_call(question: str) -> str:
             'model': 'deepseek-v4-pro',
             'max_tokens': 200,
             'temperature': 0,
+            # 新接口默认开启思考；本基准要短直答（temperature=0 语义），显式关闭
+            'thinking': {'type': 'disabled'},
             'messages': [
                 {'role': 'system', 'content': "用一句话直接回答，不确定就说'不确定'，不要解释。"},
                 {'role': 'user', 'content': question},
@@ -174,7 +176,7 @@ def _raw_llm_call(question: str) -> str:
     ).encode()
     try:
         req = urllib.request.Request(
-            'https://api.deepseek.com/v1/chat/completions',
+            'https://api.deepseek.com/chat/completions',
             body,
             {'Content-Type': 'application/json', 'Authorization': f'Bearer {api_key}'},
         )

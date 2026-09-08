@@ -293,7 +293,7 @@ python -X utf8 agent_system/run_agent.py --resume             # 续接上次未�
 ```san
 # 模型
 设 模型提供商 = "deepseek"  # deepseek / openai / qwen / gemini / mimo / ollama / tokenplan
-设 模型URL = "https://api.deepseek.com/v1/chat/completions"
+设 模型URL = "https://api.deepseek.com/chat/completions"
 设 模型名 = "deepseek-v4-pro"  # 或 deepseek-v4-flash
 设 超时秒数 = 60
 设 API密钥 = 环境变量("SANYAN_API_KEY")

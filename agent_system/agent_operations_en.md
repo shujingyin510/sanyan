@@ -255,7 +255,7 @@ roadmap (autopsy workflow, failure-vs-countermeasure table).
 
 | Provider | Base URL | Default Model |
 |----------|----------|---------------|
-| DeepSeek | https://api.deepseek.com/v1 | deepseek-v4-pro |
+| DeepSeek | https://api.deepseek.com | deepseek-v4-pro |
 | OpenAI | https://api.openai.com/v1 | gpt-4o |
 | Anthropic | https://api.anthropic.com | claude-sonnet-4 |
 | Gemini | https://generativelanguage.googleapis.com/v1beta | gemini-2.5-flash |

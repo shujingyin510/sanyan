@@ -132,12 +132,13 @@ class OpenAIProvider(LLMProvider):
 
 
 class DeepSeekProvider(LLMProvider):
-    """DeepSeek 提供者"""
+    """DeepSeek 提供者（V4 API：https://api.deepseek.com，OpenAI 兼容格式）"""
 
-    DEFAULT_BASE_URL = 'https://api.deepseek.com/v1'
+    DEFAULT_BASE_URL = 'https://api.deepseek.com'
     DEFAULT_MODEL = 'deepseek-v4-pro'
 
     def __init__(self, api_key: str, model: Optional[str] = None, base_url: Optional[str] = None, **kwargs):
+        self.thinking = bool(kwargs.get('thinking', False))
         super().__init__(
             api_key=api_key,
             model=model or self.DEFAULT_MODEL,
@@ -155,9 +156,13 @@ class DeepSeekProvider(LLMProvider):
             'max_tokens': max_tokens,
         }
 
-        # DeepSeek thinking 模式
-        if kwargs.get('thinking', False):
-            body['thinking'] = {'type': 'enabled', 'budget_tokens': 2048}
+        # DeepSeek thinking：新接口默认开启，必须显式声明开/关；旧格式
+        # {'type': 'enabled', 'budget_tokens': N} 已废弃——预算控制改由
+        # reasoning_effort（low/high/max，默认 high）承担
+        thinking_enabled = bool(kwargs.get('thinking', self.thinking))
+        body['thinking'] = {'type': 'enabled' if thinking_enabled else 'disabled'}
+        if kwargs.get('reasoning_effort'):
+            body['reasoning_effort'] = kwargs['reasoning_effort']
 
         headers = {
             'Content-Type': 'application/json',
@@ -549,12 +554,13 @@ class LLMConfig:
         'deepseek': {
             'provider': 'deepseek',
             'model': 'deepseek-v4-pro',
-            'base_url': 'https://api.deepseek.com/v1',
+            'base_url': 'https://api.deepseek.com',
+            'thinking': False,
         },
         'deepseek-reasoner': {
             'provider': 'deepseek',
             'model': 'deepseek-v4-pro',
-            'base_url': 'https://api.deepseek.com/v1',
+            'base_url': 'https://api.deepseek.com',
             'thinking': True,
         },
         'openai': {
@@ -635,11 +641,22 @@ class LLMConfig:
         model = self.config.get('model') or preset.get('model')
         base_url = self.config.get('base_url') or preset.get('base_url')
 
+        # 预设键名（如 deepseek-reasoner）不是真实厂商名——用预设里的 provider 键归一化，
+        # 否则工厂会落进 OpenAIProvider 兜底（thinking 开关随之失效）
+        actual_provider = preset.get('provider', provider_name)
+
+        # 预设里的 thinking 开关此前被丢弃（构造器不接收），这里接线；
+        # 仅 deepseek 认识该参数，其他商不传
+        kwargs = {}
+        if actual_provider == 'deepseek':
+            kwargs['thinking'] = self.config.get('thinking', preset.get('thinking', False))
+
         return LLMProvider.create(
-            provider=provider_name,
+            provider=actual_provider,
             api_key=api_key,
             model=model,
             base_url=base_url,
+            **kwargs,
         )
 
     def summary(self) -> str:

@@ -1261,7 +1261,9 @@ def main():
     parser.add_argument('--list-rules', action='store_true', help='列出所有规则')
     parser.add_argument('--export-rules', type=str, default='', help='导出规则到文件')
     parser.add_argument('--import-rules', type=str, default='', help='从文件导入规则')
-    parser.add_argument('--model', type=str, default='', help='指定模型 (deepseek-v4-pro/deepseek-coder/claude/gpt4)')
+    parser.add_argument(
+        '--model', type=str, default='', help='指定模型 (deepseek-v4-pro/deepseek-v4-flash/claude/gpt4)'
+    )
     parser.add_argument('--evo-dashboard', action='store_true', help='进化仪表盘')
     parser.add_argument('--validate', action='store_true', help='运行进化验证（100次随机+收敛+Reviewer）')
     parser.add_argument('--metaconfig', action='store_true', help='MetaConfig进化（配置参数验证）')

@@ -62,7 +62,7 @@ class LLMHandler:
         # 如果 URL 为空，根据 provider 构建默认 URL
         if not url:
             provider_urls = {
-                'deepseek': 'https://api.deepseek.com/v1/chat/completions',
+                'deepseek': 'https://api.deepseek.com/chat/completions',
                 'openai': 'https://api.openai.com/v1/chat/completions',
                 'anthropic': 'https://api.anthropic.com/v1/messages',
                 'gemini': f'https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent',
@@ -81,7 +81,7 @@ class LLMHandler:
         if provider and 'gemini' in str(provider).lower():
             body, headers, parser = self._build_gemini_request(model, key, sys_msg, prompt)
         else:
-            body, headers, parser = self._build_openai_request(model, key, sys_msg, prompt, timeout)
+            body, headers, parser = self._build_openai_request(model, key, sys_msg, prompt, timeout, provider)
 
         # 重试 3 次。异常必须留痕：P2 首跑曾因全静默吞错，把「全机 TLS 中断」
         # 排障成三轮盲跑（表象只有 error|LLM调用失败）。
@@ -255,23 +255,26 @@ class LLMHandler:
 
         return body, headers, parser
 
-    def _build_openai_request(self, model: str, key: str, sys_msg: str, prompt: str, timeout: int) -> tuple:
+    def _build_openai_request(
+        self, model: str, key: str, sys_msg: str, prompt: str, timeout: int, provider: str = ''
+    ) -> tuple:
         """构建 OpenAI 兼容请求"""
-        body = _json.dumps(
-            {
-                'model': model,
-                # 8192: 4096 时整函数级 replace_in_file 的 old+new 会截断在 JSON 中途，
-                # 括号计数永不闭合 → 解析跌进关键词启发式（P2 探针#11 实测）
-                'max_tokens': 8192,
-                'temperature': 0.7,
-                'thinking': {'type': 'enabled', 'budget_tokens': 2048},
-                'messages': [
-                    {'role': 'system', 'content': sys_msg},
-                    {'role': 'user', 'content': prompt},
-                ],
-            },
-            ensure_ascii=False,
-        ).encode('utf-8')
+        body = {
+            'model': model,
+            # 8192: 4096 时整函数级 replace_in_file 的 old+new 会截断在 JSON 中途，
+            # 括号计数永不闭合 → 解析跌进关键词启发式（P2 探针#11 实测）
+            'max_tokens': 8192,
+            'temperature': 0.7,
+            'messages': [
+                {'role': 'system', 'content': sys_msg},
+                {'role': 'user', 'content': prompt},
+            ],
+        }
+        # DeepSeek 新接口：thinking 默认开启、已无 budget_tokens 字段；只对 deepseek
+        # 显式声明（其他 OpenAI 兼容商不认识 thinking，混发可能 400）
+        if provider and 'deepseek' in provider.lower():
+            body['thinking'] = {'type': 'enabled'}
+        body = _json.dumps(body, ensure_ascii=False).encode('utf-8')
         headers = {'Content-Type': 'application/json', 'Authorization': f'Bearer {key}'}
 
         def parser(d):

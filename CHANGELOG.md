@@ -4,7 +4,7 @@
 
 ## [Unreleased]
 
-> **仓库卫生 + CLI/覆盖率修复 + 能力约束第二阶段起步**（不铸新版本号——按约定避免版本通胀）。
+> **仓库卫生 + CLI/覆盖率修复 + 能力约束第二阶段起步 + DeepSeek V4 API 迁移**（不铸新版本号——按约定避免版本通胀）。
 
 ### 能力约束 · 第二阶段（表达力）
 - **`只许` 真封印落地**：从「塌缩成 `许`」升级为**封死上界**——`只许` 声明能力宇宙的闭集，封印后再 `许` 一个域外能力在**解析期即可判定报错**（`ops/constraint_ops.py`，区别于 `许` 的加法下界）；安全审查由此得到闭集保证而非仅下限。`tests/test_capability_stack.py` +5 项（33→38）
@@ -19,6 +19,13 @@
 - **覆盖率双配置打架**：`.coveragerc`（fail_under=73）与 `pyproject [tool.coverage]`（60）各写一套、omit 清单不一致 → 删除 pyproject 死配置（coverage.py 只读 `.coveragerc`），留指针注释防复发；`.coveragerc` 补 `exclude_lines`
 - **`docs/llvm.md` 版本 stale**（v3.56.2）→ `doc_sync` 同步至 v3.58.0
 - **`sqlite_ops` WHERE 削尾 bug**：对 sql/where 用 `.strip("'")` 会把 `WHERE 名 = '张三'` 这类以引号结尾的片段削掉尾引号致 SQL 报错 → 改用 `_unquote`（只剥成对包裹引号，不碰内部/结尾引号），回归见 `tests/test_sqlite_ops.py`
+
+### Agent / LLM 接入（DeepSeek V4 新接口迁移）
+
+- **DeepSeek 官方 V4 接口迁移**（旧端点/参数失效，Agent 全链路一度不可用）：base_url `https://api.deepseek.com/v1/...` → `https://api.deepseek.com/...`；thinking 旧格式 `{type:enabled, budget_tokens:N}` → `{type:enabled}`（**budget_tokens 已废弃**，思考预算改由 `reasoning_effort` 控制；新接口**默认开启思考**，故全部调用点显式声明开/关，不依赖默认值）；`deepseek-coder`（已下架）→ `deepseek-v4-flash`。落点：`agent_llm.py`（DeepSeekProvider + LLMConfig 预设）、`agent_llm_handler.py`（主调用路径）、`agent_streaming.py`、`model_router.py`、`agent_evolution_v2.py`、`agent_policy.san`、`village_config.san`、`honesty_bench.py`、`run_village_observe.py`、`run_agent.py`（--model 帮助文本）+ 三处文档（`agent_system/README.md`、`agent_operations(.en).md`、`docs/AGENTS.md`）
+- **`honesty_bench` 显式 `thinking: disabled`**：新接口默认开思考会吃掉 200 token 上限，违背基准短直答（temperature=0）语义
+- **顺手修两处预存缺陷**：① `deepseek-reasoner` 预设 provider 键未归一化 → 工厂落进 OpenAIProvider 兜底、thinking 开关从未生效（现按预设 `provider` 键接线，thinking 参数仅 deepseek 接收）；② `_build_openai_request` 曾向所有 OpenAI 兼容商混发 `thinking` 字段（OpenAI/千问/GLM 等不认识，可能 400）→ 仅 deepseek 发送
+- 验证：`import run_agent` 冒烟 + 请求体构造冒烟（deepseek 带 thinking 新格式 / 非 deepseek 不带）+ ruff/mypy 全绿 + 全量 pytest 2907 绿
 
 ### 测试 / 覆盖率
 - 新增 `tests/test_cli.py`（16 项）：参数解析 + 版本一致性回归 + rich 降级 + `--help`/`version` 子进程冒烟（子进程显式 UTF-8 解码，避开 GBK locale 的 Windows CI 解码崩溃）

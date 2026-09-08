@@ -95,7 +95,7 @@ python -X utf8 sanyanc.py program.bin --run   # 运行
 --code-evolve: LLM生成补丁 → 行号校准 → 多后端一致性验证 → 自举验证 → 接受/回滚
 ```
 
-**LLM 连接**：DeepSeek v4（`deepseek-v4-pro`），thinking 显式启用 `{budget_tokens: 2048}`，`max_tokens: 4096`。
+**LLM 连接**：DeepSeek V4 API（`https://api.deepseek.com`，模型 `deepseek-v4-pro`/`deepseek-v4-flash`），thinking 显式 `{"type": "enabled"}`（新接口已无 `budget_tokens`，思考预算改由 `reasoning_effort` 控制），`max_tokens: 8192`。
 API 密钥通过环境变量 `SANYAN_API_KEY` 注入，`agent_policy.san` 中配置。
 
 **工具调用格式（JSON）**：

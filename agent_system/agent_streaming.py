@@ -57,20 +57,21 @@ class StreamingLLM:
 
     def _stream_openai(self, prompt, system_msg, on_token, timeout):
         """OpenAI兼容API流式调用"""
-        url = self.url or 'https://api.deepseek.com/v1/chat/completions'
-        body = json.dumps(
-            {
-                'model': self.model,
-                'max_tokens': 4096,
-                'temperature': 0.7,
-                'stream': True,
-                'messages': [
-                    {'role': 'system', 'content': system_msg},
-                    {'role': 'user', 'content': prompt},
-                ],
-            },
-            ensure_ascii=False,
-        ).encode('utf-8')
+        url = self.url or 'https://api.deepseek.com/chat/completions'
+        body = {
+            'model': self.model,
+            'max_tokens': 4096,
+            'temperature': 0.7,
+            'stream': True,
+            'messages': [
+                {'role': 'system', 'content': system_msg},
+                {'role': 'user', 'content': prompt},
+            ],
+        }
+        # DeepSeek 新接口：thinking 默认开启；显式声明，与 llm_call 主路径保持一致
+        if self.provider and 'deepseek' in self.provider.lower():
+            body['thinking'] = {'type': 'enabled'}
+        body = json.dumps(body, ensure_ascii=False).encode('utf-8')
 
         headers = {
             'Content-Type': 'application/json',

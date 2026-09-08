@@ -20,15 +20,15 @@ DEFAULT_MODELS = {
     'deepseek-v4-pro': {
         'name': 'DeepSeek V4 Pro',
         'provider': 'deepseek',
-        'url': 'https://api.deepseek.com/v1/chat/completions',
+        'url': 'https://api.deepseek.com/chat/completions',
         'cost_per_1k': 0.002,  # 每1000 token 成本
         'strengths': ['code_generation', 'code_review', 'reasoning'],
         'max_tokens': 4096,
     },
-    'deepseek-coder': {
-        'name': 'DeepSeek Coder',
+    'deepseek-v4-flash': {
+        'name': 'DeepSeek V4 Flash',
         'provider': 'deepseek',
-        'url': 'https://api.deepseek.com/v1/chat/completions',
+        'url': 'https://api.deepseek.com/chat/completions',
         'cost_per_1k': 0.001,
         'strengths': ['code_generation', 'code_completion'],
         'max_tokens': 4096,
@@ -69,7 +69,7 @@ DEFAULT_MODELS = {
 
 # 任务类型到最优模型的映射
 TASK_MODEL_MAP = {
-    'code_generation': ['deepseek-coder', 'deepseek-v4-pro', 'local/qwen2.5-0.5b'],
+    'code_generation': ['deepseek-v4-flash', 'deepseek-v4-pro', 'local/qwen2.5-0.5b'],
     'code_review': ['claude-sonnet-4', 'deepseek-v4-pro', 'local/qwen2.5-0.5b'],
     'test_generation': ['gpt-4', 'deepseek-v4-pro', 'local/qwen2.5-0.5b'],
     'reasoning': ['claude-sonnet-4', 'deepseek-v4-pro', 'local/qwen2.5-0.5b'],

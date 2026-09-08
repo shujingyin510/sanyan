@@ -95,7 +95,7 @@ if os.path.exists(cp):
                 cfg['model'] = line.split('"')[1]
             elif 'API密钥' in line:
                 cfg['key'] = line.split('"')[1]
-cfg['url'] = cfg['url'] or os.environ.get('LLM_URL', 'https://api.deepseek.com/v1/chat/completions')
+cfg['url'] = cfg['url'] or os.environ.get('LLM_URL', 'https://api.deepseek.com/chat/completions')
 cfg['model'] = cfg['model'] or os.environ.get('LLM_MODEL', 'deepseek-v4-pro')
 cfg['key'] = cfg['key'] or os.environ.get('LLM_KEY', '')
 has_llm = cfg['key'] and len(cfg['key']) > 10 and '你的' not in cfg['key'] and cfg['key'] != 'sk-你的key'

@@ -739,14 +739,14 @@ class AgentCodeModifier:
         api_key = os.environ.get('SANYAN_API_KEY', '')
         if not api_key:
             return ''
-        url = 'https://api.deepseek.com/v1/chat/completions'
+        url = 'https://api.deepseek.com/chat/completions'
         body = json.dumps(
             {
                 'model': 'deepseek-v4-pro',
                 'max_tokens': 4096,
                 'temperature': 0.3,
                 'stream': True,
-                'thinking': {'type': 'enabled', 'budget_tokens': 512},
+                'thinking': {'type': 'enabled'},
                 'messages': [
                     {
                         'role': 'system',

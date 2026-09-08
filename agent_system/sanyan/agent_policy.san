@@ -3,7 +3,7 @@
 
 // === LLM 连接配置 ===
 // 模型提供商: "deepseek" / "openai" / "qwen"(千问) / "gemini"(Google) / "mimo"(小米) / "tokenplan"(小米TokenPlan) / "ollama" / "custom"
-// DeepSeek:  https://api.deepseek.com/v1/chat/completions
+// DeepSeek:  https://api.deepseek.com/chat/completions
 // OpenAI:   https://api.openai.com/v1/chat/completions
 // 千问:     https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions
 // Gemini:   https://generativelanguage.googleapis.com/v1beta/models/
@@ -12,10 +12,10 @@
 // TokenPlan: https://token-plan-cn.xiaomimimo.com/v1/chat/completions (MIMO 模型)
 // Ollama:   http://localhost:11434/v1/chat/completions
 设 模型提供商 = "deepseek"
-设 模型URL = "https://api.deepseek.com/v1/chat/completions"
+设 模型URL = "https://api.deepseek.com/chat/completions"
 设 API密钥 = 环境变量("SANYAN_API_KEY")
 若 (等于(API密钥, 假) 或 等于(API密钥, "")) { 设 API密钥 = "sk-你的key" }
-// 可选: "deepseek-v4-pro"(推荐) "deepseek-v4-flash"(更快) "deepseek-v3"(最新v3)
+// 可选: "deepseek-v4-pro"(推荐,1M上下文) "deepseek-v4-flash"(更快更便宜)
 设 模型名 = "deepseek-v4-pro"
 设 超时秒数 = 60
 
