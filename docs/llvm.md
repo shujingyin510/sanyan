@@ -170,7 +170,7 @@ void rt_dict_set(void *d, void *key, void *value);
 ### 核心类型
 
 ```python
-_INT = ir.IntType(32)      # i32
+_INT = ir.IntType(32)  # i32
 _PTR = ir.PointerType(ir.IntType(8))  # i8*
 _ZERO = ir.Constant(_INT, 0)
 _NULL = ir.Constant(_PTR, None)
@@ -184,6 +184,7 @@ def _box_int(self, int_val: ir.Value) -> ir.Value:
     shifted = self.builder.shl(int_val, _ONE)
     tagged = self.builder.or_(shifted, _ONE)
     return self.builder.inttoptr(tagged, _PTR)
+
 
 def _unbox_int(self, ptr_val: ir.Value) -> ir.Value:
     # val ← (ptrtoint(ptr_val) >> 1), 去除 tag 位

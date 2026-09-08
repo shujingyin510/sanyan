@@ -346,6 +346,7 @@ python -X utf8 tests/run_all.py             # 集成测试
 
 ```python
 from ops.registry import register, register_alias as _ra
+
 register('source', _source_op)
 _ra('来源', 'source')
 ```

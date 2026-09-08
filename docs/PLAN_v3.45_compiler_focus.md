@@ -115,6 +115,7 @@ _TYPE_SIGS = {
     'dict_get': (['字典<K,V>', 'K'], 'V'),
 }
 
+
 # 类型匹配
 def _matches(actual: str, expected: str) -> bool:
     if expected.startswith('列表<') and expected.endswith('>'):

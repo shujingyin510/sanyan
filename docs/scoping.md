@@ -21,10 +21,10 @@ SanyanRuntime
 **核心改进** (v3.6)：替代旧版全量拷贝方案。
 
 ```python
-push_scope()      # 进入新作用域（函数调用）
-pop_scope()       # 退出作用域（函数返回）
-get_var(name)     # 从栈顶向下递归搜索
-all_scoped_vars() # 合并所有作用域（调试用）
+push_scope()  # 进入新作用域（函数调用）
+pop_scope()  # 退出作用域（函数返回）
+get_var(name)  # 从栈顶向下递归搜索
+all_scoped_vars()  # 合并所有作用域（调试用）
 ```
 
 零拷贝 push/pop，支持嵌套函数和闭包捕获。

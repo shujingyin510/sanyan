@@ -19,6 +19,7 @@
 - **覆盖率双配置打架**：`.coveragerc`（fail_under=73）与 `pyproject [tool.coverage]`（60）各写一套、omit 清单不一致 → 删除 pyproject 死配置（coverage.py 只读 `.coveragerc`），留指针注释防复发；`.coveragerc` 补 `exclude_lines`
 - **`docs/llvm.md` 版本 stale**（v3.56.2）→ `doc_sync` 同步至 v3.58.0
 - **`sqlite_ops` WHERE 削尾 bug**：对 sql/where 用 `.strip("'")` 会把 `WHERE 名 = '张三'` 这类以引号结尾的片段削掉尾引号致 SQL 报错 → 改用 `_unquote`（只剥成对包裹引号，不碰内部/结尾引号），回归见 `tests/test_sqlite_ops.py`
+- **CI lint 红灯：ruff 新版将格式检查扩展到 Markdown 代码块**（本地旧版 0.15.13 只查 .py，CI 新装 0.16.x 多查 8 个 md → lint job 红）→ 本地双 Python 环境 ruff 升级 0.16.6 对齐 CI，8 个 docs/publish 文件全量 `ruff format`（`docs/AGENTS.md`、`docs/CLAIMS.md`、`docs/PLAN_v3.45_compiler_focus.md`、`docs/llvm.md`、`docs/scoping.md`、`docs/ternary-logic.md`、`publish/ternary_engine/README(.CN).md`），406 文件 format/check 全绿
 
 ### Agent / LLM 接入（DeepSeek V4 新接口迁移）
 

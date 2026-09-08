@@ -132,8 +132,10 @@ Three states are the minimum viable model for expressing uncertainty. Sanyan mak
 def fuse_sensor_states(states):
     has_fault = any(s == SensorState.FAULT for s in states)
     all_normal = all(s == SensorState.NORMAL for s in states)
-    if has_fault: return SensorState.FAULT
-    if all_normal: return SensorState.NORMAL
+    if has_fault:
+        return SensorState.FAULT
+    if all_normal:
+        return SensorState.NORMAL
     return SensorState.OFFLINE
 ```
 
@@ -219,8 +221,10 @@ tristate_t tri_and(tristate_t a, tristate_t b) {
 Python 需要手写 `tri_and` 函数：
 ```python
 def tri_and(a, b):
-    if a == TriState.FALSE or b == TriState.FALSE: return TriState.FALSE
-    if a == TriState.TRUE and b == TriState.TRUE: return TriState.TRUE
+    if a == TriState.FALSE or b == TriState.FALSE:
+        return TriState.FALSE
+    if a == TriState.TRUE and b == TriState.TRUE:
+        return TriState.TRUE
     return TriState.MAYBE
 ```
 

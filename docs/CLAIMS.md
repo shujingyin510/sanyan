@@ -11,7 +11,7 @@
 `agent_causal_chain.py` 的 `run_experiment()` 不调用真实 LLM、不执行真实任务。它的「成功率」是：
 
 ```python
-base_sr = match_score * (1 - difficulty * 0.3)      # match_score 来自硬编码 best_params
+base_sr = match_score * (1 - difficulty * 0.3)  # match_score 来自硬编码 best_params
 success = random.random() < (base_sr + 高斯噪声)
 ```
 
