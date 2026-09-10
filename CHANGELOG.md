@@ -25,6 +25,12 @@
 - **文档漂移修复**：`docs/ARCHITECTURE.md` / `README.md` 操作码 **52 → 65**（ISA v2）；README/ARCHITECTURE 对 `匹配3` 标注「仅 S-表达式 AST，糖语法未实现」（消除文档期货）；`ops/capability.py` 模块头 E7 注释改为已落地。
 - **roadmap**：约束收尾移入 Completed；本体 Next 不再列约束主刀。
 
+### Windows Level 3 C 种子（2026-09-10）
+
+- **`csrc/sanyan_vm_seed.c` 双平台**：解释循环 `vm_run` 共用；`#ifdef _WIN32` 增加 CRT 模拟层（`fread`/`fwrite`/`fopen`/固定 256KB bump 堆映射 `SYS_brk`），`main` 替代 Linux `_start` 裸入口。Linux `-nostdlib` syscall 路径原样保留
+- **测试启用 Windows**：`tests/test_self_host.py` 去掉 `skipIf(linux-only)`；Windows 用 `gcc -Os -std=c99`（MSYS2 MinGW）；差分电池 **28/28 全过**（与 Python VM 逐项一致）；体积断言仅约束 Linux TCC/gcc 路径（CRT 链接 msvcrt 不适用 4KB 预算）
+- **编译命令**：Windows `gcc -Os -std=c99 sanyan_vm_seed.c -o sanyan_vm_seed.exe`；Linux 仍为 `gcc -nostdlib -Os -fno-builtin -lgcc …`
+
 ### 糖解析 AST 契约（2026-09-10）
 
 - **根因修复：`字列` 错映射**。`bytecode_compiler.san` / `_debug` 的 OP映射把 `字列`（str_to_list）标成 `DICT_KEYS`（50），导致 sugar.bin 词法分析把整段源码收成一个「标识符」字符串——正是 roadmap「sugar.bin 返回字符串」的根因。改为 `STR_TO_LIST`（55，常量本就存在），并重编 `bytecode_compiler.bin` + `sugar.bin`

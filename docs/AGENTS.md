@@ -66,13 +66,15 @@ python -X utf8 sanyanc.py program.bin --run   # 运行
 | Level 0 | ✅ | Python evaluator 作为宿主编译器 |
 | Level 1 | ✅ | bytecode_compiler.san 用三言写 |
 | Level 2 | ✅ | VM 加载 A → 编译 B → B 编译 C → B==C（不动点验证） |
-| Level 3 | ✅ | 318 行 C 种子 VM → TCC ~2KB 可审计二进制 |
+| Level 3 | ✅ | C 种子 VM：Linux TCC/gcc -nostdlib ~2KB；Windows MinGW CRT 路径 |
 | Level 4 | ✅ | 617 行 x86_64 NASM 汇编 VM，无需 C 编译器 |
 
 ```bash
-# Level 3 编译
-tcc -nostdlib csrc/sanyan_vm_seed.c -o sanyan_vm
-# Level 4 汇编
+# Level 3 编译（Linux）
+gcc -nostdlib -Os -fno-builtin -lgcc csrc/sanyan_vm_seed.c -o sanyan_vm -s
+# Level 3 编译（Windows / MSYS2 MinGW）
+gcc -Os -std=c99 csrc/sanyan_vm_seed.c -o sanyan_vm_seed.exe
+# Level 4 汇编（Linux + nasm）
 nasm -f bin -o sanyan_vm csrc/sanyan_vm_l4.asm
 ```
 

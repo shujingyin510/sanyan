@@ -2,16 +2,18 @@
  * Sanyan Level 3 种子 VM -- 最小可审计字节码解释器
  *
  * 设计目标:
- *   零外部依赖(不含 #include)、纯 Linux x86_64 syscall
- *   实现 bytecode_compiler.bin 所需的全部 59 个 opcode + 扩展
- *   GCC 编译 -> ~7.5KB 原生二进制 -> 人工逐字节可审计
+ *   实现 bytecode_compiler.bin 所需的全部 opcode + 扩展
+ *   Linux: 零外部依赖(不含 #include)、纯 x86_64 syscall
+ *          gcc -nostdlib -Os -fno-builtin -lgcc → ~7.5KB 可审计二进制
+ *   Windows (MinGW/MSYS2 gcc): CRT 模拟 syscall 层（fread/fwrite/malloc）
+ *          gcc -Os → 可执行，差分电池全平台跑
+ *   解释循环 vm_run 两平台共用，仅 I/O 入口 #ifdef 分叉
  *
- * 编译: gcc -nostdlib -Os -fno-builtin -lgcc sanyan_vm_seed.c -o sanyan_vm -s
+ * Linux 编译: gcc -nostdlib -Os -fno-builtin -lgcc sanyan_vm_seed.c -o sanyan_vm -s
+ * Windows 编译: gcc -Os sanyan_vm_seed.c -o sanyan_vm_seed.exe
  * 运行: ./sanyan_vm bytecode_compiler.bin
- *
- * 编码: GBK (Windows 中文环境)
  * ------------------------------------------------------------ */
-/* ── Linux x86_64 syscall 编号 ── */
+/* ── syscall 编号（两平台共用；Windows 侧映射到 CRT） ── */
 #define SYS_read   0
 #define SYS_write  1
 #define SYS_open   2
@@ -27,7 +29,67 @@ typedef unsigned short u16;
 typedef   signed short s16;
 typedef unsigned long long u64;
 
-/* ── syscall 包装 ── */
+#ifdef _WIN32
+/* ── Windows CRT 模拟层（MinGW）：fd 0/1=stdin/stdout，其余走 FILE* ── */
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+
+#define WIN_FDS 32
+static void* win_fds[WIN_FDS]; /* FILE* 槽；0/1 保留给标准流 */
+
+static u64 sys6(u64 n, u64 a1, u64 a2, u64 a3, u64 a4, u64 a5, u64 a6) {
+    (void)a4; (void)a5; (void)a6;
+    switch ((int)n) {
+    case SYS_read: {
+        s32 fd = (s32)a1; u8* buf = (u8*)a2; u32 len = (u32)a3;
+        if (fd == 0) return (u64)fread(buf, 1, len, stdin);
+        if (fd >= 2 && fd < WIN_FDS && win_fds[fd])
+            return (u64)fread(buf, 1, len, (FILE*)win_fds[fd]);
+        return (u64)-1;
+    }
+    case SYS_write: {
+        s32 fd = (s32)a1; const u8* buf = (const u8*)a2; u32 len = (u32)a3;
+        if (fd == 1) { fwrite(buf, 1, len, stdout); fflush(stdout); return len; }
+        if (fd >= 2 && fd < WIN_FDS && win_fds[fd])
+            return (u64)fwrite(buf, 1, len, (FILE*)win_fds[fd]);
+        return (u64)-1;
+    }
+    case SYS_open: {
+        /* Linux O_CREAT|O_WRONLY=66 / O_RDONLY=0 → CRT 模式 */
+        const char* path = (const char*)a1;
+        int flags = (int)a2;
+        FILE* f = (flags & 1) ? fopen(path, "wb") : fopen(path, "rb");
+        if (!f) return (u64)-1;
+        for (int i = 2; i < WIN_FDS; i++) {
+            if (!win_fds[i]) { win_fds[i] = f; return (u64)i; }
+        }
+        fclose(f);
+        return (u64)-1;
+    }
+    case SYS_close: {
+        s32 fd = (s32)a1;
+        if (fd >= 2 && fd < WIN_FDS && win_fds[fd]) {
+            fclose((FILE*)win_fds[fd]);
+            win_fds[fd] = 0;
+        }
+        return 0;
+    }
+    case SYS_brk: {
+        /* 固定 256KB bump 堆，对齐 Linux 种子容量 */
+        static u8 win_heap[262144];
+        if (a1 == 0) return (u64)(u8*)win_heap;
+        return (u64)(u8*)(win_heap + sizeof(win_heap));
+    }
+    case SYS_exit:
+        exit((int)a1);
+        return 0;
+    default:
+        return (u64)-1;
+    }
+}
+#else
+/* ── Linux x86_64 raw syscall ── */
 static u64 sys6(u64 n, u64 a1, u64 a2, u64 a3, u64 a4, u64 a5, u64 a6) {
     u64 r;
     /* syscall 指令本身摧毁 rcx(返回地址)/r11(RFLAGS)——必须申报，
@@ -37,6 +99,7 @@ static u64 sys6(u64 n, u64 a1, u64 a2, u64 a3, u64 a4, u64 a5, u64 a6) {
         : "rax","rdi","rsi","rdx","r10","r8","r9","rcx","r11","memory");
     return r;
 }
+#endif
 #define SYS3(n,a,b,c) sys6(n,(u64)(a),(u64)(b),(u64)(c),0,0,0)
 #define SYS1(n,a)     sys6(n,(u64)(a),0,0,0,0,0)
 
@@ -118,7 +181,8 @@ static void* var[VM];
 static u8    cod[CM]; static u32 cs, pc, halt;
 static struct { u32 rpc; void* sv[VM]; s32 ssp; } cstk[CD]; static s32 csp;
 
-/* ── CRT 桩（MinGW 编译器生成的内置函数调用） ── */
+#ifndef _WIN32
+/* ── CRT 桩（Linux -nostdlib：MinGW/gcc 可能生成的内置函数调用） ── */
 void* memset(void* s, int c, unsigned long long n) {
     unsigned char* p = (unsigned char*)s;
     while (n--) *p++ = (unsigned char)c;
@@ -131,6 +195,7 @@ void* memmove(void* d, const void* s, unsigned long long n) {
     else { dst += n; src += n; while (n--) *--dst = *--src; }
     return d;
 }
+#endif
 
 static void ps(void* v) { if(sp<SM)stk[sp++]=v; }
 static void* pp()        { return sp>0?stk[--sp]:0; }
@@ -358,17 +423,8 @@ static s32 load(const char* p) {
     return n;
 }
 
-/* ── _start: Linux 原生入口 ──
- *   进程入口栈布局: [argc(8B)] [argv[0](8B)] [argv[1](8B)] ...
- *   不能在 C 函数体里用 register-asm 局部变量读 rsp——gcc 只保证它在
- *   asm 操作数中生效；-Os 一旦在序言先动栈（如内联 load 的局部数组），
- *   读到的就是入口下方的全零新栈页 → argc=0 走 stdin 分支 → 全程无输出
- *   （v3.56.2 首次 CI 差分 24 项全空的根因）。
- *   改为全局 asm 裸入口，把入口 rsp 作为第一参数显式传给 C。 */
-void _start_c(u64* sp0) {
-    s32 argc = (s32)sp0[0];
-    char** argv = (char**)(sp0 + 1);
-
+/* ── 公共启动体 ── */
+static void seed_main(s32 argc, char** argv) {
     sp=0; pc=0; halt=0; csp=0;
 
     if (argc > 1) {
@@ -384,6 +440,26 @@ void _start_c(u64* sp0) {
     SYS1(SYS_exit, 0);
 }
 
+#ifdef _WIN32
+/* Windows: 标准 CRT 入口 */
+int main(int argc, char** argv) {
+    seed_main((s32)argc, argv);
+    return 0;
+}
+#else
+/* ── Linux _start 裸入口 ──
+ *   进程入口栈布局: [argc(8B)] [argv[0](8B)] [argv[1](8B)] ...
+ *   不能在 C 函数体里用 register-asm 局部变量读 rsp——gcc 只保证它在
+ *   asm 操作数中生效；-Os 一旦在序言先动栈（如内联 load 的局部数组），
+ *   读到的就是入口下方的全零新栈页 → argc=0 走 stdin 分支 → 全程无输出
+ *   （v3.56.2 首次 CI 差分 24 项全空的根因）。
+ *   改为全局 asm 裸入口，把入口 rsp 作为第一参数显式传给 C。 */
+void _start_c(u64* sp0) {
+    s32 argc = (s32)sp0[0];
+    char** argv = (char**)(sp0 + 1);
+    seed_main(argc, argv);
+}
+
 __asm__(
     ".text\n"
     ".globl _start\n"
@@ -392,3 +468,4 @@ __asm__(
     "    movq %rsp, %rdi\n"
     "    call _start_c\n"
 );
+#endif

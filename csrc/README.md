@@ -52,7 +52,7 @@ csrc/
 ├── parse_harness.c             解析器测试
 ├── debug_parse.c               解析器调试
 ├── dp.c                        动态规划算法
-├── sanyan_vm_seed.c            Level 3: C 种子 VM (318行, TCC 可编译)
+├── sanyan_vm_seed.c            Level 3: C 种子 VM（Linux syscall + Windows CRT 双路径）
 ├── sanyan_vm_l4.asm            Level 4: x86_64 NASM 汇编 VM (617行)
 
 ├── ═══ 模型文件 ═══

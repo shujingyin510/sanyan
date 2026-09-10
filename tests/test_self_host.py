@@ -251,7 +251,6 @@ class TestBootstrapLevel3(unittest.TestCase):
             with self.subTest(src=src):
                 self.assertEqual(self._run_pyvm(src), expected)
 
-    @unittest.skipIf(sys.platform != 'linux', 'C VM 种子仅支持 Linux (syscall)，此平台跳过')
     def test_seed_vm_runs_bytecode(self):
         """编译 C VM 种子，对整条操作码电池逐项与期望值差分。"""
         import subprocess
@@ -269,22 +268,32 @@ class TestBootstrapLevel3(unittest.TestCase):
 
             # 编译 C VM
             compiled = False
-            for compiler_args in [
-                [
-                    'gcc',
-                    seed_src,
-                    '-o',
-                    seed_exe,
-                    '-nostdlib',
-                    '-Os',
-                    '-fno-builtin',
-                    '-lgcc',
-                    '-Wno-main',
-                    '-s',
-                    '-fomit-frame-pointer',
-                ],
-                ['tcc', seed_src, '-o', seed_exe],
-            ]:
+            # Linux: -nostdlib 裸 syscall；Windows: CRT 模拟层（_WIN32 分叉）
+            win = sys.platform == 'win32'
+            if win:
+                seed_exe += '.exe'
+                candidate_compilers = [
+                    ['gcc', seed_src, '-o', seed_exe, '-Os', '-std=c99'],
+                    ['clang', seed_src, '-o', seed_exe, '-Os', '-std=c99'],
+                ]
+            else:
+                candidate_compilers = [
+                    [
+                        'gcc',
+                        seed_src,
+                        '-o',
+                        seed_exe,
+                        '-nostdlib',
+                        '-Os',
+                        '-fno-builtin',
+                        '-lgcc',
+                        '-Wno-main',
+                        '-s',
+                        '-fomit-frame-pointer',
+                    ],
+                    ['tcc', seed_src, '-o', seed_exe],
+                ]
+            for compiler_args in candidate_compilers:
                 try:
                     result = subprocess.run(compiler_args, capture_output=True, timeout=30)
                 except FileNotFoundError:
@@ -323,7 +332,6 @@ class TestBootstrapLevel3(unittest.TestCase):
                         f'C VM 输出不符 src={src!r} 期望={expected!r} 实得={cvm.stdout.strip()!r}',
                     )
 
-    @unittest.skipIf(sys.platform != 'linux', 'C VM 种子仅支持 Linux')
     def test_seed_vm_size(self):
         """验证种子二进制在 8KB 以内"""
         import subprocess
@@ -337,9 +345,13 @@ class TestBootstrapLevel3(unittest.TestCase):
 
         with tempfile.TemporaryDirectory() as tmpdir:
             seed_exe = os.path.join(tmpdir, 'sanyan_vm_seed')
-            for compiler in ['tcc', 'gcc']:
+            if sys.platform == 'win32':
+                seed_exe += '.exe'
+            for compiler in ['tcc', 'gcc'] if sys.platform != 'win32' else ['gcc']:
                 if compiler == 'tcc':
                     args = ['tcc', seed_src, '-o', seed_exe]
+                elif sys.platform == 'win32':
+                    args = ['gcc', seed_src, '-o', seed_exe, '-Os', '-std=c99']
                 else:
                     args = [
                         'gcc',
@@ -355,6 +367,9 @@ class TestBootstrapLevel3(unittest.TestCase):
                         '-fomit-frame-pointer',
                     ]
 
+                if sys.platform == 'win32':
+                    # Windows CRT 路径链接 msvcrt，体积不适用 4KB 预算
+                    args = ['gcc', seed_src, '-o', seed_exe, '-Os', '-std=c99']
                 try:
                     result = subprocess.run(args, capture_output=True, timeout=30)
                 except FileNotFoundError:
@@ -363,6 +378,8 @@ class TestBootstrapLevel3(unittest.TestCase):
                     size = os.path.getsize(seed_exe)
                     if compiler == 'tcc':
                         self.assertLess(size, 4096, 'TCC 编译二进制过大')
+                    elif sys.platform != 'win32' and compiler == 'gcc':
+                        self.assertLess(size, 8192, 'gcc -nostdlib 种子过大')
                     break  # success with one compiler is enough
             else:
                 self.skipTest('无法编译种子 VM (需要 tcc 或 gcc)')

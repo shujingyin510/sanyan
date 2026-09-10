@@ -9,7 +9,7 @@
 | Milestone | Details |
 |-----------|---------|
 | **C VM (ISA v2)** | 16-bit LOAD/STORE, 32-bit CALL, CLOSURE, PUSH_STR16 |
-| **Level 3 Bootstrap** | 318-line C seed VM → TCC-compiled binary |
+| **Level 3 Bootstrap** | C seed VM → TCC/Linux syscall + MinGW/Windows CRT 双路径 |
 | **Level 4 Bootstrap** | 617-line x86_64 NASM assembly VM |
 | **FFI M1–M5** | Python 桥 → 语法糖 → C 头生成 → ctypes+LLVM 双后端 → 安全收口 |
 | **Network envelope** | `SANYAN_NET` + 超时=可能 + SSRF 豁免（v3.57.0） |
@@ -17,6 +17,7 @@
 | **Constraint MVP closed** | 信封式判假·因=约束 + E7 并发继承 + 字节码拒约束算子 + 糖语法 `任务名{约束{…}}` + S1–S4 测试全绿（54 项） |
 | **`允许` 抑制语义** | `允许(x)` 挂 tolerated 元通道；`若(可能)` D8 关卡豁免；帧级 `允许 可能`（2026-09-10） |
 | **sugar 解析 AST 契约** | 修 `字列→DICT_KEYS` 错映射→`STR_TO_LIST`；生产路径裸原子包成 AST；`tests/test_sugar_bin_ast.py` 锁契约；VM 词法缺口显式记录 |
+| **Windows Level 3 C 种子** | `sanyan_vm_seed.c` 加 `_WIN32` CRT 模拟层（fread/fwrite/固定堆）；`main` 入口；差分电池 28/28 全平台 |
 | **Agent split** | `agent_system` + Agent 测试迁至 `sanyan-agent` 独立仓（2026-09-10） |
 | **拆仓扫尾** | README/AGENTS/project_structure 去 Agent 正文改指针；`.coveragerc`/mypy 去 `agent_system`；PLAN_v* 与 Agent 加固计划入 `docs/archive/`；CLAIMS 安全/越界冲突归账 |
 | **Playground / Pages** | 纯静态在线试玩入口 |
@@ -30,7 +31,6 @@
 
 | Priority | Item | Notes |
 |----------|------|-------|
-| 🟡 | **Windows Level 3 C 种子** | 当前仅 Linux/TCC |
 | 🟢 | **NASM L4 差分闭环** | 已知三缺陷待 nasm+Linux 实证 |
 | 🟢 | **类型系统编译期检查** | 当前仅运行时部分 |
 | 🟢 | **增量 LSP** | 避免大文件全量重扫 |
