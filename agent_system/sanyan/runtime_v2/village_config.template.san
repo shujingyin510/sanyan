@@ -1,5 +1,0 @@
-// 桃花村 LLM 配置模板 — 复制为 village_config.san 并填入 key
-// OpenAI 兼容: https://token-plan-cn.xiaomimimo.com/v1
-设 模型URL = "https://token-plan-cn.xiaomimimo.com/v1/chat/completions"
-设 模型名 = "MIMO-V2.5Pro"
-设 API密钥 = "tp-你的key"

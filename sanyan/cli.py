@@ -67,34 +67,35 @@ def _run_py(script, *args, timeout=300, label=''):
     return rc
 
 
-# ── Agent ──
+# ── Agent（已迁出：sanyan-agent 独立仓）──
+
+_AGENT_MOVED = (
+    'Agent 子系统已拆至独立仓库 https://github.com/shujingyin510/sanyan-agent\n'
+    '  安装: git clone https://github.com/shujingyin510/sanyan-agent && pip install -e .\n'
+    '  状态: 自更新线冻结；本仓 CLI 不再内嵌 Agent 入口。'
+)
+
+
+def _agent_moved():
+    c = _console()
+    c.print(f'\n[yellow]{_AGENT_MOVED}[/]\n')
+    return 2
 
 
 def cmd_agent_run(args):
-    from agent_system.run_agent import main as agent_main
-
-    sys.argv = ['agent_system/run_agent.py', args.task]
-    agent_main()
+    return _agent_moved()
 
 
 def cmd_agent_evolve(args):
-    c = _console()
-    c.print('\n[bold cyan]═══ Agent 自主改代码闭环 ═══[/]\n')
-    rc = _run_py('agent_system/run_agent.py', '--code-evolve')
-    c.print(f'\n  {SYMBOL_OK if rc == 0 else SYMBOL_FAIL} 退出码: {rc}')
-    return rc
+    return _agent_moved()
 
 
 def cmd_agent_auto_evolve(args):
-    c = _console()
-    c.print('\n[bold cyan]═══ 自动化进化闭环 ═══[/]\n')
-    return _run_py('agent_system/run_agent.py', '--auto-evolve')
+    return _agent_moved()
 
 
 def cmd_agent_validate(args):
-    c = _console()
-    c.print('\n[bold cyan]═══ 进化仿真验证 ═══[/]\n')
-    return _run_py('agent_system/run_agent.py', '--validate')
+    return _agent_moved()
 
 
 def cmd_agent_dashboard(args):
@@ -119,42 +120,18 @@ def cmd_agent_tui(args):
 
 
 def cmd_bench(args):
-    import sys as _sys
-
-    _sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
     c = _console()
-    bench_type = args.type or 'safety'
-    if bench_type == 'honesty':
-        c.print('\n[bold cyan]═══ Agent 诚实度基准 ═══[/]\n')
-        from benchmarks.honesty_bench import run_benchmark
-
-        run_benchmark(quick=args.quick)
-    elif bench_type == 'safety':
-        c.print('\n[bold cyan]═══ Agent 安全基准测试 ═══[/]\n')
-        from benchmarks.agent_bench import run_benchmark
-
-        run_benchmark(quick=args.quick)
-    else:
-        c.print('\n[bold cyan]═══ Agent 全量基准测试 ═══[/]\n')
-        from benchmarks.agent_bench import run_benchmark as run_safety
-        from benchmarks.honesty_bench import run_benchmark as run_honesty
-
-        run_safety(quick=args.quick)
-        c.print()
-        run_honesty(quick=args.quick)
-    return 0
+    c.print(f'\n[yellow]{_AGENT_MOVED}[/]\n')
+    c.print('  [dim]Agent 基准请在 sanyan-agent 仓库运行。[/]')
+    return 2
 
 
 def cmd_agent_self_host(args):
-    c = _console()
-    c.print('\n[bold cyan]═══ 自举验证 ═══[/]\n')
-    return _run_py('agent_system/run_agent.py', '--self-host')
+    return _agent_moved()
 
 
 def cmd_agent_review_evolve(args):
-    c = _console()
-    c.print('\n[bold cyan]═══ 带审查进化闭环 ═══[/]\n')
-    return _run_py('agent_system/run_agent.py', '--review-evolve')
+    return _agent_moved()
 
 
 # ── 编译/运行 ──

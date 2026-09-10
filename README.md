@@ -527,7 +527,7 @@ sanyan/
 ├── examples/      # 示例程序（温室/传感器融合/IoT/STM32…）
 ├── tests/         # 自动测试
 ├── docs/          # 文档（手册 / 约束 / 网络 / LLVM…）
-├── agent_system/  # Agent 系统（运行时 + 自更新闭环 + Sanyan DSL；**自更新线 2026-09-10 冻结**）
+├── agent_system/  # （已迁出）→ https://github.com/shujingyin510/sanyan-agent
 ├── sanyan/        # 包命名空间与统一 CLI（sanyan.cli）
 └── csrc/          # C 语言 VM（65 指令）
 ```

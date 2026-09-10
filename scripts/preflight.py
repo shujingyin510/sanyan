@@ -145,9 +145,7 @@ def pytest_core():
         'tests/test_vm.py',
         'tests/test_llvmgen.py',
         'tests/test_sugar_san.py',
-        'tests/agent/test_agent.py',
-        'tests/agent/test_agent_runtime.py',
-        'tests/agent/test_agent_v5.py',
+        # Agent 测试已迁至 sanyan-agent 独立仓
         'tests/test_lang_core.py',
         'tests/test_new_features.py',
         'tests/test_lang_core_ext.py',

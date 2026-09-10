@@ -2,7 +2,7 @@
 
 > 本仓只维护**三言语言 / 编译器 / VM / 约束系统**工程项。  
 > 研究叙事（UR / 周期谱）真相源：独立仓库 <https://github.com/shujingyin510/UR> 与知识库 `sanyan-obsidian`。  
-> Agent 自更新线（2026-09-10）**冻结**：同模型平台期已判定，死因考古见知识库；解冻条件=换强模型或约束系统收尾后重评。
+> Agent 子系统 **2026-09-10 拆出** → <https://github.com/shujingyin510/sanyan-agent>（自更新线冻结）。见 [`AGENT_MOVED.md`](AGENT_MOVED.md)。
 
 ## Completed（本体）
 
@@ -15,6 +15,7 @@
 | **Network envelope** | `SANYAN_NET` + 超时=可能 + SSRF 豁免（v3.57.0） |
 | **Constraint MVP first cut** | 能力栈默认拒绝 + `任务{约束}`（v3.58.0） |
 | **Constraint MVP closed** | 信封式判假·因=约束 + E7 并发继承 + 字节码拒约束算子 + 糖语法 `任务名{约束{…}}` + S1–S4 测试全绿（54 项） |
+| **Agent split** | `agent_system` + Agent 测试迁至 `sanyan-agent` 独立仓（2026-09-10） |
 | **Playground / Pages** | 纯静态在线试玩入口 |
 | **Agent Safety / Honesty / Evolution** | 已有基准保留；数字以 `docs/CLAIMS.md` 清账为准（进化实验为合成模拟·机制演示） |
 
