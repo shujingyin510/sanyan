@@ -4,7 +4,12 @@
 
 ## [Unreleased]
 
-> **仓库卫生 + CLI/覆盖率修复 + 能力约束第二阶段起步 + DeepSeek V4 API 迁移**（不铸新版本号——按约定避免版本通胀）。
+> **仓库卫生 + CLI/覆盖率修复 + 能力约束第二阶段起步 + DeepSeek V4 API 迁移 + 约束 MVP 收尾**（不铸新版本号——按约定避免版本通胀）。
+
+### 能力约束 · MVP 收尾验收（2026-09-10）
+- **盘点翻案**：知识库 Roadmap 所列「未成」项（信封式判假·因=约束、E7 并发继承、compile_bytecode 拒约束算子、糖语法 `任务名{约束{…}}`）**代码与测试均早已落地**——本轮补验收而非新实现。S1–S4 成功判据写入 `docs/constraint.md` §8；`tests/test_capability_stack.py` + `test_capability_gates.py` **54 项全绿**（含 S2 演示、E7 并发/异步、字节码拒绝、糖语法端到端）。
+- **文档漂移修复**：`docs/ARCHITECTURE.md` / `README.md` 操作码 **52 → 65**（ISA v2）；README/ARCHITECTURE 对 `匹配3` 标注「仅 S-表达式 AST，糖语法未实现」（消除文档期货）；`ops/capability.py` 模块头 E7 注释改为已落地。
+- **roadmap**：约束收尾移入 Completed；本体 Next 不再列约束主刀。
 
 ### 能力约束 · 第二阶段（表达力）
 - **`只许` 真封印落地**：从「塌缩成 `许`」升级为**封死上界**——`只许` 声明能力宇宙的闭集，封印后再 `许` 一个域外能力在**解析期即可判定报错**（`ops/constraint_ops.py`，区别于 `许` 的加法下界）；安全审查由此得到闭集保证而非仅下限。`tests/test_capability_stack.py` +5 项（33→38）

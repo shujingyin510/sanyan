@@ -184,6 +184,19 @@ FFI 同样吃这套（`py调` 与 `http请求` 同为信封式自守卫）：
 
 ---
 
+## 8 成功判据 S1–S4（2026-09-10 收尾验收）
+
+| 判据 | 含义 | 证据 |
+|------|------|------|
+| **S1 默认拒绝** | 空 `约束{}` 内效果类判假，纯计算恒通 | `test_empty_constraint_denies_effects` / `test_pure_compute_always_allowed_in_block` |
+| **S2 信封走缓存** | 外传企图在默认拒绝内**全程无异常**，判假→缓存分支 | `test_s2_demo_denied_net_falls_to_cache_no_exception` / 糖语法版 `test_sugar_s2_demo_no_exception` |
+| **S3 封印不可扩** | `只许` 域外再 `许` = 解析期可判定报错 | `test_seal_rejects_widening` |
+| **S4 并发继承** | 子求值器/spawn 继承约束，线程不是逃逸口 | `test_e7_concurrent_worker_inherits_deny` / `test_e7_async_inherits_deny_at_spawn` |
+
+配套：E7 capture/install、字节码拒约束算子、糖语法 `任务名{约束{…}}`、`限时` 看门狗——`tests/test_capability_stack.py` + `test_capability_gates.py` **54 项全绿**。
+
+---
+
 ## 9 速查
 
 **关键词**：`任务 名 { 约束 { 许/只许/禁 类; 允许 可能; 限时(n) } 体… }`

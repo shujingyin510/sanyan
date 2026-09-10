@@ -14,6 +14,7 @@
 | **FFI M1–M5** | Python 桥 → 语法糖 → C 头生成 → ctypes+LLVM 双后端 → 安全收口 |
 | **Network envelope** | `SANYAN_NET` + 超时=可能 + SSRF 豁免（v3.57.0） |
 | **Constraint MVP first cut** | 能力栈默认拒绝 + `任务{约束}`（v3.58.0） |
+| **Constraint MVP closed** | 信封式判假·因=约束 + E7 并发继承 + 字节码拒约束算子 + 糖语法 `任务名{约束{…}}` + S1–S4 测试全绿（54 项） |
 | **Playground / Pages** | 纯静态在线试玩入口 |
 | **Agent Safety / Honesty / Evolution** | 已有基准保留；数字以 `docs/CLAIMS.md` 清账为准（进化实验为合成模拟·机制演示） |
 
@@ -25,8 +26,7 @@
 
 | Priority | Item | Notes |
 |----------|------|-------|
-| 🔴 | **约束块 MVP 收尾** | 信封式判假·因=约束 + E7 并发继承 + compile_bytecode 显式报错 + 糖语法 `任务名{约束{…}}` + S1–S4 计量 |
-| 🔴 | **文档漂移修复** | ARCHITECTURE opcode 数、README `匹配3` 期货、PLAN_v* 归档 |
+| 🔴 | **文档漂移修复（本轮已修 opcode/匹配3）** | PLAN_v* 归档仍待做 |
 | 🟡 | **Agent 数据外置** | 19 个 `.db` 迁出源码树；双轨 evolution 收敛；安全/校准模块进覆盖率（**不扩新功能**） |
 | 🟡 | **sugar.bin 解析器** | 返回 AST 替代字符串（预存在 bug） |
 | 🟡 | **Windows Level 3 C 种子** | 当前仅 Linux/TCC |

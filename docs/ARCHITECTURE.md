@@ -37,7 +37,7 @@
 - `type_ops.py` — 类型判断/转换/三态值构造（170 行）
 - `ternary_source_ops.py` — 来源/证据链/冲突模型/置信度操作（280 行）
 - `ternary_util_ops.py` — 三态工具操作：移位/翻转/压缩/解析/枚举/信念（150 行）
-- `control_ops.py` — 控制流：若/循环/遍历/返回/异常/匹配3/匹配信度（460 行）
+- `control_ops.py` — 控制流：若/循环/遍历/返回/异常/匹配信度（`匹配3` 仅 S-式路径，糖语法未实现）（460 行）
 - `concurrent_ops.py` — 并发：并发融合/竞速/全部/锁（284 行）
 - `ternary_container_ops.py` — 三态容器：链/链断/解包/或解/尝试链/信度守卫（340 行）
 - `ternary_set_ops.py` — 三态集操作（187 行）
@@ -60,12 +60,12 @@
 ### 字节码编译器 (`compile_bytecode.py` + `stdlib/bytecode_compiler.san`)
 - Python 端：`compile_source()` 生成 `.bin` 文件
 - Sanyan 端：`stdlib/bytecode_compiler.san` 自举编译器
-- 52 个操作码，32 位代码大小，支持函数/闭包/模块
+- 65 个操作码（ISA v2），32 位代码大小，支持函数/闭包/模块
 
 ### C VM (`csrc/runtime.c`)
 - 1461 行 C 语言字节码解释器
 - 标记指针值系统（LSB=1 整数，LSB=0 堆对象）
-- 支持全部 52 个操作码
+- 支持全部 65 个操作码
 - **UTF-8 字符计数**: `utf8_char_len`/`utf8_byte_offset`/`utf8_substr`（2026-06-02 修复）
 - **float 字典键**: `hash_key`/`key_eq` 支持 `OBJ_FLOAT`（2026-06-02 新增）
 
@@ -83,7 +83,7 @@
 - `ops_gen_helpers.py` — 算术辅助/浮点/容器编译（243 行）
 - `ir_fixes.py` — IR 后处理工具（220 行）
 - `helpers.py` — Python 辅助函数（446 行）
-- `runtime.c` — C 运行时库（arena 分配器 + 52 操作码）
+- `runtime.c` — C 运行时库（arena 分配器 + 65 操作码）
 - `type_mapping.py` — 类型映射与运行时函数规范
 
 ### LSP 服务器 (`lsp/`)

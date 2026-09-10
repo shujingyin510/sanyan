@@ -8,7 +8,8 @@
 即 判=假·因=约束。块外无 frame → 零检查、行为与今日完全一致（向后兼容，不碰既有测试）。
 
 能力栈挂 evaluator 实例（惰性属性 `_cap_stack`），修 E6 全局态污染；单调收紧
-（子块只能求交、禁累加），修 E5 放松。E7 并发子求值器继承是后续一刀。
+（子块只能求交、禁累加），修 E5 放松。E7 并发/异步子求值器经 capture_stack/install_stack
+在 spawn 时继承约束（见 ops/concurrent_ops.py）。
 """
 
 from __future__ import annotations
