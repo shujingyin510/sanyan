@@ -4,7 +4,12 @@
 
 ## [Unreleased]
 
-> **仓库卫生 + CLI/覆盖率修复 + 能力约束第二阶段起步 + DeepSeek V4 API 迁移 + 约束 MVP 收尾**（不铸新版本号——按约定避免版本通胀）。
+> **仓库卫生 + CLI/覆盖率修复 + 能力约束第二阶段起步 + DeepSeek V4 API 迁移 + 约束 MVP 收尾 + Agent 拆仓**（不铸新版本号——按约定避免版本通胀）。
+
+### Agent 拆仓（2026-09-10）
+- **`agent_system/` + Agent 专用测试迁至** <https://github.com/shujingyin510/sanyan-agent>（自更新线冻结）。本仓只留 `agent_system/MOVED.md` 与 `docs/AGENT_MOVED.md`。
+- CLI `sanyan agent` / `sanyan bench` 改为指路提示（退出码 2）；CI/preflight 去掉 Agent 测试与 agent benchmark。
+- 本体源码树减重约 **-41k 行**（`f5296c6`）。
 
 ### 能力约束 · MVP 收尾验收（2026-09-10）
 - **盘点翻案**：知识库 Roadmap 所列「未成」项（信封式判假·因=约束、E7 并发继承、compile_bytecode 拒约束算子、糖语法 `任务名{约束{…}}`）**代码与测试均早已落地**——本轮补验收而非新实现。S1–S4 成功判据写入 `docs/constraint.md` §8；`tests/test_capability_stack.py` + `test_capability_gates.py` **54 项全绿**（含 S2 演示、E7 并发/异步、字节码拒绝、糖语法端到端）。
