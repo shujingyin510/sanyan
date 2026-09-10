@@ -1,11 +1,11 @@
 """能力层约束算子：任务 / 约束 / 能否（S-表达式入口，不依赖 Pratt 糖）。
 
 分层律：`约束` 子句在此被**结构性解析**为能力集操作，绝不把 许/禁/只许 当值算子
-分派——共享词汇不共享状态（约束-方向研究 §D1）。四关键字的值层桩在 planned_ops.py。
+分派——共享词汇不共享状态（约束-方向研究 §D1）。四关键字的值层算子在 planned_ops.py。
 
 许（加法下界）/ 只许（封死上界，越界的 许 即 parse 期报错）/ 禁（不可逆挖洞，禁>许）
-三关键字进能力帧；允许（容忍轴）与 限时（量化轴）先解析放行、语义留后续刀。糖语法 `任务名{约束{…}}`
-待 Pratt，本入口先用 S-式 `(任务 名 (约束 (许 网) …) 体…)`。
+三关键字进能力帧；限时（量化轴）看门狗；允许（容忍轴）= 帧级 `tolerate_maybe`
+（块内 `若(可能)` 关卡豁免，正交于能力域）。糖语法 `任务名{约束{…}}`。
 """
 
 from __future__ import annotations
@@ -38,10 +38,12 @@ def _to_seconds(node) -> float:
     raise SanyanValueError(f'限时 参数必须是数字（秒），得到 {node!r}')
 
 
-def _parse_constraint(clause) -> tuple[frozenset, frozenset, float | None]:
-    """(约束 (许 网) (禁 删) (只许 网) (限时 5) …) → (allowed, denied, timeout秒)。结构解析，不分派值算子。
+def _parse_constraint(clause) -> tuple[frozenset, frozenset, float | None, bool]:
+    """(约束 (许 网) (禁 删) (只许 网) (限时 5) (允许 可能) …)
+    → (allowed, denied, timeout秒, tolerate_maybe)。结构解析，不分派值算子。
 
     可判定性法则：关键字与能力类都是封闭集，非法即解析期报错（不留运行时条件）。
+    `允许` 目前只认 `可能`（容忍轴唯一合法宾语）；写别的在 parse 期拒绝。
     """
     if not isinstance(clause, list) or not clause or _dequote(clause[0]) != '约束':
         raise SanyanSyntaxError('任务 第二参必须是 (约束 …) 子句')
@@ -50,6 +52,7 @@ def _parse_constraint(clause) -> tuple[frozenset, frozenset, float | None]:
     denied: set = set()
     has_seal = False
     timeout: float | None = None
+    tolerate_maybe = False
     for sub in clause[1:]:
         if not isinstance(sub, list) or not sub:
             raise SanyanSyntaxError(f'约束子句格式错误: {sub!r}')
@@ -74,7 +77,10 @@ def _parse_constraint(clause) -> tuple[frozenset, frozenset, float | None]:
                 raise SanyanValueError(f'限时 预算必须为正数（秒），得到 {secs}')
             timeout = secs if timeout is None else min(timeout, secs)  # 多个 限时 取最紧
         elif kw == '允许':
-            pass  # 容忍轴：解析放行，语义留后续刀（见模块头）
+            # 容忍轴：`允许 可能` = 块内若(可能)关卡豁免（帧级，正交于能力域）
+            if len(sub) != 2 or _dequote(sub[1]) != '可能':
+                raise SanyanValueError('约束子句 允许 目前仅支持 `允许 可能`（容忍轴）')
+            tolerate_maybe = True
         else:
             raise SanyanSyntaxError(f'约束关键字仅限 许/只许/禁/允许/限时，得到 `{kw}`')
     # 封印域：只许 声明"能力宇宙恰为此枚举集"。任何越出封印的 许 = 可判定违规（parse 期报错，
@@ -88,15 +94,15 @@ def _parse_constraint(clause) -> tuple[frozenset, frozenset, float | None]:
         allowed: set = sealed
     else:
         allowed = granted
-    return frozenset(allowed), frozenset(denied), timeout
+    return frozenset(allowed), frozenset(denied), timeout, tolerate_maybe
 
 
 def _task_op(evaluator, args):
     """任务(名, (约束 …), 体…) — 在能力帧内执行体，退出必弹帧（单调收紧）。"""
     if len(args) < 2:
         raise SanyanSyntaxError('任务 需要 名 + (约束 …) + 体')
-    allowed, denied, timeout = _parse_constraint(args[1])
-    push_frame(evaluator, allowed, denied, timeout=timeout)
+    allowed, denied, timeout, tolerate_maybe = _parse_constraint(args[1])
+    push_frame(evaluator, allowed, denied, timeout=timeout, tolerate_maybe=tolerate_maybe)
     try:
         result: object = TritValue(0)
         for expr in args[2:]:

@@ -112,12 +112,20 @@ class CapFrame:
     默认拒绝：不在 allowed 或在 denied → 假。
     """
 
-    __slots__ = ('allowed', 'denied', 'deadline')
+    __slots__ = ('allowed', 'denied', 'deadline', 'tolerate_maybe')
 
-    def __init__(self, allowed: frozenset, denied: frozenset, deadline: Optional[float] = None) -> None:
+    def __init__(
+        self,
+        allowed: frozenset,
+        denied: frozenset,
+        deadline: Optional[float] = None,
+        tolerate_maybe: bool = False,
+    ) -> None:
         self.allowed = allowed
         self.denied = denied
         self.deadline = deadline  # 绝对墙钟死线（time.monotonic 基），None=无限时
+        # 允许 元通道（帧级）：约束子句 `允许 可能` → 块内「若(可能)」关卡豁免（正交轴，不参与能力单调收紧）
+        self.tolerate_maybe = bool(tolerate_maybe)
 
     def permits(self, cap: str) -> bool:
         if cap in self.denied:
@@ -130,11 +138,18 @@ def current_frame(evaluator) -> Optional[CapFrame]:
     return st[-1] if st else None
 
 
-def push_frame(evaluator, allowed: frozenset, denied: frozenset, timeout: Optional[float] = None) -> None:
+def push_frame(
+    evaluator,
+    allowed: frozenset,
+    denied: frozenset,
+    timeout: Optional[float] = None,
+    tolerate_maybe: bool = False,
+) -> None:
     """压入约束帧，与父帧求交（单调：子块 allowed⊆父块、denied 累加，只紧不松）。
 
     timeout（秒，来自 限时）→ 绝对死线 time.monotonic()+timeout；死线亦单调收紧，
-    子帧取更早者（不能比父块争取更多时间）。"""
+    子帧取更早者（不能比父块争取更多时间）。
+    tolerate_maybe（来自 `允许 可能`）正交轴：父容忍则子继承；子可自开（不收紧能力域）。"""
     st = getattr(evaluator, '_cap_stack', None)
     if st is None:
         st = []
@@ -146,10 +161,11 @@ def push_frame(evaluator, allowed: frozenset, denied: frozenset, timeout: Option
         denied = frozenset(denied) | parent.denied
         if parent.deadline is not None:
             deadline = parent.deadline if deadline is None else min(deadline, parent.deadline)
+        tolerate_maybe = bool(tolerate_maybe) or bool(parent.tolerate_maybe)
     else:
         allowed = frozenset(allowed)
         denied = frozenset(denied)
-    st.append(CapFrame(allowed, denied, deadline))
+    st.append(CapFrame(allowed, denied, deadline, tolerate_maybe=tolerate_maybe))
 
 
 def pop_frame(evaluator) -> None:

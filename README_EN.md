@@ -5,11 +5,11 @@
 [![PyPI](https://img.shields.io/pypi/v/ternary-engine?label=ternary-engine)](https://pypi.org/project/ternary-engine/)
 [![Playground](https://img.shields.io/badge/%E2%96%B6%20Try%20Online-Playground-c0392b)](https://shujingyin510.github.io/sanyan/playground/)
 
-> **Tri-State Cognitive Framework** — The evolution from ternary language to Knowledge Runtime. Core contribution: a verifiable self-improving Agent knowledge system proving the causal chain Knowledge → Calibration → Selection → Success.
+> **Tri-State Cognitive Framework** — Balanced ternary Chinese language + engine (evaluator / bytecode VM / C seed / LLVM) + capability constraints. Focus: make untrusted code (agents / plugins / generated code / user scripts) safe to run. The Agent self-update subsystem lives in [sanyan-agent](https://github.com/shujingyin510/sanyan-agent).
 
 **[▶ Try Sanyan Online](https://shujingyin510.github.io/sanyan/playground/)** — run a core Sanyan subset right in your browser, zero install (offline: double-click [`playground/index.html`](playground/index.html))
 
-[中文版](docs/README_archive.md) | [Operations Manual](agent_system/agent_operations_en.md)
+[中文版](README.md) | Agent moved → [sanyan-agent](https://github.com/shujingyin510/sanyan-agent)
 
 ---
 
@@ -185,60 +185,11 @@ See [CHANGELOG.md](CHANGELOG.md) for the full version history.
 
 ---
 
-### Agent: Readable Decision DSL (v5)
+### Agent Subsystem (moved)
 
-> See [agent_system/README.md](agent_system/README.md) — v5 architecture, three-phase design, patch catalog.
-
-| Feature | Description |
-|---|---|
-| **Rule Engine** | 200+ rules, task→tool chain matching, 0 LLM calls |
-| **Template Library** | 11 templates (math/data structures/algorithms/utils), code generation |
-| **Domain Knowledge** | LLM dynamic generation, SQLite caching |
-| **Learning System** | Git batch learning + project style recording + experience store |
-| **Auto Rule Generation** | LLM generates → user approves → saved |
-| **Cross-project Migration** | Export/import rules/templates/learning records |
-| **Multi-Agent** | Task decomposition → parallel execution → result aggregation |
-| **Multi-model** | DeepSeek/Claude/GPT-4/local models |
-| **AST Parsing** | Precise context loading, 4K window handles complex tasks |
-| **UR Detection** | Prevents LLM death loops |
-| **SQLite Built-in** | 10 operations, Sanyan directly operates databases |
-| **Sanyan Runtime** | agent_runtime.san, decision loop in native language |
-| **Ternary Reasoning** | LLM cognitive states → ternary mapping → Kleene propagation → Bayesian confidence → safety gating |
-| **Multi-Hypothesis** | Top-3 candidates explored in parallel, tournament selects best |
-| **Task Decomposition** | Auto-recursive task splitting, bounded context per layer |
-| **Failure Classification** | 6 FailureModes, precise retry |
-| **Safety Sandbox** | Command blacklist/whitelist, filesystem guard, read-only mode, audit log |
-| **Multi-Provider** | DeepSeek / OpenAI / Anthropic / Gemini / Qwen / GLM / Moonshot / SiliconFlow / OpenRouter |
-
-```bash
-# Interactive mode (multi-turn, hot reload)
-python -X utf8 agent_system/run_agent.py
-
-# Single-shot programming (LLM generates code → executes → returns result)
-python -X utf8 agent_system/run_agent.py "calculate sum from 1 to 1000"
-
-# Autonomous (read → modify → test → fix → loop)
-python -X utf8 agent_system/run_agent.py "fix _test_verify.py so tests pass" --auto
-
-# File operations
-python -X utf8 agent_system/run_agent.py "replace v0.3 with v0.4 in AGENTS.md"
-```
-
----
-
-## Architecture
-
-```
-Source (.san) → Sugar Parser or S-Expression Parser → AST
-  → Evaluator (interpreted) or Compiler → Bytecode (.bin) → VM
-  → LLVM Codegen → Native Binary (optional)
-```
-
-The evaluator path is the primary execution mode. The bytecode VM (vm/__init__.py) can compile and run .bin files — and has achieved full self-hosting: the VM can compile its own compiler source to produce an identical .bin.
-
-The LLVM codegen (llvmgen/) compiles to native binaries via C runtime linkage.
-
----
+> The Agent runtime / self-update loop / readable decision DSL is **not maintained in this repo**.
+> Standalone: <https://github.com/shujingyin510/sanyan-agent> · See [`docs/AGENT_MOVED.md`](docs/AGENT_MOVED.md).
+> CLI `sanyan agent` / `sanyan bench` only print a pointer (exit code 2).
 
 ## Project Structure
 
@@ -275,19 +226,7 @@ sanyan/
 │   ├── runtime.c              # C runtime library
 │   └── type_mapping.py        # Type mapping & runtime function specs
 ├── ops/                       # Built-in operations (30 modules)
-├── agent_system/              # Agent system (runtime + self-update loop + Sanyan DSL)
-│   ├── run_agent.py           # Agent CLI (interactive / one-shot / autonomous / sandbox)
-│   ├── run_self_update.py     # Self-update CLI (mine task → isolated edit → oracle → branch for human merge)
-│   ├── agent_runtime.py       # Main runtime (tool registry / constraints / coordination)
-│   ├── loop.py                # LLM main loop (time budget / wander nudge / sentinel / honest stop)
-│   ├── agent_llm_handler.py   # LLM calls (9 providers) + tool parsing (5-level fallback)
-│   ├── agent_tools.py         # Tool layer (read/replace/replace_lines/run_test, pure functions)
-│   ├── self_update.py         # SelfUpdateLoop: worktree isolation → fail-closed oracle → branch/rollback
-│   ├── task_mining.py         # Task mining (failing_test / todo / long_function)
-│   ├── contracts.py / registry.py / paths.py / store.py   # Typed seams / lazy registry / data dir / agent.db
-│   ├── …                      # 30+ capability plugins (hypothesis/evolution/learning/knowledge, lazy-loaded)
-│   ├── sanyan/                # Sanyan-side DSL (agent.san / agent_policy.san / decision.san / runtime_v2/)
-│   └── REFACTOR_PLAN.md       # North-star roadmap (P0-P5 progress log + S0-S6 forward plan)
+├── agent_system/MOVED.md       # Agent moved → https://github.com/shujingyin510/sanyan-agent
 ├── lsp/                       # Language server protocol
 ├── csrc/                      # C VM (65 instructions, with #include preprocessing)
 │   ├── runtime.c              # VM implementation
@@ -354,7 +293,7 @@ sanyan/
 - [x] Standard library expansion (network/hardware/math matrix)
 - [x] Three-value IoT cases (sensor fusion, fault-tolerant control, state machine)
 - [x] Three-value vs two-value comparison docs
-- [x] Agent subsystem with file tools (read/write/list/replace) and programming capability (31 tests)
+- [x] Agent subsystem split to [sanyan-agent](https://github.com/shujingyin510/sanyan-agent) (tests moved with it)
 - [x] #include preprocessing full pipeline (Python + C VM)
 - [ ] GPIO hardware control
 - [ ] Web IDE

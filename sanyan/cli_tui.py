@@ -111,8 +111,18 @@ def run():
         nonlocal _dirty
         try:
             sys.path.insert(0, str(ROOT))
-            from agent_system.run_agent import load_api_key, init_evaluator
-            from agent_system.agent_runtime import AgentRuntime
+            # Agent 已拆仓（2026-09-10）：本仓不再携带 agent_system 运行时
+            try:
+                from agent_system.run_agent import load_api_key, init_evaluator
+                from agent_system.agent_runtime import AgentRuntime
+            except ImportError:
+                chat.append(
+                    '⚠️ Agent 子系统已迁至 https://github.com/shujingyin510/sanyan-agent；'
+                    '本仓 TUI 不再内置 Agent 运行时。'
+                )
+                tern['state'] = '已迁出'
+                _dirty = True
+                return
 
             api_key = load_api_key()
             ev = init_evaluator(api_key)

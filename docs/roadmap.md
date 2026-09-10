@@ -15,7 +15,10 @@
 | **Network envelope** | `SANYAN_NET` + 超时=可能 + SSRF 豁免（v3.57.0） |
 | **Constraint MVP first cut** | 能力栈默认拒绝 + `任务{约束}`（v3.58.0） |
 | **Constraint MVP closed** | 信封式判假·因=约束 + E7 并发继承 + 字节码拒约束算子 + 糖语法 `任务名{约束{…}}` + S1–S4 测试全绿（54 项） |
+| **`允许` 抑制语义** | `允许(x)` 挂 tolerated 元通道；`若(可能)` D8 关卡豁免；帧级 `允许 可能`（2026-09-10） |
+| **sugar 解析 AST 契约** | 修 `字列→DICT_KEYS` 错映射→`STR_TO_LIST`；生产路径裸原子包成 AST；`tests/test_sugar_bin_ast.py` 锁契约；VM 词法缺口显式记录 |
 | **Agent split** | `agent_system` + Agent 测试迁至 `sanyan-agent` 独立仓（2026-09-10） |
+| **拆仓扫尾** | README/AGENTS/project_structure 去 Agent 正文改指针；`.coveragerc`/mypy 去 `agent_system`；PLAN_v* 与 Agent 加固计划入 `docs/archive/`；CLAIMS 安全/越界冲突归账 |
 | **Playground / Pages** | 纯静态在线试玩入口 |
 | **Agent Safety / Honesty / Evolution** | 已有基准保留；数字以 `docs/CLAIMS.md` 清账为准（进化实验为合成模拟·机制演示） |
 
@@ -27,13 +30,12 @@
 
 | Priority | Item | Notes |
 |----------|------|-------|
-| 🔴 | **文档漂移修复（本轮已修 opcode/匹配3）** | PLAN_v* 归档仍待做 |
-| 🟡 | **Agent 数据外置** | 19 个 `.db` 迁出源码树；双轨 evolution 收敛；安全/校准模块进覆盖率（**不扩新功能**） |
-| 🟡 | **sugar.bin 解析器** | 返回 AST 替代字符串（预存在 bug） |
 | 🟡 | **Windows Level 3 C 种子** | 当前仅 Linux/TCC |
 | 🟢 | **NASM L4 差分闭环** | 已知三缺陷待 nasm+Linux 实证 |
 | 🟢 | **类型系统编译期检查** | 当前仅运行时部分 |
 | 🟢 | **增量 LSP** | 避免大文件全量重扫 |
+| ⚪ | ~~文档漂移（opcode/匹配3/PLAN 归档）~~ | **本轮完成**（2026-09-10） |
+| ⚪ | ~~Agent 数据外置 / 双轨收敛~~ | **不在本仓** → sanyan-agent；自更新线冻结 |
 
 ### 中长期
 

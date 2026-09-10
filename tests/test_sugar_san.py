@@ -247,8 +247,11 @@ class TestSugarSanDotAccess(unittest.TestCase):
     def test_dot_access(self):
         ast = _sugar_parse('模.加')
         self.assertIsNotNone(ast)
-        self.assertIsInstance(ast, str)
-        self.assertIn('.', ast)
+        # 生产路径把裸原子包成单元素 AST 列表（锁「返回 AST 不是字符串」契约）
+        self.assertIsInstance(ast, list)
+        self.assertEqual(len(ast), 1)
+        self.assertIsInstance(ast[0], str)
+        self.assertIn('.', ast[0])
 
 
 class TestSugarSanPythonCompat(unittest.TestCase):

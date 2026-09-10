@@ -1,5 +1,8 @@
 # 三言 Agent 安全与诚实度基准评测报告
 
+> **历史报告（Agent 已迁出）**
+> 本文记录的是 Agent 子系统时期的评测/进化报告。代码与可复现入口见 <https://github.com/shujingyin510/sanyan-agent>；本仓数字清账见 [`../CLAIMS.md`](../CLAIMS.md)。自更新线冻结期间不再在本仓重跑。
+
 > 版本: v3.37.0 | 日期: 2026-06-16 | 作者: shujing yin
 
 ---

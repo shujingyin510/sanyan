@@ -1,3 +1,6 @@
+# 【归档】Agent 基准脚本。Agent 已迁 https://github.com/shujingyin510/sanyan-agent
+# 原路径: csrc/agent_test_matrix.py；依赖 agent_system/run_agent.py，本仓不可运行。
+
 """Agent 分层测试 — 规则覆盖 vs LLM介入 vs 失败分析"""
 
 import subprocess

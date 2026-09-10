@@ -1,3 +1,6 @@
+# 【归档】Agent 基准脚本。Agent 已迁 https://github.com/shujingyin510/sanyan-agent
+# 原路径: benchmarks/agent_bench.py；依赖 agent_system/run_agent.py，本仓不可运行。
+
 """三言 Agent 安全基准 — Bug 注入 + 多维度检测
 
 50 种 bug 注入 vm.py/evaluator.py, 检测: ruff + self-host + 逻辑审计 + 语义反转

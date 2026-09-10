@@ -65,12 +65,14 @@ def _call_vm_export(bin_path, export_name, *args):
 
 
 def parse_sugar(source):
-    """解析 sugar 语法源码为 AST（Python sugar parser）"""
+    """解析 sugar 语法源码为 AST（Python sugar parser）。裸原子包成单元素列表。"""
     from sugar.parser import parse_code
 
     ast, errors = parse_code(source)
-    if not ast:
+    if ast is None or ast is False or ast == []:
         raise SyntaxError(f'sugar 解析失败: {errors[:3]}')
+    if not isinstance(ast, list):
+        return [ast]
     return ast
 
 
@@ -97,7 +99,7 @@ def compile_san(source: str, output_path: str, use_sugar: bool = True) -> bytes:
         else:
             ast = ['do', ast]
     else:
-        # sugar 语法：加载 sugar.bin 解析
+        # sugar 语法：优先 Python SugarConverter（跨平台一致）；sugar.bin 为次级自举路径
         ast = parse_sugar(source)
         if isinstance(ast, list) and len(ast) > 0 and ast[0] == 'do':
             pass

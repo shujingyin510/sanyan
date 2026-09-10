@@ -191,7 +191,12 @@ def _ask_agent(question: str) -> str:
 
 
 def _ask_agent_calibrated(question: str) -> Tuple[str, str, float]:
-    from agent_system.truth_calibration import get_calibrator
+    try:
+        from agent_system.truth_calibration import get_calibrator
+    except ImportError as e:
+        raise SystemExit(
+            'honesty_bench 依赖 Agent 校准层，已随 Agent 迁至 https://github.com/shujingyin510/sanyan-agent'
+        ) from e
 
     tc = get_calibrator()
     raw = _raw_llm_call(question)

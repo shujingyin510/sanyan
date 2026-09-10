@@ -123,10 +123,16 @@ class TestPlannedKeywords(unittest.TestCase):
         self.assertEqual(r.to_int(), 1)
 
     def test_allow_passthrough(self):
-        """允许 是修饰子：透传 x 的实际判，不再把真/假压成可能（去有损语义）。"""
-        self.assertEqual(self.e.eval(['允许', TritValue(1)]).to_int(), 1)
-        self.assertEqual(self.e.eval(['允许', TritValue(-1)]).to_int(), -1)
-        self.assertEqual(self.e.eval(['允许', TritValue(0)]).to_int(), 0)
+        """允许 是修饰子：透传 x 的实际判，并挂 tolerated 元通道（annotate 非 map）。"""
+        r_true = self.e.eval(['允许', TritValue(1)])
+        r_false = self.e.eval(['允许', TritValue(-1)])
+        r_maybe = self.e.eval(['允许', TritValue(0)])
+        self.assertEqual(r_true.to_int(), 1)
+        self.assertEqual(r_false.to_int(), -1)
+        self.assertEqual(r_maybe.to_int(), 0)
+        self.assertTrue(r_true.tolerated)
+        self.assertTrue(r_false.tolerated)
+        self.assertTrue(r_maybe.tolerated)
 
     def test_deny_always_false(self):
         r = self.e.eval(['禁', 1])

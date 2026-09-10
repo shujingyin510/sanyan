@@ -5,7 +5,7 @@
 [![PyPI](https://img.shields.io/pypi/v/ternary-engine?label=ternary-engine)](https://pypi.org/project/ternary-engine/)
 [![Playground](https://img.shields.io/badge/%E2%96%B6%20%E5%9C%A8%E7%BA%BF%E8%AF%95%E7%8E%A9-Playground-c0392b)](https://shujingyin510.github.io/sanyan/playground/)
 
-> **三态认知框架** — 从三进制语言到 Knowledge Runtime 的演进。核心贡献：构建了一个可验证的自改进 Agent 知识系统，并通过合成模拟演示了 Knowledge → Calibration → Selection → Success 的机制链路（机制演示，非真实任务实测）。
+> **三态认知框架** — 平衡三进制中文语言 + 引擎（求值器 / 字节码 VM / C 种子 / LLVM）+ 能力约束系统。核心定位：让不可信代码（agent / 插件 / 生成码 / 用户脚本）变成可以安全运行的代码。Agent 自更新子系统已独立至 [sanyan-agent](https://github.com/shujingyin510/sanyan-agent)。
 
 **[▶ 在线试玩 Playground](https://shujingyin510.github.io/sanyan/playground/)** — 浏览器直接跑三言核心子集，零安装（离线可双击仓库内 [`playground/index.html`](playground/index.html)）
 
@@ -60,9 +60,9 @@ Layer 1: Frozen Core（冰冻核心）
 | 层 | 三态表现 | 说明 |
 |---|---|---|
 | 语言层 | TRUE / FALSE / UNKNOWN | Kleene三值逻辑 |
-| Agent层 | 高置信度 / 低置信度 / 未知 | 决策门控 |
-| Knowledge Layer | 可信知识 / 弱知识 / 未知知识 | 知识可靠性评估 |
-| Evolution Layer | 接受 / 拒绝 / 收集更多数据 | 三态裁决 |
+| Agent层 | 高置信度 / 低置信度 / 未知 | 决策门控（**已迁 sanyan-agent**） |
+| Knowledge Layer | 可信知识 / 弱知识 / 未知知识 | 知识可靠性评估（**已迁 sanyan-agent**） |
+| Evolution Layer | 接受 / 拒绝 / 收集更多数据 | 三态裁决（**已迁 sanyan-agent**） |
 
 ---
 
@@ -381,107 +381,11 @@ tests/
 | **IoT 抽象** | `注册设备`/`置`/`读`/`查`/`对` 传感器/执行器操作 |
 | **三值 IoT 案例** | 传感器融合、容错控制、状态机（含 Python/C 对比） |
 
-### Agent 可读决策 DSL
+### Agent 子系统（已迁出）
 
-> 详见 [agent_system/README.md](agent_system/README.md) — v5 架构、四阶段设计、补丁目录。
-
-| 特性 | 说明 |
-|---|---|
-| **规则引擎** | 200+ 规则，匹配任务→执行工具链，0 LLM 调用 |
-| **模板库** | 11 个模板（数学/数据结构/算法/工具），代码生成 |
-| **领域知识层** | LLM 动态生成领域知识，SQLite 缓存 |
-| **学习系统** | Git 批量学习 + 项目风格记录 + 经验库 |
-| **规则自动生成** | LLM 生成→用户审批→入库 |
-| **跨项目迁移** | 规则/模板/学习记录导出导入 |
-| **多 Agent 协作** | 任务分解→并行执行→结果汇总 |
-| **多模型路由** | DeepSeek/Claude/GPT-4/本地模型 |
-| **AST 解析** | 精准上下文加载，4K 窗口处理复杂任务 |
-| **UR 退化检测** | 防止 LLM 死循环 |
-| **SQLite 内置** | 10 个操作，三言直接操作数据库 |
-| **三言版运行时** | agent_runtime.san，本语言实现决策循环 |
-| **三态推理** | LLM 认知态 → 三态映射 → Kleene 传播 → 贝叶斯置信度 → 保护门控 |
-| **多假设并行** | Top-3 候选方案同时探索，锦标赛选优，早停淘汰死假设 |
-| **任务分解** | 大任务自动递归拆解，每层有界上下文（4000 token 硬限） |
-| **失败分类** | 6 类 FailureMode（空/缺/格式/超时/逻辑/循环），精准重试 |
-| **安全沙箱** | 命令黑名单/白名单、文件系统守卫、只读模式、审计日志 |
-| **多提供商** | DeepSeek / OpenAI / Anthropic / Gemini / Qwen / GLM / Moonshot / SiliconFlow / OpenRouter 九家 |
-| **自更新闭环** | agent 在隔离 worktree 改本仓库，fail-closed oracle 把关（静态四连闸+pytest+差分），产出分支由人合并——见 `agent_system/REFACTOR_PLAN.md` |
-
-使用方式：
-
-```bash
-# 交互模式（多轮对话，支持热重载）
-python -X utf8 agent_system/run_agent.py
-
-# 单次编程（LLM 自动生成代码→执行→返回结果）
-python -X utf8 agent_system/run_agent.py "写程序：1加到1000"
-
-# 直接执行三言代码（不走 LLM）
-python -X utf8 agent_system/run_agent.py "(设 x 10)(输出(加 x 5))"
-
-# 文件操作
-python -X utf8 agent_system/run_agent.py "把AGENTS.md里的v0.3改成v0.4"
-
-# 安全沙箱（只读模式，禁止文件修改）
-python -X utf8 agent_system/run_agent.py "分析代码结构" --sandbox
-
-# 性能报告（显示Token用量、工具耗时）
-python -X utf8 agent_system/run_agent.py "任务" --report
-
-# 实时仪表盘
-python -X utf8 agent_system/run_agent.py "任务" --dashboard
-
-# 决策追踪
-python -X utf8 agent_system/run_agent.py "任务" --trace
-
-# 流式输出
-python -X utf8 agent_system/run_agent.py "任务" --stream
-
-# 执行工具管道
-python -X utf8 agent_system/run_agent.py "任务" --pipeline read_and_analyze
-
-# 自举验证（第3层）
-python -X utf8 agent_system/run_agent.py --self-host
-
-# 约束进化验证（第3层）
-python -X utf8 agent_system/run_agent.py --evolve
-
-# 自动化进化闭环（第3层）
-python -X utf8 agent_system/run_agent.py --auto-evolve --max-cycles 3
-
-# Agent自主改代码闭环（第3层）
-python -X utf8 agent_system/run_agent.py --code-evolve --max-cycles 3
-
-# 带审查的进化闭环（第3层）
-python -X utf8 agent_system/run_agent.py --review-evolve
-```
-
-自主循环（第2层）：
-
-```bash
-# 文件监控模式
-python -X utf8 agent_system/agent_loop.py --watch
-
-# 连续循环模式
-python -X utf8 agent_system/agent_loop.py --continuous
-
-# 查看统计和健康状态
-python -X utf8 agent_system/agent_loop.py --status
-```
-
-交互模式命令：
-
-```
-/状态    — 三态决策摘要
-/记忆    — 任务记忆
-/仪表盘  — 实时仪表盘
-/追踪    — 决策链可视化
-/性能    — 性能报告（Token用量、工具耗时）
-/经验    — 跨会话经验（工具可靠性、失败模式）
-/安全    — 安全沙箱状态（审计日志）
-/共享    — 共享上下文空间
-/管道    — 工具管道列表
-```
+> Agent 运行时 / 自更新闭环 / 可读决策 DSL **不在本仓维护**。
+> 独立仓：<https://github.com/shujingyin510/sanyan-agent> · 入口见 [`docs/AGENT_MOVED.md`](docs/AGENT_MOVED.md)。
+> 本仓 CLI：`sanyan agent` / `sanyan bench` 仅输出指路提示（退出码 2）。
 
 ## 三进制算术（模拟实现）
 
@@ -592,7 +496,7 @@ sanyan/
 - [x] 三值逻辑 IoT 案例（传感器融合/容错控制/状态机）
 - [x] 三值 vs 二值对比文档
 - [x] 文档整合：22→10 个 md
-- [x] Agent 子系统测试（17 项）
+- [x] Agent 子系统已拆仓（测试随迁 sanyan-agent）
 - [x] #include 预处理全链路支持（Python + C VM）
 - [ ] GPIO 真实硬件控制
 - [ ] Web IDE
@@ -605,9 +509,9 @@ sanyan/
 | 层 | 三态表现 | 说明 |
 |---|---|---|
 | 语言层 | TRUE / FALSE / UNKNOWN | Kleene三值逻辑 |
-| Agent层 | 高置信度 / 低置信度 / 未知 | 决策门控 |
-| Knowledge Layer | 可信知识 / 弱知识 / 未知知识 | 知识可靠性评估 |
-| Evolution Layer | 接受 / 拒绝 / 收集更多数据 | 三态裁决 |
+| Agent层 | 高置信度 / 低置信度 / 未知 | 决策门控（**已迁 sanyan-agent**） |
+| Knowledge Layer | 可信知识 / 弱知识 / 未知知识 | 知识可靠性评估（**已迁 sanyan-agent**） |
+| Evolution Layer | 接受 / 拒绝 / 收集更多数据 | 三态裁决（**已迁 sanyan-agent**） |
 
 ```
 语言时代：TRUE / FALSE / UNKNOWN
@@ -665,48 +569,11 @@ Knowledge Layer：可信知识 / 弱知识 / 未知知识
 
 未来方向：如果出现三进制硬件（如三态忆阻器或量子三态），三言的语义层可以直接映射到真实三进制硬件，无需修改语言规范。
 
-## 进化子系统（上文五层架构的 Layer 1–4）
+## 进化子系统（已迁出）
 
-> 说明：本节是上文「五层架构」中进化相关的 Layer 1–4 的细化视图（自底向上重新编号为 Layer 0–3），最顶层的 Knowledge Validation（Layer 5）见上文。全仓统一以「五层架构」为准。
-
-```
-Layer 3: Knowledge Layer（知识层）
-  - MetaLearningDB（项目经验数据库）
-  - TaskEmbedding（任务向量化）
-  - ClusterLearning（自动聚类）
-  - 目标：不同任务→不同策略（条件最优）
-        ↓
-Layer 2: Evolution Layer（进化层）
-  - ParameterRanker（参数影响力排名）
-  - CostAwareRanker（收益/成本排名）
-  - ExplorationBudget（探索预算）
-  - UCBExploration（UCB探索策略）
-        ↓
-Layer 1: Policy Layer（策略层）
-  - ConfigSchema（可进化配置参数）
-  - StrategySchema（策略参数化）
-  - HypothesisSchema（候选参数）
-        ↓
-Layer 0: Frozen Core（冰冻核心，不可修改）
-  - Reviewer（代码审查）
-  - TernaryEngine（三态决策）
-  - PatchHistory（历史记录）
-  - TaskReplay（任务回放）
-```
-
-### 三层知识体系
-
-| 层 | 内容 | 共享策略 |
-|---|---|---|
-| Global Knowledge | 任务模式→策略模式（元知识） | 共享统计规律 |
-| Project Memory | 项目专属经验（最优参数/Patch模式） | 项目内共享 |
-| Personal Memory | 用户偏好/习惯 | 不共享 |
-
-**LLM知识 vs Agent知识：**
-- LLM知识 = Prior（推测）：世界知识，已预训练
-- Agent知识 = Evidence（证据）：项目级因果知识，经过验证
-
-> LLM解决"我知道什么"；Agent知识库解决"在这个项目里什么真的有效"
+> Knowledge / Evolution / Policy 等五层架构中的 Agent 侧实现已随 Agent 拆仓迁至
+> [sanyan-agent](https://github.com/shujingyin510/sanyan-agent)。本仓不再维护进化闭环代码与相关合成模拟数字
+> （历史机制演示数字见 [`docs/CLAIMS.md`](docs/CLAIMS.md)，实证以 UR 仓为准）。
 
 ## AI 声明
 

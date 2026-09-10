@@ -1,5 +1,7 @@
 # Research Documents
 
+
+> Agent 相关报告（benchmark/evolution）为**历史存档**；实现已迁 [sanyan-agent](https://github.com/shujingyin510/sanyan-agent)。
 ## Reading Order
 
 ### 1. Ternary Gating Report (Main)

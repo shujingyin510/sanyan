@@ -213,6 +213,7 @@ class TritValue:
         '_initialized',
         'precision',
         'confidence',
+        'tolerated',  # 允许 元通道：可能是否已被显式容忍（D8 关卡豁免）
         '_val_type',
         '_payload',
         '_source',
@@ -265,6 +266,7 @@ class TritValue:
             obj.precision = 0
             obj.float_val = None
             obj.confidence = 1.0
+            obj.tolerated = False
             obj._val_type = cls.TYPE_NUMERIC
             obj._payload = None
             obj._source = ''
@@ -280,9 +282,11 @@ class TritValue:
         precision: Optional[int] = None,
         confidence: float = 1.0,
         source: str = '',
+        *,
+        tolerated: bool = False,
     ) -> 'TritValue':
-        # 小整数缓存（仅数值类型，无来源）
-        if isinstance(value, int) and precision is None and confidence == 1.0 and not source:
+        # 小整数缓存（仅数值类型、无来源、未容忍）——tolerated 对象不可共享
+        if isinstance(value, int) and precision is None and confidence == 1.0 and not source and not tolerated:
             cls._build_small_cache()
             cached = cls._SMALL_INT_CACHE.get(value)
             if cached is not None:
@@ -294,11 +298,11 @@ class TritValue:
             return v
 
         key = (
-            (value, precision, confidence, source)
+            (value, precision, confidence, source, tolerated)
             if isinstance(value, (int, float))
-            else (_hashable(value), precision, confidence, source)
+            else (_hashable(value), precision, confidence, source, tolerated)
             if isinstance(value, list)
-            else (value, precision, confidence, source)
+            else (value, precision, confidence, source, tolerated)
         )
         with cls._pool_lock:
             if key in cls._pool:
@@ -316,6 +320,8 @@ class TritValue:
         precision: Optional[int] = None,
         confidence: float = 1.0,
         source: str = '',
+        *,
+        tolerated: bool = False,
     ):
         if hasattr(self, '_initialized'):
             return
@@ -323,6 +329,7 @@ class TritValue:
         self.precision = precision if precision is not None else 0
         self.float_val = None
         self.confidence = max(0.0, min(1.0, confidence))
+        self.tolerated = bool(tolerated)
         self._source = source
         self._timestamp = time.time()
         self._payload = None
@@ -422,12 +429,57 @@ class TritValue:
         return str(self.to_int())
 
     def with_confidence(self, confidence: float) -> 'TritValue':
-        """返回同值、同来源、同时间戳但不同置信度的新 TritValue。"""
+        """返回同值、同来源、同容忍标记、同时间戳但不同置信度的新 TritValue。"""
         result = (
-            TritValue(self.to_payload(), confidence=confidence, source=self._source)
+            TritValue(
+                self.to_payload(),
+                confidence=confidence,
+                source=self._source,
+                tolerated=self.tolerated,
+            )
             if self.is_string()
-            else TritValue(self.to_int(), self.precision, confidence, source=self._source)
+            else TritValue(
+                self.to_int(),
+                self.precision,
+                confidence,
+                source=self._source,
+                tolerated=self.tolerated,
+            )
         )
+        result._timestamp = self._timestamp
+        return result
+
+    def is_maybe(self) -> bool:
+        """是否为数值型「可能」（trit 0，非浮点 0.0）。"""
+        return self._val_type == self.TYPE_NUMERIC and not self.is_float() and BT.to_int(self.value) == 0
+
+    def with_tolerated(self, tolerated: bool = True) -> 'TritValue':
+        """返回同值但带/不带「允许」容忍标记的新 TritValue（annotate，不改真假）。"""
+        if bool(self.tolerated) == bool(tolerated):
+            return self
+        if self.is_string() or self.is_list() or self.is_dict():
+            result = TritValue(
+                self.to_payload(),
+                confidence=self.confidence,
+                source=self._source,
+                tolerated=tolerated,
+            )
+        elif self.float_val is not None:
+            result = TritValue(
+                self.float_val,
+                self.precision,
+                self.confidence,
+                source=self._source,
+                tolerated=tolerated,
+            )
+        else:
+            result = TritValue(
+                self.to_int(),
+                self.precision,
+                self.confidence,
+                source=self._source,
+                tolerated=tolerated,
+            )
         result._timestamp = self._timestamp
         return result
 

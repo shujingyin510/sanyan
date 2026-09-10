@@ -32,10 +32,8 @@ ruff check . && ruff format --check . && mypy . && python -X utf8 scripts/prefli
 | 🔴 P1 | 修改代码 | 优先最小变更 |
 | 🔴 P1 | 新增函数/模块前 | 先搜索项目是否已有实现 |
 | 🟡 P2 | 多文件替换 / 中文内容编辑 | 用外置 `.py` 脚本操作，不要 bash 内联（避免 GBK/UTF-8 编码错误） |
-| 🟡 P2 | 修改 `agent_system/` 下文件 | 改完必须验证 `import run_agent` 不崩 |
 | 🟡 P2 | 新增/删除/重命名文件 | 同步更新 README 目录树 + 文件结构表格 |
-| 🟡 P2 | Agent 相关新文件 | 统一放 `agent_system/`，**不要放根目录**。根目录是编程语言本身（编译器/VM/求值器等） |
-| 🟡 P2 | 新增 CLI 标志 | `run_agent.py` 加了新 flag 必须同步更新 AGENTS.md 运行方式列表 + CHANGELOG |
+| 🟡 P2 | 新增 CLI 标志 | 同步更新 AGENTS.md / CHANGELOG；本仓 CLI 不再提供 Agent 子命令 |
 | 🟡 P2 | 新文件行数 | 超过 500 行提示审查；超过 1000 行必须说明为什么不拆。已有文件不回溯 |
 | 🟢 P3 | 日常小改动、调试、提示词调优 | 只本地 commit，不 push，等用户确认 |
 
@@ -52,204 +50,14 @@ python -X utf8 sanyanc.py program.bin --run   # 运行
 
 关键陷阱：比较指令返回 TritValue(-1/1) 而非 int(0/1)，JZ/JNZ 需要加 1 归一化。
 
-## Agent 系统
+## Agent 系统（已迁出）
 
-三言 Agent 是**可读决策 DSL**——决策过程对非程序员透明可读。
+> **2026-09-10 起，Agent 子系统不在本仓维护。**
+> 新仓：<https://github.com/shujingyin510/sanyan-agent>
+> 本仓只保留语言 / 编译器 / VM / 约束系统；`sanyan agent` / `sanyan bench` CLI 子命令改为指路提示。
+> 决策、死因考古与冻结条件见知识库 `sanyan-obsidian`，本仓入口 [`AGENT_MOVED.md`](AGENT_MOVED.md)。
 
-### 多 Agent 协作
-
-父 Agent 可调度子 Agent 并行工作，每个子 Agent 独立运行决策引擎：
-
-```
-父Agent ──┬── 子Agent1 (规则分析) ──→ 返回结果
-          ├── 子Agent2 (代码编写) ──→ 返回结果
-          └── 子Agent3 (测试验证) ──→ 返回结果
-```
-
-| 工具 | 功能 |
-|------|------|
-| `调度子Agent` | task=任务 name=名称 → 子Agent独立决策 |
-| `Agent消息` | to=目标 msg=消息 → Agent间通信 |
-| `列出Agent` | 查看所有Agent状态 (running/done/error) |
-
-子Agent 继承父Agent的：置信逻辑 + 传播逻辑 + 三态决策引擎 + 工具集。
-
-**LLM 模式**：task 不以 `(` 开头时走 `Agent运行`，调用 LLM 推理。
-**代码模式**：task 以 `(` 开头时直接执行 Sanyan 表达式。
-
-### 架构
-
-```
-用户提问 → 规则匹配 → LLM 调用 → 5 种认知态 → 5→3 映射 → 三态传播 → 保护门控 → 动作分发
-  (关键词)    (DeepSeek)   AFFIRM/NEGATE     1/-1/0     上游×当前   高风险/超限   READY/TOOL
-                           UNCERT/CONFLICTED   +置信度    +置信度     /增益不足    /HUMAN
-```
-
-**V5 AgentRuntime**（Python 原生引擎，四阶段）+ **自主进化闭环**（`--code-evolve`）：
-```
-用户提问 → SymbolTable预加载 → SemanticCache缓存检查 → DecompositionEngine任务分解
-         → HypothesisGenerator多假设生成 → Tournament锦标赛选优
-         → 每步调 LLM 获取 tool+args（JSON 格式）→ TernaryEngine三态决策
-         → 经验库跨任务模式匹配 → 完成
-
---code-evolve: LLM生成补丁 → 行号校准 → 多后端一致性验证 → 自举验证 → 接受/回滚
-```
-
-**LLM 连接**：DeepSeek V4 API（`https://api.deepseek.com`，模型 `deepseek-v4-pro`/`deepseek-v4-flash`），thinking 显式 `{"type": "enabled"}`（新接口已无 `budget_tokens`，思考预算改由 `reasoning_effort` 控制），`max_tokens: 8192`。
-API 密钥通过环境变量 `SANYAN_API_KEY` 注入，`agent_policy.san` 中配置。
-
-**工具调用格式（JSON）**：
-```
-{"tool":"analyze","args":{"path":"run_agent.py"}}
-{"tool":"done","args":{"answer":"我是三言编程助手。"}}
-```
-解析器用括号计数提取 `{...}` + `json.loads`，pipe 格式 `tool|params` 作为回退。
-
-### 安全机制
-
-| 机制 | 触发条件 | 行为 |
-|------|------|------|
-| 置信度衰减检测 | 最近4轮严格单调递减 + floor<0.35 | 截断重启 |
-| 轮次兜底 | Agent运行 ≥6轮 | 截断 |
-| 超时硬杀 | 执行超过30秒 | killed |
-| 死锁检测 | running >30秒 | stuck标记 |
-| 失败分类 | info_gap / wrong_approach / unsolvable / escalation | 日志记录 |
-| LLM 失败防死循环 | 连续3次返回 error\\\\|LLM调用失败 | break 退出 |
-| 约束超限 | 同一工具连续5次 | break 退出 |
-| **安全沙箱** | `--sandbox` 模式 | 命令黑名单 + 文件系统守卫 + 只读模式 + 审计日志 |
-
-### 反馈闭环（agent_project.py）
-
-| 机制 | 触发条件 | 行为 |
-|------|------|------|
-| 结构化重试历史 | 每轮记录 diff + 失败原因 | 注入 task.description |
-| 同位置连错检测 | 连续两轮同文件同错误 | 自动 escalate |
-| Toggle 检测 | 文件内容回到 baseline | 自动 escalate |
-| 经验库 | 跨任务关键词匹配 | 失败2次生成 AVOID 提示 |
-
-可配置项（`agent_policy.san`）：`Agent超时秒数`、`Agent最大轮次`、`Agent置信度衰减窗`、`Agent置信度底线`
-
-### 文件结构
-
-核心 Agent 文件位于 `agent_system/`：
-
-| 文件 | 用途 |
-|------|------|
-| `agent_system/agent_runtime.py` | V5 引擎: SymbolTable、MemoryStore、ProjectGraph |
-| `agent_system/agent_core.py` | Agent 核心控制流 |
-| `agent_system/agent_llm.py` | LLM 连接层 |
-| `agent_system/agent_tools.py` | 工具定义与注册 |
-| `agent_system/agent_decompose.py` | 任务分解引擎 |
-| `agent_system/agent_strategy.py` | 策略自优化 |
-| `agent_system/agent_evolution.py` | 约束进化 |
-| `agent_system/agent_sandbox.py` | 安全沙箱 |
-| `agent_system/agent_loop.py` | 自主循环 |
-| `agent_system/loop.py` | 主循环（阶段4重构） |
-| `agent_system/loop_policy.py` | 停止条件 |
-| `agent_system/registry.py` | 懒加载注册表 |
-| `agent_system/store.py` | 统一存储 |
-| `agent_system/paths.py` | 路径管理 |
-| `agent_system/truth_calibration.py` | Truth Calibration Engine |
-| `agent_system/logic_audit.py` | 逻辑审计引擎 |
-| `agent_system/myth_shield.py` | 误解盾 |
-| `agent_system/auto_verify.py` | 自动验证 |
-| `run_agent.py` | 启动器 |
-
-### 运行方式
-
-```bash
-python -X utf8 run_agent.py "问题"                    # 单次提问
-python -X utf8 run_agent.py                            # 交互模式
-python -X utf8 run_agent.py "任务" --sandbox           # 安全沙箱（只读）
-python -X utf8 run_agent.py "任务" --report            # 性能报告
-python -X utf8 run_agent.py "任务" --stream            # 流式输出
-python -X utf8 run_agent.py "任务" --pipeline NAME     # 执行管道
-python -X utf8 run_agent.py "任务" --dashboard         # 仪表盘
-python -X utf8 run_agent.py "任务" --trace             # 决策追踪
-python -X utf8 run_agent.py --self-host                # 自举验证（第3层）
-python -X utf8 run_agent.py --evolve                   # 约束进化验证（第3层）
-python -X utf8 run_agent.py --auto-evolve              # 自动化进化闭环（第3层）
-python -X utf8 run_agent.py --code-evolve              # Agent自主改代码闭环（第3层）
-python -X utf8 run_agent.py --review-evolve             # 带审查的进化闭环（第3层）
-python -X utf8 agent_loop.py --watch                   # 文件监控（第2层）
-python -X utf8 agent_loop.py --continuous              # 连续循环（第2层）
-python -X utf8 agent_loop.py --status                  # 查看统计（第2层）
-```
-
-### 关键设计
-
-- **配置与逻辑分离**: `agent_policy.san` 纯数据，非程序员可直接编辑，修改后自动热重载
-- **决策记录**: `_决策记录` 字典存储每轮完整推理链
-- **概率三态**: `TritValue.confidence` 字段，贝叶斯置信度传播（`传播置信度 = 上游 × 当前`）
-- **`#include` 预处理**: `agent.san` 通过 `#include "ternary_agent/agent_policy.san"` 内联策略
-
-### 进化子系统（五层架构的 Layer 1–4）
-
-> 全仓统一以「五层架构」为准（顶层 Layer 5 = Knowledge Validation）。本节为其中进化相关的 Layer 1–4 的细化视图，自底向上重编号为 Layer 0–3。
-
-```
-Layer 3: Knowledge Layer
-  - MetaLearningDB（项目经验数据库）
-  - TaskEmbedding（任务向量化）
-  - ClusterLearning（自动聚类）
-  - 目标：不同任务→不同策略（条件最优）
-        ↓
-Layer 2: Evolution Layer
-  - ParameterRanker（参数影响力排名）
-  - CostAwareRanker（收益/成本排名）
-  - ExplorationBudget（探索预算）
-  - UCBExploration（UCB探索策略）
-        ↓
-Layer 1: Policy Layer
-  - ConfigSchema（7个可进化配置参数）
-  - StrategySchema（策略参数化）
-  - HypothesisSchema（候选参数）
-        ↓
-Layer 0: Frozen Core（不可修改）
-  - Reviewer（代码审查）
-  - TernaryEngine（三态决策）
-  - PatchHistory（历史记录）
-  - TaskReplay（任务回放）
-```
-
-### 三层知识体系
-
-```
-Layer 3: Global Knowledge（云端）
-  - 不共享具体Patch历史（项目差异大）
-  - 共享元知识：任务模式→策略模式
-  - 新用户开箱即用
-
-Layer 2: Project Memory（项目）
-  - sanyan.db = 项目大脑
-  - 最有价值的一层
-
-Layer 1: Personal Memory（个人）
-  - 用户偏好/习惯
-  - 绝不共享
-```
-
-### LLM知识 vs Agent知识
-
-| 类型 | LLM有 | Agent需要 | 价值 |
-|------|-------|-----------|------|
-| 世界知识 | ✓ | ✗ | 低（已预训练） |
-| 项目知识 | ✗ | ✓ | 高（MetaLearningDB） |
-| 验证后知识 | ✗ | ✓ | 最高（有证据） |
-
-```
-LLM知识 = Prior（推测）
-Agent知识 = Evidence（证据）
-
-LLM解决"我知道什么"
-Agent知识库解决"在这个项目里什么真的有效"
-```
-
-### Agent 已知修复（2026-06-13）
-
-- **`保护()` 返回字典**: `decision.san` 中 `保护()` 原返回列表，改为返回字典
-- **`规则降级()` 调用方式**: `query_weather()` 未定义 → 改为 `调度工具("query_weather", 城市)`
-- **`好感要求` 安全读取**: `_V` 未定义时 try/catch 保护，默认好感=50
+汇编器仍可被任意宿主（含 sanyan-agent）用来写字节码，见上方「汇编器」一节。
 
 ## 自举层级
 
@@ -324,7 +132,7 @@ preflight 绿了 → `git push`。红了 → 修完再推。
 **版本号一致性**：推送前检查 `README.md`、`README_EN.md`、`docs/manual.md`、`docs/llvm.md`、`CHANGELOG.md` 中的版本号是否一致。
 
 **CHANGELOG 约定**：功能写完就写条目，不要攒到一天结束。同一天的多次改动合并为一个版本号。
-**CHANGELOG 模板**：每个版本必须包含 Summary 一行概括 + Highlights(3-4条) + 分类段落(Language/Compiler/VM/Agent/Build/Project Layout/Toolchain/CI) + Bug Fixes + Metrics 表格。
+**CHANGELOG 模板**：每个版本必须包含 Summary 一行概括 + Highlights(3-4条) + 分类段落(Language/Compiler/VM/Build/Project Layout/Toolchain/CI；历史版本可含 Agent) + Bug Fixes + Metrics 表格。
 
 ## 测试
 

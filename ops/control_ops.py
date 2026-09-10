@@ -9,7 +9,7 @@ from core.values import (
     SanyanSyntaxError,
     SanyanValueError,
 )
-from ops.capability import check_deadline
+from ops.capability import check_deadline, current_frame
 from ops.list_ops import _as_list
 from ops.registry import register, register_alias
 
@@ -22,10 +22,13 @@ class ControlOps:
         if len(args) < 2:
             raise SanyanSyntaxError('if 需要条件和真分支')
         cond = evaluator.eval(args[0])
-        # D8 关卡：「可能」（trit 0）作为确定性条件未显式处理 → 收集诊断。
-        # 运行时不变（仍按假 fall-through）；未来 允许(x) 标记后在此跳过（待 TritValue 元通道）。
-        if isinstance(cond, TritValue) and cond.is_numeric() and not cond.is_float() and BT.to_int(cond.value) == 0:
-            evaluator._maybe_warnings.append('若: 条件求值为「可能」，未显式处理（默认按假分支）')
+        # D8 关卡：「可能」作为确定性条件未显式处理 → 收集诊断。
+        # 运行时不变（仍按假 fall-through）。豁免：`允许(x)` 元通道 或 帧级 `允许 可能`。
+        if isinstance(cond, TritValue) and cond.is_maybe():
+            frame = current_frame(evaluator)
+            frame_tol = frame is not None and getattr(frame, 'tolerate_maybe', False)
+            if not (cond.tolerated or frame_tol):
+                evaluator._maybe_warnings.append('若: 条件求值为「可能」，未显式处理（默认按假分支）')
         if isinstance(cond, TritValue):
             cond_bool = BT.to_int(cond.value) == 1
         elif isinstance(cond, int):

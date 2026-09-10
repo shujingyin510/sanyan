@@ -141,15 +141,18 @@ def _grant_op(evaluator, args):
 
 
 def _allow_op(evaluator, args):
-    """允许(x) → x: 修饰子（Modifier），透传 x 的实际判——态度是"容忍可能"，
+    """允许(x) → x（已容忍）: 修饰子（Modifier），透传 x 的实际判——态度是"容忍可能"，
     不改 x 的真假（annotate 非 map）。区别于构造子 许/禁（制造固定判值）。
 
-    "可容忍"元数据标记暂不挂：需 TritValue 元通道 + "可能即错"消费方（严格判/
-    断言），二者动核心值类型、波及 VM/字节码——与 D4「因」字段合并为**一次**
-    TritValue 演化（等真实消费者出现再升，先透传诚实恒等）。见 约束-方向研究 §D1/§D4。"""
+    TritValue 结果挂 `tolerated=True` 元通道（`with_tolerated`，新实例防单例污染）。
+    消费方：`若` 的 D8 关卡——条件为可能且已容忍 → 跳过诊断（运行时仍按假 fall-through）。
+    非 TritValue 原样返回。分层律：本算子只碰值元数据，绝不打开能力。"""
     if len(args) < 1:
         raise SanyanSyntaxError('允许 需要一个参数')
-    return evaluator.eval(args[0])
+    val = evaluator.eval(args[0])
+    if isinstance(val, TritValue):
+        return val.with_tolerated(True)
+    return val
 
 
 def _restrict_op(evaluator, args):

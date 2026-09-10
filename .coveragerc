@@ -5,10 +5,6 @@ omit =
     compiler/build_exe.py
     compiler/compile_llvmgen.py
     compiler/sanyancc.py
-    # 演示/启动器（需 LLM 网络调用，无法单测）
-    agent_system/run_agent.py
-    agent_system/agent_runtime.py
-    agent_system/agent_tools.py
     examples/*
     # GUI/服务器（需图形或网络环境）
     repl/gui.py
@@ -25,8 +21,6 @@ omit =
     scripts/*
     examples/*
     csrc/*
-    # Agent 系统（独立模块，暂不纳入核心覆盖率）
-    agent_system/*
     # 网络依赖（需外网访问）
     #   package_ops.py: GitHub 包下载/索引，需外网
     #   net_ops.py: HTTP 请求，需外网

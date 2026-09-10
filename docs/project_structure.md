@@ -1,6 +1,7 @@
 # 三言项目结构（详细快照）
 
 > 这是逐文件级的结构快照，可能随开发滞后；权威入口以 [README「项目结构」](../README.md#项目结构) 的顶层树为准。
+> **Agent 子系统已迁出** → <https://github.com/shujingyin510/sanyan-agent>（本仓仅留 `agent_system/MOVED.md`）。
 
 ```text
 sanyan/
@@ -35,7 +36,6 @@ sanyan/
 ├── compiler/discompiler/asm.py                   # 字节码反汇编器
 ├── verify.py                   # 字节码验证器
 ├── scripts/preflight.py        # 发版前预检（lint+test+自举）
-├── agent_system/run_agent.py               # Agent 启动器
 ├── examples/run_v2.py                  # v2 演示启动器
 ├── examples/run_v2_demo.py             # v2 演示脚本
 ├── examples/run_village_demo.py        # 村庄演示脚本
@@ -50,36 +50,6 @@ sanyan/
 ├── core/ternary_core.py            # 平衡三进制算术（模拟）
 ├── core/values.py                  # 值类型 + 异常体系
 ├── vm/__init__.py                      # 字节码 VM（自举能力）
-├── agent_system/              # Agent 系统（运行时 + 自更新闭环 + Sanyan DSL）
-│   ├── run_agent.py           # Agent CLI 入口（交互/单次/自主/沙箱/进化）
-│   ├── run_self_update.py     # 自更新闭环 CLI（挖掘→隔离编辑→oracle→分支由人合并）
-│   ├── agent_loop.py          # 自主循环（文件监控+连续循环+健康监控）
-│   ├── agent_runtime.py       # 主运行时（工具注册/约束限额/子系统协调）
-│   ├── loop.py                # LLM 多轮主循环（时间预算/徘徊顶推/哨兵/停机如实）
-│   ├── loop_policy.py         # 循环策略（UR 退化/上下文判定）
-│   ├── agent_llm_handler.py   # LLM 调用（9 家提供商）+ 工具解析（五级兜底）
-│   ├── agent_tools.py         # 工具层（read/replace/replace_lines/run_test 等纯函数）
-│   ├── agent_core.py          # 基础类（SymbolTable/MemoryStore/ProjectGraph）
-│   ├── self_update.py         # SelfUpdateLoop：worktree 隔离→fail-closed oracle→分支/回滚
-│   ├── task_mining.py         # 任务挖掘（failing_test/todo/long_function）
-│   ├── contracts.py           # ToolResult / LLMProvider 类型契约
-│   ├── registry.py            # LazyRegistry 能力懒加载
-│   ├── paths.py / store.py    # 数据目录统一（AGENT_DATA_DIR）/ 单一 agent.db
-│   ├── config.py              # AgentConfig（agent_policy.san 热重载）
-│   ├── agent_domain.py        # 领域知识层（LLM 动态生成 + SQLite 缓存）
-│   ├── agent_rules.py         # 规则引擎（200+ 规则）
-│   ├── template_manager.py    # 模板管理器（11 个模板库） + templates/
-│   ├── ast_parser.py          # AST 解析器（精准上下文）
-│   ├── ur_monitor.py          # UR 退化检测
-│   ├── …                      # 30+ 能力插件（假设/进化/学习/协作/观测/知识层，懒加载）
-│   ├── sanyan/                # Sanyan 语言实现（Agent DSL）
-│   │   ├── agent.san          # Agent 核心逻辑（决策函数、记忆、追踪）
-│   │   ├── agent_policy.san   # 纯数据策略（配置、阈值、映射规则）
-│   │   ├── decision.san       # 决策核心（信任感知规则匹配）
-│   │   └── runtime_v2/        # V2 运行时（village_game.san / npc_game.san / …）
-│   ├── README.md / README_EN.md            # Agent 文档（中/英）
-│   ├── agent_operations.md / _en.md        # 操作手册（中/英）
-│   └── REFACTOR_PLAN.md       # 北极星路线（P0-P5 进度日志 + S0-S6 前瞻规划）
 ├── sugar/                     # 糖语法转换器
 │   ├── __init__.py
 │   ├── errors.py
@@ -228,7 +198,6 @@ sanyan/
 │   ├── test_compiler/discompiler/asm.py          # 反汇编器测试（6 项）
 │   ├── test_vm/__init__.py             # VM 字节码测试（91 项）
 │   ├── test_c_vm/__init__.py           # C VM 测试（14 项，需 gcc）
-│   ├── test_agent.py          # Agent 测试（31 项）
 │   ├── test_llvm_native.py    # LLVM 原生编译测试
 │   └── run_all.py             # 集成测试（46 项）
 ├── docs/                      # 文档
@@ -237,10 +206,5 @@ sanyan/
 │   ├── ternary-logic.md        # 三值逻辑深度解析
 │   └── package_development.md # 包开发指南
 ├── benchmark/                 # 性能基准测试
-├── ternary_agent/             # 三言 Agent（可读决策 DSL）
-│   ├── agent.san              # Agent 核心逻辑（决策函数、记忆、追踪）
-│   ├── agent_policy.san       # 纯数据策略（配置、阈值、映射规则）
-│   └── memory.json            # Agent 记忆持久化
-├── agent_system/run_agent.py               # Agent 启动器（单次/交互/热重载）
 └── csrc/dp.c                  # parse_sanyan 原生编译验证
 ```

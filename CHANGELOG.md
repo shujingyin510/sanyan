@@ -4,7 +4,16 @@
 
 ## [Unreleased]
 
-> **仓库卫生 + CLI/覆盖率修复 + 能力约束第二阶段起步 + DeepSeek V4 API 迁移 + 约束 MVP 收尾 + Agent 拆仓**（不铸新版本号——按约定避免版本通胀）。
+> **仓库卫生 + CLI/覆盖率修复 + 能力约束第二阶段起步 + DeepSeek V4 API 迁移 + 约束 MVP 收尾 + Agent 拆仓 + 拆仓扫尾 + `允许` 抑制语义 + 糖解析 AST 契约**（不铸新版本号——按约定避免版本通胀）。
+
+### 拆仓扫尾（2026-09-10）
+
+- **文档/配置不再假装 Agent 还在本仓**：`README.md` / `README_EN.md` 的「Agent 可读决策 DSL」「进化子系统」正文与 `run_agent` 用法、项目树、五层架构中 Agent/Knowledge/Evolution 行改为迁出指针；`docs/AGENTS.md` 约 200 行 Agent 章节收缩为指针；`docs/project_structure.md` 去掉 `agent_system/`/`ternary_agent/` 详细树
+- **CI/类型配置对齐拆仓**：`.coveragerc` 删除 `agent_system/*` omit；`pyproject.toml` mypy overrides 删除 `agent_system.*`
+- **历史计划归档**：`docs/PLAN_compiler_focus{,_v2,_v3}.md`、`PLAN_v3.45_compiler_focus.md`、`AGENT_HARDENING_PLAN.md`、`agent_rules.md` → `docs/archive/`（附索引 README）
+- **CLAIMS ⬛ 冲突归账**：安全检出 **100%（49/49）**、认知越界 **-16.7%** 以 `docs/research/agent_benchmark_report.md` 为权威值；旧 ROADMAP 的 98% / -11.5% 随 ROADMAP 重写已消失。迁移 baseline 冲突挂起至 Agent 解冻后在 sanyan-agent 处理
+- **roadmap**：Next 移除已落地的 PLAN 归档与本仓无关的 Agent 数据外置；补入 `允许` 抑制语义（约束线剩余唯一关键字缺口）
+- **活代码去 Agent 硬依赖**：`sanyan/cli_tui.py` 对 `agent_system` 改为 ImportError 指路；`benchmarks/honesty_bench.py` 缺校准层时 SystemExit 指向 sanyan-agent；失效基准脚本 `agent_bench.py` / `agent_full_matrix.py` / `agent_test_matrix.py` 入 `docs/archive/`；mypy exclude `docs/archive/`；ruff per-file-ignores 删死条目 `run_agent.py`
 
 ### Agent 拆仓（2026-09-10）
 - **`agent_system/` + Agent 专用测试迁至** <https://github.com/shujingyin510/sanyan-agent>（自更新线冻结）。本仓只留 `agent_system/MOVED.md` 与 `docs/AGENT_MOVED.md`。
@@ -15,6 +24,21 @@
 - **盘点翻案**：知识库 Roadmap 所列「未成」项（信封式判假·因=约束、E7 并发继承、compile_bytecode 拒约束算子、糖语法 `任务名{约束{…}}`）**代码与测试均早已落地**——本轮补验收而非新实现。S1–S4 成功判据写入 `docs/constraint.md` §8；`tests/test_capability_stack.py` + `test_capability_gates.py` **54 项全绿**（含 S2 演示、E7 并发/异步、字节码拒绝、糖语法端到端）。
 - **文档漂移修复**：`docs/ARCHITECTURE.md` / `README.md` 操作码 **52 → 65**（ISA v2）；README/ARCHITECTURE 对 `匹配3` 标注「仅 S-表达式 AST，糖语法未实现」（消除文档期货）；`ops/capability.py` 模块头 E7 注释改为已落地。
 - **roadmap**：约束收尾移入 Completed；本体 Next 不再列约束主刀。
+
+### 糖解析 AST 契约（2026-09-10）
+
+- **根因修复：`字列` 错映射**。`bytecode_compiler.san` / `_debug` 的 OP映射把 `字列`（str_to_list）标成 `DICT_KEYS`（50），导致 sugar.bin 词法分析把整段源码收成一个「标识符」字符串——正是 roadmap「sugar.bin 返回字符串」的根因。改为 `STR_TO_LIST`（55，常量本就存在），并重编 `bytecode_compiler.bin` + `sugar.bin`
+- **生产路径裸原子包成 AST**：`ops/file_ops._parse_with_python_converter` / `_parse_code` 与 `compiler/sanyanc.parse_sugar` 此前对 `42` / `"hello"` 这类单表达式返回裸原子或 None；现统一 `_as_ast_list` 包成单元素列表，锁「返回 AST 不是字符串」
+- **契约测试** `tests/test_sugar_bin_ast.py`：生产路径 never-string / 无字符串化子树 / 与 Python 结构一致；`字列` 微程序已在 VM 正确输出 `['a','b']`。sugar.bin 经 ModuleValue 导出的词法仍有缺口（多字符源可能收成单 token），用 `test_sugar_bin_vm_lex_gap` **显式记录不静默**；生产解析优先 Python Converter，不受影响
+- **文档**：sanyanc 注释不再谎称「加载 sugar.bin 解析」；roadmap 移除陈旧「返回 AST 替代字符串」条目
+
+### 能力约束 · `允许` 抑制语义（D8 豁免，2026-09-10）
+
+- **`允许(x)` 从纯透传升级为 annotate**（`ops/planned_ops.py`）：TritValue 结果挂 `tolerated=True` 元通道（`with_tolerated`，新实例防小整数单例污染）；真假不变——`许/禁` 是构造子，`允许` 是修饰子（annotate 非 map）
+- **`若` D8 关卡接上消费方**（`ops/control_ops.py`）：条件为可能且（`cond.tolerated` 或 帧级 `允许 可能`）→ **跳过诊断**；运行时仍按假 fall-through（collect-only 关卡行为不变）。用 `is_maybe()` 收敛重复判定
+- **约束子句 `允许 可能` 入帧**（`ops/constraint_ops.py` + `ops/capability.py`）：`CapFrame.tolerate_maybe`；父帧容忍则子继承，子可自开（正交轴，不参与能力单调收紧）；`允许` 宾语目前仅认 `可能`，其他 parse 期报错
+- **TritValue 元通道首次被真实消费**：`tolerated` 字段（含池键/小整数缓存排除）此前已就位，本刀接上 `允许(x)→若` 链路——`约束-方向研究` D8「已解锁的下一步」落地
+- 测试：`test_maybe_gate.py` +8（表达式豁免/帧级豁免/嵌套继承/子自开/非法宾语）；`test_planned_keywords` 允许用例改断言 `tolerated`
 
 ### 能力约束 · 第二阶段（表达力）
 - **`只许` 真封印落地**：从「塌缩成 `许`」升级为**封死上界**——`只许` 声明能力宇宙的闭集，封印后再 `许` 一个域外能力在**解析期即可判定报错**（`ops/constraint_ops.py`，区别于 `许` 的加法下界）；安全审查由此得到闭集保证而非仅下限。`tests/test_capability_stack.py` +5 项（33→38）

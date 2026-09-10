@@ -247,14 +247,22 @@ def _load_sugar_parser(evaluator):
     return _sugar_parser_module
 
 
+def _as_ast_list(ast):
+    """把 SugarConverter 结果规范成 AST 列表：裸原子（int/str/…）包成单元素列表。"""
+    if isinstance(ast, list):
+        return ast
+    if ast is None:
+        return None
+    return [ast]
+
+
 def _parse_with_python_converter(code, evaluator):
-    """使用 Python SugarConverter 解析糖语法代码（VM 解析器的可靠回退）。"""
+    """使用 Python SugarConverter 解析糖语法代码（生产主路径 / VM 解析器的可靠回退）。"""
     from sugar import SugarConverter
 
     try:
         ast = SugarConverter.convert(code, evaluator.skin_manager)
-        if isinstance(ast, list):
-            return ast
+        return _as_ast_list(ast)
     except SyntaxError:
         pass
     return None
@@ -300,8 +308,9 @@ def _parse_code(code, evaluator):
         from sugar import SugarConverter
 
         ast = SugarConverter.convert(code, evaluator.skin_manager)
-        if isinstance(ast, list):
-            return ast
+        wrapped = _as_ast_list(ast)
+        if wrapped is not None:
+            return wrapped
     except SyntaxError:
         pass
     # S-表达式检测：以 ( 或 （ 开头的代码直接用 S-表达式解析器，不走 sugar.san 自举路径
