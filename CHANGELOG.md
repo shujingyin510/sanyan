@@ -31,6 +31,13 @@
 - **测试启用 Windows**：`tests/test_self_host.py` 去掉 `skipIf(linux-only)`；Windows 用 `gcc -Os -std=c99`（MSYS2 MinGW）；差分电池 **28/28 全过**（与 Python VM 逐项一致）。**体积断言只钉 TCC**（&lt;4KB）；误给 Linux `gcc -nostdlib` 加 8KB 上限会在 CI 上爆（实测 17KB）——已撤回，gcc/MinGW CRT 不设体积死线
 - **编译命令**：Windows `gcc -Os -std=c99 sanyan_vm_seed.c -o sanyan_vm_seed.exe`；Linux 仍为 `gcc -nostdlib -Os -fno-builtin -lgcc …`
 
+### sugar.bin VM 词法缺口关闭（2026-09-10）
+
+- **真/假 字面量编译**（`bytecode_compiler.san`）：三态关键字原先落到 `PUSH_STR` 兜底，`JZ` 只认 `int>0`，字符串 `"真"` 永远是假 → 标识符循环的 `跳出` 永不执行，整段源码收成一个 token。现发 `PUSH_I` 1/-1/0（含 true/亮/有/是 等别名）
+- **嵌套循环 `跳出位置` 隔离**（`编译循环`/`遍历`）：内层 break 留在父列表时，外层回填会二次改写跳转目标（跳到函数末尾，丢掉标识符发射）。与 `继续位置` 一样 save/restore
+- **`VM._exec_frame` 隔离 stack**：原先只恢复 code/pc/vars/call_stack，栈残留导致 sugar.bin 连续两次 `解析` 结果漂移（`设 x = 42` 第二次变成别的标识符）
+- **验证**：`词法分析("a b")` → 2 token；`"设 x = 42"` → 4 token；契约测试 `test_sugar_bin_vm_lex_multi_token` 从缺口记录改为硬断言。`sugar.san` 对 else/多语句循环仍不完整（浅 AST），生产路径优先 PythonConverter，测试已诚实标注
+
 ### 糖解析 AST 契约（2026-09-10）
 
 - **根因修复：`字列` 错映射**。`bytecode_compiler.san` / `_debug` 的 OP映射把 `字列`（str_to_list）标成 `DICT_KEYS`（50），导致 sugar.bin 词法分析把整段源码收成一个「标识符」字符串——正是 roadmap「sugar.bin 返回字符串」的根因。改为 `STR_TO_LIST`（55，常量本就存在），并重编 `bytecode_compiler.bin` + `sugar.bin`

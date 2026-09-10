@@ -124,11 +124,12 @@ class TestSugarBinLoader(unittest.TestCase):
         self.assertIsNotNone(mod)
         self.assertIn('解析', mod.exports)
 
-    def test_sugar_bin_vm_lex_gap(self):
-        """已知缺口（记录，不静默）：VM 导出词法仍可能把多字符源收成单 token。
+    def test_sugar_bin_vm_lex_multi_token(self):
+        """sugar.bin VM 导出词法必须切出多 token（契约，不再是缺口记录）。
 
-        根因之一（字列→DICT_KEYS 错映射）已在 bytecode_compiler.san 修复并重编
-        sugar.bin；若本用例变绿，说明 VM 词法已对齐，可删此记录并收紧契约。
+        根因链（09-10）：① 字列→DICT_KEYS 错映射；② 真/假 被编成 PUSH_STR，
+        JZ 不认字符串为真 → 跳出 永不执行；③ 嵌套循环 跳出位置 未隔离，
+        外层回填二次改写内层 break；④ _exec_frame 不隔离 stack，跨调用污染。
         """
         root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
         bin_path = os.path.join(root, 'stdlib', 'sugar.bin')
@@ -137,14 +138,23 @@ class TestSugarBinLoader(unittest.TestCase):
         from core.evaluator import SanyanEvaluator as E
 
         temp = E(skin_manager=SkinManager('chinese'), max_loop_steps=500000)
-        r = mod.call(temp, ['词法分析', '设 x = 42'])
-        # 若已修复：应为多 token 列表；若仍缺口：单 token 且值为整段源码
-        if isinstance(r, list) and len(r) >= 3:
-            self.skipTest('sugar.bin VM 词法已对齐多 token——可删除本缺口记录')
-        # 记录现状：单 token / 整段标识符
-        self.assertIsInstance(r, list)
-        if r:
-            self.assertEqual(r[0][0], '标识符')
+        cases = {
+            'a b': 2,
+            '设 x = 42': 4,
+            'ab': 1,
+        }
+        for code, ntok in cases.items():
+            with self.subTest(code=code):
+                r = mod.call(temp, ['词法分析', code])
+                self.assertIsInstance(r, list, f'词法结果须是列表: {code!r} → {r!r}')
+                self.assertEqual(len(r), ntok, f'{code!r} 期望 {ntok} token，实得 {r!r}')
+                # 每个 token 是 [类型, 值]
+                for tok in r:
+                    self.assertIsInstance(tok, list)
+                    self.assertGreaterEqual(len(tok), 2)
+                # 多 token 时不得把整段源码收成一个标识符
+                if ntok > 1:
+                    self.assertNotEqual(r[0][1], code)
 
 
 if __name__ == '__main__':

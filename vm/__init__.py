@@ -186,30 +186,36 @@ class VM:
     def _exec_frame(self, code, start_pc, args: list | None = None) -> None:
         """在一个模块帧中执行字节码。
 
-        保存当前的 code/pc/vars/call_stack，切换到目标帧执行，
-        执行完毕后完整恢复。注意：vars 用 copy 隔离，避免内部修改
-        污染外层变量（这是 JMP 循环 + 递归 CALL 能正常工作的关键）。
+        保存当前的 code/pc/vars/call_stack/stack，切换到目标帧执行，
+        执行完毕后完整恢复。vars 用 copy 隔离；**stack 必须隔离**——否则
+        上次调用残留的栈值会污染下次（sugar.bin 解析两次结果漂移的根因）。
+        返回值留在栈顶供调用方读取。
         """
         old_code = self.code
         old_pc = self.pc
         old_vars = self.vars  # 保存外层 vars 引用
         old_call_stack = list(self.call_stack)
+        old_stack = list(self.stack)
 
         self.call_stack.clear()
+        self.stack.clear()
         self.code = code
         self.pc = start_pc
         self.vars = list(old_vars)  # 使用独立副本执行
         if args:
-            for val in args:
-                self.stack.append(val)
+            self.stack.extend(args)
 
         self._run_inner()
+        result = self.stack[-1] if self.stack else None
 
-        # 完整恢复外层状态（关键：vars 回原来的引用，不保留内部修改）
+        # 完整恢复外层状态（关键：vars/stack 回原来的引用/内容）
         self.code = old_code
         self.pc = old_pc
         self.vars = old_vars
         self.call_stack = old_call_stack
+        self.stack[:] = old_stack
+        if result is not None:
+            self.stack.append(result)
 
     # ═══════════════════════════════════════════════════════════
     # 指令读取辅助方法

@@ -30,7 +30,7 @@ OUTPUT_BIN = os.path.join(
     'self_host_output.bin',
 )
 
-REFERENCE_SHA256 = '5f3f70980b5172fe2030dbaeff60e79304e95bc51a116ead8cfb8302297b69c6'
+REFERENCE_SHA256 = 'f5bc83b9e922b096904b4ff7b23d38d89d13e91241558b307dde17cee9e130ba'
 
 # ── Level 2 自举辅助：用 .bin 编译器编译源码 ──
 

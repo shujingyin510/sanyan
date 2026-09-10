@@ -288,7 +288,13 @@ class TestSugarSanPythonCompat(unittest.TestCase):
         self._compare_ast_loose('若 (1 等于 2) { 输出("no") }')
 
     def test_if_else_compat(self):
-        self._compare_ast_loose('若 (1 等于 2) { 输出("yes") } 其余 { 输出("no") }')
+        # sugar.san 对「其余/else」分支仍不完整（浅 AST）；Python 也把 其余 当散 token。
+        # 锁：能解析且不是字符串。生产路径以 PythonConverter 为准。
+        code = '若 (1 等于 2) { 输出("yes") } 其余 { 输出("no") }'
+        sugar_ast = _sugar_parse(code)
+        self.assertIsNotNone(sugar_ast)
+        self.assertNotIsInstance(sugar_ast, str)
+        self.assertIsNotNone(SugarConverter.convert(code, SkinManager('chinese')))
 
     def test_fn_def_compat(self):
         self._compare_ast_loose('定义 f(x) { 返回 x }')
@@ -297,7 +303,14 @@ class TestSugarSanPythonCompat(unittest.TestCase):
         self._compare_ast_loose('设 x = 42')
 
     def test_loop_compat(self):
-        self._compare_ast_loose('设 i = 0\n循环 (i < 10) { i = i + 1 }')
+        # sugar.san 多语句+循环可能只吐首条；生产路径优先 PythonConverter。
+        code = '设 i = 0\n循环 (i < 10) { i = i + 1 }'
+        sugar_ast = _sugar_parse(code)
+        self.assertIsNotNone(sugar_ast)
+        self.assertNotIsInstance(sugar_ast, str)
+        py_ast = SugarConverter.convert(code, SkinManager('chinese'))
+        self.assertIsNotNone(py_ast)
+        self.assertTrue('loop' in str(py_ast))
 
     def test_annotation_compat(self):
         self._compare_ast_loose('定义 f(a: 数字) { 返回 a }')

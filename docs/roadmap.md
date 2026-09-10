@@ -16,7 +16,7 @@
 | **Constraint MVP first cut** | 能力栈默认拒绝 + `任务{约束}`（v3.58.0） |
 | **Constraint MVP closed** | 信封式判假·因=约束 + E7 并发继承 + 字节码拒约束算子 + 糖语法 `任务名{约束{…}}` + S1–S4 测试全绿（54 项） |
 | **`允许` 抑制语义** | `允许(x)` 挂 tolerated 元通道；`若(可能)` D8 关卡豁免；帧级 `允许 可能`（2026-09-10） |
-| **sugar 解析 AST 契约** | 修 `字列→DICT_KEYS` 错映射→`STR_TO_LIST`；生产路径裸原子包成 AST；`tests/test_sugar_bin_ast.py` 锁契约；VM 词法缺口显式记录 |
+| **sugar 解析 AST 契约** | 修 `字列→STR_TO_LIST`；真/假 发 PUSH_I；嵌套循环跳出隔离；`_exec_frame` 隔离 stack；VM 词法多 token 契约锁定 |
 | **Windows Level 3 C 种子** | `sanyan_vm_seed.c` 加 `_WIN32` CRT 模拟层（fread/fwrite/固定堆）；`main` 入口；差分电池 28/28 全平台 |
 | **Agent split** | `agent_system` + Agent 测试迁至 `sanyan-agent` 独立仓（2026-09-10） |
 | **拆仓扫尾** | README/AGENTS/project_structure 去 Agent 正文改指针；`.coveragerc`/mypy 去 `agent_system`；PLAN_v* 与 Agent 加固计划入 `docs/archive/`；CLAIMS 安全/越界冲突归账 |
