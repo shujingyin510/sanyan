@@ -2,9 +2,9 @@
 
 import pytest
 
-# test_deadloop.py 是手动探针脚本（import 即加载 agent.san 并真跑 LLM 死循环任务，
-# 消耗 API 额度、耗时数分钟），绝不能进 pytest 收集。用法见其文件头：python tests/test_deadloop.py
-collect_ignore = ['test_deadloop.py']
+# tests/agent/test_deadloop.py 是手动探针脚本（import 即加载 agent.san 并真跑 LLM 死循环任务，
+# 消耗 API 额度、耗时数分钟），绝不能进 pytest 收集。用法见其文件头：python tests/agent/test_deadloop.py
+collect_ignore = ['agent/test_deadloop.py']
 
 
 @pytest.fixture(autouse=True)
