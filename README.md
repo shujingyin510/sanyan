@@ -13,7 +13,15 @@
 
 ---
 
-## v3.58.0 更新摘要
+## 更新摘要
+
+### Unreleased（2026-09-10，不铸版本号）
+- **Agent 拆仓 + 扫尾**：子系统迁 [sanyan-agent](https://github.com/shujingyin510/sanyan-agent)；本仓文档/配置去 Agent 正文，历史计划入 `docs/archive/`
+- **`允许` 抑制语义**：`允许(x)` 挂 tolerated 元通道；`若(可能)` D8 关卡豁免；帧级 `允许 可能`——约束四关键字+限时闭环
+- **糖解析 AST 契约**：修 `字列` 错映射；生产路径返回 AST 不是字符串
+- **Windows Level 3 C 种子**：CRT 模拟层，差分电池 28/28 全平台
+
+详见 [CHANGELOG](CHANGELOG.md) Unreleased。
 
 ### v3.58.0 (2026-07-12)
 - **约束系统 MVP**：能力层约束 `任务 { 约束 { 许 网 } 体 }`——默认拒绝的实例级能力栈 + dispatch 咽喉强制；四关键字 `许`/`只许`/`禁`/`允许`，违规是值（判假·因=约束）走控制流不抛异常

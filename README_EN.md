@@ -13,7 +13,15 @@
 
 ---
 
-## v3.56.2 Update Summary
+## Update Summary
+
+### Unreleased (2026-09-10)
+- **Agent split**: subsystem moved to [sanyan-agent](https://github.com/shujingyin510/sanyan-agent); docs/config cleaned
+- **`allow` suppression**: `tolerated` meta-channel + D8 `if(maybe)` gate exemption; frame-level `allow maybe`
+- **Sugar AST contract**: root-cause `str_to_list` opcode mis-map fixed; production path returns AST not strings
+- **Windows Level 3 C seed**: CRT shim path; differential battery 28/28 on all platforms
+
+See [CHANGELOG](CHANGELOG.md) Unreleased.
 
 ### v3.56.2 (2026-07-09)
 - **Online Playground launched**: pure-static, zero-server, single-file page (`playground/`) running a core Sanyan subset in the browser with tri-color balanced-ternary visualization; output validated example-by-example against the Python reference evaluator → [▶ Try Online](https://shujingyin510.github.io/sanyan/playground/)
