@@ -148,11 +148,11 @@ Register virtual devices, read/write sensors with ternary values. Perfect for sm
 
 | Feature | Description |
 |---|---|
-| **52 Opcodes** | Full instruction set: arithmetic/comparison/logic/container/string/dict/control/IO |
+| **65 Opcodes** | ISA v2 full instruction set: arithmetic/comparison/logic/container/string/dict/control/IO |
 | **Self-Hosting** | `bytecode_compiler.san` compiles itself, VM output byte-identical to Python evaluator |
 | **32-bit Code Size** | Supports >64KB bytecode (old 16-bit limit was 64KB) |
 | **Standalone .bin** | sugar.bin (~10KB) and llvmgen.bin (~72KB) run independently on VM |
-| **C VM** | `csrc/runtime.c` pure C implementation, 52 instructions, no Python dependency |
+| **C VM** | `csrc/runtime.c` pure C implementation, 65 instructions, no Python dependency |
 | **C VM Tests** | `csrc/test_runtime.c` 61 unit tests covering all instructions |
 | **STM32 Firmware** | `compiler/sanyancc.py` cross-compile → `runtime_stm32.c`, Blue Pill hardware verified |
 
@@ -289,7 +289,7 @@ sanyan/
 │   ├── sanyan/                # Sanyan-side DSL (agent.san / agent_policy.san / decision.san / runtime_v2/)
 │   └── REFACTOR_PLAN.md       # North-star roadmap (P0-P5 progress log + S0-S6 forward plan)
 ├── lsp/                       # Language server protocol
-├── csrc/                      # C VM (52 instructions, with #include preprocessing)
+├── csrc/                      # C VM (65 instructions, with #include preprocessing)
 │   ├── runtime.c              # VM implementation
 │   ├── test_runtime.c         # VM unit tests (61 tests)
 │   └── dp.c                   # parse_sanyan native compile test

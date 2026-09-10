@@ -96,7 +96,7 @@ sanyan/
 │   ├── ops_gen.py             # 主编译入口（410 行）
 │   ├── ops_gen_control.py     # 控制流编译（341 行，从 ops_gen.py 拆出）
 │   ├── ops_gen_helpers.py     # 算术/容器辅助（240 行，从 ops_gen.py 拆出）
-│   ├── runtime.c              # C 运行时库（arena 分配器 + 52 操作码）
+│   ├── runtime.c              # C 运行时库（arena 分配器 + 65 操作码）
 │   └── type_mapping.py        # 类型映射与运行时函数规范
 ├── ops/                       # 内置操作实现（30 模块）
 │   ├── __init__.py
@@ -142,7 +142,7 @@ sanyan/
 │   ├── handler.py
 │   ├── keywords.py
 │   └── protocol.py
-├── csrc/                      # C 语言 VM（52 指令完整版）
+├── csrc/                      # C 语言 VM（65 指令完整版，ISA v2）
 │   ├── runtime.c              # VM 实现（支持 #include 预处理）
 │   ├── test_runtime.c         # VM 单元测试（61 项）
 │   └── dp.c                   # parse_sanyan 原生编译测试

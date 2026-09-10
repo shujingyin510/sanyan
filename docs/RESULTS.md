@@ -1,5 +1,7 @@
 # Results — UR ≈ 0.30 Degeneration Threshold
 
+> **Migrated (2026-09-10):** This content lives in the **UR repository** (<https://github.com/shujingyin510/UR>). Keep here only as a historical snapshot; do not maintain numbers in this monorepo. UR mainline is now period-spectrum (R1–R4).
+
 > All experiments run with sliding window=32, UR threshold=0.30, temperature=0.8, top-k=50.
 
 ---

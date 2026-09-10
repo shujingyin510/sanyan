@@ -527,9 +527,9 @@ sanyan/
 ├── examples/      # 示例程序（温室/传感器融合/IoT/STM32…）
 ├── tests/         # 自动测试
 ├── docs/          # 文档（手册 / 约束 / 网络 / LLVM…）
-├── agent_system/  # Agent 系统（运行时 + 自更新闭环 + Sanyan DSL）
+├── agent_system/  # Agent 系统（运行时 + 自更新闭环 + Sanyan DSL；**自更新线 2026-09-10 冻结**）
 ├── sanyan/        # 包命名空间与统一 CLI（sanyan.cli）
-└── csrc/          # C 语言 VM（52 指令）
+└── csrc/          # C 语言 VM（65 指令）
 ```
 
 > 完整逐文件结构见 **[`docs/project_structure.md`](docs/project_structure.md)**。
@@ -579,7 +579,7 @@ sanyan/
 - [x] DAP 调试适配器（v3.10.0）
 - [x] LLVM 代码生成器 + C 运行时库（v3.12.0）
 - [x] LLVM 原生编译（AOT，LLVM → 汇编 → 可执行文件）
-- [x] C 字节码 VM（52 指令完整版）
+- [x] C 字节码 VM（65 指令完整版，ISA v2）
 - [x] C VM 单元测试（61 项，覆盖全部指令集）
 - [x] 浮点支持 + 整数自动提升
 - [x] import 静态链接
