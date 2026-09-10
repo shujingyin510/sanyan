@@ -1,32 +1,53 @@
 # Roadmap
 
-## Completed
+> 本仓只维护**三言语言 / 编译器 / VM / 约束系统**工程项。  
+> 研究叙事（UR / 周期谱）真相源：独立仓库 <https://github.com/shujingyin510/UR> 与知识库 `sanyan-obsidian`。  
+> Agent 自更新线（2026-09-10）**冻结**：同模型平台期已判定，死因考古见知识库；解冻条件=换强模型或约束系统收尾后重评。
+
+## Completed（本体）
 
 | Milestone | Details |
 |-----------|---------|
 | **C VM (ISA v2)** | 16-bit LOAD/STORE, 32-bit CALL, CLOSURE, PUSH_STR16 |
 | **Level 3 Bootstrap** | 318-line C seed VM → TCC-compiled binary |
 | **Level 4 Bootstrap** | 617-line x86_64 NASM assembly VM |
-| **Sanyan → C FFI Demo** | .san → reg_op → C DLL → GPT-2 end-to-end |
-| **Agent Safety Benchmarks** | 49 bug injections, 100% detection rate (49/49) |
-| **Agent Honesty Benchmarks** | 100 questions × 5 categories, Truth Calibration -16.7% overreach (50.0%→33.3%) |
-| **Agent Evolution Runtime** | 5-layer architecture, knowledge→calibration→selection→success chain（合成模拟·机制演示，见 README 核心实验说明） |
+| **FFI M1–M5** | Python 桥 → 语法糖 → C 头生成 → ctypes+LLVM 双后端 → 安全收口 |
+| **Network envelope** | `SANYAN_NET` + 超时=可能 + SSRF 豁免（v3.57.0） |
+| **Constraint MVP first cut** | 能力栈默认拒绝 + `任务{约束}`（v3.58.0） |
+| **Playground / Pages** | 纯静态在线试玩入口 |
+| **Agent Safety / Honesty / Evolution** | 已有基准保留；数字以 `docs/CLAIMS.md` 清账为准（进化实验为合成模拟·机制演示） |
 
-> **三态门控 / 神经推理工作已迁移到独立 UR 仓库。**
-> AVX2 GEMM（66 GFLOPS）、C 算子库、TinyStories/GPT-2 推理、UR 阈值校准（0.30）、Qwen 误报率（0.4%）、人类盲评（ternary 79.7% preferred）、消融实验、统计显著性（p = 0.0287）等成果不再在本仓 ROADMAP 维护。
-> 详见 [`docs/research/ternary_gating_report.md`](research/ternary_gating_report.md) 及独立 UR 仓库 <https://github.com/shujingyin510/UR>。
+> 三态门控 / 神经推理 / UR 阈值与 R1–R4 周期谱**不在本仓维护** → <https://github.com/shujingyin510/UR>
 
 ---
 
-## Next
+## Next（本体工程）
 
 | Priority | Item | Notes |
 |----------|------|-------|
-| 🔴 | **TinyLlama-1.1B validation** | Test if UR≈0.30 holds for Llama architecture |
-| 🔴 | **Paper draft** | Ternary gating + UR threshold as main contribution |
-| 🟡 | **GGUF format support** | Quantized model loading (INT8/FP16) |
-| 🟡 | **Semantic loop detection** | Embedding-distance based detection for subtle loops |
-| 🟡 | **GPU inference** | CUDA kernels for GEMM/Attention |
-| 🟢 | **More architectures** | SmolLM, Phi, Mistral |
-| 🟢 | **Larger models** | 1B-7B range for stress-testing false positive rate |
-| 🟢 | **Streaming token-level gate** | Real-time UR check during token generation |
+| 🔴 | **约束块 MVP 收尾** | 信封式判假·因=约束 + E7 并发继承 + compile_bytecode 显式报错 + 糖语法 `任务名{约束{…}}` + S1–S4 计量 |
+| 🔴 | **文档漂移修复** | ARCHITECTURE opcode 数、README `匹配3` 期货、PLAN_v* 归档 |
+| 🟡 | **Agent 数据外置** | 19 个 `.db` 迁出源码树；双轨 evolution 收敛；安全/校准模块进覆盖率（**不扩新功能**） |
+| 🟡 | **sugar.bin 解析器** | 返回 AST 替代字符串（预存在 bug） |
+| 🟡 | **Windows Level 3 C 种子** | 当前仅 Linux/TCC |
+| 🟢 | **NASM L4 差分闭环** | 已知三缺陷待 nasm+Linux 实证 |
+| 🟢 | **类型系统编译期检查** | 当前仅运行时部分 |
+| 🟢 | **增量 LSP** | 避免大文件全量重扫 |
+
+### 中长期
+
+| Item | Notes |
+|------|-------|
+| C VM 多线程 | 性能 |
+| LLVM JIT 缓存 | 避免重复编译 |
+| 正式语言规范 RFC | 约束语义定稿后再写 |
+
+---
+
+## Frozen
+
+| Item | Reason |
+|------|--------|
+| Agent S0–S6 扩张（S1/S3/S5/S6） | 2026-09-10 冻结；见知识库 Roadmap |
+| UR / GGUF / CUDA / 论文 | 属 UR 仓 |
+| 新增 `agent_*.py` 双轨实验 | 先写知识库笔记，不进本仓 |
