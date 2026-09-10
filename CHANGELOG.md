@@ -28,7 +28,7 @@
 ### Windows Level 3 C 种子（2026-09-10）
 
 - **`csrc/sanyan_vm_seed.c` 双平台**：解释循环 `vm_run` 共用；`#ifdef _WIN32` 增加 CRT 模拟层（`fread`/`fwrite`/`fopen`/固定 256KB bump 堆映射 `SYS_brk`），`main` 替代 Linux `_start` 裸入口。Linux `-nostdlib` syscall 路径原样保留
-- **测试启用 Windows**：`tests/test_self_host.py` 去掉 `skipIf(linux-only)`；Windows 用 `gcc -Os -std=c99`（MSYS2 MinGW）；差分电池 **28/28 全过**（与 Python VM 逐项一致）；体积断言仅约束 Linux TCC/gcc 路径（CRT 链接 msvcrt 不适用 4KB 预算）
+- **测试启用 Windows**：`tests/test_self_host.py` 去掉 `skipIf(linux-only)`；Windows 用 `gcc -Os -std=c99`（MSYS2 MinGW）；差分电池 **28/28 全过**（与 Python VM 逐项一致）。**体积断言只钉 TCC**（&lt;4KB）；误给 Linux `gcc -nostdlib` 加 8KB 上限会在 CI 上爆（实测 17KB）——已撤回，gcc/MinGW CRT 不设体积死线
 - **编译命令**：Windows `gcc -Os -std=c99 sanyan_vm_seed.c -o sanyan_vm_seed.exe`；Linux 仍为 `gcc -nostdlib -Os -fno-builtin -lgcc …`
 
 ### 糖解析 AST 契约（2026-09-10）
