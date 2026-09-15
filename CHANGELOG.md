@@ -2,9 +2,21 @@
 
 ---
 
-## [Unreleased]
+## [3.59.0] — 2026-09-15
 
-> **仓库卫生 + CLI/覆盖率修复 + 能力约束第二阶段起步 + DeepSeek V4 API 迁移 + 约束 MVP 收尾 + Agent 拆仓 + 拆仓扫尾 + `允许` 抑制语义 + 糖解析 AST 契约**（不铸新版本号——按约定避免版本通胀）。
+> **内部冻结（非对外产品发布）**：约束形式语义 + 三态互操作规范 + 契约差分电池；Agent 拆仓扫尾；`允许` 抑制；糖解析 AST/词法；Windows Level 3 C 种子。
+> 完成线见 `docs/release-3.59.md` · ADR-008/009/010。
+
+### Metrics（3.59.0）
+
+| 指标 | 值 |
+|------|-----|
+| pytest core（preflight 显式清单） | 含 ternary_interop 31 + diff_battery 15 |
+| test_capability_stack | 49 |
+| C 种子差分电池 | 28/28（Python VM stdout 锚定） |
+| 形式语义 | constraint §1.5（R-S/P/Q/T/D/N/G/B + X1–X12） |
+| 三态规范 | ternary-spec §T.0–T.10 |
+| 版本 | 3.59.0（内部冻结） |
 
 ### 拆仓扫尾（2026-09-10）
 
@@ -30,6 +42,13 @@
 - **`csrc/sanyan_vm_seed.c` 双平台**：解释循环 `vm_run` 共用；`#ifdef _WIN32` 增加 CRT 模拟层（`fread`/`fwrite`/`fopen`/固定 256KB bump 堆映射 `SYS_brk`），`main` 替代 Linux `_start` 裸入口。Linux `-nostdlib` syscall 路径原样保留
 - **测试启用 Windows**：`tests/test_self_host.py` 去掉 `skipIf(linux-only)`；Windows 用 `gcc -Os -std=c99`（MSYS2 MinGW）；差分电池 **28/28 全过**（与 Python VM 逐项一致）。**体积断言只钉 TCC**（&lt;4KB）；误给 Linux `gcc -nostdlib` 加 8KB 上限会在 CI 上爆（实测 17KB）——已撤回，gcc/MinGW CRT 不设体积死线
 - **编译命令**：Windows `gcc -Os -std=c99 sanyan_vm_seed.c -o sanyan_vm_seed.exe`；Linux 仍为 `gcc -nostdlib -Os -fno-builtin -lgcc …`
+
+### v3.59 批次 4：契约差分 + 铸 3.59.0（2026-09-15）
+
+- **修假绿**：`test_ternary_interop.py` / `test_diff_battery.py` 写入 `scripts/preflight.py` 与 CI 显式清单
+- **孤儿处置**：`tests/test_differential.py`（依赖已迁 Agent）→ `docs/archive/`
+- **`tests/test_diff_battery.py`**：S-式 vs 糖契约差分 + 规范条款↔实测；fail-closed
+- **铸版本 3.59.0**：`__version__` / README 中英 / llvm / manual 标题 / constraint 状态行；CHANGELOG 结束 Unreleased
 
 ### v3.59 批次 3：三态互操作规范（2026-09-10）
 

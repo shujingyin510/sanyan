@@ -159,6 +159,8 @@ def pytest_core():
         'tests/test_coverage_boost6.py',
         'tests/test_coverage_boost7.py',
         'tests/test_math_coverage.py',
+        'tests/test_ternary_interop.py',
+        'tests/test_diff_battery.py',
     ]
     r = _run(
         [sys.executable, '-X', 'utf8', '-m', 'pytest'] + test_files + ['-q'],
@@ -392,7 +394,7 @@ def main():
 
     if not lint_only:
         print('─ Tests ─')
-        check('pytest core (20 files)', pytest_core)
+        check('pytest core', pytest_core)
         check('self_host (Level 0-3)', pytest_self_host)
         check('sugar_self_host', pytest_sugar_self_host)
         check('bin consistency', bin_consistency)

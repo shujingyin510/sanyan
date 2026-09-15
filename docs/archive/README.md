@@ -10,3 +10,4 @@
 | `agent_rules.md` | Agent 工具链规则库；随 Agent 迁出 |
 | `agent_bench.py` | Agent 安全基准驱动（原 `benchmarks/`） |
 | `agent_full_matrix.py` / `agent_test_matrix.py` | Agent 测试矩阵（原 `csrc/`） |
+| `test_differential.py` | 差分验证器测试（真身在 sanyan-agent；曾为孤儿测试） |

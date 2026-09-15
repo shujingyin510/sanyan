@@ -1,6 +1,6 @@
 # 三言 v3.59 — 内部冻结完成线
 
-> 状态：进行中（批次 1/4）  
+> 状态：**完成（v3.59.0，2026-09-15）**  
 > 性质：**内部技术资产冻结**，非对外产品发布  
 > 决策：[ADR-009](adr/009-Release-359-Scope.md) · [ADR-008](adr/008-Bootstrap-Not-Production.md) · [ADR-010](adr/010-Trinary-Interop-Boundary.md)
 
@@ -18,8 +18,8 @@
 |---|------|--------|------|
 | 1 | 约束语义规格化 | `docs/constraint.md` 形式语义（作用域/组合/冲突/违规值/限时/允许）+ 正反边界测试 | **done** |
 | 2 | 三态互操作规范 | `docs/ternary-spec.md` + `tests/test_ternary_interop.py` | **done** |
-| 3 | 差分电池覆盖关键判定 | 不仅 stdout：约束判定、错误类别、三态值、信封「因」 | 批次 4 |
-| 4 | 文档与版本冻结 | 本文件终稿 + CHANGELOG 铸 3.59 + 版本号一致 | 批次 4 |
+| 3 | 差分电池覆盖关键判定 | `test_diff_battery.py`：S-式 vs 糖 + 规范条款↔实测 | **done** |
+| 4 | 文档与版本冻结 | 3.59.0 已铸；CHANGELOG 结束 Unreleased | **done** |
 
 **非成功标准（3.59 不看）**：用户、下载、论文、Agent 解冻、性能榜、商业指标。
 

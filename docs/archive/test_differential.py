@@ -1,3 +1,6 @@
+# 【归档】差分验证器测试。真身 DifferentialVerifier 在 sanyan-agent；
+# 本文件曾因不在显式 pytest 清单而未被跑（孤儿）。归档以避免 pytest tests/ 踩雷。
+
 """差分验证器（P2 oracle 前置修复）：fail-closed + 真差分 + 代码走文件。
 
 旧版三雷（见 REFACTOR_PLAN 2026-07-01）：代码当 CLI 参数传给只吃文件路径的 main.py
