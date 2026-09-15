@@ -27,30 +27,35 @@
 
 ---
 
-## Next（本体工程）
+## Next — 唯一主线：v3.59 内部冻结
 
-| Priority | Item | Notes |
-|----------|------|-------|
-| 🟢 | **NASM L4 差分闭环** | 已知三缺陷待 nasm+Linux 实证 |
-| 🟢 | **类型系统编译期检查** | 当前仅运行时部分 |
-| 🟢 | **增量 LSP** | 避免大文件全量重扫 |
-| ⚪ | ~~文档漂移（opcode/匹配3/PLAN 归档）~~ | **本轮完成**（2026-09-10） |
-| ⚪ | ~~Agent 数据外置 / 双轨收敛~~ | **不在本仓** → sanyan-agent；自更新线冻结 |
+完成线与冻结清单 → [`release-3.59.md`](release-3.59.md) · 决策 → [`adr/009-Release-359-Scope.md`](adr/009-Release-359-Scope.md)
 
-### 中长期
+| Batch | Goal | Status |
+|-------|------|--------|
+| 1 | 定义完成线 + 冻结清单 + ADR-008/009/010 | **done** |
+| 2 | 约束语义规格化 + 正反边界测试 | pending |
+| 3 | 三态互操作规范 + 矩阵测试 | pending |
+| 4 | 差分扩展（约束/错误/三态/因）+ CI + 铸 3.59 | pending |
+
+### 3.59 之后再选（现在并行=违例）
 
 | Item | Notes |
 |------|-------|
-| C VM 多线程 | 性能 |
-| LLVM JIT 缓存 | 避免重复编译 |
-| 正式语言规范 RFC | 约束语义定稿后再写 |
+| 类型系统编译期检查 | 当前仅运行时 |
+| sugar.san `解析` else/多语句循环 | 浅 AST；生产 Python 兜底 |
+| 增量 LSP | 避免大文件全量重扫 |
+| NASM L4 差分闭环 | 需 nasm+Linux |
+| C VM 多线程 / LLVM JIT 缓存 / 语言规范 RFC | 中长期 |
 
 ---
 
-## Frozen
+## Frozen / 暂停（3.59 内）
 
 | Item | Reason |
 |------|--------|
-| Agent S0–S6 扩张（S1/S3/S5/S6） | 2026-09-10 冻结；见知识库 Roadmap |
-| UR / GGUF / CUDA / 论文 | 属 UR 仓 |
-| 新增 `agent_*.py` 双轨实验 | 先写知识库笔记，不进本仓 |
+| UR / 论文 / GGUF / CUDA | 属 UR 仓 |
+| Agent S0–S6 扩张 / 双轨实验 | sanyan-agent；自更新冻结 |
+| 自举链升生产路径 | [ADR-008](adr/008-Bootstrap-Not-Production.md) |
+| 对外发布 / 用户指标 / 商业化 | 兴趣线；无需求 |
+| 三态条件运行时语义变更 | [ADR-010](adr/010-Trinary-Interop-Boundary.md)；批次 3 只规格化 |

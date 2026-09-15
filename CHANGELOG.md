@@ -31,6 +31,14 @@
 - **测试启用 Windows**：`tests/test_self_host.py` 去掉 `skipIf(linux-only)`；Windows 用 `gcc -Os -std=c99`（MSYS2 MinGW）；差分电池 **28/28 全过**（与 Python VM 逐项一致）。**体积断言只钉 TCC**（&lt;4KB）；误给 Linux `gcc -nostdlib` 加 8KB 上限会在 CI 上爆（实测 17KB）——已撤回，gcc/MinGW CRT 不设体积死线
 - **编译命令**：Windows `gcc -Os -std=c99 sanyan_vm_seed.c -o sanyan_vm_seed.exe`；Linux 仍为 `gcc -nostdlib -Os -fno-builtin -lgcc …`
 
+### v3.59 主线立项（2026-09-10）
+
+- **唯一主线**：本体内部冻结——三态+约束+自举差分规格化/测试/审计/版本冻结（非对外发布）
+- **`docs/release-3.59.md`**：DoD、IN/OUT、冻结清单、四批次验收
+- **ADR-008** 自举不升生产 · **ADR-009** 3.59 范围 · **ADR-010** 三态互操作默认
+- **暂停**：UR/论文、Agent 解冻、NASM L4、类型编译期、增量 LSP、发布/指标/商业化
+- roadmap Next 改为批次表；批次 1 完成
+
 ### sugar.bin VM 词法缺口关闭（2026-09-10）
 
 - **真/假 字面量编译**（`bytecode_compiler.san`）：三态关键字原先落到 `PUSH_STR` 兜底，`JZ` 只认 `int>0`，字符串 `"真"` 永远是假 → 标识符循环的 `跳出` 永不执行，整段源码收成一个 token。现发 `PUSH_I` 1/-1/0（含 true/亮/有/是 等别名）
