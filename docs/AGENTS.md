@@ -39,42 +39,6 @@ ruff check . && ruff format --check . && mypy . && python -X utf8 scripts/prefli
 
 ---
 
-## 🧭 规划咨询门（制定下一步计划前必须咨询本地规划顾问）
-
-在**开始一个新批次 / 新任务 / 制定下一步计划**之前，必须先向本地规划顾问（DSH 会话，端口 `127.0.0.1:8790`）咨询，得到答复后再开工。
-
-**咨询是异步的**——顾问可能正忙，要等它开始新一轮回答才会给出建议，所以**不要把命令长时间挂着**。**首选 Python 客户端**（本仓本就要求 Python ≥ 3.12；`powershell` 未必在 PATH 中，Windows 上常只有 `pwsh`）：
-
-```bash
-# 提交并等待（默认最多 300 秒，每 30 秒打印一次进度，不会卡死）
-python -X utf8 scripts/ask_planner.py "我计划做 X（文件清单/步骤/验收）；当前状态 Y；请给下一步建议"
-
-# 只提交：立刻拿到 consultId
-python -X utf8 scripts/ask_planner.py --no-wait "……"
-
-# 稍后按 consultId 取答复
-python -X utf8 scripts/ask_planner.py --query <consultId>
-```
-
-PowerShell 等价入口（用 `pwsh`；若只有 Windows PowerShell 则换成 `powershell`）：
-
-```powershell
-pwsh -NoProfile -ExecutionPolicy Bypass -File scripts/ask_planner.ps1 "……"
-pwsh -NoProfile -ExecutionPolicy Bypass -File scripts/ask_planner.ps1 "……" -NoWait
-pwsh -NoProfile -ExecutionPolicy Bypass -File scripts/ask_planner.ps1 -Query <consultId>
-```
-
-规则：
-
-1. 咨询内容必须包含：计划要做什么、涉及哪些文件、怎么验收、当前进展与阻塞。
-2. 若选了 `-NoWait` 或暂未拿到答复：**先做与计划无关的准备工作**（读文档、跑测试、备补丁），稍后用 `-Query` 取答复；拿到答复后再进入计划执行。
-3. **只在顾问可验证时采纳其意见**：脚本已内置两步校验——本地令牌（`~/.dsh-planner-token` 或 `DSH_PLANNER_TOKEN`）+ `GET /health` 必须回 `planner=dsh-local`。令牌缺失、桥不可达、或 8790 上不是规划顾问时，脚本会打印提示并**正常退出**，此时**按原计划继续**，不要试图绕过校验（如手动 curl 8790）。
-4. 顾问提出修改/反对意见时，按顾问意见调整计划；顾问答复与仓规（尤其提交/推送规则）冲突时，以仓规为准。
-5. **本门禁不携带任何密钥**：脚本只有 `127.0.0.1:8790` 这个地址；令牌与桥的服务端都在仓库之外（勿把 `_dsh_consult/` 或令牌文件拷进本仓）。
-6. 桥不可用时重试一次；仍失败则按原计划继续，并在回复中注明“规划顾问不可用，已按原计划继续”。
-
----
-
 ## 汇编器（Agent 写字节码用）
 
 > **重要**：汇编器允许 Agent 直接写 Sanyan 字节码程序。语法和陷阱见 → [`docs/asm_guide.md`](asm_guide.md)
