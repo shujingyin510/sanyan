@@ -31,6 +31,12 @@
 - **测试启用 Windows**：`tests/test_self_host.py` 去掉 `skipIf(linux-only)`；Windows 用 `gcc -Os -std=c99`（MSYS2 MinGW）；差分电池 **28/28 全过**（与 Python VM 逐项一致）。**体积断言只钉 TCC**（&lt;4KB）；误给 Linux `gcc -nostdlib` 加 8KB 上限会在 CI 上爆（实测 17KB）——已撤回，gcc/MinGW CRT 不设体积死线
 - **编译命令**：Windows `gcc -Os -std=c99 sanyan_vm_seed.c -o sanyan_vm_seed.exe`；Linux 仍为 `gcc -nostdlib -Os -fno-builtin -lgcc …`
 
+### v3.59 批次 3：三态互操作规范（2026-09-10）
+
+- **`docs/ternary-spec.md`**：§T.0–T.10 规范条款（3.59 冻结）。**如实冻结多位数位级语义**：`且(5,3)=-4`、`或(5,3)=+12`、`非(5)=-5`（≠ 整数 min/max）；`0.0` 不是可能；异常与三态正交；`TernaryEngine` 标为 Agent 遗留、不在范围
+- **`tests/test_ternary_interop.py`**：31 项矩阵（真值表/位级锚点/置信度/条件三路/D8/异常正交/is_maybe）全绿
+- `ternary-logic.md` 顶部指路规范；宣导文与规范分区
+
 ### v3.59 批次 2：约束语义规格化（2026-09-10）
 
 - **`docs/constraint.md` §1.5 形式语义**：状态四元组 ⟨A,D,δ,τ⟩（sealed 为解析期构造量，不进运行时帧）；规则编号 R-S/P/Q/T/D/N/G/B；冲突判定表 X1–X12；规则↔测试对照表

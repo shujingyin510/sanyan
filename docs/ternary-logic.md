@@ -1,5 +1,8 @@
 # 三值逻辑深度解析
 
+> **规范条款（3.59 冻结）** → [`ternary-spec.md`](ternary-spec.md)  
+> 本文为宣导/案例文，非规范。
+
 
 Every real-world system encounters uncertainty. Binary logic (true/false) cannot express it; you either force a choice or build workarounds. Sanyan's three-valued logic (true / maybe / false) follows Kleene strong logic — `maybe` propagates correctly through any expression.
 
