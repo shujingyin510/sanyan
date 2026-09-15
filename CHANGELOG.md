@@ -31,6 +31,12 @@
 - **测试启用 Windows**：`tests/test_self_host.py` 去掉 `skipIf(linux-only)`；Windows 用 `gcc -Os -std=c99`（MSYS2 MinGW）；差分电池 **28/28 全过**（与 Python VM 逐项一致）。**体积断言只钉 TCC**（&lt;4KB）；误给 Linux `gcc -nostdlib` 加 8KB 上限会在 CI 上爆（实测 17KB）——已撤回，gcc/MinGW CRT 不设体积死线
 - **编译命令**：Windows `gcc -Os -std=c99 sanyan_vm_seed.c -o sanyan_vm_seed.exe`；Linux 仍为 `gcc -nostdlib -Os -fno-builtin -lgcc …`
 
+### v3.59 批次 2：约束语义规格化（2026-09-10）
+
+- **`docs/constraint.md` §1.5 形式语义**：状态四元组 ⟨A,D,δ,τ⟩（sealed 为解析期构造量，不进运行时帧）；规则编号 R-S/P/Q/T/D/N/G/B；冲突判定表 X1–X12；规则↔测试对照表
+- **边界测试补齐**：X6 `只许X;禁Y∉X`、X7 重复`许`幂等、X8 重复`限时`取 min、R-N5 非约束异常仍弹帧；`test_capability_stack` **49 项全绿**
+- **顾问纠正已采纳**：不把 sealed 写进运行时状态，避免扩语义
+
 ### v3.59 主线立项（2026-09-10）
 
 - **唯一主线**：本体内部冻结——三态+约束+自举差分规格化/测试/审计/版本冻结（非对外发布）

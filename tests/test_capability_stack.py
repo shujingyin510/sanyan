@@ -87,6 +87,15 @@ def test_deny_overrides_seal():
     assert r.to_int() == -1
 
 
+def test_seal_deny_outside_seal_no_extra_effect():
+    """X6 / R-P2+R-P3：只许 X; 禁 Y(Y∉X) —— 禁对域外能力无额外效果，域内仍可禁。"""
+    # Y∉sealed：禁 盘读 在只许 网 的帧内合法；网 仍被封印允许
+    r = ev().eval(['任务', '"t"', ['约束', ['只许', '网'], ['禁', '盘读']], ['能否', '网']])
+    assert r.to_int() == 1
+    r2 = ev().eval(['任务', '"t"', ['约束', ['只许', '网'], ['禁', '盘读']], ['能否', '盘读']])
+    assert r2.to_int() == -1  # 本就不在封印域
+
+
 def test_grant_stays_additive_without_seal():
     # 无封印时 许 仍是加法：许 网 + 许 盘读 两者都放行（确认封印不误伤普通 许）
     r1 = ev().eval(['任务', '"t"', ['约束', ['许', '网'], ['许', '盘读']], ['能否', '网']])
@@ -95,6 +104,12 @@ def test_grant_stays_additive_without_seal():
 
 
 # ── 限时：看门狗（超预算 → 判假·因=超时）──
+
+
+def test_duplicate_grant_idempotent():
+    """X7 / R-P1：重复 许 X 幂等（集合并）。"""
+    r = ev().eval(['任务', '"t"', ['约束', ['许', '网'], ['许', '网']], ['能否', '网']])
+    assert r.to_int() == 1
 
 
 def _ev_big():
@@ -136,6 +151,23 @@ def test_timebox_nested_inner_tighter():
 def test_timebox_parse_missing_arg():
     with pytest.raises(SanyanSyntaxError):
         ev().eval(['任务', '"t"', ['约束', ['限时']], ['设', 'x', 1]])
+
+
+def test_duplicate_timebox_takes_min():
+    """X8 / R-P5：重复 限时 取 min（更紧预算）。"""
+    # 两个限时：0.05 与 30 → 取 0.05；循环应按更紧死线超时
+    # 用 _ev_big：默认 max_loop_steps 可能先于墙钟触发
+    with pytest.raises(SanyanConstraintDenied) as ei:
+        _ev_big().eval(
+            [
+                '任务',
+                '"t"',
+                ['约束', ['限时', 0.05], ['限时', 30]],
+                ['设', 'i', TritValue(0)],
+                ['循环', ['lt', 'i', TritValue(10**7)], ['do', ['set', 'i', ['add', 'i', TritValue(1)]]]],
+            ]
+        )
+    assert ei.value.reason == '超时'
 
 
 def test_timebox_parse_non_positive():
@@ -181,6 +213,15 @@ def test_frame_popped_after_denial():
 
 
 # ── 单调嵌套：子块只能收紧 ──
+
+
+def test_frame_popped_after_non_constraint_exception():
+    """R-N5：求值中抛非约束异常（如除零）仍弹帧，不污染外层能力。"""
+    e = ev()
+    with pytest.raises(Exception):
+        e.eval(['任务', '"t"', ['约束', ['禁', '网']], ['div', TritValue(1), TritValue(0)]])
+    # 帧应已弹：无帧 → 能否 网 = 真
+    assert e.eval(['能否', '网']).to_int() == 1
 
 
 def test_nested_monotonic_intersect():

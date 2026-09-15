@@ -35,6 +35,114 @@
 
 ---
 
+## 1.5 形式语义（规范条款 · 3.59）
+
+> 陈述式、可判定；**只写实现已支撑的**。设计全文见知识库 `约束-方向研究`。
+
+### §F.0 记号与域
+
+- 能力类集合 `CAP = {网, 盘读, 盘写, 进程, 外链}`（封闭集）。
+- 真值域 `{真, 假, 可能}`；权限判定**永不**产出 `可能`（分层律）。
+- 帧记法：`F = ⟨A, D, δ, τ⟩`；无帧记 `⊤`。
+
+### §F.1 状态定义
+
+- **运行时帧**（四元组，`CapFrame`）：
+  - `A ⊆ CAP`：许可集（`许` 下界，或 `只许` 封印后的闭集）
+  - `D ⊆ CAP`：禁止集（`禁`，不可逆）
+  - `δ ∈ ℝ⁺ ∪ {None}`：墙钟绝对死线；`None` = 无限
+  - `τ ∈ {⊥, ⊤}`：容忍轴（`允许 可能`）；影响 D8 诊断，**不**改 `permits`
+- **无帧 `⊤`**：零检查，一切效果类算子放行（`R-S4`）。
+- **判定**：`permits(c) ≜ c ∉ D ∧ c ∈ A`（空 `约束{}` ⇒ `A = D = ∅`，五类全假，`R-S2`）。
+- **纯计算**：`cap_of(op) = None` 的算子不参与判定，恒通（`R-S3`）。
+- **`sealed` 是解析期构造量，不进运行时帧**：`只许` 在解析阶段形成闭集并拦截域外 `许`（`R-P4`）。
+
+### §F.2 五关键字推理规则（声明 → 状态）
+
+| 规则 | 声明 | 时机 | 转换 / 效果 |
+|------|------|------|-------------|
+| **R-P1** | `许 X`（无封印） | parse | `A := A ∪ X`（加法下界） |
+| **R-P2** | `只许 X`（可多条） | parse | `sealed := sealed ∪ X`；最终 `A := sealed`（封死上界） |
+| **R-P3** | `禁 X` | parse | `D := D ∪ X`（`禁` > `许`，不可逆） |
+| **R-P4** | 封印后 `许 X` 且 `X ⊄ sealed` | parse | **违规** `SanyanValueError`（可判定，不进运行时） |
+| **R-P5** | `限时 n` | parse | `δ₀ := min(已有, n)`；`n > 0` 为数字，否则 parse 报错 |
+| **R-P6** | `允许 可能` | parse | `τ := ⊤`；宾语 ≠ `可能` 则 parse 报错 |
+| **R-Q1** | `能否(c)` | eval | 恒 `真/假`：`真 ⟺ permits(c)`；无帧 `⊤` ⇒ `真` |
+| **R-T1** | `限时` 挂点 | eval | 看门狗挂在**循环/遍历/尾递归**迭代点；**直线代码不拦** |
+| **R-T2** | 超 `δ` | eval | 抛 `SanyanConstraintDenied`，`因=超时`，判=假，退帧 |
+| **R-D1** | 直取式效果算子被禁 | eval | 抛 `SanyanConstraintDenied`（如 `约束禁止: 盘读(存在)`） |
+| **R-D2** | 信封式效果算子被禁 | eval | **不抛**；返回信封 `判=假, 因=约束` |
+| **R-D3** | `因` 枚举 | eval | `约束\|门控\|超时\|远端\|传输`（封闭）；约束/门控/超预算失败恒为假 |
+
+### §F.3 嵌套继承公式（只紧不松）
+
+设父帧 `F_p = ⟨A_p, D_p, δ_p, τ_p⟩`，子声明导出 `⟨A_c⁰, D_c⁰, δ_c⁰, τ_c⁰⟩`，压入子帧：
+
+- **R-N1** `A := A_c⁰ ∩ A_p`（allowed 求交）
+- **R-N2** `D := D_c⁰ ∪ D_p`（禁累加，不可回授）
+- **R-N3** `δ := min(δ_c⁰, δ_p)`（无则取有；皆有取更早）
+- **R-N4** `τ := τ_c⁰ ∨ τ_p`（父容忍则子继承；子可自开）
+- **R-N5** **退出必弹帧**（`finally`；含约束拒绝与任意异常路径）
+- **R-N6** **spawn 快照继承**：`并发`/`异步`/`并行块` 在 spawn 时 `capture_stack` → 子 `install_stack`；线程不是逃逸口
+
+### §F.4 冲突判定表
+
+| 编号 | 子句组合 | 时机 | 判定 | 结果 | 测试 |
+|------|----------|------|------|------|------|
+| X1 | `许 X` 且 X ⊄ sealed（有 `只许`） | parse | 违规 | `SanyanValueError` | `test_seal_rejects_widening` |
+| X2 | `许 X` 且 X ⊆ sealed（冗余） | parse | 合法 | 无额外效果 | `test_seal_allows_redundant_grant` |
+| X3 | 多个 `只许` | parse | 合法 | `sealed` 取并 | `test_seal_multiple_caps` |
+| X4 | `许 X; 禁 X` | eval | 合法 | `permits=假`（禁胜） | `test_deny_overrides_grant` |
+| X5 | `只许 X; 禁 X` | eval | 合法 | `permits=假` | `test_deny_overrides_seal` |
+| X6 | `只许 X; 禁 Y`(Y∉X) | eval | 合法 | 禁对域外无额外效果 | `test_seal_deny_outside_seal_no_extra_effect` |
+| X7 | 重复 `许 X` | parse | 合法 | 幂等（并集） | `test_duplicate_grant_idempotent` |
+| X8 | 重复 `限时 n` | parse | 合法 | 取 `min` | `test_duplicate_timebox_takes_min` |
+| X9 | `允许 可能` + 能力子句 | eval | 合法 | 正交，互不影响 `permits` | `test_constraint_allow_maybe_frame_skips_diagnostic` |
+| X10 | `允许 X`（X ≠ `可能`） | parse | 违规 | 报错 | `test_constraint_allow_rejects_non_maybe` |
+| X11 | 未知能力类 / 未知关键字 | parse | 违规 | 报错 | `test_unknown_cap_class_rejected` |
+| X12 | 空 `约束{}` | eval | 合法 | `A=D=∅`，五类假、纯计算通 | `test_empty_constraint_denies_effects` |
+
+### §F.5 违规值表示
+
+- 直取式：抛 `SanyanConstraintDenied`（`R-D1`），可 `尝试/捕获`。
+- 信封式：`(判=假, 因=约束)`，程序走否则/缓存分支（`R-D2`）。
+- 超时：`(判=假, 因=超时)` 或抛（`R-T2`）；与「世界没回答→可能·因=超时」正交（见 §3）。
+- 门控：`(判=假, 因=门控)`，区别于约束（`R-D3`）。
+
+### §F.6 分层律与容忍轴
+
+- **R-G1** 值层裸 `许/禁/只许/允许` **不改**能力集；唯一入口是 `约束{}`（`R-G1` → `test_bare_value_ops_dont_touch_capset`）。
+- **R-G2** 表达式 `允许(x)`：透传真假 + `tolerated` 元通道；消费方为 D8 `若(可能)`。
+- **R-G3** 块内 `允许 可能`：`τ=⊤`，块内 `若(可能)` **不收集诊断**；运行时仍假 fall-through。
+
+### §F.7 规则 ↔ 测试对照
+
+| 规则 | 测试 |
+|------|------|
+| R-S2 | `test_empty_constraint_denies_effects` |
+| R-S3 | `test_pure_compute_always_allowed_in_block` |
+| R-S4 | `test_no_frame_everything_permitted` |
+| R-P1 | `test_grant_stays_additive_without_seal` / `test_grant_allows_named_class` |
+| R-P3 | `test_deny_overrides_grant` |
+| R-P4 | `test_seal_rejects_widening` / `test_seal_allows_redundant_grant` |
+| R-P5 | `test_timebox_parse_missing_arg` / `_non_positive` / `_non_number` |
+| R-P6 | `test_constraint_allow_rejects_non_maybe` |
+| R-Q1 | `test_grant_allows_named_class`（能否真）/ `test_grant_leaves_others_denied`（能否假） |
+| R-T1–T2 | `test_timebox_not_exceeded_completes` / `test_timebox_exceeded_raises_timeout` / `test_timebox_pops_frame_on_timeout` |
+| R-N1–N3 | `test_nested_monotonic_intersect` / `test_nested_cannot_regrant_parent_denied` / `test_timebox_nested_inner_tighter` |
+| R-N4 | `test_nested_frame_inherits_tolerate` / `test_child_can_open_tolerate_without_parent` |
+| R-N5 | `test_frame_popped_after_task` / `_after_denial` |
+| R-N6 | `test_e7_concurrent_worker_inherits_deny` / `test_e7_async_inherits_deny_at_spawn` / `test_e7_no_frame_concurrent_unaffected` |
+| R-D1–D3 | `test_denied_effect_op_raises` / `test_envelope_op_denied_returns_envelope_not_raise` / `test_reason_distinguishes_constraint_from_gate` / `test_ffi_*` |
+| R-G1 | `test_bare_value_ops_dont_touch_capset` |
+| R-G2–G3 | `test_allow_expression_*` / `test_constraint_allow_maybe_frame_skips_diagnostic` |
+| R-B1 | `test_bytecode_rejects_constraint_ops` / `test_sugar_ast_matches_sexpr` |
+| S1–S4 成功判据 | 见 §成功判据 |
+
+**Step2 已补（2026-09-10）**：X6/X7/X8 与 `R-N5` 非约束异常弹帧（`test_frame_popped_after_non_constraint_exception`）。
+
+---
+
 ## 2 四关键字
 
 ```
